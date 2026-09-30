@@ -1975,7 +1975,7 @@ export default function App() {
     setNotification({ text: `Synthesizing ${batchSize} examples. Please wait...`, type: "info" });
     
     try {
-      // Keep the selected batch intact; the API server schedules its five-model stacks.
+      // Keep the selected batch intact; the API server schedules concurrent ten-model waves.
       const clientChunkSize = batchSize;
       const subChunkCounts: number[] = [];
       let remaining = batchSize;
@@ -4995,7 +4995,7 @@ export default function App() {
                         </button>
 
                         {/* Sizes unlocked only once approved */}
-                        {[10, 25, 50, 200, 250].map((size) => {
+                        {[10, 25, 50, 100, 200, 250].map((size) => {
                           const isGreyedOutInGuestMode = !currentUser && (size === 200 || size === 250);
                           const isDisabled = !isScalingUnlocked || isGreyedOutInGuestMode;
                           return (

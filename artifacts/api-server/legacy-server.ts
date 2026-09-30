@@ -1031,6 +1031,7 @@ const DEFAULT_GENERATION_MODEL_GROUPS = [
     "nemotron-3-nano-omni",
   ],
 ];
+const SUPPORTED_GENERATION_BATCH_SIZES = [5, 10, 25, 50, 100, 200, 250] as const;
 
 function getGenerationModels(): string[] {
   return DEFAULT_GENERATION_MODEL_GROUPS.flat().map((model) => normalizeModel(model));
@@ -1056,14 +1057,14 @@ function createModelGenerationStacks(
   }
   if (totalExamples === 50) return repeat(5, allModels);
   if (totalExamples === 100) return repeat(10, allModels);
+  const duplicatedModels = [...allModels, ...allModels];
   if (totalExamples === 200) {
-    const duplicatedModels = [...allModels, ...allModels];
     return repeat(10, duplicatedModels);
   }
   if (totalExamples === 250) {
     return [
-      ...repeat(10, allModels, 2),
-      ...repeat(5, allModels, 1),
+      ...repeat(12, duplicatedModels),
+      assign(allModels),
     ];
   }
 
@@ -1968,7 +1969,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       try {
         const topUpStacks = createModelGenerationStacks(missingCount, generationModels);
         for (let stackIndex = 0; stackIndex < topUpStacks.length; stackIndex++) {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+          if (stackIndex > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
           const results = await Promise.allSettled(
             topUpStacks[stackIndex].map(async (assignment, modelIndex) => {
               const reasoningTopUpFormat = turnMode !== "Reasoning"
