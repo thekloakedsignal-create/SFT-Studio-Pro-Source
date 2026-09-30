@@ -1347,8 +1347,11 @@ app.post("/api/generate", async (req, res) => {
       "Single Turn";
     const reasoningFormatInstruction = `
 REASONING TEMPLATE FORMAT:
-- In every example in this Reasoning batch, the assistant "content" must start with <think>, contain a non-empty reasoning trace, close with </think>, and then give the final answer.
-- Required shape: "<think>\n[Reasoning trace]\n</think>\n[Final answer]".
+- In every example in this Reasoning batch, the assistant "content" must start with <think>, contain a non-empty, concise explanation of the key reasoning steps, close with </think>, and then give the final answer.
+- Required shape: "<think>\n[Concise explanation of the key reasoning steps]\n</think>\n[Final answer]".
+- Formatting example:
+{"messages":[{"role":"user","content":"What is 2 + 3?"},{"role":"assistant","content":"<think>\nI add 2 and 3 to get 5.\n</think>\nThe answer is 5."}]}
+- Use this only as a formatting example; create new content for the requested task and persona.
 - Never omit either tag, put the final answer inside the tags, or use the format for any template other than Reasoning.
 - Do not emit a separate "reasoning" or "reasoning_content" property.
 - Keep the selected template's message roles and any required instruction markers.
@@ -1585,11 +1588,10 @@ REASONING TEMPLATE FORMAT:
         Your task is to generate exactly ${currentChunkSize} high-quality, diverse SFT training examples (model stack ${c + 1} of ${generationStacks.length}).
 
         ${turnMode === "Reasoning" ? `
-        CRITICAL MANDATE — FIRST-PERSON TRAINEE CHAIN OF THOUGHT:
-        We are building training data so models in training learn step-by-step reasoning and chain of thought.
-        - In all reasoning examples, you MUST write the thinking traces in the FIRST PERSON as the trainee model working through the problem (e.g., "The user is asking... Let me first analyze... If I calculate... Wait, let me double check... Therefore...").
-        - The thinking trace must strictly demonstrate the trainee's authentic chain of thought to arrive at the response.
-        - ABSOLUTELY NO META REASONING FROM THE GENERATOR: Never mention generating dataset examples, prompt writing, fine-tuning, or synthesizer goals. Only the trainee solving the prompt.
+        CRITICAL MANDATE — REASONING EXPLANATION:
+        - In every Reasoning example, include a concise, clear explanation of the key steps and checks that support the final answer, written from the trainee assistant's perspective.
+        - Place that explanation inside the required <think>...</think> block, then put the final answer after </think>.
+        - Do not omit the explanation or either tag. Do not include meta commentary about generating dataset examples, prompt writing, or fine-tuning.
         ` : turnMode === "Mixed" ? `
         CRITICAL SCOPE RULE FOR CHAIN OF THOUGHT:
         Chain of thought is for reasoning examples ONLY.
@@ -1684,7 +1686,7 @@ REASONING TEMPLATE FORMAT:
         {
           "messages": [
             {"role": "user", "content": "### Instruction:\n[User instruction/question]"},
-            {"role": "assistant", "content": "### Response:\n<think>\n[Trainee's internal step-by-step chain of thought solving the problem]\n</think>\n[Final answer]"}
+            {"role": "assistant", "content": "### Response:\n<think>\n[Concise explanation of the key reasoning steps]\n</think>\n[Final answer]"}
           ]
         }
         ` : `
@@ -1738,7 +1740,7 @@ REASONING TEMPLATE FORMAT:
         {
           "messages": [
             {"role": "user", "content": "[INST] [User instruction] [/INST]"},
-            {"role": "assistant", "content": "<think>\n[Trainee's internal step-by-step chain of thought solving the problem]\n</think>\n[Final answer]"}
+            {"role": "assistant", "content": "<think>\n[Concise explanation of the key reasoning steps]\n</think>\n[Final answer]"}
           ]
         }
         ` : `
@@ -1806,7 +1808,7 @@ REASONING TEMPLATE FORMAT:
         {
           "messages": [
             {"role": "user", "content": "[Direct, clear user query or prompt]"},
-            {"role": "assistant", "content": "<think>\n[Trainee's internal step-by-step chain of thought solving the problem]\n</think>\n[Final answer]"}
+            {"role": "assistant", "content": "<think>\n[Concise explanation of the key reasoning steps]\n</think>\n[Final answer]"}
           ]
         }
         ` : `
@@ -1880,12 +1882,10 @@ REASONING TEMPLATE FORMAT:
             systemInstruction: turnMode === "Reasoning"
               ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
 
-MANDATORY CHAIN-OF-THOUGHT DIRECTIVE (REASONING EXAMPLES ONLY):
-We want the models in training to learn reasoning chain of thought in the reasoning examples ONLY.
-You MUST write all thinking traces in the FIRST PERSON from the perspective of the trainee model working through the prompt (e.g., "The user is asking for... Let me first check... I need to verify... Therefore, the answer is...").
-- The reasoning trace must ALWAYS demonstrate the internal chain of thought the trainee will use to arrive at the response.
-- Strictly write thinking traces in the first person ("I", "let me", "my next step").
-- ABSOLUTELY NO META REASONING FROM THE GENERATOR: Never include any generator meta commentary about dataset synthesis, writing prompts, or instructions. It must solely be the trainee model solving the problem.
+REASONING EXPLANATION DIRECTIVE (REASONING EXAMPLES ONLY):
+For every example, provide a concise explanation of the key reasoning steps and checks that support the final answer, written from the trainee assistant's perspective.
+Place the explanation inside <think>...</think> in the assistant content and place the final answer after </think>.
+Do not omit the explanation or either tag. Do not include meta commentary about dataset synthesis, writing prompts, or instructions.
 ${reasoningFormatInstruction}`
               : turnMode === "Mixed"
               ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
