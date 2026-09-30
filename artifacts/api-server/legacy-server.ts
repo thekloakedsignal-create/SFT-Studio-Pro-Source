@@ -8,7 +8,6 @@ import { db } from "./src/db/index.ts";
 import { projects, batches, users, studentCodes } from "./src/db/schema.ts";
 import { eq, and } from "drizzle-orm";
 import { optionalAuth, AuthRequest } from "./src/middleware/auth.ts";
-import { Gradient } from "./src/lib/gradient.ts";
 
 dotenv.config();
 
@@ -816,7 +815,7 @@ app.get("/api/contact/inquiries", (_req, res) => {
   return res.json({ inquiries: [] });
 });
 
-// Helper to safely extract text from DigitalOcean Gradient response
+// Helper to safely extract text from a DigitalOcean Chat Completions response
 function extractResponseText(res: any): string {
   if (!res) return "";
   if (typeof res.text === "string") return res.text;
@@ -841,7 +840,7 @@ function normalizeModel(modelName?: string): string {
   return process.env.DO_MODEL || "glm-5.3-flash";
 }
 
-// Clean human-readable error formatting for DigitalOcean Gradient Inference errors
+// Clean human-readable error formatting for DigitalOcean inference errors
 function formatAIErrorMessage(err: any): string {
   if (!err) return "An unknown AI generation error occurred.";
   const raw = typeof err === "string" ? err : err?.message || JSON.stringify(err);
@@ -965,20 +964,40 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
     baseMessages.push({ role: "user", content: "Hello" });
   }
 
-  const inferenceClient = new Gradient({ model_access_key: doApiKey.trim() });
-
   // Cap max_tokens to 4096 to avoid prefill memory buffer allocation overload on inference server
   const maxTokensToUse = Math.min(params.config?.maxOutputTokens ?? 4096, 4096);
   const jsonMode = Boolean(params.config?.responseSchema) || params.config?.responseMimeType === "application/json";
 
   console.log(`[DigitalOcean Chat Completions] Request to model ${targetModel} (max_tokens: ${maxTokensToUse})...`);
-  const completion = await inferenceClient.chat.completions.create({
-    model: targetModel,
-    messages: baseMessages,
-    temperature: params.config?.temperature ?? 0.7,
-    max_tokens: maxTokensToUse,
-    ...(jsonMode ? { response_format: { type: "json_object" } } : {})
+  const completionResponse = await fetch("https://inference.do-ai.run/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${doApiKey.trim()}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: targetModel,
+      messages: baseMessages,
+      temperature: params.config?.temperature ?? 0.7,
+      max_tokens: maxTokensToUse,
+      ...(jsonMode ? { response_format: { type: "json_object" } } : {})
+    })
   });
+  const completionBody = await completionResponse.text();
+  let completion: any;
+  try {
+    completion = JSON.parse(completionBody);
+  } catch {
+    completion = { error: { message: completionBody } };
+  }
+  if (!completionResponse.ok) {
+    const errorMessage =
+      completion?.error?.message ||
+      completion?.message ||
+      completionBody ||
+      completionResponse.statusText;
+    throw new Error(`DigitalOcean Chat Completions request failed (${completionResponse.status}): ${errorMessage}`);
+  }
 
   const textContent = completion.choices?.[0]?.message?.content || "";
 
@@ -998,8 +1017,8 @@ function getDigitalOceanClient(): { provider: string } {
   return { provider: "DigitalOcean GenAI Inference" };
 }
 
-// Direct AI execution through DigitalOcean Gradient Inference.
-async function callDigitalOceanAI(_initialClient: any, params: any): Promise<any> {
+// Direct AI execution through DigitalOcean Chat Completions.
+async function callDigitalOceanAI(params: any): Promise<any> {
   const doApiKey =
     process.env.GRADIENT_MODEL_ACCESS_KEY ||
     process.env.DIGITALOCEAN_TOKEN ||
@@ -1009,10 +1028,6 @@ async function callDigitalOceanAI(_initialClient: any, params: any): Promise<any
     "";
   console.log(`[DigitalOcean Inference] Executing request using model ${params.model || process.env.DO_MODEL || "glm-5.3-flash"}...`);
   return await callDigitalOceanInference(doApiKey.trim(), params);
-}
-
-async function callGradientAI(params: any): Promise<any> {
-  return await callDigitalOceanAI(null, params);
 }
 
 const DEFAULT_GENERATION_MODEL_GROUPS = [
