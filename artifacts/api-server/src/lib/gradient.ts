@@ -1,4 +1,4 @@
-import { Client } from "@digitalocean/dots/inference";
+import OpenAI from "openai";
 
 export interface GradientOptions {
   modelAccessKey?: string;
@@ -20,7 +20,7 @@ export class Gradient {
     };
   };
 
-  private client: InstanceType<typeof Client>;
+  private client: OpenAI;
 
   constructor(options?: GradientOptions) {
     const key = options?.modelAccessKey || 
@@ -39,7 +39,10 @@ export class Gradient {
       );
     }
 
-    this.client = new Client({ apiKey: key.trim() });
+    this.client = new OpenAI({
+      apiKey: key.trim(),
+      baseURL: options?.baseURL || "https://inference.do-ai.run/v1"
+    });
 
     this.chat = {
       completions: {
