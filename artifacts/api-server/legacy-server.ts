@@ -835,10 +835,10 @@ function extractResponseText(res: any): string {
 // Normalize model name for DigitalOcean GenAI Inference
 function normalizeModel(modelName?: string): string {
   const candidate = modelName?.trim();
-  if (candidate && !/^(gemini|vertex)[\s:/_-]/i.test(candidate)) {
+  if (candidate && !/^(?:gemini|vertex|google)(?:$|[\s:/_-])/i.test(candidate)) {
     return candidate;
   }
-  return process.env.DO_MODEL || "deepseek-4-flash";
+  return process.env.DO_MODEL || "glm-5.3-flash";
 }
 
 // Clean human-readable error formatting for DigitalOcean Gradient Inference errors
@@ -861,7 +861,7 @@ function formatAIErrorMessage(err: any): string {
     raw.includes('"code":429') ||
     raw.includes("code 429")
   ) {
-    return "DigitalOcean GenAI Inference quota limit reached (429). Please verify your MODEL_ACCESS_KEY or DIGITALOCEAN_API_KEY.";
+    return "DigitalOcean Inference quota limit reached (429). Verify the configured DigitalOcean inference credential.";
   }
   if (
     raw.includes("UNAUTHENTICATED") ||
@@ -869,7 +869,7 @@ function formatAIErrorMessage(err: any): string {
     raw.includes('"code":401') ||
     raw.includes("code 401")
   ) {
-    return "DigitalOcean Gradient API authentication failed (401). Please verify your MODEL_ACCESS_KEY in environment settings.";
+    return "DigitalOcean Inference authentication failed (401). Verify DIGITALOCEAN_TOKEN or GRADIENT_MODEL_ACCESS_KEY in the app environment.";
   }
 
   // Attempt to extract clean message field if raw is a JSON string
@@ -883,28 +883,19 @@ function formatAIErrorMessage(err: any): string {
   return raw.replace(/^(Error:\s*)+/, "").trim();
 }
 
-// DigitalOcean GenAI Inference integration using official SDK with model lineup cascade
+// DigitalOcean Inference integration using the official DoTs SDK.
 async function callDigitalOceanInference(doApiKey: string, params: any): Promise<any> {
   if (!doApiKey.trim()) {
-    throw new Error("DigitalOcean API key is not configured. Set DIGITALOCEAN_API_KEY in the app environment.");
+    throw new Error("DigitalOcean inference credentials are not configured. Set DIGITALOCEAN_TOKEN or GRADIENT_MODEL_ACCESS_KEY.");
   }
 
   const requestedModel = typeof params.model === "string" ? params.model : "";
   const isMultimodal = Array.isArray(params.contents) && params.contents.some((item: any) => item?.inlineData?.data);
-  const primaryModel = normalizeModel(
+  const targetModel = normalizeModel(
     isMultimodal
       ? requestedModel || process.env.DO_VISION_MODEL || "nemotron-nano-12b-v2-vl"
-      : requestedModel || process.env.DO_MODEL || "deepseek-4-flash"
+      : requestedModel || process.env.DO_MODEL || "glm-5.3-flash"
   );
-  const candidateModels = isMultimodal
-    ? [primaryModel]
-    : Array.from(new Set([
-        primaryModel,
-        "deepseek-4-flash",
-        "deepseek-v4.1-flash",
-        "llama-4-maverick",
-        "mistral-3-14B",
-      ]));
 
   const sysInst = params.config?.systemInstruction;
   let sysText = "";
@@ -976,46 +967,31 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
 
   const inferenceClient = new Gradient({ model_access_key: doApiKey.trim() });
 
-  let lastError: any = null;
-
   // Cap max_tokens to 4096 to avoid prefill memory buffer allocation overload on inference server
   const maxTokensToUse = Math.min(params.config?.maxOutputTokens ?? 4096, 4096);
   const jsonMode = Boolean(params.config?.responseSchema) || params.config?.responseMimeType === "application/json";
 
-  for (const targetModel of candidateModels) {
-    try {
-      console.log(`[Gradient Inference] Direct request to model ${targetModel} (max_tokens: ${maxTokensToUse})...`);
-      const completion = await inferenceClient.chat.completions.create({
-        model: targetModel,
-        messages: baseMessages,
-        temperature: params.config?.temperature ?? 0.7,
-        max_tokens: maxTokensToUse,
-        ...(jsonMode ? { response_format: { type: "json_object" } } : {})
-      });
+  console.log(`[DoTs Inference] Direct request to model ${targetModel} (max_tokens: ${maxTokensToUse})...`);
+  const completion = await inferenceClient.chat.completions.create({
+    model: targetModel,
+    messages: baseMessages,
+    temperature: params.config?.temperature ?? 0.7,
+    max_tokens: maxTokensToUse,
+    ...(jsonMode ? { response_format: { type: "json_object" } } : {})
+  });
 
-      const textContent = completion.choices?.[0]?.message?.content || "";
+  const textContent = completion.choices?.[0]?.message?.content || "";
 
-      if (!textContent) {
-        throw new Error(`Empty response content from DigitalOcean model ${targetModel}`);
-      }
-
-      return {
-        text: textContent,
-        candidates: [{ content: { parts: [{ text: textContent }] } }],
-        _usedModel: targetModel,
-        _usedProvider: "DigitalOcean GenAI Inference"
-      };
-    } catch (err: any) {
-      lastError = err;
-      const msg = err?.message || JSON.stringify(err);
-      console.warn(`[DigitalOcean SDK] Model ${targetModel} notice ("${msg}"). Checking next lineup model...`);
-      if ([400, 401, 403].includes(Number(err?.status || err?.statusCode))) {
-        throw err;
-      }
-    }
+  if (!textContent) {
+    throw new Error(`Empty response content from DigitalOcean model ${targetModel}`);
   }
 
-  throw lastError || new Error("All DigitalOcean inference model candidates in lineup failed.");
+  return {
+    text: textContent,
+    candidates: [{ content: { parts: [{ text: textContent }] } }],
+    _usedModel: targetModel,
+    _usedProvider: "DigitalOcean Inference"
+  };
 }
 
 function getDigitalOceanClient(): { provider: string } {
@@ -1024,13 +1000,81 @@ function getDigitalOceanClient(): { provider: string } {
 
 // Direct AI execution through DigitalOcean Gradient Inference.
 async function callDigitalOceanAI(_initialClient: any, params: any): Promise<any> {
-  const doApiKey = process.env.DIGITALOCEAN_API_KEY || process.env.MODEL_ACCESS_KEY || process.env.DO_INFERENCE_KEY || "";
-  console.log(`[DigitalOcean Gradient Inference] Executing request using model ${params.model || process.env.DO_MODEL || "deepseek-4-flash"}...`);
+  const doApiKey =
+    process.env.GRADIENT_MODEL_ACCESS_KEY ||
+    process.env.DIGITALOCEAN_TOKEN ||
+    process.env.DIGITALOCEAN_API_KEY ||
+    process.env.MODEL_ACCESS_KEY ||
+    process.env.DO_INFERENCE_KEY ||
+    "";
+  console.log(`[DigitalOcean Inference] Executing request using model ${params.model || process.env.DO_MODEL || "glm-5.3-flash"}...`);
   return await callDigitalOceanInference(doApiKey.trim(), params);
 }
 
 async function callGradientAI(params: any): Promise<any> {
   return await callDigitalOceanAI(null, params);
+}
+
+const DEFAULT_GENERATION_MODELS = [
+  "glm-5.3-flash",
+  "mistral-3-14B",
+  "deepseek-4-flash",
+  "qwen3.8-max",
+  "llama-4-maverick",
+];
+
+function getGenerationModels(): string[] {
+  const configuredModels = (process.env.DO_GENERATION_MODELS || "")
+    .split(",")
+    .map((model) => model.trim())
+    .filter(Boolean);
+
+  const models =
+    configuredModels.length === DEFAULT_GENERATION_MODELS.length &&
+    new Set(configuredModels).size === DEFAULT_GENERATION_MODELS.length
+      ? configuredModels
+      : DEFAULT_GENERATION_MODELS;
+
+  return models.map((model) => normalizeModel(model));
+}
+
+function createModelGenerationStacks(
+  totalExamples: number,
+  models: string[],
+): Array<Array<{ model: string; count: number }>> {
+  const distribute = (count: number) => {
+    const baseCount = Math.floor(count / models.length);
+    const remainder = count % models.length;
+
+    return models
+      .map((model, index) => ({
+        model,
+        count: baseCount + (index < remainder ? 1 : 0),
+      }))
+      .filter((assignment) => assignment.count > 0);
+  };
+
+  if (totalExamples <= 0) return [];
+  if (totalExamples <= 5) return [distribute(totalExamples)];
+  if (totalExamples <= 10) {
+    return [distribute(5), distribute(totalExamples - 5)];
+  }
+  if (totalExamples <= 25) {
+    const firstStackCount = Math.floor(totalExamples / 10) * 5;
+    return [
+      distribute(firstStackCount),
+      distribute(totalExamples - firstStackCount),
+    ];
+  }
+
+  const stacks: Array<Array<{ model: string; count: number }>> = [];
+  let remaining = totalExamples;
+  while (remaining > 0) {
+    const stackCount = Math.min(50, remaining);
+    stacks.push(distribute(stackCount));
+    remaining -= stackCount;
+  }
+  return stacks;
 }
 
 // Preset TRiAD Dataset Templates
