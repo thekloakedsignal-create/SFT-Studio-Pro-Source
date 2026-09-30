@@ -4995,8 +4995,8 @@ export default function App() {
                         </button>
 
                         {/* Sizes unlocked only once approved */}
-                        {[10, 25, 50, 100, 200, 250].map((size) => {
-                          const isGreyedOutInGuestMode = !currentUser && (size === 100 || size === 200 || size === 250);
+                        {[10, 25, 50, 200, 250].map((size) => {
+                          const isGreyedOutInGuestMode = !currentUser && (size === 200 || size === 250);
                           const isDisabled = !isScalingUnlocked || isGreyedOutInGuestMode;
                           return (
                             <button

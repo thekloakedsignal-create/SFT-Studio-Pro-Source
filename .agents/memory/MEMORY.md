@@ -1,0 +1,1 @@
+- [SFT generation constraints](sft-generation-constraints.md) — Use individual DigitalOcean Chat Completions calls; never Model Synthesis or changes to templates and batch choices.

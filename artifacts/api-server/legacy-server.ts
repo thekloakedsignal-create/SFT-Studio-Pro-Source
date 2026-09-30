@@ -883,7 +883,7 @@ function formatAIErrorMessage(err: any): string {
   return raw.replace(/^(Error:\s*)+/, "").trim();
 }
 
-// DigitalOcean Inference integration using the official DoTs SDK.
+// DigitalOcean Chat Completions through the existing OpenAI-compatible endpoint.
 async function callDigitalOceanInference(doApiKey: string, params: any): Promise<any> {
   if (!doApiKey.trim()) {
     throw new Error("DigitalOcean inference credentials are not configured. Set DIGITALOCEAN_TOKEN or GRADIENT_MODEL_ACCESS_KEY.");
@@ -971,7 +971,7 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
   const maxTokensToUse = Math.min(params.config?.maxOutputTokens ?? 4096, 4096);
   const jsonMode = Boolean(params.config?.responseSchema) || params.config?.responseMimeType === "application/json";
 
-  console.log(`[DoTs Inference] Direct request to model ${targetModel} (max_tokens: ${maxTokensToUse})...`);
+  console.log(`[DigitalOcean Chat Completions] Request to model ${targetModel} (max_tokens: ${maxTokensToUse})...`);
   const completion = await inferenceClient.chat.completions.create({
     model: targetModel,
     messages: baseMessages,
