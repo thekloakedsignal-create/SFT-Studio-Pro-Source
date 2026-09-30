@@ -1975,7 +1975,8 @@ export default function App() {
     setNotification({ text: `Synthesizing ${batchSize} examples. Please wait...`, type: "info" });
     
     try {
-      const clientChunkSize = batchSize > 25 ? 25 : batchSize;
+      // Keep the selected batch intact; the API server schedules its five-model stacks.
+      const clientChunkSize = batchSize;
       const subChunkCounts: number[] = [];
       let remaining = batchSize;
       while (remaining > 0) {
@@ -1987,6 +1988,36 @@ export default function App() {
       let accumulatedExamples: any[] = [];
       let lastSource = "Generator";
       let serverBatchId: string | null = null;
+      const progressByTask = new Map<string, number>();
+      let streamedProgressCount = 0;
+
+      const updateStreamedProgress = (subChunkIdx: number, taskId: string, generatedCount: number) => {
+        const key = `${subChunkIdx}:${taskId}`;
+        const nextCount = Math.max(0, generatedCount);
+        const previousCount = progressByTask.get(key) || 0;
+        progressByTask.set(key, nextCount);
+        streamedProgressCount = Math.max(0, streamedProgressCount + nextCount - previousCount);
+        setGenerationProgress({
+          current: Math.min(batchSize, streamedProgressCount),
+          total: batchSize,
+          percent: Math.min(100, Math.round((streamedProgressCount / batchSize) * 100))
+        });
+      };
+
+      const clearStreamedProgress = (subChunkIdx: number) => {
+        const prefix = `${subChunkIdx}:`;
+        for (const [key, count] of progressByTask) {
+          if (key.startsWith(prefix)) {
+            streamedProgressCount = Math.max(0, streamedProgressCount - count);
+            progressByTask.delete(key);
+          }
+        }
+        setGenerationProgress({
+          current: Math.min(batchSize, streamedProgressCount),
+          total: batchSize,
+          percent: Math.min(100, Math.round((streamedProgressCount / batchSize) * 100))
+        });
+      };
 
       // Execute sub-chunks (concurrency 2 for high reliability and rapid throughput)
       const chunkConcurrency = Math.min(2, subChunkCounts.length);
@@ -2013,11 +2044,58 @@ export default function App() {
                 isInstruction: project.projectFormat === ProjectFormat.INSTRUCTION,
                 representativePrompt: project.representativePrompt,
                 representativeCompletion: project.representativeCompletion,
-                count: countToGen
+                count: countToGen,
+                stream: true
               })
             });
 
-            const data = await res.json();
+            let data: any;
+            if (res.headers.get("content-type")?.includes("text/event-stream")) {
+              const reader = res.body?.getReader();
+              if (!reader) throw new Error("Generation progress stream is unavailable.");
+
+              const decoder = new TextDecoder();
+              let buffer = "";
+              let completedPayload: any = null;
+              const processFrame = (frame: string) => {
+                const dataLine = frame.split(/\r?\n/).find(line => line.startsWith("data:"));
+                if (!dataLine) return;
+                const payload = JSON.parse(dataLine.slice(5).trim());
+                if (payload.type === "progress" && typeof payload.taskId === "string") {
+                  updateStreamedProgress(
+                    currentSubIdx,
+                    payload.taskId,
+                    Number(payload.generatedCount) || 0
+                  );
+                } else if (payload.type === "complete") {
+                  completedPayload = payload;
+                } else if (payload.type === "error") {
+                  throw new Error(payload.error || "Generation failed.");
+                }
+              };
+
+              while (true) {
+                const { done, value } = await reader.read();
+                buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+                let frameEnd = buffer.indexOf("\n\n");
+                while (frameEnd >= 0) {
+                  processFrame(buffer.slice(0, frameEnd));
+                  buffer = buffer.slice(frameEnd + 2);
+                  frameEnd = buffer.indexOf("\n\n");
+                }
+                if (done) {
+                  if (buffer.trim()) processFrame(buffer);
+                  break;
+                }
+              }
+              data = completedPayload;
+            } else {
+              data = await res.json();
+            }
+
+            if (!res.ok || !data?.success) {
+              throw new Error(data?.error || `Generation request failed (${res.status}).`);
+            }
             if (data.success && Array.isArray(data.examples) && data.examples.length > 0) {
               if (data.source) lastSource = data.source;
               if ((data.batchId || data.id) && !serverBatchId) {
@@ -2030,6 +2108,7 @@ export default function App() {
           } catch (err: any) {
             attempts++;
             console.warn(`[Batch Orchestrator] Sub-batch ${currentSubIdx + 1} attempt ${attempts} notice:`, err?.message || err);
+            clearStreamedProgress(currentSubIdx);
             if (attempts < maxAttempts) {
               await new Promise(r => setTimeout(r, 1000 * attempts));
             }
@@ -2045,10 +2124,11 @@ export default function App() {
           const results = await runSubChunk(count, index);
           if (results.length > 0) {
             accumulatedExamples.push(...results);
+            const currentCount = Math.max(streamedProgressCount, accumulatedExamples.length);
             setGenerationProgress({
-              current: Math.min(batchSize, accumulatedExamples.length),
+              current: Math.min(batchSize, currentCount),
               total: batchSize,
-              percent: Math.min(100, Math.round((accumulatedExamples.length / batchSize) * 100))
+              percent: Math.min(100, Math.round((currentCount / batchSize) * 100))
             });
           }
         }

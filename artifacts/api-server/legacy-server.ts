@@ -1307,6 +1307,22 @@ app.post("/api/generate", async (req, res) => {
   } = req.body;
 
   const countNum = parseInt(count) || 5;
+  const wantsProgressStream = req.body?.stream === true;
+  let progressStreamStarted = false;
+  const startProgressStream = () => {
+    if (!wantsProgressStream || progressStreamStarted) return;
+    res.status(200);
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    (res as any).flushHeaders?.();
+    progressStreamStarted = true;
+  };
+  const sendProgressEvent = (payload: Record<string, unknown>) => {
+    if (!progressStreamStarted || res.writableEnded || res.destroyed) return;
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  };
 
   const client = getDigitalOceanClient();
 
@@ -1524,22 +1540,18 @@ app.post("/api/generate", async (req, res) => {
       return [];
     };
 
-    // Calculate dynamic chunk size and worker count optimized for large batch throughput
-    const chunkSize = countNum <= 20 ? countNum : (countNum <= 60 ? 15 : 25);
-    const chunksCount = Math.ceil(countNum / chunkSize);
-    let lastUsedModel = process.env.DO_MODEL || "deepseek-4-flash";
-    let lastUsedProvider = "DigitalOcean GenAI Inference";
-    
-    // Create chunk tasks
-    const chunkTasks: Array<() => Promise<any[]>> = [];
+    const generationModels = getGenerationModels();
+    const generationStacks = createModelGenerationStacks(countNum, generationModels);
+    const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);
+    let completedExampleCount = 0;
 
-    for (let c = 0; c < chunksCount; c++) {
-      const currentChunkSize = (c === chunksCount - 1) ? (countNum - (c * chunkSize)) : chunkSize;
-      if (currentChunkSize <= 0) continue;
+    for (let c = 0; c < generationStacks.length; c++) {
+      for (let modelIndex = 0; modelIndex < generationStacks[c].length; modelIndex++) {
+        const { model: targetModel, count: currentChunkSize } = generationStacks[c][modelIndex];
 
       const fullPrompt = `
         You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
-        Your task is to generate exactly ${currentChunkSize} high-quality, diverse SFT training examples (batch subset ${c + 1} of ${chunksCount}).
+        Your task is to generate exactly ${currentChunkSize} high-quality, diverse SFT training examples (model stack ${c + 1} of ${generationStacks.length}).
 
         ${turnMode === "Reasoning" ? `
         CRITICAL MANDATE — FIRST-PERSON TRAINEE CHAIN OF THOUGHT:
@@ -1828,7 +1840,7 @@ app.post("/api/generate", async (req, res) => {
         Generate exactly ${currentChunkSize} examples. Return them as a JSON array of examples.
       `;
 
-      chunkTasks.push(async () => {
+      chunkTasks[c].push(async () => {
         try {
           // Single direct call without retry loops
           const configObj: any = {
@@ -1859,56 +1871,46 @@ Every assistant response MUST begin immediately with the direct, substantive ans
 No internal deliberation, planning, or reasoning fields are permitted.`
           };
           const response = await callGradientAI({
-            model: normalizeModel(),
+            model: targetModel,
             contents: fullPrompt,
             config: configObj
           });
-          if ((response as any)?._usedModel) {
-            lastUsedModel = (response as any)._usedModel;
-          }
-          if ((response as any)?._usedProvider) {
-            lastUsedProvider = (response as any)._usedProvider;
-          }
           const text = extractResponseText(response) || "[]";
           const parsed = parseGeneratedExamples(text);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
-          }
+          const generated = Array.isArray(parsed) ? parsed.slice(0, currentChunkSize) : [];
+          completedExampleCount += generated.length;
+          sendProgressEvent({
+            type: "progress",
+            taskId: `${c}:${modelIndex}:${targetModel}`,
+            model: targetModel,
+            generatedCount: generated.length,
+            completedCount: completedExampleCount,
+            total: countNum
+          });
+          return generated;
         } catch (err: any) {
-          console.error(`[Batch Chunk ${c + 1}/${chunksCount}] error:`, err?.message || err);
+          console.error(`[Batch Stack ${c + 1} Model ${targetModel}] error:`, err?.message || err);
           throw err;
         }
-        return [];
       });
+      }
     }
 
-    // Execute chunk tasks in controlled worker pool of 4 concurrent requests to maximize throughput
-    const concurrency = Math.min(4, chunkTasks.length);
     let firstError: any = null;
-
-    // Helper to run tasks with concurrency limit
-    const executeInBatches = async () => {
-      const results: any[] = new Array(chunkTasks.length);
-      let currentIndex = 0;
-
-      const workers = Array.from({ length: concurrency }, async () => {
-        while (currentIndex < chunkTasks.length) {
-          const index = currentIndex++;
-          try {
-            if (index > 0) await new Promise(r => setTimeout(r, 350 * index));
-            results[index] = await chunkTasks[index]();
-          } catch (err) {
-            if (!firstError) firstError = err;
-            results[index] = [];
-          }
+    startProgressStream();
+    const taskOutputs: any[][] = [];
+    for (let stackIndex = 0; stackIndex < chunkTasks.length; stackIndex++) {
+      if (stackIndex > 0) await new Promise((resolve) => setTimeout(resolve, 2000));
+      const results = await Promise.allSettled(chunkTasks[stackIndex].map((task) => task()));
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          taskOutputs.push(result.value);
+        } else {
+          if (!firstError) firstError = result.reason;
+          taskOutputs.push([]);
         }
-      });
-
-      await Promise.all(workers);
-      return results;
-    };
-
-    const taskOutputs = await executeInBatches();
+      }
+    }
 
     let allExamples: any[] = [];
     taskOutputs.forEach((arr, idx) => {
@@ -1927,41 +1929,68 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       const missingCount = countNum - allExamples.length;
       console.log(`[Batch Self-Healing] Recovering ${missingCount} missing examples to complete large batch request of ${countNum}...`);
       try {
-        const topUpPrompt = `
-          Generate exactly ${missingCount} additional high-quality SFT examples matching persona "${targetTask || "Domain Assistant"}" and template type "${templateType}".
-          Make every example unique and distinct. Return as a JSON array of examples.
-        `;
-        const topUpRes = await callDigitalOceanAI(client, {
-          model: normalizeModel(),
-          contents: topUpPrompt,
-          config: {
-            maxOutputTokens: 65536,
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.ARRAY,
-              items: schemaProperty
-            },
-            ...(turnMode !== "Reasoning" && turnMode !== "Mixed" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-            systemInstruction: (turnMode === "Single Turn" || turnMode === "Multi Turn")
-              ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
+        const topUpStacks = createModelGenerationStacks(missingCount, generationModels);
+        for (let stackIndex = 0; stackIndex < topUpStacks.length; stackIndex++) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          const results = await Promise.allSettled(
+            topUpStacks[stackIndex].map(async (assignment, modelIndex) => {
+              const topUpPrompt = `
+                Generate exactly ${assignment.count} additional high-quality SFT examples matching persona "${targetTask || "Domain Assistant"}" and template type "${templateType}".
+                Make every example unique and distinct. Return as a JSON array of examples.
+              `;
+              const topUpRes = await callDigitalOceanAI(client, {
+                model: assignment.model,
+                contents: topUpPrompt,
+                config: {
+                  maxOutputTokens: 65536,
+                  responseMimeType: "application/json",
+                  responseSchema: {
+                    type: Type.ARRAY,
+                    items: schemaProperty
+                  },
+                  ...(turnMode !== "Reasoning" && turnMode !== "Mixed" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+                  systemInstruction: (turnMode === "Single Turn" || turnMode === "Multi Turn")
+                    ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
 ABSOLUTE ZERO CHAIN-OF-THOUGHT MANDATE:
 Single turn and multi turn responses must NEVER contain any train of thought, thinking traces, internal planning monologue, or reasoning. Return direct assistant responses only.`
-              : `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
+                    : `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
 CRITICAL SCOPE RULE FOR CHAIN OF THOUGHT:
 Chain of thought is for reasoning examples ONLY. Single and multi turn responses must never contain any train of thought, thinking traces, or reasoning. Chain of thought is strictly restricted to reasoning examples.`
-          }
-        });
-        const topUpText = extractResponseText(topUpRes) || "[]";
-        const topUpParsed = parseGeneratedExamples(topUpText);
-        if (Array.isArray(topUpParsed)) {
-          topUpParsed.forEach((ex, exIdx) => {
-            if (allExamples.length < countNum) {
-              allExamples.push(sanitizeExample({
-                ...ex,
-                id: `gen-topup-${exIdx}-${Date.now()}`
-              }, turnMode));
+                }
+              });
+              const topUpText = extractResponseText(topUpRes) || "[]";
+              const topUpParsed = parseGeneratedExamples(topUpText);
+              const generated = Array.isArray(topUpParsed)
+                ? topUpParsed.slice(0, assignment.count)
+                : [];
+              completedExampleCount += generated.length;
+              sendProgressEvent({
+                type: "progress",
+                taskId: `topup:${stackIndex}:${modelIndex}:${assignment.model}`,
+                model: assignment.model,
+                generatedCount: generated.length,
+                completedCount: completedExampleCount,
+                total: countNum
+              });
+              return generated;
+            })
+          );
+
+          for (const result of results) {
+            if (result.status === "rejected") {
+              if (!firstError) firstError = result.reason;
+              console.warn("[Batch Self-Healing] Model top-up notice:", result.reason);
+              continue;
             }
-          });
+            result.value.forEach((example, exampleIndex) => {
+              if (allExamples.length < countNum) {
+                allExamples.push(sanitizeExample({
+                  ...example,
+                  id: `gen-topup-${stackIndex}-${exampleIndex}-${Date.now()}`
+                }, turnMode));
+              }
+            });
+          }
         }
       } catch (topUpErr) {
         console.warn("[Batch Self-Healing] Top-up notice:", topUpErr);
@@ -1980,13 +2009,25 @@ Chain of thought is for reasoning examples ONLY. Single and multi turn responses
 
     const formattedExamples = allExamples.map(example => sanitizeExample(example, turnMode));
 
-    return res.json({ 
+    const generationResponse = {
       success: true, 
       examples: formattedExamples, 
-      source: `${lastUsedProvider} (${lastUsedModel})` 
-    });
+      source: `DigitalOcean Inference (${generationModels.join(", ")})`
+    };
+    if (progressStreamStarted) {
+      sendProgressEvent({ type: "complete", ...generationResponse });
+      return res.end();
+    }
+    return res.json(generationResponse);
   } catch (error: any) {
     console.error("DigitalOcean batch generation error:", error);
+    if (progressStreamStarted) {
+      sendProgressEvent({
+        type: "error",
+        error: formatAIErrorMessage(error)
+      });
+      return res.end();
+    }
     return res.status(500).json({
       success: false,
       error: formatAIErrorMessage(error)
