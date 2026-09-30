@@ -2077,6 +2077,11 @@ Chain of thought is for reasoning examples ONLY. Single and multi turn responses
       throw new Error("No examples were returned by the generation engine. Please retry with a smaller batch or check connection.");
     }
 
+    if (allExamples.length < countNum) {
+      const failureDetails = firstError ? formatAIErrorMessage(firstError) : "Some model calls returned no examples.";
+      throw new Error(`Generation returned ${allExamples.length} of ${countNum} requested examples. ${failureDetails}`);
+    }
+
     // Ensure we don't exceed requested count
     if (allExamples.length > countNum) {
       allExamples = allExamples.slice(0, countNum);
