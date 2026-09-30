@@ -1014,11 +1014,12 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
 }
 
 function getDigitalOceanClient(): { provider: string } {
-  return { provider: "DigitalOcean GenAI Inference" };
+  return { provider: "DigitalOcean Chat Completions" };
 }
 
 // Direct AI execution through DigitalOcean Chat Completions.
-async function callDigitalOceanAI(params: any): Promise<any> {
+async function callDigitalOceanAI(initialClientOrParams: any, maybeParams?: any): Promise<any> {
+  const params = maybeParams ?? initialClientOrParams;
   const doApiKey =
     process.env.GRADIENT_MODEL_ACCESS_KEY ||
     process.env.DIGITALOCEAN_TOKEN ||
@@ -1923,7 +1924,7 @@ This task generates direct ${turnMode} assistant responses. ${turnMode} response
 Every assistant response MUST begin immediately with the direct, substantive answer to the user.
 No internal deliberation, planning, or reasoning fields are permitted.`
           };
-          const response = await callGradientAI({
+          const response = await callDigitalOceanAI({
             model: targetModel,
             contents: fullPrompt,
             config: configObj
@@ -2877,7 +2878,7 @@ Return ONLY a valid JSON object matching:
 Do NOT wrap output in extra text outside the JSON. Return raw JSON.
 `;
 
-    const aiRes = await callGradientAI({
+    const aiRes = await callDigitalOceanAI({
       model: normalizeModel(extractionModel),
       contents: analysisPrompt
     });
@@ -2948,7 +2949,7 @@ app.post("/api/convert-document", async (req, res) => {
     converterInstructions
   } = req.body;
 
-  console.log("DigitalOcean Gradient AI client initialized.");
+  console.log("DigitalOcean Chat Completions client initialized.");
 
   const actualDocType = docType || (isTranscript ? "transcript" : "knowledge_base");
 
@@ -3311,7 +3312,7 @@ Return ONLY a valid JSON object matching this structure:
 Return raw JSON without extra conversational text.
 `;
 
-        const aiRes = await callGradientAI({
+        const aiRes = await callDigitalOceanAI({
           model: normalizeModel(extractionModel),
           contents: synthesisPrompt,
           config: {
@@ -3854,7 +3855,7 @@ app.post("/api/analyze-quality", async (req, res) => {
             - "suggestions": Array of 1 to 3 actionable, high-level improvement recommendations for this dataset chunk.
           `;
 
-          const response = await callGradientAI({
+          const response = await callDigitalOceanAI({
             model: normalizeModel(),
             contents: chunkPrompt,
             config: {
@@ -4055,7 +4056,7 @@ app.post("/api/regenerate-flagged", async (req, res) => {
       5. Return ONLY valid JSON matching the requested schema.
     `;
 
-    const response = await callGradientAI({
+    const response = await callDigitalOceanAI({
       model: normalizeModel(),
       contents: fullPrompt,
       config: {
