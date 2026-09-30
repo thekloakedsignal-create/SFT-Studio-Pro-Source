@@ -2024,10 +2024,7 @@ export default function App() {
       let chunkIdx = 0;
 
       const runSubChunk = async (countToGen: number, currentSubIdx: number): Promise<any[]> => {
-        let attempts = 0;
-        const maxAttempts = 3;
-        while (attempts < maxAttempts) {
-          try {
+        try {
             const res = await fetch("/api/generate", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -2105,16 +2102,11 @@ export default function App() {
             } else {
               throw new Error(data.error || "Sub-batch returned empty response");
             }
-          } catch (err: any) {
-            attempts++;
-            console.warn(`[Batch Orchestrator] Sub-batch ${currentSubIdx + 1} attempt ${attempts} notice:`, err?.message || err);
-            clearStreamedProgress(currentSubIdx);
-            if (attempts < maxAttempts) {
-              await new Promise(r => setTimeout(r, 1000 * attempts));
-            }
-          }
+        } catch (err: any) {
+          console.warn(`[Batch Orchestrator] Sub-batch ${currentSubIdx + 1} failed:`, err?.message || err);
+          clearStreamedProgress(currentSubIdx);
+          throw err;
         }
-        return [];
       };
 
       const workers = Array.from({ length: chunkConcurrency }, async () => {
