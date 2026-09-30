@@ -1015,64 +1015,70 @@ async function callGradientAI(params: any): Promise<any> {
   return await callDigitalOceanAI(null, params);
 }
 
-const DEFAULT_GENERATION_MODELS = [
-  "glm-5.3-flash",
-  "mistral-3-14B",
-  "deepseek-4-flash",
-  "qwen3.8-max",
-  "llama-4-maverick",
+const DEFAULT_GENERATION_MODEL_GROUPS = [
+  [
+    "glm-3-flash",
+    "qwen3.5-397b-a17b",
+    "gemma-4-31B-it",
+    "deepseek-v4-pro",
+    "kimi-k2.6",
+  ],
+  [
+    "llama-4-maverick",
+    "mimo-v2.5-pro",
+    "minimax-m2.5",
+    "mistral-3-14B",
+    "nemotron-3-nano-omni",
+  ],
 ];
 
 function getGenerationModels(): string[] {
-  const configuredModels = (process.env.DO_GENERATION_MODELS || "")
-    .split(",")
-    .map((model) => model.trim())
-    .filter(Boolean);
-
-  const models =
-    configuredModels.length === DEFAULT_GENERATION_MODELS.length &&
-    new Set(configuredModels).size === DEFAULT_GENERATION_MODELS.length
-      ? configuredModels
-      : DEFAULT_GENERATION_MODELS;
-
-  return models.map((model) => normalizeModel(model));
+  return DEFAULT_GENERATION_MODEL_GROUPS.flat().map((model) => normalizeModel(model));
 }
 
 function createModelGenerationStacks(
   totalExamples: number,
   models: string[],
 ): Array<Array<{ model: string; count: number }>> {
-  const distribute = (count: number) => {
-    const baseCount = Math.floor(count / models.length);
-    const remainder = count % models.length;
-
-    return models
-      .map((model, index) => ({
-        model,
-        count: baseCount + (index < remainder ? 1 : 0),
-      }))
-      .filter((assignment) => assignment.count > 0);
-  };
-
   if (totalExamples <= 0) return [];
-  if (totalExamples <= 5) return [distribute(totalExamples)];
-  if (totalExamples <= 10) {
-    return [distribute(5), distribute(totalExamples - 5)];
+  const groupOne = models.slice(0, 5);
+  const groupTwo = models.slice(5, 10);
+  const allModels = [...groupOne, ...groupTwo];
+  const assign = (modelList: string[], count = 1) =>
+    modelList.map((model) => ({ model, count }));
+  const repeat = (stackCount: number, modelList: string[], count = 1) =>
+    Array.from({ length: stackCount }, () => assign(modelList, count));
+
+  if (totalExamples === 5) return [assign(groupOne)];
+  if (totalExamples === 10) return [assign(allModels)];
+  if (totalExamples === 25) {
+    return [assign(allModels), assign(allModels), assign(groupOne)];
   }
-  if (totalExamples <= 25) {
-    const firstStackCount = Math.floor(totalExamples / 10) * 5;
+  if (totalExamples === 50) return repeat(5, allModels);
+  if (totalExamples === 100) return repeat(10, allModels);
+  if (totalExamples === 200) {
+    const duplicatedModels = [...allModels, ...allModels];
+    return repeat(10, duplicatedModels);
+  }
+  if (totalExamples === 250) {
     return [
-      distribute(firstStackCount),
-      distribute(totalExamples - firstStackCount),
+      ...repeat(10, allModels, 2),
+      ...repeat(5, allModels, 1),
     ];
   }
 
   const stacks: Array<Array<{ model: string; count: number }>> = [];
   let remaining = totalExamples;
+  let modelOffset = 0;
   while (remaining > 0) {
-    const stackCount = Math.min(50, remaining);
-    stacks.push(distribute(stackCount));
-    remaining -= stackCount;
+    const callsThisStack = Math.min(allModels.length, remaining);
+    const stackModels = Array.from(
+      { length: callsThisStack },
+      (_, index) => allModels[(modelOffset + index) % allModels.length],
+    );
+    stacks.push(assign(stackModels));
+    modelOffset = (modelOffset + callsThisStack) % allModels.length;
+    remaining -= callsThisStack;
   }
   return stacks;
 }
