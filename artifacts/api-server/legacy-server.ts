@@ -444,7 +444,7 @@ app.get("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
     const userProjects = await db.select().from(projects);
     if (userProjects && userProjects.length > 0) {
       // Merge SQL rows with local file store to guarantee no batches are ever omitted
-      const merged = userProjects.map(sp => {
+      const merged = userProjects.map((sp: any) => {
         const lp = allLocal.find(p => p.id === sp.id);
         const spBatches = Array.isArray(sp.batches) ? sp.batches : [];
         const lpBatches = (lp && Array.isArray(lp.batches)) ? lp.batches : [];
@@ -455,11 +455,11 @@ app.get("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
         };
       });
       allLocal.forEach(lp => {
-        if (!merged.some(m => m.id === lp.id)) {
+        if (!merged.some((m: any) => m.id === lp.id)) {
           merged.push(lp);
         }
       });
-      const filtered = merged.filter(p => p.userId === userId || p.userId === "default" || !p.userId || userId === "default");
+      const filtered = merged.filter((p: any) => p.userId === userId || p.userId === "default" || !p.userId || userId === "default");
       return res.json({ success: true, projects: filtered.length > 0 ? filtered : merged });
     }
   } catch (error: any) {
@@ -4326,7 +4326,7 @@ app.post("/api/ocr", async (req, res) => {
     });
 
     const extractedText = extractResponseText(response);
-    res.json({ success: true, text: extractedText });
+    return res.json({ success: true, text: extractedText });
   } catch (err: any) {
     console.error("OCR extraction error:", err);
     return res.status(500).json({ success: false, error: err.message || err });
@@ -4352,7 +4352,7 @@ app.post("/api/parse-pdf", async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       text,
       pageCount,
@@ -4383,7 +4383,7 @@ app.post("/api/parse-docx", async (req, res) => {
       return res.status(400).json({ success: false, error: "No readable text found in the uploaded DOCX file." });
     }
 
-    res.json({ success: true, text: result.value });
+    return res.json({ success: true, text: result.value });
   } catch (err: any) {
     console.error("DOCX parsing error:", err);
     return res.status(500).json({ success: false, error: err.message || "Failed to extract text from DOCX file." });
@@ -4445,7 +4445,7 @@ app.post("/api/suggest-doc-count", async (req, res) => {
       );
     }
 
-    res.json({
+    return res.json({
       success: true,
       suggestedCount,
       explanation: data.explanation || `Suggested ${suggestedCount} examples based on document analysis.`,
