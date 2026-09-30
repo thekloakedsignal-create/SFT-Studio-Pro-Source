@@ -520,7 +520,7 @@ app.post("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
 
 // Incremental single-batch save/update route
 app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest, res) => {
-  const projectId = req.params.id;
+  const projectId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
   const { batch } = req.body;
   if (!projectId || !batch || !batch.id) {
     return res.status(400).json({ success: false, error: "Missing projectId or batch payload." });
@@ -558,7 +558,8 @@ app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest,
 
 // Incremental single-batch delete route
 app.delete("/api/sql/projects/:id/batches/:batchId", optionalAuth, async (req: AuthRequest, res) => {
-  const { id: projectId, batchId } = req.params;
+  const projectId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
+  const batchId = Array.isArray(req.params.batchId) ? req.params.batchId[0] ?? "" : req.params.batchId;
   if (!projectId || !batchId) {
     return res.status(400).json({ success: false, error: "Missing projectId or batchId." });
   }
@@ -575,7 +576,7 @@ app.delete("/api/sql/projects/:id/batches/:batchId", optionalAuth, async (req: A
 });
 
 app.get("/api/sql/projects/:id", optionalAuth, async (req: AuthRequest, res) => {
-  const projId = req.params.id;
+  const projId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
   const allLocal = getLocalProjects();
   const foundLocal = allLocal.find(p => p.id === projId);
 
@@ -605,7 +606,7 @@ app.get("/api/sql/projects/:id", optionalAuth, async (req: AuthRequest, res) => 
 });
 
 app.delete("/api/sql/projects/:id", optionalAuth, async (req: AuthRequest, res) => {
-  const projId = req.params.id;
+  const projId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
   deleteLocalProjectItem(projId);
   try {
     await db.delete(projects).where(eq(projects.id, projId));
