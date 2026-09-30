@@ -978,7 +978,7 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
     temperature: params.config?.temperature ?? 0.7,
     max_tokens: maxTokensToUse,
     ...(jsonMode ? { response_format: { type: "json_object" } } : {})
-  });
+  }, { maxRetries: 0 });
 
   const textContent = completion.choices?.[0]?.message?.content || "";
 

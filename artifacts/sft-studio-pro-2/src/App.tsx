@@ -2025,7 +2025,7 @@ export default function App() {
 
       const runSubChunk = async (countToGen: number, currentSubIdx: number): Promise<any[]> => {
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 1;
         while (attempts < maxAttempts) {
           try {
             const res = await fetch("/api/generate", {
@@ -2109,6 +2109,7 @@ export default function App() {
             attempts++;
             console.warn(`[Batch Orchestrator] Sub-batch ${currentSubIdx + 1} attempt ${attempts} notice:`, err?.message || err);
             clearStreamedProgress(currentSubIdx);
+            if (attempts >= maxAttempts) throw err;
             if (attempts < maxAttempts) {
               await new Promise(r => setTimeout(r, 1000 * attempts));
             }

@@ -16,7 +16,7 @@ export class Gradient {
         temperature?: number;
         max_tokens?: number;
         [key: string]: any;
-      }) => Promise<any>;
+      }, requestOptions?: { maxRetries?: number }) => Promise<any>;
     };
   };
 
@@ -46,7 +46,7 @@ export class Gradient {
 
     this.chat = {
       completions: {
-        create: async (params) => {
+        create: async (params, requestOptions) => {
           const model = params.model || process.env.DO_MODEL || "glm-5.3-flash";
           const maxTokens = Math.min(params.max_tokens ?? 4096, 4096);
 
@@ -55,7 +55,7 @@ export class Gradient {
             messages: params.messages as any,
             model,
             max_tokens: maxTokens
-          } as any);
+          } as any, requestOptions);
         }
       }
     };
