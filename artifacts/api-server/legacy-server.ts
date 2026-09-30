@@ -1347,8 +1347,9 @@ app.post("/api/generate", async (req, res) => {
       "Single Turn";
     const reasoningFormatInstruction = `
 REASONING TEMPLATE FORMAT:
-- Put the reasoning section inside the assistant message's "content" as <think>...</think>.
-- Put the final answer after </think> in that same "content" string.
+- In every example in this Reasoning batch, the assistant "content" must start with <think>, contain a non-empty reasoning trace, close with </think>, and then give the final answer.
+- Required shape: "<think>\n[Reasoning trace]\n</think>\n[Final answer]".
+- Never omit either tag, put the final answer inside the tags, or use the format for any template other than Reasoning.
 - Do not emit a separate "reasoning" or "reasoning_content" property.
 - Keep the selected template's message roles and any required instruction markers.
 `;
