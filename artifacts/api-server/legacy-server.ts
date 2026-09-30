@@ -1034,11 +1034,11 @@ async function callDigitalOceanAI(initialClientOrParams: any, maybeParams?: any)
 
 const DEFAULT_GENERATION_MODEL_GROUPS = [
   [
-    "glm-3-flash",
+    "glm-3.5-flash",
     "qwen3.5-397b-a17b",
     "gemma-4-31B-it",
     "deepseek-v4-pro",
-    "kimi-k2.6",
+    "nemotron-3-ultra-550b",
   ],
   [
     "llama-4-maverick",
@@ -1330,7 +1330,16 @@ app.post("/api/generate", async (req, res) => {
     count
   } = req.body;
 
-  const countNum = parseInt(count) || 5;
+  const countNum = count === undefined || count === null ? 5 : Number(count);
+  if (
+    !Number.isInteger(countNum) ||
+    !SUPPORTED_GENERATION_BATCH_SIZES.some((supportedSize) => supportedSize === countNum)
+  ) {
+    return res.status(400).json({
+      success: false,
+      error: `Batch size must be one of: ${SUPPORTED_GENERATION_BATCH_SIZES.join(", ")}.`
+    });
+  }
   const wantsProgressStream = req.body?.stream === true;
   let progressStreamStarted = false;
   const startProgressStream = () => {
