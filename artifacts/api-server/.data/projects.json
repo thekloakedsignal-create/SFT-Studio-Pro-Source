@@ -1,5 +1,265 @@
 [
   {
+    "id": "project-1790742482031",
+    "userId": "device-4h8x8l38s1p1790736980351",
+    "name": "SFT Project 4",
+    "settings": {
+      "name": "SFT Project 4",
+      "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+      "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+      "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+      "selectedPreset": "General Use AI",
+      "projectFormat": "Instruction",
+      "templateType": "Instruction Template",
+      "instructTemplate": "ChatML",
+      "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      "representativePrompt": "Explain why the sky appears blue.",
+      "representativeCompletion": "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
+    },
+    "batches": [
+      {
+        "id": "batch-1790742614956-bpdgb",
+        "batchId": "batch-1790742614956-bpdgb",
+        "name": "Truth",
+        "source": "Generator",
+        "templateType": "Reasoning",
+        "examplesCount": 5,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "My friend asked me whether her homemade soup tasted good, and honestly it was too salty and bland for my taste. She noticed I hesitated. What should I do — I already half-smiled and said \"it's interesting\"? I don't want to lie, but I also don't want to hurt her feelings."
+              },
+              {
+                "role": "assistant",
+                "content": "Completed response."
+              }
+            ],
+            "id": "synth-1790742614956-0",
+            "templateType": "Reasoning"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Provide instructions regarding Instruction following, educational explanations, summaries, and general QA.."
+              },
+              {
+                "role": "assistant",
+                "content": "\\nThe Earth *does* move relative to the galactic center, and your friend’s position is contradictory because it ignores the hierarchical nature of orbital mechanics. Here’s why:\\n\\n1. **Earth’s orbit around the Sun**: The Earth moves at ~30 km/s in its orbit around the Sun. This is relative to the Sun, not the galaxy.\\n\\n2. **Sun’s orbit around the Milky Way**: The Sun (and thus the Earth) orbits the galactic center at ~230 km/s. This is the *dominant* motion, as it’s nearly an order of magnitude faster than the Earth’s solar orbit.\\n\\nYour friend is correct that the Earth isn’t the center of the galaxy—it orbits the Sun, and the Sun orbits the galaxy. But the Earth isn’t stationary relative to the galactic center. Instead, its motion is the *combination* of these two orbits. Think of it like this:\\n- If you’re on a treadmill (the Sun’s galactic orbit) and you start walking (Earth’s solar orbit), your *total speed* is the sum of the treadmill’s speed and your walking speed. You’re not stationary!\\n\\nThe Earth’s net motion relative to the galactic center is therefore ~230 km/s (from the Sun’s orbit) plus the smaller contribution from its orbit around the Sun. This means the Earth is *most definitely* moving relative to the galaxy’s center—just like every other star in the Milky Way. The confusion arises from separating the Earth’s solar orbit from the Sun’s galactic orbit, but they’re not independent; the Earth participates in *both* motions. Thus, calling the Earth “stationary” relative to the galaxy is incorrect.\\n\\nIn short: The Earth moves in two major ways—around the Sun and around the galaxy—and ignoring one of these ignores the bigger picture of its motion.\"\n        }\n      ]\n    }\n  ]\n}"
+              }
+            ],
+            "id": "synth-1790742614956-1",
+            "templateType": "Reasoning"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "I've heard that some people believe the Earth is flat. Is that true?"
+              },
+              {
+                "role": "assistant",
+                "content": "thinking\nThe user is asking whether the Earth is flat, and they mention that some people believe this. They seem curious but may be confused by conflicting information. I need to provide a clear, correct, and honest answer based on scientific consensus. Let me start by acknowledging the question. The Earth is not flat; it's an oblate spheroid. I should explain this simply, with evidence like satellite images, ship horizon disappearance, and time zones. I also need to address why some people might hold this belief without being dismissive, but firmly state the truth. The assistant must be helpful and educational. So, I'll structure the response: first, a clear answer that the Earth is round, then a brief explanation of evidence, and finally a courteous note on the flat Earth claim. Let me keep it concise and factual.\n response\nThat's an excellent question, and it touches on an important distinction between widely accepted scientific fact and fringe beliefs. The short answer is no, the Earth is not flat. There is overwhelming evidence from multiple fields of science that our planet is an oblate spheroid—essentially a sphere that is slightly flattened at the poles and bulging at the equator. This fact has been established for millennia. Ancient Greek scholars like Eratosthenes calculated the Earth's circumference with remarkable accuracy around 240 BCE using shadows at different locations. Modern confirmation comes from countless sources: full-disk photographs of Earth from space, satellite orbits that follow a curved path around a spherical body, the way ships disappear hull-first over the horizon, and the fact that time zones exist because sunlight hits a curved surface. Flat Earth claims contradict all of these observations and rely on misinterpretations of physics or a misunderstanding of perspective. While people are free to explore unconventional ideas, the scientific community unanimously agrees that the Earth is round because the evidence is consistent, repeatable, and verifiable. I hope this clarifies the matter for you. If you have any more questions about how we know this or about other scientific topics, I'll be happy to help."
+              }
+            ],
+            "id": "synth-1790742614956-2",
+            "templateType": "Reasoning"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Provide instructions regarding Instruction following, educational explanations, summaries, and general QA.."
+              },
+              {
+                "role": "assistant",
+                "content": "\\nSymbiosis is a close, long-term relationship between different biological species. There are three main types: mutualism, where both species benefit, such as clownfish and sea anemones; commensalism, where one benefits and the other is unaffected, like remora fish and sharks; and parasitism, where one benefits at the expense of the other, for example, tapeworms in mammals. These relationships highlight the diverse interactions between species in nature.\"}]}"
+              }
+            ],
+            "id": "synth-1790742614956-3",
+            "templateType": "Reasoning"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "A bat and a ball cost $1.10 together. The bat costs $1.00 more than the ball. How much does the ball cost? Explain your reasoning step by step."
+              },
+              {
+                "role": "assistant",
+                "content": "The ball costs $0.05. Here's why: if the ball cost $0.10, the bat would cost $1.10, making the total $1.20 — too much. So set up an equation: let the ball cost x. The bat costs x + $1.00. Together: x + (x + 1.00) = 1.10. That gives 2x = 0.10, so x = 0.05. Check: ball $0.05 + bat $1.05 = $1.10, and $1.05 − $0.05 = $1.00. ✓",
+                "reasoning": "The intuitive answer $0.10 is a common trap because people split the total as 1.00/0.10. I should verify by equation: ball = x, bat = x + 1.00, total 2x + 1.00 = 1.10 → x = 0.05. Verify: 0.05 + 1.05 = 1.10 and difference is 1.00. Correct."
+              }
+            ],
+            "id": "synth-1790742614956-4",
+            "templateType": "Reasoning"
+          }
+        ],
+        "status": "Pending",
+        "timestamp": "2026-09-30 04:30",
+        "description": "Truth ",
+        "specialInstructions": "The virtue of honesty ",
+        "temporaryConstraints": "200-600 words each "
+      },
+      {
+        "id": "batch-1790742554062-wrtqh",
+        "batchId": "batch-1790742554062-wrtqh",
+        "name": "Truth",
+        "source": "Generator",
+        "templateType": "Multi Turn",
+        "examplesCount": 5,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Why is honesty considered a virtue? I'd like a clear explanation I could use in a class discussion."
+              },
+              {
+                "role": "assistant",
+                "content": "Honesty is considered a virtue because it is the foundation of trust, and trust is what makes cooperation between people possible. Here are the main reasons, suitable for a class discussion:\n\n1. **Trust and social cooperation**: Societies, families, workplaces, and friendships all depend on people being able to rely on each other's word. When honesty is common, we don't need constant verification, contracts for everything, or suspicion — which makes everyday life simpler and safer.\n\n2. **Respect for others**: Telling the truth treats people as rational agents capable of making their own decisions. Lying manipulates someone's view of reality and, in effect, takes control of their choices away from them.\n\n3. **Self-integrity**: A person who is honest doesn't have to maintain a web of false claims or remember which lies they told. Honesty aligns one's outward words with one's inner beliefs, which philosophers have long linked to integrity and psychological well-being.\n\n4. **Corrective value**: Errors and bad ideas can only be corrected if they can be openly stated. Science, law, journalism, and history all depend on truthful reporting to self-correct over time.\n\n5. **Practical consequences**: Dishonesty tends to compound. One lie usually requires others to sustain it, and when discovered, it damages reputations far more than an uncomfortable truth would have.\n\nA useful distinction for discussion: honesty doesn't require brutality. The virtue is about not deceiving, not about volunteering every harsh thought. Many ethicists argue honesty should be paired with kindness and tact.\n\nA good discussion question to pose: *Is it ever morally acceptable to lie — for example, to protect someone from serious harm?* This tension between honesty and other virtues is where much of the philosophical debate lives."
+              },
+              {
+                "role": "user",
+                "content": "That helps. So would you say a 'white lie' to spare someone's feelings is always wrong, or are there exceptions?"
+              },
+              {
+                "role": "assistant",
+                "content": "Most ethical traditions treat white lies as a genuine moral gray area rather than a simple right-or-wrong case. Here's a balanced view you can use:\n\n**The case against even small lies:**\n- Kant argued that lying is wrong in principle because it treats the listener as a means to an end, and any exception erodes the very institution of truth-telling.\n- Small lies can erode trust incrementally: if people know you sometimes shade the truth 'for their own good,' they may discount your praise and reassurance generally.\n- You may be wrong about what the person can handle; deciding for them can be paternalistic.\n\n**The case for limited exceptions:**\n- Consequentialists argue that a lie preventing serious, pointless harm can be morally justified — the classic example is lying to a would-be murderer about a victim's whereabouts.\n- Everyday politeness (e.g., 'I appreciate the effort you put into this gift') can lubricate social life without meaningful deception or harm.\n- Withholding or softening the truth temporarily — such as delaying bad news until someone is in a stable state to receive it — can be an act of compassion.\n\n**A reasonable middle position:** honesty is a strong default, not an absolute. When weighing a potential white lie, it helps to ask:\n1. What harm does the truth actually cause?\n2. Would the person, if fully informed, prefer the truth later?\n3. Is there a kind and honest middle path — tactful phrasing, choosing the right moment, or emphasizing what is genuinely positive?\n\nIn many cases the 'lie vs. truth' framing is false: you can often be honest *and* kind by choosing your words carefully. Genuine exceptions tend to be rare and limited to preventing serious harm or profound, immediate distress — and even then, honesty usually resumes as soon as the person is able to handle it."
+              }
+            ],
+            "id": "synth-1790742554062-0",
+            "templateType": "Multi Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "I’ve recently heard about the ethical concerns surrounding the use of AI in hiring processes. Some companies claim AI tools are unbiased, but advocates for equity say otherwise. Can you break down why there might be a discrepancy in how AI is perceived in these contexts?"
+              },
+              {
+                "role": "assistant",
+                "content": "The discrepancy in perceptions about AI fairness in hiring stems from a few key technical, design, and implementation challenges. Here’s the core of it: AI hiring tools often rely on historical hiring data to train their models, meaning they may perpetuate existing biases if past decisions were discriminatory. For example, if data shows a preference for candidates from certain universities or with certain names, the AI might unintentionally favor those same patterns. Additionally, the metrics used to assess candidates—such as interview responses or résumé keywords—can be arbitrarily weighted, and if those weights aren’t regularly audited, biases can seep in. Another issue is the lack of transparency: many AI models act as 'black boxes,' making it hard to verify whether they’re discriminating. Even with best intentions, if developers, data scientists, or hiring teams don’t actively test for fairness or include diverse perspectives in the model’s design, the tool may fail to meet equity goals."
+              },
+              {
+                "role": "user",
+                "content": "That’s a lot to unpack. Let’s focus on one part: if AI models are trained on historical hiring data, how exactly could that lead to bias, and could that ever create systemic harm? Maybe you could give a concrete example."
+              },
+              {
+                "role": "assistant",
+                "content": "Absolutely. Imagine an AI hiring tool trained on data from the past decade, where the majority of successful candidates for a technical role came from two elite universities—both predominantly attended by students from higher-income families. The model might learn to associate those universities with ‘high potential’ and rank candidates from there more highly, even if equally qualified candidates from other backgrounds are overlooked. This isn’t just a fairness issue; it risks reinforcing economic disparities. For instance, if families with fewer resources lack access to those universities, the AI could indirectly favor candidates who already had advantages. Over time, this could create a self-perpetuating cycle where the hiring pipeline remains homogenous, limiting opportunities for underrepresented groups and narrowing the talent pool’s diversity. Systemic harm occurs when these biases become institutionalized, making them harder to dismantle without proactive intervention."
+              }
+            ],
+            "id": "synth-1790742554062-1",
+            "templateType": "Multi Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "I've heard that some animals can predict earthquakes. Is that true? If so, how do they do it?"
+              },
+              {
+                "role": "assistant",
+                "content": "That's a fascinating question. The idea that animals can predict earthquakes is a long-standing belief, but the scientific evidence is mixed and inconclusive.\n\nThere are many anecdotal reports of animals behaving strangely before earthquakes—dogs barking excessively, cats hiding, birds flying in unusual patterns, or snakes abandoning their nests. However, these observations are often retrospective and difficult to verify systematically.\n\nScientists have proposed several possible mechanisms for how animals might sense impending earthquakes:\n\n1. **P-waves**: Earthquakes produce primary (P) waves that travel faster than the more destructive secondary (S) waves and surface waves. Humans cannot feel P-waves, but some animals might be sensitive to them and react before the stronger shaking arrives.\n\n2. **Ground tilting or deformation**: Very subtle changes in the Earth's surface may occur before a quake. Animals with keen spatial awareness, like certain birds or insects, could potentially detect these shifts.\n\n3. **Chemical changes**: The stress on rocks before an earthquake can release gases (like radon) or change the electrical conductivity of the ground. Animals with a strong sense of smell might detect these chemical signals.\n\n4. **Electromagnetic signals**: Some research suggests that the crushing of rocks generates electromagnetic pulses before a quake. Certain animals, such as migratory birds, are sensitive to Earth's magnetic field and might sense these anomalies.\n\nHowever, rigorous scientific studies have failed to consistently replicate or confirm these effects. The most notable study, published in 2018, analyzed video footage of a wildlife reserve in Peru before a major earthquake and found no significant changes in animal behavior.\n\nIn summary, while the idea is intriguing and plausible in theory, it remains unproven. Honest science requires us to acknowledge that we simply do not have reliable, predictive evidence that animals can consistently forecast earthquakes. It's an area of active research, but for now, relying on animals as a warning system would be unreliable."
+              },
+              {
+                "role": "user",
+                "content": "That's interesting but also a bit disappointing. So, if we can't rely on animals, what is the most reliable method we currently have for earthquake early warning?"
+              },
+              {
+                "role": "assistant",
+                "content": "That's an excellent question, and it touches on a crucial distinction between prediction and early warning.\n\nFirst, it's important to clarify that we cannot *predict* earthquakes in the sense of saying with certainty that one will happen at a specific time and place. What we do have are **earthquake early warning systems**.\n\nThese systems don't predict earthquakes before they start. Instead, they detect the initial, less destructive waves (P-waves) in real-time, immediately after an earthquake begins, and send alerts to areas that are about to be hit by the slower, more destructive waves (S-waves and surface waves).\n\nThe most reliable method works like this:\n\n1. **A dense network of seismometers** is placed strategically across seismically active regions. These instruments continuously monitor ground motion.\n\n2. When an earthquake occurs, the nearest seismometers detect the fast-moving P-waves. The system then rapidly estimates the earthquake's location, magnitude, and expected intensity.\n\n3. Within seconds, an alert is broadcast to the affected area via cell phones, radio, television, and dedicated receivers.\n\n4. This window of warning — typically from a few seconds to a minute — is enough for people to take protective actions like dropping, covering, and holding on. It can also automatically trigger safety measures like slowing trains, opening fire station doors, stopping elevators at the nearest floor, shutting down gas lines, and pausing sensitive industrial processes.\n\nExamples of operational systems include:\n- **ShakeAlert** in the western United States.\n- **Earthquake Early Warning (EEW)** systems in Japan and Mexico.\n\nThe effectiveness of the system depends on the distance from the epicenter: the farther you are, the more warning time you have.\n\nIn summary, honest science tells us that absolute earthquake prediction is not yet possible. But early warning is a practical, technologically proven, and life-saving approach that gives us precious seconds to prepare. While it doesn't fulfill the myth of predictive animals, it represents a powerful and reliable tool grounded in real-time physics."
+              }
+            ],
+            "id": "synth-1790742554062-2",
+            "templateType": "Multi Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Can you explain what honesty means as a virtue, and why philosophers consider it more than just 'not telling lies'?"
+              },
+              {
+                "role": "assistant",
+                "content": "Honesty as a virtue is broader than simply avoiding false statements. At its core, honesty is a settled disposition to represent reality truthfully—in speech, in action, and in self-presentation. Philosophers generally highlight three dimensions:\n\n1. Truthfulness in communication: refusing to lie, mislead, or deceive others intentionally.\n2. Integrity of action: refusing to cheat, steal, or manipulate, so that one's conduct matches one's professed values. This is why we call an unfair game 'dishonest' even when no words are spoken.\n3. Honesty with oneself: acknowledging one's own faults, limitations, and motives rather than indulging in self-deception.\n\nAristotle treated honesty as a mean between boastfulness (overstating oneself) and self-deprecation (understating oneself), framing it as truthfulness about who one is. Later thinkers, such as Kant, argued that honesty matters because deception undermines the respect owed to rational persons, while virtue ethicists emphasize that an honest person tells the truth because it expresses good character, not merely out of fear of consequences.\n\nSo honesty is considered a virtue because it shapes a person's whole orientation toward truth: it governs what they say, how they act, and how they understand themselves. Someone who never utters a literal lie but constantly manipulates appearances is still dishonest, which shows that the virtue targets the deeper commitment to truth rather than mere verbal accuracy."
+              },
+              {
+                "role": "user",
+                "content": "That's helpful. But if honesty is about representing reality truthfully, why do most ethicists still say it's okay to tell a 'white lie' to spare someone's feelings? Doesn't that contradict the virtue?"
+              },
+              {
+                "role": "assistant",
+                "content": "This is one of the classic tension points in ethics, and different traditions handle it differently, but most ethicists who accept white lies do not see them as contradicting honesty for a few reasoned points:\n\n1. Honesty is one virtue among several. Virtue ethicists note that virtues must be balanced with compassion, kindness, and practical wisdom (phronesis). A blunt remark that devastates someone over a trivial matter may be verbally accurate but lacks the care that a fully good person shows. The honest person aims at truthfulness in the right way, toward the right things, at the right time—not at raw factual disclosure regardless of consequences.\n\n2. The purpose of honesty is trust and genuine communication, not literalism. Many philosophers argue that what honesty protects is the trustworthiness of our relationships. A small, kind lie that spares unnecessary humiliation (for example, telling a nervous host the meal was fine) often preserves trust and goodwill, whereas cruel candor can damage relationships without serving any truthful purpose.\n\n3. Intent matters. The defining feature of dishonesty is the intent to deceive for gain or to manipulate. A white lie told to protect someone's feelings lacks that exploitative intent; it is regulated by benevolence rather than self-interest.\n\nHowever, ethicists attach strict caveats: white lies should be rare, minor, and motivated by the other person's good—not by our discomfort or convenience. Once they become habitual, they erode both trust and our own character. Notably, Kant rejects this entire accommodation, insisting that any deliberate falsehood violates duty. So the debate is live, but the mainstream view is that honesty, properly understood, is truthfulness governed by practical wisdom, not indiscriminate bluntness."
+              }
+            ],
+            "id": "synth-1790742554062-3",
+            "templateType": "Multi Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Explain the concept of honesty and its importance in personal and professional relationships. Can you provide examples?"
+              },
+              {
+                "role": "assistant",
+                "content": "Honesty is the virtue of being truthful and transparent in one's words and actions. It is a fundamental aspect of building trust and respect in both personal and professional relationships. When individuals are honest, they foster an environment of reliability and integrity. For instance, in personal relationships, honesty helps to create a strong foundation of trust, allowing for deeper and more meaningful connections. In professional settings, honesty is crucial for maintaining ethical standards, ensuring accountability, and promoting a positive work culture. Examples of honesty include admitting mistakes, providing accurate information, and being transparent about one's intentions and actions."
+              },
+              {
+                "role": "user",
+                "content": "How can one cultivate honesty in their daily life, especially when it's challenging to be truthful due to potential negative consequences?"
+              },
+              {
+                "role": "assistant",
+                "content": "Cultivating honesty in daily life involves developing self-awareness, practicing transparency, and embracing accountability. One can start by being truthful in small matters, which builds confidence and habit. When faced with challenging situations, it's essential to weigh the long-term benefits of honesty against the short-term discomfort. Being honest, even when difficult, can lead to greater respect and trust from others. For example, admitting a mistake at work may be uncomfortable, but it demonstrates integrity and can lead to learning and growth. Additionally, considering the potential consequences of dishonesty, such as damaged reputation and lost trust, can motivate individuals to choose honesty. Practicing empathy and communicating truthful information with sensitivity can also help mitigate negative reactions."
+              }
+            ],
+            "id": "synth-1790742554062-4",
+            "templateType": "Multi Turn"
+          }
+        ],
+        "status": "Approved",
+        "timestamp": "2026-09-30 04:29",
+        "description": "Truth ",
+        "specialInstructions": "The virtue of honesty ",
+        "temporaryConstraints": "200-600 words each "
+      }
+    ],
+    "updatedAt": "2026-09-30T04:30:15.027Z"
+  },
+  {
     "id": "project-1790737010579",
     "userId": "device-4h8x8l38s1p1790736980351",
     "name": "SFT Project 3",

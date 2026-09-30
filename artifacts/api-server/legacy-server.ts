@@ -1345,6 +1345,13 @@ app.post("/api/generate", async (req, res) => {
       (tTypeLower.includes("reasoning") || tTypeLower.includes("cot")) ? "Reasoning" :
       (tTypeLower.includes("mixed") || tTypeLower.includes("mix")) ? "Mixed" :
       "Single Turn";
+    const reasoningFormatInstruction = `
+REASONING TEMPLATE FORMAT:
+- Put the reasoning section inside the assistant message's "content" as <think>...</think>.
+- Put the final answer after </think> in that same "content" string.
+- Do not emit a separate "reasoning" or "reasoning_content" property.
+- Keep the selected template's message roles and any required instruction markers.
+`;
 
     // Define response schema to guarantee format
     let schemaProperty: any = {};
@@ -1378,8 +1385,10 @@ app.post("/api/generate", async (req, res) => {
                 type: Type.OBJECT,
                 properties: {
                   role: { type: Type.STRING },
-                  content: { type: Type.STRING },
-                  reasoning: { type: Type.STRING }
+                  content: {
+                    type: Type.STRING,
+                    description: "For reasoning examples, include <think>...</think> followed by the final answer in this content string."
+                  }
                 },
                 required: ["role", "content"]
               }
@@ -1424,8 +1433,29 @@ app.post("/api/generate", async (req, res) => {
         },
         required: ["messages"]
       };
+    } else if (turnMode === "Reasoning") {
+      schemaProperty = {
+        type: Type.OBJECT,
+        properties: {
+          messages: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                role: { type: Type.STRING },
+                content: {
+                  type: Type.STRING,
+                  description: "Assistant content must contain <think>...</think> followed by the final answer."
+                }
+              },
+              required: ["role", "content"]
+            }
+          }
+        },
+        required: ["messages"]
+      };
     } else {
-      // Reasoning
+      // Mixed
       schemaProperty = {
         type: Type.OBJECT,
         properties: {
@@ -1786,7 +1816,7 @@ app.post("/api/generate", async (req, res) => {
         - Reasoning: NO system message, user prompt, assistant response formatted with <think>\n{trainee's chain of thought to get to response (no generator meta reasoning)}\n</think>\n{final_answer}
         `}
           `
-        ) : templateType === "Reasoning" ? `
+        ) : turnMode === "Reasoning" ? `
         EXACT MANDATORY STRUCTURE FOR REASONING TEMPLATE:
         Every single example in the JSON array MUST follow this exact structure:
         {
@@ -1797,18 +1827,13 @@ app.post("/api/generate", async (req, res) => {
             },
             {
               "role": "assistant",
-              "reasoning": "Trainee's internal natural language step-by-step chain of thought analyzing the problem and solving it...",
-              "content": "The clear, complete final assistant response..."
+              "content": "<think>\\n[Reasoning trace]\\n</think>\\n[Clear, complete final assistant response]"
             }
           ]
         }
         
-        STRICT REASONING RULES:
-        1. Reasoning within the template should always demonstrate a chain of thought the trainee will use to get to the response.
-        2. NO META REASONING FROM THE GENERATOR: Never include meta reasoning from the generator about creating the dataset, writing prompts, or synthesizer planning (e.g. do NOT say 'I will create a prompt...', 'As an SFT generator...'). The reasoning must solely demonstrate the trainee model's internal step-by-step thinking process to solve the problem and reach the response.
-        3. Every assistant message MUST contain the "reasoning" key containing the trainee's step-by-step thinking process AND the "content" key containing the final answer.
-        4. Do NOT put reasoning inside the "content" field or inside <think> tags. The "reasoning" key must strictly be populated.
-        5. Do NOT add extra turns or system messages.
+        ${reasoningFormatInstruction}
+        Do not add a system message or extra turns.
         ` : templateType === "Multi Turn" ? `
         EXACT MANDATORY STRUCTURE FOR MULTI TURN TEMPLATE:
         Every single example in the JSON array MUST follow this exact structure:
@@ -1837,6 +1862,7 @@ app.post("/api/generate", async (req, res) => {
         
         To guarantee dataset diversity, make sure that every generated example has a completely unique, creative, and distinct subject matter and scenario. Do NOT repeat or reuse scenarios, prompts, or topics. Every prompt and response should be highly original, realistic, and tailored to the requested persona.
 
+        ${turnMode === "Reasoning" ? reasoningFormatInstruction : ""}
         Generate exactly ${currentChunkSize} examples. Return them as a JSON array of examples.
       `;
 
@@ -1855,7 +1881,8 @@ We want the models in training to learn reasoning chain of thought in the reason
 You MUST write all thinking traces in the FIRST PERSON from the perspective of the trainee model working through the prompt (e.g., "The user is asking for... Let me first check... I need to verify... Therefore, the answer is...").
 - The reasoning trace must ALWAYS demonstrate the internal chain of thought the trainee will use to arrive at the response.
 - Strictly write thinking traces in the first person ("I", "let me", "my next step").
-- ABSOLUTELY NO META REASONING FROM THE GENERATOR: Never include any generator meta commentary about dataset synthesis, writing prompts, or instructions. It must solely be the trainee model solving the problem.`
+- ABSOLUTELY NO META REASONING FROM THE GENERATOR: Never include any generator meta commentary about dataset synthesis, writing prompts, or instructions. It must solely be the trainee model solving the problem.
+${reasoningFormatInstruction}`
               : turnMode === "Mixed"
               ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
 
@@ -1934,8 +1961,17 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           await new Promise((resolve) => setTimeout(resolve, 2000));
           const results = await Promise.allSettled(
             topUpStacks[stackIndex].map(async (assignment, modelIndex) => {
+              const reasoningTopUpFormat = turnMode !== "Reasoning"
+                ? ""
+                : isInstruct
+                  ? `${reasoningFormatInstruction}
+Use the selected ${instructTemplate} instruction template's exact user/assistant markers. The assistant content must place <think>...</think> before its final answer.`
+                  : `${reasoningFormatInstruction}
+Return each example in this exact JSON structure, with no system message:
+{"messages":[{"role":"user","content":"[User prompt]"},{"role":"assistant","content":"<think>\\n[Reasoning trace]\\n</think>\\n[Final answer]"}]}`;
               const topUpPrompt = `
                 Generate exactly ${assignment.count} additional high-quality SFT examples matching persona "${targetTask || "Domain Assistant"}" and template type "${templateType}".
+                ${reasoningTopUpFormat}
                 Make every example unique and distinct. Return as a JSON array of examples.
               `;
               const topUpRes = await callDigitalOceanAI(client, {
