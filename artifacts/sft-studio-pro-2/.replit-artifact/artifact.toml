@@ -15,13 +15,22 @@ localPort = 18171
 run = "pnpm --filter @workspace/sft-studio-pro-2 run dev"
 
 [services.production]
-build = [ "pnpm", "--filter", "@workspace/sft-studio-pro-2", "run", "build" ]
-serve = "static"
-publicDir = "artifacts/sft-studio-pro-2/dist/public"
 
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+[services.production.build]
+args = ["pnpm", "--filter", "@workspace/sft-studio-pro-2", "run", "build"]
+
+[services.production.build.env]
+NODE_ENV = "production"
+
+[services.production.run]
+args = ["node", "--enable-source-maps", "artifacts/sft-studio-pro-2/dist/server.cjs"]
+
+[services.production.run.env]
+PORT = "18171"
+NODE_ENV = "production"
+
+[services.production.health.startup]
+path = "/"
 
 [services.env]
 PORT = "18171"
