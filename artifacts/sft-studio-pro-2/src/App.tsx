@@ -1975,7 +1975,7 @@ export default function App() {
     setNotification({ text: `Synthesizing ${batchSize} examples. Please wait...`, type: "info" });
     
     try {
-      // Keep the selected batch intact; the API server schedules concurrent ten-model waves.
+      // Keep the selected batch intact; the API server schedules concurrent model waves.
       const clientChunkSize = batchSize;
       const subChunkCounts: number[] = [];
       let remaining = batchSize;
@@ -2019,7 +2019,7 @@ export default function App() {
         });
       };
 
-      // Execute sub-chunks (concurrency 2 for high reliability and rapid throughput)
+      // The selected batch is one API request; the API server controls model concurrency by wave.
       const chunkConcurrency = Math.min(2, subChunkCounts.length);
       let chunkIdx = 0;
 

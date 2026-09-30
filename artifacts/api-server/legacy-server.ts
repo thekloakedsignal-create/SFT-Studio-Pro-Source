@@ -1314,6 +1314,12 @@ app.post("/api/generate", async (req, res) => {
   } = req.body;
 
   const countNum = parseInt(count) || 5;
+  if (!(SUPPORTED_GENERATION_BATCH_SIZES as readonly number[]).includes(countNum)) {
+    return res.status(400).json({
+      success: false,
+      error: `Unsupported batch size. Choose one of: ${SUPPORTED_GENERATION_BATCH_SIZES.join(", ")}.`,
+    });
+  }
   const wantsProgressStream = req.body?.stream === true;
   let progressStreamStarted = false;
   const startProgressStream = () => {
