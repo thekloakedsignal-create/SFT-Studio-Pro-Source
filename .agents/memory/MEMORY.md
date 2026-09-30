@@ -1,1 +1,1 @@
-- [SFT generation constraints](sft-generation-constraints.md) — Use the two ordered five-model groups, exact batch sizes, and concurrent deployment waves; never use Model Synthesis.
+- [SFT generation constraints](sft-generation-constraints.md) — Use individual DigitalOcean Chat Completions calls; never Model Synthesis or changes to templates and batch choices.

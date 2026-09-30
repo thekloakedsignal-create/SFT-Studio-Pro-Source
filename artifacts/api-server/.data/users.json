@@ -8,21 +8,5 @@
     "updatedAt": "2026-09-29T08:46:27.075Z",
     "id": 2,
     "createdAt": "2026-08-27T19:45:01.975Z"
-  },
-  "d7DchmfBQpPQUBzcNrkprUIYFbA2": {
-    "uid": "d7DchmfBQpPQUBzcNrkprUIYFbA2",
-    "email": "sftstudentgroup1@gmail.com",
-    "subscriptionStatus": "Free",
-    "limit": 5000,
-    "redeemedCode": null,
-    "updatedAt": "2026-09-30T05:55:20.655Z"
-  },
-  "0l3DRt7a96NkbBJ736dNKf1mASn1": {
-    "uid": "0l3DRt7a96NkbBJ736dNKf1mASn1",
-    "email": "sftstudentgroup1@yahoo.com",
-    "subscriptionStatus": "Free",
-    "limit": 5000,
-    "redeemedCode": null,
-    "updatedAt": "2026-09-30T06:18:09.973Z"
   }
 }

@@ -8,7 +8,7 @@ import { db } from "./src/db/index.ts";
 import { projects, batches, users, studentCodes } from "./src/db/schema.ts";
 import { eq, and } from "drizzle-orm";
 import { optionalAuth, AuthRequest } from "./src/middleware/auth.ts";
-import OpenAI from "openai";
+import { Gradient } from "./src/lib/gradient.ts";
 
 dotenv.config();
 
@@ -816,7 +816,7 @@ app.get("/api/contact/inquiries", (_req, res) => {
   return res.json({ inquiries: [] });
 });
 
-// Helper to safely extract text from DigitalOcean Chat Completions responses
+// Helper to safely extract text from DigitalOcean Gradient response
 function extractResponseText(res: any): string {
   if (!res) return "";
   if (typeof res.text === "string") return res.text;
@@ -841,7 +841,7 @@ function normalizeModel(modelName?: string): string {
   return process.env.DO_MODEL || "glm-5.3-flash";
 }
 
-// Clean human-readable error formatting for DigitalOcean Chat Completions errors
+// Clean human-readable error formatting for DigitalOcean Gradient Inference errors
 function formatAIErrorMessage(err: any): string {
   if (!err) return "An unknown AI generation error occurred.";
   const raw = typeof err === "string" ? err : err?.message || JSON.stringify(err);
@@ -869,7 +869,7 @@ function formatAIErrorMessage(err: any): string {
     raw.includes('"code":401') ||
     raw.includes("code 401")
   ) {
-    return "DigitalOcean Chat Completions authentication failed (401). Verify DIGITALOCEAN_TOKEN or DIGITALOCEAN_API_KEY in the app environment.";
+    return "DigitalOcean Inference authentication failed (401). Verify DIGITALOCEAN_TOKEN or GRADIENT_MODEL_ACCESS_KEY in the app environment.";
   }
 
   // Attempt to extract clean message field if raw is a JSON string
@@ -883,10 +883,10 @@ function formatAIErrorMessage(err: any): string {
   return raw.replace(/^(Error:\s*)+/, "").trim();
 }
 
-// Make a direct request to DigitalOcean's OpenAI-compatible Chat Completions endpoint.
-async function callDigitalOceanChatCompletions(doApiKey: string, params: any): Promise<any> {
+// DigitalOcean Chat Completions through the existing OpenAI-compatible endpoint.
+async function callDigitalOceanInference(doApiKey: string, params: any): Promise<any> {
   if (!doApiKey.trim()) {
-    throw new Error("DigitalOcean Chat Completions credentials are not configured. Set DIGITALOCEAN_TOKEN or DIGITALOCEAN_API_KEY.");
+    throw new Error("DigitalOcean inference credentials are not configured. Set DIGITALOCEAN_TOKEN or GRADIENT_MODEL_ACCESS_KEY.");
   }
 
   const requestedModel = typeof params.model === "string" ? params.model : "";
@@ -965,26 +965,22 @@ async function callDigitalOceanChatCompletions(doApiKey: string, params: any): P
     baseMessages.push({ role: "user", content: "Hello" });
   }
 
-  const chatCompletionsClient = new OpenAI({
-    apiKey: doApiKey.trim(),
-    baseURL: "https://inference.do-ai.run/v1",
-    maxRetries: 0,
-  });
+  const inferenceClient = new Gradient({ model_access_key: doApiKey.trim() });
 
   // Cap max_tokens to 4096 to avoid prefill memory buffer allocation overload on inference server
   const maxTokensToUse = Math.min(params.config?.maxOutputTokens ?? 4096, 4096);
   const jsonMode = Boolean(params.config?.responseSchema) || params.config?.responseMimeType === "application/json";
 
   console.log(`[DigitalOcean Chat Completions] Request to model ${targetModel} (max_tokens: ${maxTokensToUse})...`);
-  const completion = await chatCompletionsClient.chat.completions.create({
+  const completion = await inferenceClient.chat.completions.create({
     model: targetModel,
     messages: baseMessages,
     temperature: params.config?.temperature ?? 0.7,
     max_tokens: maxTokensToUse,
     ...(jsonMode ? { response_format: { type: "json_object" } } : {})
-  }, { maxRetries: 0 });
+  });
 
-  const textContent = extractResponseText(completion);
+  const textContent = completion.choices?.[0]?.message?.content || "";
 
   if (!textContent) {
     throw new Error(`Empty response content from DigitalOcean model ${targetModel}`);
@@ -994,33 +990,38 @@ async function callDigitalOceanChatCompletions(doApiKey: string, params: any): P
     text: textContent,
     candidates: [{ content: { parts: [{ text: textContent }] } }],
     _usedModel: targetModel,
-    _usedProvider: "DigitalOcean Chat Completions"
+    _usedProvider: "DigitalOcean Inference"
   };
 }
 
 function getDigitalOceanClient(): { provider: string } {
-  return { provider: "DigitalOcean Chat Completions" };
+  return { provider: "DigitalOcean GenAI Inference" };
 }
 
-// Direct AI execution through DigitalOcean Chat Completions.
+// Direct AI execution through DigitalOcean Gradient Inference.
 async function callDigitalOceanAI(_initialClient: any, params: any): Promise<any> {
   const doApiKey =
+    process.env.GRADIENT_MODEL_ACCESS_KEY ||
     process.env.DIGITALOCEAN_TOKEN ||
     process.env.DIGITALOCEAN_API_KEY ||
     process.env.MODEL_ACCESS_KEY ||
     process.env.DO_INFERENCE_KEY ||
     "";
-  console.log(`[DigitalOcean Chat Completions] Executing request using model ${params.model || process.env.DO_MODEL || "glm-5.3-flash"}...`);
-  return await callDigitalOceanChatCompletions(doApiKey.trim(), params);
+  console.log(`[DigitalOcean Inference] Executing request using model ${params.model || process.env.DO_MODEL || "glm-5.3-flash"}...`);
+  return await callDigitalOceanInference(doApiKey.trim(), params);
+}
+
+async function callGradientAI(params: any): Promise<any> {
+  return await callDigitalOceanAI(null, params);
 }
 
 const DEFAULT_GENERATION_MODEL_GROUPS = [
   [
-    "glm-5.3-flash",
+    "glm-3-flash",
     "qwen3.5-397b-a17b",
     "gemma-4-31B-it",
     "deepseek-v4-pro",
-    "qwen3.8-max",
+    "kimi-k2.6",
   ],
   [
     "llama-4-maverick",
@@ -1306,8 +1307,6 @@ app.post("/api/generate", async (req, res) => {
     batchDescription,
     specialInstructions,
     temporaryConstraints,
-    representativePrompt,
-    representativeCompletion,
     templateType,
     instructTemplate,
     isInstruction,
@@ -1315,12 +1314,6 @@ app.post("/api/generate", async (req, res) => {
   } = req.body;
 
   const countNum = parseInt(count) || 5;
-  if (!(SUPPORTED_GENERATION_BATCH_SIZES as readonly number[]).includes(countNum)) {
-    return res.status(400).json({
-      success: false,
-      error: `Unsupported batch size. Choose one of: ${SUPPORTED_GENERATION_BATCH_SIZES.join(", ")}.`,
-    });
-  }
   const wantsProgressStream = req.body?.stream === true;
   let progressStreamStarted = false;
   const startProgressStream = () => {
@@ -1626,13 +1619,6 @@ REASONING TEMPLATE FORMAT:
         - System Prompt to include/simulate: ${systemPrompt || "You are a helpful assistant."}
         - Target Task & Persona: ${targetTask || "General helpfulness"}
         - General Constraints: ${constraints || "Be accurate, detailed, and clear."}
-
-        ${representativePrompt || representativeCompletion ? `
-        GOLDEN EXAMPLE — VOICE REFERENCE:
-        Match the assistant's voice, tone, vocabulary, cadence, and level of detail in this example. Use it only as a style reference; do not copy its wording, facts, or scenario.
-        Example user prompt: ${representativePrompt || ""}
-        Example assistant completion: ${representativeCompletion || ""}
-        ` : ""}
         
         BATCH TEMPORARY SETTINGS:
         - Batch Description: ${batchDescription || "Standard synth batch"}
@@ -1922,7 +1908,7 @@ This task generates direct ${turnMode} assistant responses. ${turnMode} response
 Every assistant response MUST begin immediately with the direct, substantive answer to the user.
 No internal deliberation, planning, or reasoning fields are permitted.`
           };
-          const response = await callDigitalOceanAI(null, {
+          const response = await callGradientAI({
             model: targetModel,
             contents: fullPrompt,
             config: configObj
@@ -1976,13 +1962,93 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       }
     });
 
-    if (firstError) {
-      throw firstError;
+    // Self-healing top-up for large batch requests: if any chunks dropped items, synthesize missing difference
+    if (allExamples.length > 0 && allExamples.length < countNum) {
+      const missingCount = countNum - allExamples.length;
+      console.log(`[Batch Self-Healing] Recovering ${missingCount} missing examples to complete large batch request of ${countNum}...`);
+      try {
+        const topUpStacks = createModelGenerationStacks(missingCount, generationModels);
+        for (let stackIndex = 0; stackIndex < topUpStacks.length; stackIndex++) {
+          if (stackIndex > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+          const results = await Promise.allSettled(
+            topUpStacks[stackIndex].map(async (assignment, modelIndex) => {
+              const reasoningTopUpFormat = turnMode !== "Reasoning"
+                ? ""
+                : isInstruct
+                  ? `${reasoningFormatInstruction}
+Use the selected ${instructTemplate} instruction template's exact user/assistant markers. The assistant content must place <think>...</think> before its final answer.`
+                  : `${reasoningFormatInstruction}
+Return each example in this exact JSON structure, with no system message:
+{"messages":[{"role":"user","content":"[User prompt]"},{"role":"assistant","content":"<think>\\n[Reasoning trace]\\n</think>\\n[Final answer]"}]}`;
+              const topUpPrompt = `
+                Generate exactly ${assignment.count} additional high-quality SFT examples matching persona "${targetTask || "Domain Assistant"}" and template type "${templateType}".
+                ${reasoningTopUpFormat}
+                Make every example unique and distinct. Return as a JSON array of examples.
+              `;
+              const topUpRes = await callDigitalOceanAI(client, {
+                model: assignment.model,
+                contents: topUpPrompt,
+                config: {
+                  maxOutputTokens: 65536,
+                  responseMimeType: "application/json",
+                  responseSchema: {
+                    type: Type.ARRAY,
+                    items: schemaProperty
+                  },
+                  ...(turnMode !== "Reasoning" && turnMode !== "Mixed" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+                  systemInstruction: (turnMode === "Single Turn" || turnMode === "Multi Turn")
+                    ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
+ABSOLUTE ZERO CHAIN-OF-THOUGHT MANDATE:
+Single turn and multi turn responses must NEVER contain any train of thought, thinking traces, internal planning monologue, or reasoning. Return direct assistant responses only.`
+                    : `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
+CRITICAL SCOPE RULE FOR CHAIN OF THOUGHT:
+Chain of thought is for reasoning examples ONLY. Single and multi turn responses must never contain any train of thought, thinking traces, or reasoning. Chain of thought is strictly restricted to reasoning examples.`
+                }
+              });
+              const topUpText = extractResponseText(topUpRes) || "[]";
+              const topUpParsed = parseGeneratedExamples(topUpText);
+              const generated = Array.isArray(topUpParsed)
+                ? topUpParsed.slice(0, assignment.count)
+                : [];
+              completedExampleCount += generated.length;
+              sendProgressEvent({
+                type: "progress",
+                taskId: `topup:${stackIndex}:${modelIndex}:${assignment.model}`,
+                model: assignment.model,
+                generatedCount: generated.length,
+                completedCount: completedExampleCount,
+                total: countNum
+              });
+              return generated;
+            })
+          );
+
+          for (const result of results) {
+            if (result.status === "rejected") {
+              if (!firstError) firstError = result.reason;
+              console.warn("[Batch Self-Healing] Model top-up notice:", result.reason);
+              continue;
+            }
+            result.value.forEach((example, exampleIndex) => {
+              if (allExamples.length < countNum) {
+                allExamples.push(sanitizeExample({
+                  ...example,
+                  id: `gen-topup-${stackIndex}-${exampleIndex}-${Date.now()}`
+                }, turnMode));
+              }
+            });
+          }
+        }
+      } catch (topUpErr) {
+        console.warn("[Batch Self-Healing] Top-up notice:", topUpErr);
+      }
     }
-    if (allExamples.length !== countNum) {
-      throw new Error(
-        `Generation returned ${allExamples.length} of ${countNum} requested examples. No extra model calls were made, to preserve the selected deployment schedule.`,
-      );
+
+    if (allExamples.length === 0) {
+      if (firstError) throw firstError;
+      throw new Error("No examples were returned by the generation engine. Please retry with a smaller batch or check connection.");
     }
 
     // Ensure we don't exceed requested count
@@ -1995,7 +2061,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     const generationResponse = {
       success: true, 
       examples: formattedExamples, 
-      source: `DigitalOcean Chat Completions (${generationModels.join(", ")})`
+      source: `DigitalOcean Inference (${generationModels.join(", ")})`
     };
     if (progressStreamStarted) {
       sendProgressEvent({ type: "complete", ...generationResponse });
@@ -2796,7 +2862,7 @@ Return ONLY a valid JSON object matching:
 Do NOT wrap output in extra text outside the JSON. Return raw JSON.
 `;
 
-    const aiRes = await callDigitalOceanAI(null, {
+    const aiRes = await callGradientAI({
       model: normalizeModel(extractionModel),
       contents: analysisPrompt
     });
@@ -2867,7 +2933,7 @@ app.post("/api/convert-document", async (req, res) => {
     converterInstructions
   } = req.body;
 
-  console.log("DigitalOcean Chat Completions client initialized.");
+  console.log("DigitalOcean Gradient AI client initialized.");
 
   const actualDocType = docType || (isTranscript ? "transcript" : "knowledge_base");
 
@@ -3230,7 +3296,7 @@ Return ONLY a valid JSON object matching this structure:
 Return raw JSON without extra conversational text.
 `;
 
-        const aiRes = await callDigitalOceanAI(null, {
+        const aiRes = await callGradientAI({
           model: normalizeModel(extractionModel),
           contents: synthesisPrompt,
           config: {
@@ -3773,7 +3839,7 @@ app.post("/api/analyze-quality", async (req, res) => {
             - "suggestions": Array of 1 to 3 actionable, high-level improvement recommendations for this dataset chunk.
           `;
 
-          const response = await callDigitalOceanAI(null, {
+          const response = await callGradientAI({
             model: normalizeModel(),
             contents: chunkPrompt,
             config: {
@@ -3974,7 +4040,7 @@ app.post("/api/regenerate-flagged", async (req, res) => {
       5. Return ONLY valid JSON matching the requested schema.
     `;
 
-    const response = await callDigitalOceanAI(null, {
+    const response = await callGradientAI({
       model: normalizeModel(),
       contents: fullPrompt,
       config: {

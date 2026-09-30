@@ -1975,7 +1975,7 @@ export default function App() {
     setNotification({ text: `Synthesizing ${batchSize} examples. Please wait...`, type: "info" });
     
     try {
-      // Keep the selected batch intact; the API server schedules concurrent model waves.
+      // Keep the selected batch intact; the API server schedules concurrent ten-model waves.
       const clientChunkSize = batchSize;
       const subChunkCounts: number[] = [];
       let remaining = batchSize;
@@ -2019,13 +2019,13 @@ export default function App() {
         });
       };
 
-      // The selected batch is one API request; the API server controls model concurrency by wave.
+      // Execute sub-chunks (concurrency 2 for high reliability and rapid throughput)
       const chunkConcurrency = Math.min(2, subChunkCounts.length);
       let chunkIdx = 0;
 
       const runSubChunk = async (countToGen: number, currentSubIdx: number): Promise<any[]> => {
         let attempts = 0;
-        const maxAttempts = 1;
+        const maxAttempts = 3;
         while (attempts < maxAttempts) {
           try {
             const res = await fetch("/api/generate", {
@@ -2109,7 +2109,6 @@ export default function App() {
             attempts++;
             console.warn(`[Batch Orchestrator] Sub-batch ${currentSubIdx + 1} attempt ${attempts} notice:`, err?.message || err);
             clearStreamedProgress(currentSubIdx);
-            if (attempts >= maxAttempts) throw err;
             if (attempts < maxAttempts) {
               await new Promise(r => setTimeout(r, 1000 * attempts));
             }

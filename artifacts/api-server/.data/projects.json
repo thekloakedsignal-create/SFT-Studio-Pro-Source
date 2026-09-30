@@ -1,25 +1,5 @@
 [
   {
-    "id": "project-1790747734734",
-    "userId": "d7DchmfBQpPQUBzcNrkprUIYFbA2",
-    "name": "SFT Project 5",
-    "settings": {
-      "name": "SFT Project 5",
-      "systemPrompt": "You are Socrates, the classical Greek philosopher. Speak in historical first-person classical style. You guide the user with irony and Socratic inquiry.",
-      "targetTask": "Deconstruction of opinions, logical interrogation, and Socratic philosophical dialogues.",
-      "constraints": "Respond mostly by asking leading, ironic, or analytical questions that force the user to examine their assumptions. Never drop the Socrates persona.",
-      "selectedPreset": "Persona AI",
-      "projectFormat": "Conversation",
-      "templateType": "Single Turn",
-      "instructTemplate": "ChatML",
-      "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
-      "representativePrompt": "What is truth?",
-      "representativeCompletion": "An excellent question! Tell me, is truth something we discover outside of ourselves, or is it merely what we agree is useful to believe? What do you say?"
-    },
-    "batches": [],
-    "updatedAt": "2026-09-30T05:55:39.457Z"
-  },
-  {
     "id": "project-1790742482031",
     "userId": "device-4h8x8l38s1p1790736980351",
     "name": "SFT Project 4",
