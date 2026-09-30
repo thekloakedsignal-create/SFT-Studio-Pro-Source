@@ -826,14 +826,6 @@ function extractResponseText(res: any): string {
       if (typeof val === "string") return val;
     } catch (e) {}
   }
-  const chatContent = res.choices?.[0]?.message?.content;
-  if (typeof chatContent === "string") return chatContent;
-  if (Array.isArray(chatContent)) {
-    return chatContent
-      .filter((part: any) => part?.type === "text" && typeof part.text === "string")
-      .map((part: any) => part.text)
-      .join("");
-  }
   if (res.candidates?.[0]?.content?.parts?.[0]?.text) {
     return res.candidates[0].content.parts[0].text;
   }
@@ -877,7 +869,7 @@ function formatAIErrorMessage(err: any): string {
     raw.includes('"code":401') ||
     raw.includes("code 401")
   ) {
-    return "DigitalOcean Inference authentication failed (401). Verify DIGITALOCEAN_TOKEN or GRADIENT_MODEL_ACCESS_KEY in the app environment.";
+    return "DigitalOcean Chat Completions authentication failed (401). Verify DIGITALOCEAN_TOKEN or DIGITALOCEAN_API_KEY in the app environment.";
   }
 
   // Attempt to extract clean message field if raw is a JSON string
@@ -894,7 +886,7 @@ function formatAIErrorMessage(err: any): string {
 // Make a direct request to DigitalOcean's OpenAI-compatible Chat Completions endpoint.
 async function callDigitalOceanChatCompletions(doApiKey: string, params: any): Promise<any> {
   if (!doApiKey.trim()) {
-    throw new Error("DigitalOcean inference credentials are not configured. Set DIGITALOCEAN_TOKEN or GRADIENT_MODEL_ACCESS_KEY.");
+    throw new Error("DigitalOcean Chat Completions credentials are not configured. Set DIGITALOCEAN_TOKEN or DIGITALOCEAN_API_KEY.");
   }
 
   const requestedModel = typeof params.model === "string" ? params.model : "";
@@ -998,7 +990,12 @@ async function callDigitalOceanChatCompletions(doApiKey: string, params: any): P
     throw new Error(`Empty response content from DigitalOcean model ${targetModel}`);
   }
 
-  return completion;
+  return {
+    text: textContent,
+    candidates: [{ content: { parts: [{ text: textContent }] } }],
+    _usedModel: targetModel,
+    _usedProvider: "DigitalOcean Chat Completions"
+  };
 }
 
 function getDigitalOceanClient(): { provider: string } {
@@ -1008,7 +1005,6 @@ function getDigitalOceanClient(): { provider: string } {
 // Direct AI execution through DigitalOcean Chat Completions.
 async function callDigitalOceanAI(_initialClient: any, params: any): Promise<any> {
   const doApiKey =
-    process.env.GRADIENT_MODEL_ACCESS_KEY ||
     process.env.DIGITALOCEAN_TOKEN ||
     process.env.DIGITALOCEAN_API_KEY ||
     process.env.MODEL_ACCESS_KEY ||

@@ -23,12 +23,12 @@ export class Gradient {
   private client: OpenAI;
 
   constructor(options?: GradientOptions) {
-    const key = options?.modelAccessKey || 
-                options?.model_access_key || 
-                options?.apiKey || 
-                process.env.MODEL_ACCESS_KEY || 
-                process.env.DIGITALOCEAN_API_KEY || 
-                process.env.DO_INFERENCE_KEY || 
+    const key = options?.modelAccessKey ||
+                options?.model_access_key ||
+                options?.apiKey ||
+                process.env.MODEL_ACCESS_KEY ||
+                process.env.DIGITALOCEAN_API_KEY ||
+                process.env.DO_INFERENCE_KEY ||
                 "";
 
     this.client = new OpenAI({
