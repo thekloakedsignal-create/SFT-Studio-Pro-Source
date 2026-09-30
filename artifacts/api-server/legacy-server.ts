@@ -8,7 +8,7 @@ import { db } from "./src/db/index.ts";
 import { projects, batches, users, studentCodes } from "./src/db/schema.ts";
 import { eq, and } from "drizzle-orm";
 import { optionalAuth, AuthRequest } from "./src/middleware/auth.ts";
-import { Gradient } from "./src/lib/gradient.ts";
+import OpenAI from "openai";
 
 dotenv.config();
 
@@ -816,7 +816,7 @@ app.get("/api/contact/inquiries", (_req, res) => {
   return res.json({ inquiries: [] });
 });
 
-// Helper to safely extract text from DigitalOcean Gradient response
+// Helper to safely extract text from DigitalOcean Chat Completions responses
 function extractResponseText(res: any): string {
   if (!res) return "";
   if (typeof res.text === "string") return res.text;
@@ -825,6 +825,14 @@ function extractResponseText(res: any): string {
       const val = res.text();
       if (typeof val === "string") return val;
     } catch (e) {}
+  }
+  const chatContent = res.choices?.[0]?.message?.content;
+  if (typeof chatContent === "string") return chatContent;
+  if (Array.isArray(chatContent)) {
+    return chatContent
+      .filter((part: any) => part?.type === "text" && typeof part.text === "string")
+      .map((part: any) => part.text)
+      .join("");
   }
   if (res.candidates?.[0]?.content?.parts?.[0]?.text) {
     return res.candidates[0].content.parts[0].text;
@@ -841,7 +849,7 @@ function normalizeModel(modelName?: string): string {
   return process.env.DO_MODEL || "glm-5.3-flash";
 }
 
-// Clean human-readable error formatting for DigitalOcean Gradient Inference errors
+// Clean human-readable error formatting for DigitalOcean Chat Completions errors
 function formatAIErrorMessage(err: any): string {
   if (!err) return "An unknown AI generation error occurred.";
   const raw = typeof err === "string" ? err : err?.message || JSON.stringify(err);
@@ -883,8 +891,8 @@ function formatAIErrorMessage(err: any): string {
   return raw.replace(/^(Error:\s*)+/, "").trim();
 }
 
-// DigitalOcean Chat Completions through the existing OpenAI-compatible endpoint.
-async function callDigitalOceanInference(doApiKey: string, params: any): Promise<any> {
+// Make a direct request to DigitalOcean's OpenAI-compatible Chat Completions endpoint.
+async function callDigitalOceanChatCompletions(doApiKey: string, params: any): Promise<any> {
   if (!doApiKey.trim()) {
     throw new Error("DigitalOcean inference credentials are not configured. Set DIGITALOCEAN_TOKEN or GRADIENT_MODEL_ACCESS_KEY.");
   }
@@ -965,14 +973,18 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
     baseMessages.push({ role: "user", content: "Hello" });
   }
 
-  const inferenceClient = new Gradient({ model_access_key: doApiKey.trim() });
+  const chatCompletionsClient = new OpenAI({
+    apiKey: doApiKey.trim(),
+    baseURL: "https://inference.do-ai.run/v1",
+    maxRetries: 0,
+  });
 
   // Cap max_tokens to 4096 to avoid prefill memory buffer allocation overload on inference server
   const maxTokensToUse = Math.min(params.config?.maxOutputTokens ?? 4096, 4096);
   const jsonMode = Boolean(params.config?.responseSchema) || params.config?.responseMimeType === "application/json";
 
   console.log(`[DigitalOcean Chat Completions] Request to model ${targetModel} (max_tokens: ${maxTokensToUse})...`);
-  const completion = await inferenceClient.chat.completions.create({
+  const completion = await chatCompletionsClient.chat.completions.create({
     model: targetModel,
     messages: baseMessages,
     temperature: params.config?.temperature ?? 0.7,
@@ -980,25 +992,20 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
     ...(jsonMode ? { response_format: { type: "json_object" } } : {})
   }, { maxRetries: 0 });
 
-  const textContent = completion.choices?.[0]?.message?.content || "";
+  const textContent = extractResponseText(completion);
 
   if (!textContent) {
     throw new Error(`Empty response content from DigitalOcean model ${targetModel}`);
   }
 
-  return {
-    text: textContent,
-    candidates: [{ content: { parts: [{ text: textContent }] } }],
-    _usedModel: targetModel,
-    _usedProvider: "DigitalOcean Inference"
-  };
+  return completion;
 }
 
 function getDigitalOceanClient(): { provider: string } {
-  return { provider: "DigitalOcean GenAI Inference" };
+  return { provider: "DigitalOcean Chat Completions" };
 }
 
-// Direct AI execution through DigitalOcean Gradient Inference.
+// Direct AI execution through DigitalOcean Chat Completions.
 async function callDigitalOceanAI(_initialClient: any, params: any): Promise<any> {
   const doApiKey =
     process.env.GRADIENT_MODEL_ACCESS_KEY ||
@@ -1007,12 +1014,8 @@ async function callDigitalOceanAI(_initialClient: any, params: any): Promise<any
     process.env.MODEL_ACCESS_KEY ||
     process.env.DO_INFERENCE_KEY ||
     "";
-  console.log(`[DigitalOcean Inference] Executing request using model ${params.model || process.env.DO_MODEL || "glm-5.3-flash"}...`);
-  return await callDigitalOceanInference(doApiKey.trim(), params);
-}
-
-async function callGradientAI(params: any): Promise<any> {
-  return await callDigitalOceanAI(null, params);
+  console.log(`[DigitalOcean Chat Completions] Executing request using model ${params.model || process.env.DO_MODEL || "glm-5.3-flash"}...`);
+  return await callDigitalOceanChatCompletions(doApiKey.trim(), params);
 }
 
 const DEFAULT_GENERATION_MODEL_GROUPS = [
@@ -1923,7 +1926,7 @@ This task generates direct ${turnMode} assistant responses. ${turnMode} response
 Every assistant response MUST begin immediately with the direct, substantive answer to the user.
 No internal deliberation, planning, or reasoning fields are permitted.`
           };
-          const response = await callGradientAI({
+          const response = await callDigitalOceanAI(null, {
             model: targetModel,
             contents: fullPrompt,
             config: configObj
@@ -1996,7 +1999,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     const generationResponse = {
       success: true, 
       examples: formattedExamples, 
-      source: `DigitalOcean Inference (${generationModels.join(", ")})`
+      source: `DigitalOcean Chat Completions (${generationModels.join(", ")})`
     };
     if (progressStreamStarted) {
       sendProgressEvent({ type: "complete", ...generationResponse });
@@ -2797,7 +2800,7 @@ Return ONLY a valid JSON object matching:
 Do NOT wrap output in extra text outside the JSON. Return raw JSON.
 `;
 
-    const aiRes = await callGradientAI({
+    const aiRes = await callDigitalOceanAI(null, {
       model: normalizeModel(extractionModel),
       contents: analysisPrompt
     });
@@ -2868,7 +2871,7 @@ app.post("/api/convert-document", async (req, res) => {
     converterInstructions
   } = req.body;
 
-  console.log("DigitalOcean Gradient AI client initialized.");
+  console.log("DigitalOcean Chat Completions client initialized.");
 
   const actualDocType = docType || (isTranscript ? "transcript" : "knowledge_base");
 
@@ -3231,7 +3234,7 @@ Return ONLY a valid JSON object matching this structure:
 Return raw JSON without extra conversational text.
 `;
 
-        const aiRes = await callGradientAI({
+        const aiRes = await callDigitalOceanAI(null, {
           model: normalizeModel(extractionModel),
           contents: synthesisPrompt,
           config: {
@@ -3774,7 +3777,7 @@ app.post("/api/analyze-quality", async (req, res) => {
             - "suggestions": Array of 1 to 3 actionable, high-level improvement recommendations for this dataset chunk.
           `;
 
-          const response = await callGradientAI({
+          const response = await callDigitalOceanAI(null, {
             model: normalizeModel(),
             contents: chunkPrompt,
             config: {
@@ -3975,7 +3978,7 @@ app.post("/api/regenerate-flagged", async (req, res) => {
       5. Return ONLY valid JSON matching the requested schema.
     `;
 
-    const response = await callGradientAI({
+    const response = await callDigitalOceanAI(null, {
       model: normalizeModel(),
       contents: fullPrompt,
       config: {
