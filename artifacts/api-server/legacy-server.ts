@@ -1307,6 +1307,8 @@ app.post("/api/generate", async (req, res) => {
     batchDescription,
     specialInstructions,
     temporaryConstraints,
+    representativePrompt,
+    representativeCompletion,
     templateType,
     instructTemplate,
     isInstruction,
@@ -1625,6 +1627,13 @@ REASONING TEMPLATE FORMAT:
         - System Prompt to include/simulate: ${systemPrompt || "You are a helpful assistant."}
         - Target Task & Persona: ${targetTask || "General helpfulness"}
         - General Constraints: ${constraints || "Be accurate, detailed, and clear."}
+
+        ${representativePrompt || representativeCompletion ? `
+        GOLDEN EXAMPLE — VOICE REFERENCE:
+        Match the assistant's voice, tone, vocabulary, cadence, and level of detail in this example. Use it only as a style reference; do not copy its wording, facts, or scenario.
+        Example user prompt: ${representativePrompt || ""}
+        Example assistant completion: ${representativeCompletion || ""}
+        ` : ""}
         
         BATCH TEMPORARY SETTINGS:
         - Batch Description: ${batchDescription || "Standard synth batch"}

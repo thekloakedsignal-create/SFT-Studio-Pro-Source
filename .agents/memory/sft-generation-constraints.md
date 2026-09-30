@@ -19,7 +19,8 @@ Never use Model Synthesis. Supported batch sizes are exactly 5, 10, 25, 50, 100,
 - 250: Groups 1 twice + Group 2 twice for 12 deployments, then Groups 1+2 once.
 
 Preserve the existing templates and output schemas unless explicitly requested otherwise.
+Pass the project's golden example prompt and completion to every generation model as a voice/style reference, not as content to copy.
 
-**Why:** The user explicitly specified the ordered model groups, exact batch sizes, and parallel deployment timing, and objected to inferred changes beyond those requirements.
+**Why:** The user explicitly designated the golden example as a voice reference and specified the ordered model groups, exact batch sizes, and parallel deployment timing; they objected to inferred changes beyond those requirements.
 
-**How to apply:** Keep every deployment wave concurrent and never delay between individual models. Only the next deployment waits 2 seconds. Do not add request retries or top-up calls. Keep user-visible batch choices and server validation aligned with the exact supported sizes.
+**How to apply:** Keep every deployment wave concurrent and never delay between individual models. Only the next deployment waits 2 seconds. Do not add request retries or top-up calls. Keep user-visible batch choices and server validation aligned with the exact supported sizes. Include the golden example in each model prompt as voice guidance while preserving the selected output template.
