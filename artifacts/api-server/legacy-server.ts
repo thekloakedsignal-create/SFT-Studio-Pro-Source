@@ -1873,6 +1873,9 @@ REASONING TEMPLATE FORMAT:
           const configObj: any = {
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
+            ...(turnMode === "Reasoning"
+              ? { responseSchema: { type: Type.ARRAY, items: schemaProperty } }
+              : {}),
             ...(turnMode !== "Reasoning" && turnMode !== "Mixed" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
             systemInstruction: turnMode === "Reasoning"
               ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
