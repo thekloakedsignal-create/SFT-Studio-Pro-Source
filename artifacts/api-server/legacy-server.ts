@@ -1034,7 +1034,7 @@ async function callDigitalOceanAI(initialClientOrParams: any, maybeParams?: any)
 
 const DEFAULT_GENERATION_MODEL_GROUPS = [
   [
-    "glm-3.5-flash",
+    "glm-5.3-flash",
     "qwen3.5-397b-a17b",
     "gemma-4-31B-it",
     "deepseek-v4-pro",
@@ -1342,14 +1342,6 @@ app.post("/api/generate", async (req, res) => {
   }
   const wantsProgressStream = req.body?.stream === true;
   let progressStreamStarted = false;
-  let progressHeartbeat: ReturnType<typeof setInterval> | null = null;
-  const stopProgressHeartbeat = () => {
-    if (progressHeartbeat) {
-      clearInterval(progressHeartbeat);
-      progressHeartbeat = null;
-    }
-  };
-  res.on("close", stopProgressHeartbeat);
   const startProgressStream = () => {
     if (!wantsProgressStream || progressStreamStarted) return;
     res.status(200);
@@ -1359,13 +1351,6 @@ app.post("/api/generate", async (req, res) => {
     res.setHeader("X-Accel-Buffering", "no");
     (res as any).flushHeaders?.();
     progressStreamStarted = true;
-    progressHeartbeat = setInterval(() => {
-      if (res.writableEnded || res.destroyed) {
-        stopProgressHeartbeat();
-        return;
-      }
-      res.write(": keep-alive\n\n");
-    }, 10_000);
   };
   const sendProgressEvent = (payload: Record<string, unknown>) => {
     if (!progressStreamStarted || res.writableEnded || res.destroyed) return;
@@ -2111,7 +2096,6 @@ Chain of thought is for reasoning examples ONLY. Single and multi turn responses
     };
     if (progressStreamStarted) {
       sendProgressEvent({ type: "complete", ...generationResponse });
-      stopProgressHeartbeat();
       return res.end();
     }
     return res.json(generationResponse);
@@ -2122,7 +2106,6 @@ Chain of thought is for reasoning examples ONLY. Single and multi turn responses
         type: "error",
         error: formatAIErrorMessage(error)
       });
-      stopProgressHeartbeat();
       return res.end();
     }
     return res.status(500).json({
