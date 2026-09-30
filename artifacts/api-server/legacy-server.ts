@@ -1034,7 +1034,7 @@ async function callDigitalOceanAI(initialClientOrParams: any, maybeParams?: any)
 
 const DEFAULT_GENERATION_MODEL_GROUPS = [
   [
-    "glm-3.5-flash",
+    "glm-5.3-flash",
     "qwen3.5-397b-a17b",
     "gemma-4-31B-it",
     "deepseek-v4-pro",
