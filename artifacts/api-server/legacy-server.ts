@@ -847,6 +847,10 @@ function formatAIErrorMessage(err: any): string {
   if (!err) return "An unknown AI generation error occurred.";
   const raw = typeof err === "string" ? err : err?.message || JSON.stringify(err);
 
+  if (/backup model .* failed:/i.test(raw)) {
+    return raw.replace(/^(?:Error:\s*)+/, "").trim();
+  }
+
   if (
     raw.includes("Prefill queue overloaded") ||
     raw.includes("overloaded") ||
@@ -1691,6 +1695,8 @@ REASONING TEMPLATE FORMAT:
     let completedExampleCount = 0;
 
     for (let c = 0; c < generationStacks.length; c++) {
+      const scheduledStackModels = new Set(generationStacks[c].map(({ model }) => model));
+      const backupModelsUsed = new Set<string>();
       for (let modelIndex = 0; modelIndex < generationStacks[c].length; modelIndex++) {
         const { model: targetModel, count: currentChunkSize } = generationStacks[c][modelIndex];
 
@@ -2012,19 +2018,68 @@ This task generates direct ${turnMode} assistant responses. ${turnMode} response
 Every assistant response MUST begin immediately with the direct, substantive answer to the user.
 No internal deliberation, planning, or reasoning fields are permitted.`
           };
-          const response = await callDigitalOceanAI({
-            model: targetModel,
-            contents: fullPrompt,
-            config: configObj
-          });
-          const text = extractResponseText(response) || "[]";
-          const parsed = parseGeneratedExamples(text);
-          const generated = Array.isArray(parsed) ? parsed.slice(0, currentChunkSize) : [];
+          const requestExamplesFromModel = async (model: string) => {
+            const response = await callDigitalOceanAI({
+              model,
+              contents: fullPrompt,
+              config: configObj
+            });
+            const text = extractResponseText(response) || "[]";
+            const parsed = parseGeneratedExamples(text);
+            return Array.isArray(parsed) ? parsed.slice(0, currentChunkSize) : [];
+          };
+
+          let responseModel = targetModel;
+          let generated: any[] = [];
+          try {
+            generated = await requestExamplesFromModel(targetModel);
+          } catch (primaryError: any) {
+            const primaryMessage = String(primaryError?.message || primaryError || "");
+            if (!primaryMessage.includes("DigitalOcean Chat Completions request failed (529)")) {
+              throw primaryError;
+            }
+
+            const unusedBackupModels = generationModels.filter(
+              model =>
+                model !== targetModel &&
+                !scheduledStackModels.has(model) &&
+                !backupModelsUsed.has(model)
+            );
+            const availableBackupModels = unusedBackupModels.length > 0
+              ? unusedBackupModels
+              : generationModels.filter(
+                  model => model !== targetModel && !backupModelsUsed.has(model)
+                );
+            const backupModel = availableBackupModels[0] || generationModels.find(model => model !== targetModel);
+            if (!backupModel) throw primaryError;
+
+            backupModelsUsed.add(backupModel);
+            console.warn(
+              `[Batch Stack ${c + 1} Model ${targetModel}] received HTTP 529; retrying once with backup model ${backupModel}.`
+            );
+
+            try {
+              generated = await requestExamplesFromModel(backupModel);
+            } catch (backupError: any) {
+              const backupMessage = String(backupError?.message || backupError || "Unknown backup model error");
+              throw new Error(
+                `Model ${targetModel} returned HTTP 529; backup model ${backupModel} failed: ${backupMessage}`
+              );
+            }
+            if (generated.length === 0) {
+              throw new Error(
+                `Backup model ${backupModel} returned no examples after ${targetModel} returned HTTP 529.`
+              );
+            }
+            responseModel = backupModel;
+          }
+
           completedExampleCount += generated.length;
           sendProgressEvent({
             type: "progress",
-            taskId: `${c}:${modelIndex}:${targetModel}`,
-            model: targetModel,
+            taskId: `${c}:${modelIndex}:${responseModel}`,
+            model: responseModel,
+            ...(responseModel !== targetModel ? { retriedModel: targetModel } : {}),
             generatedCount: generated.length,
             completedCount: completedExampleCount,
             total: countNum
