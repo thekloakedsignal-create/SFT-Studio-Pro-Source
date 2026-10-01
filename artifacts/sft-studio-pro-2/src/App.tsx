@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { pendingBatches, rememberBatch, forgetBatch, orderBatchesForReview } from "./lib/batch-recovery";
 import { 
   Sparkles, 
   Settings, 
@@ -384,7 +385,7 @@ function ProgressiveScrollList<T>({
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [items.length, chunkSize]);
+  }, [items.length, chunkSize, visibleCount]);
 
   if (!items || items.length === 0) {
     return <>{emptyMessage}</>;
@@ -606,7 +607,16 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [userProjects, setUserProjects] = useState<any[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
+  const activeProjectId = useRef<string | null>(null);
+  const projectLoadVersion = useRef(0);
+  // Preserve completed/edited batches when an older project request resolves later.
+  const sessionBatches = useRef(new Map<string, Map<string, SFTBatch>>());
+  const setSelectedProjectId = (id: string | null) => {
+    if (activeProjectId.current !== id) projectLoadVersion.current += 1;
+    activeProjectId.current = id;
+    setSelectedProjectIdState(id);
+  };
   const [dropdownKey, setDropdownKey] = useState<number>(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isFieldsUnlocked, setIsFieldsUnlocked] = useState(true);
@@ -1186,7 +1196,7 @@ export default function App() {
 
     // 1. Save metadata and full batches to Postgres database
     try {
-      await fetch("/api/sql/projects", {
+      const response = await fetch("/api/sql/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1194,6 +1204,10 @@ export default function App() {
           batches: batches
         })
       });
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || `Project save failed (${response.status}).`);
+      }
       // Update local storage cache
       const cached = localStorage.getItem(`cached_projects_${userIdToUse}`) || "[]";
       try {
@@ -1214,8 +1228,8 @@ export default function App() {
     } catch (error: any) {
       console.warn("Postgres save notice:", error?.message);
       setNotification({ 
-        text: `Project "${project.name || "SFT Project"}" saved to database!`, 
-        type: "success" 
+        text: `Project save failed: ${error?.message || "Please retry."}`,
+        type: "error"
       });
     } finally {
       setIsSaving(false);
@@ -1225,13 +1239,16 @@ export default function App() {
   // Helper to save a single batch incrementally to Postgres DB
   const saveBatch = async (projectId: string, batch: SFTBatch) => {
     const targetBatchId = batch?.id || batch?.batchId;
-    if (!batch || !targetBatchId || !projectId) return;
+    if (!batch || !targetBatchId || !projectId) return false;
 
     const normalizedBatch: SFTBatch = {
       ...batch,
       id: targetBatchId,
       batchId: targetBatchId
     };
+    const projectBatches = sessionBatches.current.get(projectId) || new Map<string, SFTBatch>();
+    projectBatches.set(targetBatchId, normalizedBatch);
+    sessionBatches.current.set(projectId, projectBatches);
 
     // Update userProjects in state so the active project in memory always has the latest batch
     setUserProjects(prev => prev.map(p => {
@@ -1248,21 +1265,58 @@ export default function App() {
       };
     }));
 
-    // Save single batch to Postgres
+    // Keep a recovery copy even if the network/database save fails.
+    const batchUserId = auth.currentUser?.uid || getDeviceId();
     try {
-      await fetch(`/api/sql/projects/${projectId}/batches`, {
+      rememberBatch(localStorage, batchUserId, projectId, normalizedBatch);
+    } catch (error) {
+      console.warn("Batch recovery cache unavailable:", error);
+    }
+
+    // Save single batch to Postgres and report the actual outcome.
+    try {
+      const response = await fetch(`/api/sql/projects/${encodeURIComponent(projectId)}/batches`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ batch: normalizedBatch })
       });
-    } catch (e) {
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || `Batch save failed (${response.status}).`);
+      }
+      try {
+        // Do not clear a newer pending edit when an earlier save resolves.
+        if (sessionBatches.current.get(projectId)?.get(targetBatchId) === normalizedBatch) {
+          forgetBatch(localStorage, batchUserId, projectId, targetBatchId);
+        }
+      } catch (error) {
+        console.warn("Batch recovery cache cleanup failed:", error);
+      }
+      return true;
+    } catch (e: any) {
       console.warn("Postgres batch save notice:", e);
+      setNotification({ text: `Batch is available for review, but was not saved to the database: ${e?.message || e}`, type: "error" });
+      return false;
     }
   };
 
   // Helper to delete a single batch from Postgres DB
   const deleteBatch = async (projectId: string, batchId: string) => {
     if (!projectId || !batchId) return;
+    projectLoadVersion.current += 1;
+    sessionBatches.current.get(projectId)?.delete(batchId);
+    try {
+      forgetBatch(localStorage, auth.currentUser?.uid || getDeviceId(), projectId, batchId);
+      const cacheKey = `cached_projects_${auth.currentUser?.uid || getDeviceId()}`;
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || "[]");
+      if (Array.isArray(cached)) {
+        localStorage.setItem(cacheKey, JSON.stringify(cached.map((p: any) => p.id === projectId
+          ? { ...p, batches: (p.batches || []).filter((b: any) => (b.id || b.batchId) !== batchId) }
+          : p)));
+      }
+    } catch (error) {
+      console.warn("Batch recovery cache update failed:", error);
+    }
 
     setUserProjects(prev => prev.map(p => {
       if (p.id !== projectId) return p;
@@ -1286,6 +1340,8 @@ export default function App() {
 
   // Switch/Load selected project from Postgres or local cache
   const handleSelectProject = async (selectedId: string) => {
+    const loadVersion = ++projectLoadVersion.current;
+    const batchesAtLoadStart = new Map(sessionBatches.current.get(selectedId));
     if (selectedId === "NEW_PROJECT") {
       handleCreateNewProject();
       return;
@@ -1295,6 +1351,7 @@ export default function App() {
     if (isFieldsUnlocked && selectedProjectId) {
       await handleSaveProject(selectedProjectId);
     }
+    if (loadVersion !== projectLoadVersion.current) return;
     
     let selected: any = userProjects.find(p => p.id === selectedId) || null;
     let sqlLoadedProject: any = null;
@@ -1312,6 +1369,7 @@ export default function App() {
     } catch (sqlErr) {
       console.warn("Postgres project fetch notice:", sqlErr);
     }
+    if (loadVersion !== projectLoadVersion.current) return;
 
     // 2. Fallback to localStorage cache if project not found yet
     if (!selected) {
@@ -1357,7 +1415,23 @@ export default function App() {
       });
     }
 
-    const finalBatches: SFTBatch[] = Array.from(batchesMap.values());
+    const preferredBatchIds: string[] = [];
+    try {
+      pendingBatches(localStorage, auth.currentUser?.uid || getDeviceId(), selectedId)
+        .forEach(batch => {
+          batchesMap.set(batch.id, batch);
+          preferredBatchIds.push(batch.id);
+        });
+    } catch (error) {
+      console.warn("Batch recovery cache could not be loaded:", error);
+    }
+    sessionBatches.current.get(selectedId)?.forEach((batch, id) => {
+      if (batchesAtLoadStart.get(id) !== batch) {
+        batchesMap.set(id, batch);
+        preferredBatchIds.unshift(id);
+      }
+    });
+    const finalBatches = orderBatchesForReview(Array.from(batchesMap.values()), preferredBatchIds);
 
     setSelectedProjectId(selectedId);
     setIsFieldsUnlocked(false);
@@ -1732,7 +1806,7 @@ export default function App() {
           if (!migrated) {
             const projectsList = await loadUserProjects(user.uid);
             if (projectsList && projectsList.length > 0) {
-              const targetProj = (selectedProjectId ? projectsList.find(p => p.id === selectedProjectId) : null) || projectsList[0];
+              const targetProj = projectsList.find(p => p.id === activeProjectId.current) || projectsList[0];
               if (targetProj) {
                 await handleSelectProject(targetProj.id);
               }
@@ -1773,7 +1847,7 @@ export default function App() {
           try {
             const guestProjects = await loadUserProjects(getDeviceId());
             if (guestProjects && guestProjects.length > 0) {
-              const targetProj = (selectedProjectId ? guestProjects.find(p => p.id === selectedProjectId) : null) || guestProjects[0];
+              const targetProj = guestProjects.find(p => p.id === activeProjectId.current) || guestProjects[0];
               await handleSelectProject(targetProj.id);
             } else {
               // Fallback to local storage if no guest projects found
@@ -1964,12 +2038,14 @@ export default function App() {
 
   // Handle synthetic generation with high-reliability client-side chunking for large batches
   const handleSyntheticGenerate = async () => {
+    if (isGenerating) return;
     if (isFieldsUnlocked || !selectedProjectId) {
       setNotification({ text: "Project definition must be saved and locked before generation.", type: "error" });
       return;
     }
 
     if (!checkGenerationLimit(batchSize)) return;
+    const generationProjectId = selectedProjectId;
     setIsGenerating(true);
     setGenerationProgress({ current: 0, total: batchSize, percent: 0 });
     setNotification({ text: `Synthesizing ${batchSize} examples. Please wait...`, type: "info" });
@@ -2112,6 +2188,11 @@ export default function App() {
       if (accumulatedExamples.length !== batchSize) {
         throw new Error(`Generation returned ${accumulatedExamples.length} of ${batchSize} requested examples. The incomplete batch was not saved.`);
       }
+      if (accumulatedExamples.some(ex => !Array.isArray(ex?.messages)
+        || !["user", "assistant"].every(role => ex.messages.some((m: any) =>
+          m?.role === role && typeof m.content === "string" && m.content.trim().length > 0)))) {
+        throw new Error("Generation returned an invalid or empty example. The batch was not saved.");
+      }
 
       // Format unique IDs for generated items
       const finalExamples = accumulatedExamples.slice(0, batchSize).map((ex, idx) => ({
@@ -2130,22 +2211,23 @@ export default function App() {
         examplesCount: finalExamples.length,
         examples: finalExamples,
         status: "Pending",
-        timestamp: new Date().toISOString().slice(0, 16).replace("T", " "),
+        timestamp: new Date().toISOString().replace("T", " "),
         description: batchDesc,
         specialInstructions: batchInstructions,
         temporaryConstraints: batchTempConstraints
       };
 
-      setBatches(prev => [newBatch, ...prev]);
-      setSelectedBatchId(newBatch.id); // auto-select in assessor for review
-      if (selectedProjectId) {
-        saveBatch(selectedProjectId, newBatch);
+      if (activeProjectId.current === generationProjectId) {
+        setBatches(prev => [newBatch, ...prev]);
+        setSelectedBatchId(newBatch.id);
       }
-      
-      setNotification({
-        text: `Success! Generated pending batch with ${finalExamples.length}/${batchSize} examples. Saved to database.`,
-        type: "success"
-      });
+      const saved = await saveBatch(generationProjectId, newBatch);
+      if (saved) {
+        setNotification({
+          text: `Generated ${finalExamples.length}/${batchSize} examples and saved to "${project.name}".${activeProjectId.current !== generationProjectId ? " Open that project to review the batch." : ""}`,
+          type: "success"
+        });
+      }
     } catch (err: any) {
       setNotification({ text: `Synthesis Error: ${err.message || err}`, type: "error" });
     } finally {
@@ -5135,6 +5217,7 @@ export default function App() {
 
                       {/* SFT Examples scroll-through rendering list */}
                       <ProgressiveScrollList
+                        key={latestGeneratorBatch.id}
                         items={latestGeneratorBatch.examples}
                         title="Generated SFT Examples"
                         renderItem={(ex: SFTExample, exIdx: number) => (

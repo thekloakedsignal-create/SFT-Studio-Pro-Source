@@ -1,0 +1,153 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import vm from "node:vm";
+import { transform } from "esbuild";
+import {
+  ChatCompletionsHttpError, isProviderOverload, normalizeText,
+  parseGeneratedExamples, sanitizeExample
+} from "../src/lib/generation-response.ts";
+
+// Actual legacy dispatch/provider adapter, with a fixture-only fetch and immediate
+// recorded timers. No listener, secrets, live inference, or production files.
+const source = await readFile(new URL("../legacy-server.ts", import.meta.url), "utf8");
+const dispatchSource = source.slice(
+  source.indexOf("// Helper to safely extract text from a DigitalOcean"),
+  source.indexOf("// Helper to split document into exactly count")
+);
+assert.ok(dispatchSource.includes('app.post("/api/generate"'));
+const compiled = await transform(dispatchSource, { loader: "ts", format: "cjs", target: "node24" });
+
+const firstModel = "glm-5.3-flash";
+const models = [
+  firstModel, "qwen3.5-397b-a17b", "gemma-4-31B-it", "deepseek-v4-pro", "nemotron-3-ultra-550b",
+  "llama-4-maverick", "mimo-v2.5-pro", "minimax-m2.5", "mistral-3-14B", "nemotron-3-nano-omni"
+];
+
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" = "success") {
+  const routes = new Map<string, Function>();
+  const calls: any[] = [];
+  const delays: number[] = [];
+  let concurrent = 0;
+  let peakConcurrent = 0;
+  const context = {
+    module: { exports: {} },
+    app: {
+      get(route: string, handler: Function) { routes.set(`GET ${route}`, handler); },
+      post(route: string, handler: Function) { routes.set(`POST ${route}`, handler); }
+    },
+    Type: { OBJECT: "object", ARRAY: "array", STRING: "string", NUMBER: "number", BOOLEAN: "boolean" },
+    ChatCompletionsHttpError, isProviderOverload, normalizeText, parseGeneratedExamples, sanitizeExample,
+    process: { env: { GRADIENT_MODEL_ACCESS_KEY: "offline-fixture-only-not-a-secret" } },
+    console: { log() {}, warn() {}, error() {} },
+    AbortSignal: { timeout() { return undefined; } },
+    randomUUID: () => "fixture-job",
+    setTimeout(callback: Function, delay: number) { delays.push(delay); callback(); },
+    async fetch(url: string, options: any) {
+      assert.equal(url, "https://inference.do-ai.run/v1/chat/completions");
+      const request = JSON.parse(options.body);
+      calls.push(request);
+      concurrent++;
+      peakConcurrent = Math.max(peakConcurrent, concurrent);
+      await Promise.resolve();
+      concurrent--;
+      const isPrimary = request.model === firstModel;
+      const isBackup = !models.slice(0, 5).includes(request.model);
+      const status = ((mode === "primary529" || mode === "both529") && isPrimary)
+        || (mode === "both529" && isBackup) ? 529
+        : mode === "503" && isPrimary ? 503 : 200;
+      const example = { messages: [
+        { role: "user", content: `Question for ${request.model}` },
+        { role: "assistant", content: `Answer from ${request.model}.` }
+      ] };
+      const content = mode === "invalid" && isPrimary
+        ? "This is prose, not a JSON training example."
+        : JSON.stringify({ examples: [{ messages: [] }, example] });
+      const response = status === 200
+        ? { choices: [{ message: { content: [
+          { type: "text", text: content.slice(0, 30) }, { type: "text", text: content.slice(30) }
+        ] } }] }
+        : { error: { message: "fixture provider unavailable" } };
+      return { ok: status === 200, status, statusText: "Fixture", async text() { return JSON.stringify(response); } };
+    }
+  };
+  vm.runInNewContext(compiled.code, context);
+  return {
+    calls, delays,
+    peak: () => peakConcurrent,
+    async generate(count = 5) {
+      const response: any = {
+        statusCode: 200, body: undefined,
+        status(value: number) { this.statusCode = value; return this; },
+        json(value: any) { this.body = value; return this; }
+      };
+      await routes.get("POST /api/generate")!({
+        body: { count, templateType: "Single Turn", targetTask: "Offline fixture" }
+      }, response);
+      return response;
+    }
+  };
+}
+
+test("real dispatcher launches the preserved initial models concurrently and counts only valid examples", async () => {
+  const f = fixture();
+  const response = await f.generate();
+  assert.equal(response.body.success, true);
+  assert.equal(response.body.examples.length, 5);
+  assert.deepEqual(f.calls.map(call => call.model), models.slice(0, 5));
+  assert.equal(f.peak(), 5);
+  assert.deepEqual(f.delays, []);
+  assert.equal(f.calls.every(call => call.max_tokens === 4096 && call.response_format.type === "json_object"), true);
+});
+
+test("HTTP 529 triggers exactly one distinct configured backup request", async () => {
+  const f = fixture("primary529");
+  const response = await f.generate();
+  assert.equal(response.body.success, true);
+  assert.equal(f.calls.length, 6);
+  assert.deepEqual(f.calls.slice(0, 5).map(call => call.model), models.slice(0, 5));
+  assert.ok(models.includes(f.calls[5].model));
+  assert.notEqual(f.calls[5].model, firstModel);
+});
+
+test("a failed 529 backup is not retried again and a partial batch cannot succeed", async () => {
+  const f = fixture("both529");
+  const response = await f.generate();
+  assert.equal(f.calls.length, 6);
+  assert.equal(response.statusCode, 500);
+  assert.equal(response.body.success, false);
+  assert.match(response.body.error, /4 of 5/);
+});
+
+test("other HTTP failures and invalid content do not cause retries or top-ups", async () => {
+  for (const mode of ["503", "invalid"] as const) {
+    const f = fixture(mode);
+    const response = await f.generate();
+    assert.equal(f.calls.length, 5);
+    assert.equal(response.statusCode, 500);
+    assert.equal(response.body.success, false);
+    assert.match(response.body.error, /4 of 5/);
+  }
+});
+
+test("preserved schedules and two-second spacing cover every supported batch size", async () => {
+  const expected: Record<number, number[]> = {
+    5: [5], 10: [10], 25: [10, 10, 5], 50: Array(5).fill(10),
+    100: Array(10).fill(10), 200: Array(10).fill(20), 250: [...Array(12).fill(20), 10]
+  };
+  for (const [count, stackSizes] of Object.entries(expected)) {
+    const f = fixture();
+    const response = await f.generate(Number(count));
+    assert.equal(response.body.success, true);
+    assert.equal(response.body.examples.length, Number(count));
+    assert.equal(f.calls.length, Number(count));
+    assert.equal(f.peak(), Math.max(...stackSizes));
+    assert.deepEqual(f.delays, Array(stackSizes.length - 1).fill(2000));
+    let offset = 0;
+    for (const stackSize of stackSizes) {
+      const scheduled = stackSize === 20 ? [...models, ...models] : models.slice(0, stackSize);
+      assert.deepEqual(f.calls.slice(offset, offset + stackSize).map(call => call.model), scheduled);
+      offset += stackSize;
+    }
+  }
+});

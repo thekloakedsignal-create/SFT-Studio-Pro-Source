@@ -7,8 +7,17 @@ import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 import { db } from "./src/db/index.ts";
 import { projects, batches, users, studentCodes } from "./src/db/schema.ts";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { optionalAuth, AuthRequest } from "./src/middleware/auth.ts";
+import { logger } from "./src/lib/logger.ts";
+import {
+  ChatCompletionsHttpError, isProviderOverload, normalizeText,
+  parseGeneratedExamples, sanitizeExample, sanitizeMessage
+} from "./src/lib/generation-response.ts";
+import {
+  mergeBatchRecords, mergeProjectSnapshot, removeBatch, sqlBatchData, visibleBatches
+} from "./src/lib/project-batches.ts";
+export { stripCoTFromSingleTurn, sanitizeMessage, sanitizeExample } from "./src/lib/generation-response.ts";
 
 dotenv.config();
 
@@ -29,227 +38,6 @@ if (!fs.existsSync(DATA_DIR)) {
 const LOCAL_PROJECTS_FILE = path.join(DATA_DIR, "projects.json");
 const LOCAL_STUDENT_CODES_FILE = path.join(DATA_DIR, "student_codes.json");
 const LOCAL_USERS_FILE = path.join(DATA_DIR, "users.json");
-
-// Robust cleaner to ensure Single Turn and non-reasoning responses NEVER contain CoT / thinking traces / internal monologue
-export function stripCoTFromSingleTurn(text: string): string {
-  if (!text || typeof text !== "string") return text || "";
-  let s = text.trim();
-
-  // 1. Remove XML/HTML/Bracketed thinking tags (closed and unclosed)
-  const tags = [
-    "think", "thought", "thoughts", "reasoning", "reflection",
-    "scratchpad", "internal", "plan", "cot", "analysis",
-    "inner_thought", "mind"
-  ];
-  for (const tag of tags) {
-    const closedXml = new RegExp("<" + tag + "(?:\\s+[^>]*)?>[\\s\\S]*?<\\/" + tag + ">", "gi");
-    const unclosedXml = new RegExp("<" + tag + "(?:\\s+[^>]*)?>[\\s\\S]*$", "gi");
-    const closedBracket = new RegExp("\\[" + tag + "\\][\\s\\S]*?\\[\\/" + tag + "\\]", "gi");
-    const unclosedBracket = new RegExp("\\[" + tag + "\\][\\s\\S]*$", "gi");
-    s = s.replace(closedXml, "");
-    s = s.replace(unclosedXml, "");
-    s = s.replace(closedBracket, "");
-    s = s.replace(unclosedBracket, "");
-  }
-
-  // 2. Multi-paragraph or single-block Thought Process followed by Response/Answer delimiter
-  const answerDelimiterRegex = /(?:^|\n)\s*(?:[\*\#\_]{0,4})\s*(?:Final\s+Answer|Final\s+Response|Direct\s+Answer|Response|Answer|Output|Conclusion|Solution)\s*(?:[\*\#\_]{0,4}):?\s*(?:[\*\#\_]{0,4})\s*\n?/i;
-  const thoughtHeaderRegex = /^(?:[\*\#\_\s]*)(?:Thinking\s+Process|Thought\s+Process|Chain\s+of\s+Thought|Reasoning\s+Trace|Reasoning\s+Process|Reasoning|Thoughts|Internal\s+Thoughts|Internal\s+Monologue|Scratchpad|Analysis|Draft|Planning|Step-by-step\s+reasoning|Here\s+is\s+my\s+reasoning|Here\x27s\s+my\s+thought\s+process|Let(?:\x27s|\s+me)\s+think)/i;
-
-  if (thoughtHeaderRegex.test(s)) {
-    const matches = Array.from(s.matchAll(new RegExp(answerDelimiterRegex.source, "gi")));
-    if (matches && matches.length > 0) {
-      const lastMatch = matches[matches.length - 1];
-      const remainder = s.substring(lastMatch.index + lastMatch[0].length).trim();
-      if (remainder.length > 0) {
-        s = remainder;
-      }
-    }
-  } else {
-    const match = s.match(answerDelimiterRegex);
-    if (match && match.index !== undefined && match.index > 0) {
-      const preamble = s.substring(0, match.index).trim();
-      if (/(?:think|reason|analyz|consider|step|plan|approach|user\s+is|goal|draft|scratch)/i.test(preamble)) {
-        s = s.substring(match.index + match[0].length).trim();
-      }
-    }
-  }
-
-  // 3. Standalone thinking process headers without answer delimiters
-  s = s.replace(
-    /(?:^|\n)\s*(?:[\*\#\_]{0,4})\s*(?:Thinking\s+Process|Thought\s+Process|Chain\s+of\s+Thought|Reasoning\s+Trace|Reasoning\s+Process|Reasoning|Thoughts|Internal\s+Thoughts|Internal\s+Monologue|Scratchpad|Analysis|Draft)\s*(?:[\*\#\_]{0,4}):?[\s\S]*?(?=(?:\n\s*(?:[\*\#\_]{0,4})\s*(?:Final\s+Answer|Response|Answer|Output|Conclusion):?|\n\s*\n[A-Z]|\n#{1,4}\s+[A-Z]|$))/gi,
-    ""
-  );
-
-  // 4. Strip leftover response / answer / instruction prefix markers
-  s = s.replace(/^(?:[\*\#\_\s]*)(?:Response|Instruction|Answer|Assistant|Output|Solution)(?:[\*\#\_\s]*):?\s*/i, "");
-
-  // 5. Paragraph-level meta-monologue cleaner
-  let paragraphs = s.split(/\n\s*\n/);
-  while (paragraphs.length > 1) {
-    const p0 = paragraphs[0].trim();
-    const isP0Meta = /^(?:(?:I\s+(?:am\s+(?:analyzing|reviewing|tracing|considering|thinking)|need\s+to|will\s+(?:explain|describe|state|construct|outline|note)|must\s+first|should\s+also)|Let(?:\x27s|\s+me)\s+(?:first|analyze|think|examine|consider|break)|To\s+answer\s+this|First,\s+I\s+will|The\s+user\s+(?:wants|is\s+asking)|Here\s+is\s+(?:my\s+)?(?:step-by-step\s+)?(?:reasoning|thought|analysis))\b)/i.test(p0);
-    if (isP0Meta) {
-      paragraphs.shift();
-      s = paragraphs.join("\n\n").trim();
-    } else {
-      break;
-    }
-  }
-
-  // 6. Sentence-level meta-monologue cleaner for first sentences
-  const metaRegex = /^(?:(?:I\s+(?:am\s+(?:analyzing|reviewing|tracing|considering|thinking)|need\s+to\s+(?:first|analyze|explain|note)|will\s+(?:explain|describe|outline|state)|should\s+first)|Let(?:\x27s|\s+me)\s+(?:first\s+)?(?:analyze|think|examine|consider|break\s+down)|To\s+answer\s+this\s+(?:question|request|prompt)?|The\s+user\s+(?:wants|is\s+asking\s+(?:for|to)?)|Here\s+is\s+my\s+(?:step-by-step\s+)?(?:thought|reasoning|analysis))\b[^.!?]*[.!?]+\s*)+/i;
-  const cleanedLeading = s.replace(metaRegex, "").trim();
-  if (cleanedLeading.length > 15) {
-    s = cleanedLeading;
-  }
-
-  // 7. Strip instruction wrapping tokens if accidentally retained
-  s = s.replace(/^\[INST\]\s*/i, "");
-  s = s.replace(/\s*\[\/INST\]$/i, "");
-  s = s.replace(/^<s>\s*/i, "");
-  s = s.replace(/\s*<\/s>$/i, "");
-  s = s.replace(/^<\|im_start\|>\s*(?:assistant\s*)?/i, "");
-  s = s.replace(/\s*<\|im_end\|>$/i, "");
-
-  return s.trim();
-}
-
-export function sanitizeMessage(msg: any, templateType?: string): { role: string; content: string; reasoning?: string } {
-  if (!msg || typeof msg !== "object") {
-    return { role: "assistant", content: typeof msg === "string" ? stripCoTFromSingleTurn(msg) : "" };
-  }
-
-  const role = typeof msg.role === "string" ? msg.role : "assistant";
-  let content = msg.content;
-  let reasoning = msg.reasoning || msg.reasoning_content || msg.thought || msg.thoughts;
-
-  // Handle case where content is an object with { reasoning, response } or { content, reasoning }
-  if (content && typeof content === "object") {
-    if (!reasoning && (content.reasoning || content.reasoning_content || content.thought || content.thoughts)) {
-      reasoning = content.reasoning || content.reasoning_content || content.thought || content.thoughts;
-    }
-    content = content.response || content.content || content.text || content.answer || content.output || (
-      content.reasoning && !content.response ? content.reasoning : JSON.stringify(content)
-    );
-  }
-
-  // Handle case where reasoning is an object
-  if (reasoning && typeof reasoning === "object") {
-    reasoning = reasoning.reasoning || reasoning.thought || reasoning.content || reasoning.text || JSON.stringify(reasoning);
-  }
-
-  let finalContent = typeof content === "string" ? content.trim() : (content !== undefined && content !== null ? String(content).trim() : "");
-  // Sanitize any accidental literal "/n" string artifacts into clean newlines
-  finalContent = finalContent
-    .replace(/\\\/n/g, "\n")
-    .replace(/(?<=\s|^)\/n(?=\s|$)/g, "\n")
-    .replace(/(?<=[a-zA-Z0-9.,!?;:])\/n(?=[a-zA-Z0-9])/g, "\n")
-    .replace(/\s*\/n\s*/g, "\n")
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .trim();
-
-  let finalReasoning = typeof reasoning === "string" ? reasoning.trim() : (reasoning !== undefined && reasoning !== null ? String(reasoning).trim() : undefined);
-  if (finalReasoning) {
-    finalReasoning = finalReasoning
-      .replace(/\\\/n/g, "\n")
-      .replace(/(?<=\s|^)\/n(?=\s|$)/g, "\n")
-      .replace(/(?<=[a-zA-Z0-9.,!?;:])\/n(?=[a-zA-Z0-9])/g, "\n")
-      .replace(/\s*\/n\s*/g, "\n")
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n")
-      .trim();
-  }
-
-  // Extract <think> or <thinking> tags from content if present
-  if (role === "assistant" && typeof finalContent === "string" && finalContent.length > 0) {
-    const thinkMatch = finalContent.match(/<(?:think|thinking)>([\s\S]*?)<\/(?:think|thinking)>/i);
-    if (thinkMatch) {
-      if (!finalReasoning && thinkMatch[1] && thinkMatch[1].trim().length > 0) {
-        finalReasoning = thinkMatch[1].trim();
-      }
-      finalContent = finalContent.replace(/<(?:think|thinking)>[\s\S]*?<\/(?:think|thinking)>/gi, "").trim();
-    }
-  }
-
-  // Check if non-reasoning template (Reasoning traces are ONLY allowed for "Reasoning" and "Mixed" templates)
-  const isReasoningOrMixed = templateType
-    ? (templateType.toLowerCase().includes("reason") || templateType.toLowerCase().includes("mix"))
-    : Boolean(finalReasoning);
-  const isNonReasoning = templateType ? !isReasoningOrMixed : false;
-
-  if (isNonReasoning || role !== "assistant") {
-    finalReasoning = undefined;
-    finalContent = stripCoTFromSingleTurn(finalContent);
-  }
-
-  return {
-    role,
-    content: finalContent,
-    ...(finalReasoning && (isReasoningOrMixed || !templateType) ? { reasoning: finalReasoning } : {})
-  };
-}
-
-export function sanitizeExample(example: any, templateType?: string): any {
-  if (!example || typeof example !== "object") return example;
-  const effectiveTemplate = templateType || example.templateType || "Single Turn";
-
-  // 1. Convert alternate SFT formats (conversations, instruction/output, prompt/response) into messages
-  let rawMessages = example.messages;
-  if (!Array.isArray(rawMessages)) {
-    if (Array.isArray(example.conversations)) {
-      rawMessages = example.conversations.map((c: any) => ({
-        role: c.from === "human" || c.from === "user" ? "user" : "assistant",
-        content: c.value || c.content || ""
-      }));
-    } else {
-      const userText = example.instruction || example.prompt || example.input || example.user || example.query;
-      const astText = example.response || example.output || example.assistant || example.completion || example.answer;
-      const sysText = example.system || example.systemPrompt;
-      const msgs: any[] = [];
-      if (sysText) msgs.push({ role: "system", content: String(sysText).trim() });
-      if (userText) msgs.push({ role: "user", content: String(userText).trim() });
-      if (astText) msgs.push({ role: "assistant", content: String(astText).trim() });
-      rawMessages = msgs;
-    }
-  }
-
-  // 2. Sanitize and clean message turns
-  const isReasoningOrMixed = effectiveTemplate
-    ? (effectiveTemplate.toLowerCase().includes("reason") || effectiveTemplate.toLowerCase().includes("mix"))
-    : false;
-
-  let cleanedMessages = (Array.isArray(rawMessages) ? rawMessages : [])
-    .map((m: any) => sanitizeMessage(m, effectiveTemplate))
-    .filter((m: any) => m && typeof m.content === "string" && m.content.trim().length > 0);
-
-  // If conversation has no user message or no assistant message, repair it
-  const hasUser = cleanedMessages.some((m: any) => m.role === "user");
-  const hasAssistant = cleanedMessages.some((m: any) => m.role === "assistant");
-
-  if (!hasUser && cleanedMessages.length > 0) {
-    cleanedMessages.unshift({ role: "user", content: "Provide instruction." });
-  }
-  if (!hasAssistant && cleanedMessages.length > 0) {
-    cleanedMessages.push({ role: "assistant", content: "Completed response." });
-  }
-
-  const sanitizedExample: any = {
-    ...example,
-    templateType: effectiveTemplate,
-    messages: cleanedMessages
-  };
-
-  if (!isReasoningOrMixed) {
-    delete sanitizedExample.reasoning;
-    delete sanitizedExample.reasoning_content;
-    delete sanitizedExample.thought;
-    delete sanitizedExample.thoughts;
-  }
-
-  return sanitizedExample;
-}
 
 export function sanitizeProjectData(project: any): any {
   if (!project || typeof project !== "object") return project;
@@ -272,38 +60,31 @@ export function sanitizeProjectData(project: any): any {
 }
 
 function getLocalProjects(): any[] {
-  try {
-    if (fs.existsSync(LOCAL_PROJECTS_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(LOCAL_PROJECTS_FILE, "utf-8"));
-      if (Array.isArray(parsed)) {
-        return parsed.map(sanitizeProjectData);
-      }
-      return parsed;
-    }
-  } catch (e) {
-    console.error("Error reading local projects file:", e);
-  }
-  return [];
+  if (!fs.existsSync(LOCAL_PROJECTS_FILE)) return [];
+  const parsed = JSON.parse(fs.readFileSync(LOCAL_PROJECTS_FILE, "utf-8"));
+  if (!Array.isArray(parsed)) throw new Error("Local project storage is not a project array.");
+  return parsed.map(sanitizeProjectData);
 }
 
 function saveLocalProjects(list: any[]) {
+  const sanitizedList = list.map(sanitizeProjectData);
+  const temporaryFile = `${LOCAL_PROJECTS_FILE}.${randomUUID()}.tmp`;
   try {
-    const sanitizedList = Array.isArray(list) ? list.map(sanitizeProjectData) : list;
-    fs.writeFileSync(LOCAL_PROJECTS_FILE, JSON.stringify(sanitizedList, null, 2), "utf-8");
-  } catch (e) {
-    console.error("Error writing local projects file:", e);
+    fs.writeFileSync(temporaryFile, JSON.stringify(sanitizedList, null, 2), "utf-8");
+    fs.renameSync(temporaryFile, LOCAL_PROJECTS_FILE);
+  } finally {
+    if (fs.existsSync(temporaryFile)) fs.unlinkSync(temporaryFile);
   }
 }
 
-function saveLocalProjectItem(item: any) {
+function saveLocalProjectItem(item: any, replaceBatches = false) {
   const current = getLocalProjects();
   const sanitizedItem = sanitizeProjectData(item);
   const idx = current.findIndex(p => p.id === item.id);
   if (idx >= 0) {
-    const existingBatches = current[idx].batches || [];
-    const effectiveBatches = sanitizedItem.batches !== undefined && Array.isArray(sanitizedItem.batches) && sanitizedItem.batches.length > 0
-      ? sanitizedItem.batches 
-      : existingBatches;
+    const effectiveBatches = replaceBatches
+      ? sanitizedItem.batches
+      : mergeProjectSnapshot(current[idx].batches, sanitizedItem.batches);
     current[idx] = { 
       ...current[idx], 
       ...sanitizedItem, 
@@ -330,23 +111,36 @@ function saveLocalBatchItem(projectId: string, batchItem: any) {
     if (!Array.isArray(projectBatches)) projectBatches = [];
     const batchIdx = projectBatches.findIndex((b: any) => b.id === batchItem.id);
     if (batchIdx >= 0) {
-      projectBatches[batchIdx] = { ...projectBatches[batchIdx], ...batchItem };
+      projectBatches[batchIdx] = batchItem;
     } else {
       projectBatches.unshift(batchItem);
     }
     current[projIdx].batches = projectBatches;
     current[projIdx].updatedAt = new Date().toISOString();
     saveLocalProjects(current);
-  }
+  } else throw new Error("Project not found in local storage.");
 }
 
 function deleteLocalBatchItem(projectId: string, batchId: string) {
   const current = getLocalProjects();
   const projIdx = current.findIndex(p => p.id === projectId);
   if (projIdx >= 0 && Array.isArray(current[projIdx].batches)) {
-    current[projIdx].batches = current[projIdx].batches.filter((b: any) => b.id !== batchId);
+    current[projIdx].batches = removeBatch(current[projIdx].batches, batchId);
     current[projIdx].updatedAt = new Date().toISOString();
     saveLocalProjects(current);
+  }
+}
+
+function projectForResponse(project: any): any {
+  return sanitizeProjectData({ ...project, batches: visibleBatches(project.batches) });
+}
+
+function cacheSQLProject(project: any) {
+  try {
+    saveLocalProjectItem(project, true);
+  } catch (error) {
+    // SQL already committed; a cache failure must not turn a durable save into a fake failure.
+    logger.warn({ error: String(error) }, "SQL project saved, but local project cache could not be updated");
   }
 }
 
@@ -438,123 +232,144 @@ app.get("/api/health", (_req, res) => {
 app.get("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
   const userId = req.user?.uid || req.deviceId || (req.query.userId as string) || "default";
   
-  // Local file store contains full batch records (all training examples)
   const allLocal = getLocalProjects();
 
   try {
     const userProjects = await db.select().from(projects);
-    if (userProjects && userProjects.length > 0) {
-      // Merge SQL rows with local file store to guarantee no batches are ever omitted
-      const merged = userProjects.map((sp: any) => {
-        const lp = allLocal.find(p => p.id === sp.id);
-        const spBatches = Array.isArray(sp.batches) ? sp.batches : [];
-        const lpBatches = (lp && Array.isArray(lp.batches)) ? lp.batches : [];
-        return {
-          ...sp,
-          settings: sp.settings || lp?.settings || {},
-          batches: lpBatches.length >= spBatches.length ? lpBatches : spBatches
-        };
+    const projectIds = [...new Set<string>([
+      ...userProjects.map((project: any) => project.id), ...allLocal.map(project => project.id)
+    ])];
+    const batchRows = projectIds.length > 0
+      ? await db.select().from(batches).where(inArray(batches.projectId, projectIds))
+      : [];
+    const merged = userProjects.map((sp: any) => {
+      const lp = allLocal.find(project => project.id === sp.id);
+      return projectForResponse({
+        ...sp,
+        settings: sp.settings || lp?.settings || {},
+        batches: mergeProjectSnapshot(
+          mergeBatchRecords(lp?.batches, sp.batches), undefined, sqlBatchData(batchRows, sp.id)
+        )
       });
-      allLocal.forEach(lp => {
-        if (!merged.some((m: any) => m.id === lp.id)) {
-          merged.push(lp);
-        }
-      });
-      const filtered = merged.filter((p: any) => p.userId === userId || p.userId === "default" || !p.userId || userId === "default");
-      return res.json({ success: true, projects: filtered.length > 0 ? filtered : merged });
-    }
+    });
+    allLocal.forEach(lp => {
+      if (!merged.some((project: any) => project.id === lp.id)) {
+        merged.push(projectForResponse({
+          ...lp, batches: mergeProjectSnapshot(lp.batches, undefined, sqlBatchData(batchRows, lp.id))
+        }));
+      }
+    });
+    const filtered = merged.filter((p: any) => p.userId === userId || p.userId === "default" || !p.userId || userId === "default");
+    return res.json({ success: true, projects: filtered.length > 0 ? filtered : merged });
   } catch (error: any) {
-    console.warn("SQL db list projects fallback to local storage:", error?.message);
+    logger.warn({ error: error?.message }, "SQL list projects fell back to local storage");
   }
 
   // Local file store fallback
   const userProjects = allLocal.filter(p => p.userId === userId || p.userId === "default" || !p.userId || userId === "default");
-  return res.json({ success: true, projects: userProjects.length > 0 ? userProjects : allLocal });
+  return res.json({ success: true, projects: (userProjects.length > 0 ? userProjects : allLocal).map(projectForResponse) });
 });
 
 app.post("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
   const { id, name, settings, batches: batchList } = req.body;
   const userId = req.user?.uid || req.deviceId || req.body.userId || "default";
 
-  if (!id || !name) {
+  if (typeof id !== "string" || !id || typeof name !== "string" || !name) {
     return res.status(400).json({ success: false, error: "Missing required project id or name." });
   }
-
-  // Preserve existing batches if batchList is omitted
-  const currentLocal = getLocalProjects();
-  const existingProj = currentLocal.find(p => p.id === id);
-  const effectiveBatches = batchList !== undefined ? batchList : (existingProj?.batches || []);
-
-  saveLocalProjectItem({
-    id,
-    userId,
-    name,
-    settings: settings || {},
-    batches: effectiveBatches
-  });
-
-  try {
-    await db.insert(projects)
-      .values({
-        id,
-        userId,
-        name,
-        settings: settings || {},
-        batches: effectiveBatches,
-        updatedAt: new Date()
-      })
-      .onConflictDoUpdate({
-        target: projects.id,
-        set: {
-          name,
-          settings: settings || {},
-          batches: effectiveBatches,
-          updatedAt: new Date()
-        }
-      });
-  } catch (error: any) {
-    console.warn("SQL db save project saved to local store fallback:", error?.message);
+  if (batchList !== undefined && !Array.isArray(batchList)) {
+    return res.status(400).json({ success: false, error: "Project batches must be an array when supplied." });
   }
 
-  return res.json({ success: true, id });
+  try {
+    const existingLocal = getLocalProjects().find(project => project.id === id);
+    if (!db) {
+      saveLocalProjectItem({ id, userId, name, settings: settings || {}, batches: batchList });
+      return res.json({ success: true, id, storage: "local" });
+    }
+    const saved = await db.transaction(async (tx: any) => {
+      const [stored] = await tx.select().from(projects).where(eq(projects.id, id)).for("update");
+      const batchRows = await tx.select().from(batches).where(eq(batches.projectId, id));
+      const effectiveBatches = mergeProjectSnapshot(
+        mergeBatchRecords(existingLocal?.batches, stored?.batches),
+        batchList, sqlBatchData(batchRows, id)
+      );
+      const project = {
+        id, userId: stored?.userId || userId, name,
+        settings: settings || stored?.settings || {},
+        batches: effectiveBatches, updatedAt: new Date()
+      };
+      await tx.insert(projects).values(project).onConflictDoUpdate({
+        target: projects.id,
+        set: { name, settings: project.settings, batches: effectiveBatches, updatedAt: project.updatedAt }
+      });
+      return project;
+    });
+    cacheSQLProject(saved);
+    return res.json({ success: true, id, storage: "sql" });
+  } catch (error: any) {
+    logger.error({ error: error?.message }, "Project save failed");
+    return res.status(db ? 503 : 500).json({ success: false, error: "Project save failed. Your changes were not saved." });
+  }
 });
 
 // Incremental single-batch save/update route
 app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest, res) => {
   const projectId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
   const { batch } = req.body;
-  if (!projectId || !batch || !batch.id) {
+  if (!projectId || !batch || typeof batch.id !== "string" || !batch.id) {
     return res.status(400).json({ success: false, error: "Missing projectId or batch payload." });
   }
 
-  saveLocalBatchItem(projectId, batch);
-
   try {
-    await db.insert(batches)
-      .values({
-        id: batch.id,
-        projectId,
+    const savedBatch = { ...batch };
+    delete savedBatch.__deleted;
+    if (!db) {
+      if (!getLocalProjects().some(project => project.id === projectId)) {
+        return res.status(404).json({ success: false, error: "Project not found." });
+      }
+      saveLocalBatchItem(projectId, savedBatch);
+      return res.json({ success: true, batchId: batch.id, storage: "local" });
+    }
+    const saved = await db.transaction(async (tx: any) => {
+      const [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("update");
+      if (!project) return null;
+      const [existingBatch] = await tx.select().from(batches).where(eq(batches.id, batch.id));
+      if (existingBatch && existingBatch.projectId !== projectId) {
+        throw new Error("Batch ID already belongs to another project.");
+      }
+      const record = {
+        id: batch.id, projectId,
         name: batch.name || "SFT Batch",
         timestamp: batch.timestamp || new Date().toISOString(),
         templateType: batch.templateType || "Single Turn",
-        data: batch,
-        updatedAt: new Date()
-      })
-      .onConflictDoUpdate({
+        data: savedBatch, updatedAt: new Date()
+      };
+      await tx.insert(batches).values(record).onConflictDoUpdate({
         target: batches.id,
         set: {
-          name: batch.name || "SFT Batch",
-          timestamp: batch.timestamp || new Date().toISOString(),
-          templateType: batch.templateType || "Single Turn",
-          data: batch,
-          updatedAt: new Date()
+          name: record.name, timestamp: record.timestamp,
+          templateType: record.templateType, data: savedBatch, updatedAt: record.updatedAt
         }
       });
+      const batchRows = await tx.select().from(batches).where(eq(batches.projectId, projectId));
+      const updatedProject = {
+        ...project,
+        batches: mergeBatchRecords(project.batches, sqlBatchData(batchRows, projectId)),
+        updatedAt: record.updatedAt
+      };
+      await tx.update(projects).set({
+        batches: updatedProject.batches, updatedAt: updatedProject.updatedAt
+      }).where(eq(projects.id, projectId));
+      return updatedProject;
+    });
+    if (!saved) return res.status(404).json({ success: false, error: "Project not found." });
+    cacheSQLProject(saved);
+    return res.json({ success: true, batchId: batch.id, storage: "sql" });
   } catch (error: any) {
-    console.warn("SQL db save single batch notice:", error?.message);
+    logger.error({ error: error?.message }, "Batch save failed");
+    return res.status(db ? 503 : 500).json({ success: false, error: "Batch save failed. Your batch was not saved." });
   }
-
-  return res.json({ success: true, batchId: batch.id });
 });
 
 // Incremental single-batch delete route
@@ -565,15 +380,33 @@ app.delete("/api/sql/projects/:id/batches/:batchId", optionalAuth, async (req: A
     return res.status(400).json({ success: false, error: "Missing projectId or batchId." });
   }
 
-  deleteLocalBatchItem(projectId, batchId);
-
   try {
-    await db.delete(batches).where(and(eq(batches.id, batchId), eq(batches.projectId, projectId)));
+    if (!db) {
+      if (!getLocalProjects().some(project => project.id === projectId)) {
+        return res.status(404).json({ success: false, error: "Project not found." });
+      }
+      deleteLocalBatchItem(projectId, batchId);
+      return res.json({ success: true, storage: "local" });
+    }
+    const saved = await db.transaction(async (tx: any) => {
+      const [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("update");
+      if (!project) return null;
+      await tx.delete(batches).where(and(eq(batches.id, batchId), eq(batches.projectId, projectId)));
+      const updatedProject = {
+        ...project, batches: removeBatch(project.batches, batchId), updatedAt: new Date()
+      };
+      await tx.update(projects).set({
+        batches: updatedProject.batches, updatedAt: updatedProject.updatedAt
+      }).where(eq(projects.id, projectId));
+      return updatedProject;
+    });
+    if (!saved) return res.status(404).json({ success: false, error: "Project not found." });
+    cacheSQLProject(saved);
+    return res.json({ success: true, storage: "sql" });
   } catch (error: any) {
-    console.warn("SQL db delete batch notice:", error?.message);
+    logger.error({ error: error?.message }, "Batch deletion failed");
+    return res.status(db ? 503 : 500).json({ success: false, error: "Batch deletion failed. Your batch was not deleted." });
   }
-
-  return res.json({ success: true });
 });
 
 app.get("/api/sql/projects/:id", optionalAuth, async (req: AuthRequest, res) => {
@@ -583,38 +416,46 @@ app.get("/api/sql/projects/:id", optionalAuth, async (req: AuthRequest, res) => 
 
   try {
     const projRows = await db.select().from(projects).where(eq(projects.id, projId));
-    if (projRows.length > 0) {
-      const sqlProj = projRows[0];
-      const sqlBatches = Array.isArray(sqlProj.batches) ? sqlProj.batches : [];
-      const localBatches = (foundLocal && Array.isArray(foundLocal.batches)) ? foundLocal.batches : [];
+    const batchRows = await db.select().from(batches).where(eq(batches.projectId, projId));
+    const sqlProj = projRows[0];
+    if (sqlProj || foundLocal) {
+      const project = sqlProj || foundLocal;
       return res.json({
         success: true,
-        project: {
-          ...sqlProj,
-          settings: sqlProj.settings || foundLocal?.settings || {},
-          batches: localBatches.length >= sqlBatches.length ? localBatches : sqlBatches
-        }
+        project: projectForResponse({
+          ...project,
+          settings: sqlProj?.settings || foundLocal?.settings || {},
+          batches: mergeProjectSnapshot(
+            mergeBatchRecords(foundLocal?.batches, sqlProj?.batches), undefined, sqlBatchData(batchRows, projId)
+          )
+        })
       });
     }
   } catch (error: any) {
-    console.warn("SQL db get project fallback to local store:", error?.message);
+    logger.warn({ error: error?.message }, "SQL get project fell back to local storage");
   }
   
   if (foundLocal) {
-    return res.json({ success: true, project: foundLocal });
+    return res.json({ success: true, project: projectForResponse(foundLocal) });
   }
   return res.status(404).json({ success: false, error: "Project not found." });
 });
 
 app.delete("/api/sql/projects/:id", optionalAuth, async (req: AuthRequest, res) => {
   const projId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
-  deleteLocalProjectItem(projId);
   try {
-    await db.delete(projects).where(eq(projects.id, projId));
+    if (db) {
+      await db.transaction(async (tx: any) => {
+        await tx.delete(batches).where(eq(batches.projectId, projId));
+        await tx.delete(projects).where(eq(projects.id, projId));
+      });
+    }
+    deleteLocalProjectItem(projId);
+    return res.json({ success: true });
   } catch (error: any) {
-    console.warn("SQL db delete project local store updated:", error?.message);
+    logger.error({ error: error?.message }, "Project deletion failed");
+    return res.status(db ? 503 : 500).json({ success: false, error: "Project deletion failed." });
   }
-  return res.json({ success: true });
 });
 
 // Student / Teacher codes endpoints
@@ -1015,10 +856,10 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
       completion?.message ||
       completionBody ||
       completionResponse.statusText;
-    throw new Error(`DigitalOcean Chat Completions request failed (${completionResponse.status}): ${errorMessage}`);
+    throw new ChatCompletionsHttpError(completionResponse.status, errorMessage);
   }
 
-  const textContent = completion.choices?.[0]?.message?.content || "";
+  const textContent = normalizeText(completion.choices?.[0]?.message?.content);
 
   if (!textContent) {
     throw new Error(`Empty response content from DigitalOcean model ${targetModel}`);
@@ -1598,100 +1439,6 @@ REASONING TEMPLATE FORMAT:
       };
     }
 
-    // Helper to robustly extract examples from diverse model output formats
-    const parseGeneratedExamples = (rawText: string): any[] => {
-      if (!rawText || !rawText.trim()) return [];
-      const clean = rawText.replace(/```json\s*/gi, "").replace(/```\s*$/gi, "").trim();
-
-      // 1. Direct JSON parse
-      try {
-        const direct = JSON.parse(clean);
-        if (Array.isArray(direct)) return direct;
-        if (direct && typeof direct === "object") {
-          if (Array.isArray(direct.examples)) return direct.examples;
-          if (Array.isArray(direct.data)) return direct.data;
-          if (Array.isArray(direct.items)) return direct.items;
-          if (Array.isArray(direct.conversations)) return direct.conversations;
-          if (Array.isArray(direct.batch)) return direct.batch;
-          if (Array.isArray(direct.messages)) return [direct];
-          if (direct.prompt || direct.instruction || direct.user || direct.query) return [direct];
-        }
-      } catch (e) {}
-
-      // 2. Line-by-line NDJSON parse
-      const lines = clean.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-      const ndjsonResults: any[] = [];
-      for (const line of lines) {
-        if ((line.startsWith("{") && line.endsWith("}")) || (line.startsWith("[") && line.endsWith("]"))) {
-          try {
-            const parsedLine = JSON.parse(line);
-            if (Array.isArray(parsedLine)) {
-              ndjsonResults.push(...parsedLine);
-            } else if (parsedLine && typeof parsedLine === "object") {
-              ndjsonResults.push(parsedLine);
-            }
-          } catch (eNd) {}
-        }
-      }
-      if (ndjsonResults.length > 0) return ndjsonResults;
-
-      // 3. Regex extraction of JSON array [...]
-      const arrayMatch = clean.match(/\[\s*\{[\s\S]*\}\s*\]/);
-      if (arrayMatch) {
-        try {
-          const parsed = JSON.parse(arrayMatch[0]);
-          if (Array.isArray(parsed)) return parsed;
-        } catch (e2) {
-          try {
-            const trimmedArray = arrayMatch[0].replace(/,\s*([\]\}])/g, "$1");
-            const parsed = JSON.parse(trimmedArray);
-            if (Array.isArray(parsed)) return parsed;
-          } catch (e2b) {}
-        }
-      }
-
-      // 4. Regex extraction of individual JSON objects { ... }
-      const objectMatches = clean.match(/\{[^{}]*"(?:messages|prompt|instruction|role|response|content)"[^{}]*\}/gi);
-      if (objectMatches && objectMatches.length > 0) {
-        const collectedObj: any[] = [];
-        for (const m of objectMatches) {
-          try {
-            const p = JSON.parse(m);
-            if (p && typeof p === "object") collectedObj.push(p);
-          } catch (eM) {}
-        }
-        if (collectedObj.length > 0) return collectedObj;
-      }
-
-      // 5. Single outer object match
-      const objMatch = clean.match(/\{[\s\S]*\}/);
-      if (objMatch) {
-        try {
-          const parsedObj = JSON.parse(objMatch[0]);
-          if (parsedObj && Array.isArray(parsedObj.examples)) return parsedObj.examples;
-          if (parsedObj && Array.isArray(parsedObj.data)) return parsedObj.data;
-          if (parsedObj && Array.isArray(parsedObj.items)) return parsedObj.items;
-          if (parsedObj && Array.isArray(parsedObj.conversations)) return parsedObj.conversations;
-          if (parsedObj && Array.isArray(parsedObj.batch)) return parsedObj.batch;
-          if (parsedObj && Array.isArray(parsedObj.messages)) return [parsedObj];
-          if (parsedObj.prompt || parsedObj.instruction || parsedObj.user) return [parsedObj];
-        } catch (e3) {}
-      }
-
-      // 6. Emergency Fallback: If clean contains plain text response, convert prose into a single valid example
-      if (clean.length > 20) {
-        return [{
-          messages: [
-            { role: "system", content: systemPrompt || "You are a helpful assistant." },
-            { role: "user", content: `Provide instructions regarding ${targetTask || "the requested task"}.` },
-            { role: "assistant", content: clean }
-          ]
-        }];
-      }
-
-      return [];
-    };
-
     const generationModels = getGenerationModels();
     const generationStacks = createModelGenerationStacks(countNum, generationModels);
     const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);
@@ -2027,9 +1774,11 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               contents: fullPrompt,
               config: configObj
             });
-            const text = extractResponseText(response) || "[]";
-            const parsed = parseGeneratedExamples(text);
-            return Array.isArray(parsed) ? parsed.slice(0, currentChunkSize) : [];
+            const parsed = parseGeneratedExamples(extractResponseText(response), turnMode);
+            if (parsed.length === 0) {
+              throw new Error(`Model ${model} returned no valid, non-empty SFT examples.`);
+            }
+            return parsed.slice(0, currentChunkSize);
           };
 
           let responseModel = targetModel;
@@ -2037,8 +1786,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           try {
             generated = await requestExamplesFromModel(targetModel);
           } catch (primaryError: any) {
-            const primaryMessage = String(primaryError?.message || primaryError || "");
-            if (!primaryMessage.includes("DigitalOcean Chat Completions request failed (529)")) {
+            if (!isProviderOverload(primaryError)) {
               throw primaryError;
             }
 
