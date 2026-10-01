@@ -1036,18 +1036,27 @@ function getDigitalOceanClient(): { provider: string } {
   return { provider: "DigitalOcean Chat Completions" };
 }
 
-// Direct AI execution through DigitalOcean Chat Completions.
-async function callDigitalOceanAI(initialClientOrParams: any, maybeParams?: any): Promise<any> {
-  const params = maybeParams ?? initialClientOrParams;
-  const doApiKey =
+function getDigitalOceanApiKey(): string {
+  return (
     process.env.GRADIENT_MODEL_ACCESS_KEY ||
     process.env.DIGITALOCEAN_TOKEN ||
     process.env.DIGITALOCEAN_API_KEY ||
     process.env.MODEL_ACCESS_KEY ||
     process.env.DO_INFERENCE_KEY ||
-    "";
+    ""
+  );
+}
+
+// Direct AI execution through DigitalOcean's Chat Completions endpoint.
+async function callDigitalOceanChatCompletions(params: any): Promise<any> {
+  const doApiKey = getDigitalOceanApiKey();
   console.log(`[DigitalOcean Inference] Executing request using model ${params.model || process.env.DO_MODEL || "glm-5.3-flash"}...`);
   return await callDigitalOceanInference(doApiKey.trim(), params);
+}
+
+// Compatibility wrapper for non-generation endpoints that still pass a client marker.
+async function callDigitalOceanAI(initialClientOrParams: any, maybeParams?: any): Promise<any> {
+  return callDigitalOceanChatCompletions(maybeParams ?? initialClientOrParams);
 }
 
 const DEFAULT_GENERATION_MODEL_GROUPS = [
@@ -1439,13 +1448,7 @@ app.post("/api/generate", async (req, res) => {
     res.write(`data: ${JSON.stringify(payload)}\n\n`);
   };
 
-  const client = getDigitalOceanClient();
-
   try {
-    if (!client) {
-      throw new Error("DigitalOcean inference client is not available.");
-    }
-
     const isInstruct = Boolean(
       isInstruction || 
       req.body.projectFormat === "Instruction" || 
@@ -2019,7 +2022,7 @@ Every assistant response MUST begin immediately with the direct, substantive ans
 No internal deliberation, planning, or reasoning fields are permitted.`
           };
           const requestExamplesFromModel = async (model: string) => {
-            const response = await callDigitalOceanAI({
+            const response = await callDigitalOceanChatCompletions({
               model,
               contents: fullPrompt,
               config: configObj
