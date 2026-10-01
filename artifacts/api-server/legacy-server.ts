@@ -17,6 +17,7 @@ import {
 import {
   mergeBatchRecords, mergeProjectSnapshot, removeBatch, sqlBatchData, visibleBatches
 } from "./src/lib/project-batches.ts";
+import { projectBelongsTo, projectOwnerId } from "./src/lib/project-access.ts";
 export { stripCoTFromSingleTurn, sanitizeMessage, sanitizeExample } from "./src/lib/generation-response.ts";
 
 dotenv.config();
@@ -230,20 +231,22 @@ app.get("/api/health", (_req, res) => {
 
 // Local / SQL Database API Endpoints
 app.get("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
-  const userId = req.user?.uid || req.deviceId || (req.query.userId as string) || "default";
+  const ownerId = projectOwnerId(req);
+  if (!ownerId) return res.status(401).json({ success: false, error: "Project access requires a signed-in account or guest device identity." });
   
   const allLocal = getLocalProjects();
 
   try {
-    const userProjects = await db.select().from(projects);
+    const userProjects = await db.select().from(projects).where(eq(projects.userId, ownerId));
+    const ownedLocal = allLocal.filter(project => projectBelongsTo(project, ownerId));
     const projectIds = [...new Set<string>([
-      ...userProjects.map((project: any) => project.id), ...allLocal.map(project => project.id)
+      ...userProjects.map((project: any) => project.id), ...ownedLocal.map(project => project.id)
     ])];
     const batchRows = projectIds.length > 0
       ? await db.select().from(batches).where(inArray(batches.projectId, projectIds))
       : [];
     const merged = userProjects.map((sp: any) => {
-      const lp = allLocal.find(project => project.id === sp.id);
+      const lp = ownedLocal.find(project => project.id === sp.id);
       return projectForResponse({
         ...sp,
         settings: sp.settings || lp?.settings || {},
@@ -252,27 +255,29 @@ app.get("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
         )
       });
     });
-    allLocal.forEach(lp => {
+    ownedLocal.forEach(lp => {
       if (!merged.some((project: any) => project.id === lp.id)) {
         merged.push(projectForResponse({
           ...lp, batches: mergeProjectSnapshot(lp.batches, undefined, sqlBatchData(batchRows, lp.id))
         }));
       }
     });
-    const filtered = merged.filter((p: any) => p.userId === userId || p.userId === "default" || !p.userId || userId === "default");
-    return res.json({ success: true, projects: filtered.length > 0 ? filtered : merged });
+    return res.json({ success: true, projects: merged });
   } catch (error: any) {
     logger.warn({ error: error?.message }, "SQL list projects fell back to local storage");
   }
 
   // Local file store fallback
-  const userProjects = allLocal.filter(p => p.userId === userId || p.userId === "default" || !p.userId || userId === "default");
-  return res.json({ success: true, projects: (userProjects.length > 0 ? userProjects : allLocal).map(projectForResponse) });
+  return res.json({
+    success: true,
+    projects: allLocal.filter(project => projectBelongsTo(project, ownerId)).map(projectForResponse)
+  });
 });
 
 app.post("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
   const { id, name, settings, batches: batchList } = req.body;
-  const userId = req.user?.uid || req.deviceId || req.body.userId || "default";
+  const userId = projectOwnerId(req);
+  if (!userId) return res.status(401).json({ success: false, error: "Project access requires a signed-in account or guest device identity." });
 
   if (typeof id !== "string" || !id || typeof name !== "string" || !name) {
     return res.status(400).json({ success: false, error: "Missing required project id or name." });
@@ -283,12 +288,16 @@ app.post("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
 
   try {
     const existingLocal = getLocalProjects().find(project => project.id === id);
+    if (existingLocal && !projectBelongsTo(existingLocal, userId)) {
+      return res.status(404).json({ success: false, error: "Project not found." });
+    }
     if (!db) {
       saveLocalProjectItem({ id, userId, name, settings: settings || {}, batches: batchList });
       return res.json({ success: true, id, storage: "local" });
     }
     const saved = await db.transaction(async (tx: any) => {
       const [stored] = await tx.select().from(projects).where(eq(projects.id, id)).for("update");
+      if (stored && !projectBelongsTo(stored, userId)) return null;
       const batchRows = await tx.select().from(batches).where(eq(batches.projectId, id));
       const effectiveBatches = mergeProjectSnapshot(
         mergeBatchRecords(existingLocal?.batches, stored?.batches),
@@ -305,6 +314,7 @@ app.post("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
       });
       return project;
     });
+    if (!saved) return res.status(404).json({ success: false, error: "Project not found." });
     cacheSQLProject(saved);
     return res.json({ success: true, id, storage: "sql" });
   } catch (error: any) {
@@ -316,6 +326,8 @@ app.post("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
 // Incremental single-batch save/update route
 app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest, res) => {
   const projectId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
+  const ownerId = projectOwnerId(req);
+  if (!ownerId) return res.status(401).json({ success: false, error: "Project access requires a signed-in account or guest device identity." });
   const { batch } = req.body;
   if (!projectId || !batch || typeof batch.id !== "string" || !batch.id) {
     return res.status(400).json({ success: false, error: "Missing projectId or batch payload." });
@@ -325,7 +337,8 @@ app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest,
     const savedBatch = { ...batch };
     delete savedBatch.__deleted;
     if (!db) {
-      if (!getLocalProjects().some(project => project.id === projectId)) {
+      const localProject = getLocalProjects().find(project => project.id === projectId);
+      if (!projectBelongsTo(localProject, ownerId)) {
         return res.status(404).json({ success: false, error: "Project not found." });
       }
       saveLocalBatchItem(projectId, savedBatch);
@@ -333,7 +346,7 @@ app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest,
     }
     const saved = await db.transaction(async (tx: any) => {
       const [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("update");
-      if (!project) return null;
+      if (!projectBelongsTo(project, ownerId)) return null;
       const [existingBatch] = await tx.select().from(batches).where(eq(batches.id, batch.id));
       if (existingBatch && existingBatch.projectId !== projectId) {
         throw new Error("Batch ID already belongs to another project.");
@@ -376,13 +389,16 @@ app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest,
 app.delete("/api/sql/projects/:id/batches/:batchId", optionalAuth, async (req: AuthRequest, res) => {
   const projectId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
   const batchId = Array.isArray(req.params.batchId) ? req.params.batchId[0] ?? "" : req.params.batchId;
+  const ownerId = projectOwnerId(req);
+  if (!ownerId) return res.status(401).json({ success: false, error: "Project access requires a signed-in account or guest device identity." });
   if (!projectId || !batchId) {
     return res.status(400).json({ success: false, error: "Missing projectId or batchId." });
   }
 
   try {
     if (!db) {
-      if (!getLocalProjects().some(project => project.id === projectId)) {
+      const localProject = getLocalProjects().find(project => project.id === projectId);
+      if (!projectBelongsTo(localProject, ownerId)) {
         return res.status(404).json({ success: false, error: "Project not found." });
       }
       deleteLocalBatchItem(projectId, batchId);
@@ -390,7 +406,7 @@ app.delete("/api/sql/projects/:id/batches/:batchId", optionalAuth, async (req: A
     }
     const saved = await db.transaction(async (tx: any) => {
       const [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("update");
-      if (!project) return null;
+      if (!projectBelongsTo(project, ownerId)) return null;
       await tx.delete(batches).where(and(eq(batches.id, batchId), eq(batches.projectId, projectId)));
       const updatedProject = {
         ...project, batches: removeBatch(project.batches, batchId), updatedAt: new Date()
@@ -411,13 +427,18 @@ app.delete("/api/sql/projects/:id/batches/:batchId", optionalAuth, async (req: A
 
 app.get("/api/sql/projects/:id", optionalAuth, async (req: AuthRequest, res) => {
   const projId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
+  const ownerId = projectOwnerId(req);
+  if (!ownerId) return res.status(401).json({ success: false, error: "Project access requires a signed-in account or guest device identity." });
   const allLocal = getLocalProjects();
-  const foundLocal = allLocal.find(p => p.id === projId);
+  const foundLocal = allLocal.find(p => p.id === projId && projectBelongsTo(p, ownerId));
 
   try {
     const projRows = await db.select().from(projects).where(eq(projects.id, projId));
     const batchRows = await db.select().from(batches).where(eq(batches.projectId, projId));
     const sqlProj = projRows[0];
+    if (sqlProj && !projectBelongsTo(sqlProj, ownerId)) {
+      return res.status(404).json({ success: false, error: "Project not found." });
+    }
     if (sqlProj || foundLocal) {
       const project = sqlProj || foundLocal;
       return res.json({
@@ -443,12 +464,23 @@ app.get("/api/sql/projects/:id", optionalAuth, async (req: AuthRequest, res) => 
 
 app.delete("/api/sql/projects/:id", optionalAuth, async (req: AuthRequest, res) => {
   const projId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
+  const ownerId = projectOwnerId(req);
+  if (!ownerId) return res.status(401).json({ success: false, error: "Project access requires a signed-in account or guest device identity." });
   try {
     if (db) {
-      await db.transaction(async (tx: any) => {
+      const deleted = await db.transaction(async (tx: any) => {
+        const [project] = await tx.select().from(projects).where(eq(projects.id, projId)).for("update");
+        if (!projectBelongsTo(project, ownerId)) return false;
         await tx.delete(batches).where(eq(batches.projectId, projId));
         await tx.delete(projects).where(eq(projects.id, projId));
+        return true;
       });
+      if (!deleted) return res.status(404).json({ success: false, error: "Project not found." });
+    } else {
+      const localProject = getLocalProjects().find(project => project.id === projId);
+      if (!projectBelongsTo(localProject, ownerId)) {
+        return res.status(404).json({ success: false, error: "Project not found." });
+      }
     }
     deleteLocalProjectItem(projId);
     return res.json({ success: true });
@@ -1276,7 +1308,7 @@ app.post("/api/generate", async (req, res) => {
   const sendProgressEvent = (payload: Record<string, unknown>) => {
     if (generationJobId) {
       const job = generationJobs.get(generationJobId);
-      if (job && payload.type === "progress") {
+      if (job && job.status === "running" && payload.type === "progress") {
         job.progress.completed = Math.min(
           job.progress.total,
           Number(payload.completedCount) || job.progress.completed
@@ -1844,19 +1876,20 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       }
     }
 
-    let firstError: any = null;
     startProgressStream();
     const taskOutputs: any[][] = [];
     for (let stackIndex = 0; stackIndex < chunkTasks.length; stackIndex++) {
       if (stackIndex > 0) await new Promise((resolve) => setTimeout(resolve, 2000));
-      const results = await Promise.allSettled(chunkTasks[stackIndex].map((task) => task()));
-      for (const result of results) {
-        if (result.status === "fulfilled") {
-          taskOutputs.push(result.value);
-        } else {
-          if (!firstError) firstError = result.reason;
-          taskOutputs.push([]);
-        }
+      try {
+        // Each task already applies the sole allowed 529 fallback. Fail the job as
+        // soon as one task is unrecoverable instead of waiting for every slow request.
+        taskOutputs.push(...await Promise.all(chunkTasks[stackIndex].map(task => task())));
+      } catch (error: any) {
+        const detail = formatAIErrorMessage(error);
+        throw new Error(
+          `Generation stopped after ${completedExampleCount} of ${countNum} examples completed. `
+          + `The incomplete batch was not saved. ${detail}`
+        );
       }
     }
 
@@ -1873,13 +1906,11 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     });
 
     if (allExamples.length === 0) {
-      if (firstError) throw firstError;
       throw new Error("No examples were returned by the generation engine. Please retry with a smaller batch or check connection.");
     }
 
     if (allExamples.length < countNum) {
-      const failureDetails = firstError ? formatAIErrorMessage(firstError) : "Some model calls returned no examples.";
-      throw new Error(`Generation returned ${allExamples.length} of ${countNum} requested examples. ${failureDetails}`);
+      throw new Error(`Generation returned ${allExamples.length} of ${countNum} requested examples.`);
     }
 
     // Ensure we don't exceed requested count

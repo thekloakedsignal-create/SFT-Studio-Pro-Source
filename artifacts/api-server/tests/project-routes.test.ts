@@ -8,6 +8,7 @@ import { sanitizeExample } from "../src/lib/generation-response.ts";
 import {
   mergeBatchRecords, mergeProjectSnapshot, removeBatch, sqlBatchData, visibleBatches
 } from "../src/lib/project-batches.ts";
+import { projectBelongsTo, projectOwnerId } from "../src/lib/project-access.ts";
 
 // Evaluate the real persistence handlers with in-memory SQL/files and captured Express
 // registrations. No server, auth initialization, production data, or network is used.
@@ -116,6 +117,7 @@ function fixture(initial: MemoryState, local: any[] = [], sqlEnabled = true) {
     optionalAuth() {},
     logger: { warn() {}, error() {} },
     sanitizeExample, mergeBatchRecords, mergeProjectSnapshot, removeBatch, sqlBatchData, visibleBatches,
+    projectBelongsTo, projectOwnerId,
     fs: {
       existsSync: (file: string) => files.has(file),
       mkdirSync() {},
@@ -136,7 +138,13 @@ function fixture(initial: MemoryState, local: any[] = [], sqlEnabled = true) {
     state, local: () => JSON.parse(files.get(projectsFile)!),
     failSQL() { failSQL = true; },
     failFiles() { failFiles = true; },
-    async request(method: string, route: string, body: any = {}, params: any = {}) {
+    async request(
+      method: string,
+      route: string,
+      body: any = {},
+      params: any = {},
+      identity: any = { user: { uid: "owner-a" } }
+    ) {
       const response: any = {
         statusCode: 200, body: undefined,
         status(code: number) { this.statusCode = code; return this; },
@@ -144,14 +152,14 @@ function fixture(initial: MemoryState, local: any[] = [], sqlEnabled = true) {
       };
       const handler = routes.get(`${method} ${route}`);
       assert.ok(handler, `handler missing: ${method} ${route}`);
-      await handler({ body, params, query: {} }, response);
+      await handler({ body, params, query: {}, ...identity }, response);
       return response;
     }
   };
 }
 
 const project = {
-  id: "p1", name: "Fixture project", userId: "default", settings: {},
+  id: "p1", name: "Fixture project", userId: "owner-a", settings: {},
   batches: [{ id: "old", name: "Embedded" }, { id: "shared", examples: ["stale", "longer"] }]
 };
 const incremental = {
@@ -236,4 +244,66 @@ test("local-only save works without SQL; disk failure and missing project are ex
   const failed = await f.request("POST", "/api/sql/projects/:id/batches", { batch: { id: "failed" } }, { id: "p1" });
   assert.equal(failed.statusCode, 500);
   assert.equal(failed.body.success, false);
+});
+
+test("project list is scoped to the authenticated owner and never falls back to other users", async () => {
+  const other = { ...project, id: "p2", userId: "owner-b", name: "Private to B" };
+  const legacy = { ...project, id: "legacy", userId: "default" };
+  const f = fixture({ projects: [project, other, legacy], batches: [] }, [project, other, legacy]);
+  const own = await f.request("GET", "/api/sql/projects");
+  const emptyOwner = await f.request("GET", "/api/sql/projects", {}, {}, { user: { uid: "owner-c" } });
+  const guest = await f.request("GET", "/api/sql/projects", {}, {}, { deviceId: "device-private" });
+  const missingIdentity = await f.request("GET", "/api/sql/projects", {}, {}, {});
+
+  assert.deepEqual(own.body.projects.map((item: any) => item.id), ["p1"]);
+  assert.deepEqual(emptyOwner.body.projects, []);
+  assert.deepEqual(guest.body.projects, []);
+  assert.equal(missingIdentity.statusCode, 401);
+});
+
+test("another owner cannot read, overwrite, mutate batches, or delete a project", async () => {
+  const other = { ...project, id: "p2", userId: "owner-b" };
+  const f = fixture({ projects: [project, other], batches: [] }, [project, other]);
+  const asA = { user: { uid: "owner-a" } };
+  const asB = { user: { uid: "owner-b" } };
+
+  assert.equal((await f.request("GET", "/api/sql/projects/:id", {}, { id: "p2" }, asA)).statusCode, 404);
+  assert.equal((await f.request("POST", "/api/sql/projects", {
+    ...other, userId: "owner-a", name: "Hijacked"
+  }, {}, asA)).statusCode, 404);
+  assert.equal((await f.request("POST", "/api/sql/projects/:id/batches", {
+    batch: { id: "attack-batch", name: "No" }
+  }, { id: "p2" }, asA)).statusCode, 404);
+  assert.equal((await f.request("DELETE", "/api/sql/projects/:id/batches/:batchId", {},
+    { id: "p2", batchId: "anything" }, asA)).statusCode, 404);
+  assert.equal((await f.request("DELETE", "/api/sql/projects/:id", {}, { id: "p2" }, asA)).statusCode, 404);
+  assert.equal(f.state.projects.find(item => item.id === "p2").name, other.name);
+
+  assert.equal((await f.request("GET", "/api/sql/projects/:id", {}, { id: "p2" }, asB)).body.project.id, "p2");
+  const saved = await f.request("POST", "/api/sql/projects", {
+    ...project, id: "new", userId: "owner-b"
+  }, {}, asB);
+  assert.equal(saved.body.success, true);
+  assert.equal(f.state.projects.find(item => item.id === "new").userId, "owner-b");
+});
+
+test("guest device identity is required and cannot be replaced with a body owner ID", async () => {
+  const f = fixture({ projects: [], batches: [] });
+  const guestA = { deviceId: "device-private-a" };
+  const guestB = { deviceId: "device-private-b" };
+  const created = await f.request("POST", "/api/sql/projects", {
+    id: "guest-project", name: "Guest", userId: "device-private-b", settings: {}, batches: []
+  }, {}, guestA);
+  assert.equal(created.body.success, true);
+  assert.equal(f.state.projects[0].userId, "device-private-a");
+  assert.equal((await f.request("GET", "/api/sql/projects/:id", {}, { id: "guest-project" }, guestB)).statusCode, 404);
+  assert.equal((await f.request("GET", "/api/sql/projects", {}, {}, {})).statusCode, 401);
+});
+
+test("project ownership helpers reject missing and reserved default identities", () => {
+  assert.equal(projectOwnerId({}), null);
+  assert.equal(projectOwnerId({ deviceId: "default" }), null);
+  assert.equal(projectOwnerId({ user: { uid: "user-a" }, deviceId: "device-a" }), "user-a");
+  assert.equal(projectBelongsTo(project, "owner-a"), true);
+  assert.equal(projectBelongsTo(project, "owner-b"), false);
 });

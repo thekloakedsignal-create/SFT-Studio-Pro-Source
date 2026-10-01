@@ -478,6 +478,15 @@ export default function App() {
     }
     return id;
   };
+  const projectApiFetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    const headers = new Headers(init.headers);
+    if (auth.currentUser) {
+      headers.set("Authorization", `Bearer ${await auth.currentUser.getIdToken()}`);
+    } else {
+      headers.set("X-Device-ID", getDeviceId());
+    }
+    return fetch(input, { ...init, headers });
+  };
 
   // Batches state initialized with initial default data
   const [batches, setBatches] = useState<SFTBatch[]>(DEFAULT_INITIAL_BATCHES);
@@ -833,10 +842,10 @@ export default function App() {
 
       // 1. Query Postgres SQL endpoint
       try {
-        const sqlRes = await fetch(`/api/sql/projects?userId=${userId}`);
+        const sqlRes = await projectApiFetch("/api/sql/projects");
         const sqlData = await sqlRes.json();
         if (sqlData.success && Array.isArray(sqlData.projects)) {
-          sqlProjects = sqlData.projects;
+          sqlProjects = sqlData.projects.filter((project: any) => project?.userId === userId);
         }
       } catch (e) {
         console.warn("SQL projects lookup notice:", e);
@@ -851,12 +860,13 @@ export default function App() {
       });
 
       try {
-        const cachedList = localStorage.getItem("local_sft_projects_list") || localStorage.getItem(`cached_projects_${userId}`);
+        const cachedList = localStorage.getItem(`cached_projects_${userId}`)
+          || localStorage.getItem("local_sft_projects_list");
         if (cachedList) {
           const parsed = JSON.parse(cachedList);
           if (Array.isArray(parsed)) {
             parsed.forEach(cp => {
-              if (cp && cp.id && !mergedMap.has(cp.id)) {
+              if (cp && cp.id && cp.userId === userId && !mergedMap.has(cp.id)) {
                 mergedMap.set(cp.id, cp);
               }
             });
@@ -1196,7 +1206,7 @@ export default function App() {
 
     // 1. Save metadata and full batches to Postgres database
     try {
-      const response = await fetch("/api/sql/projects", {
+      const response = await projectApiFetch("/api/sql/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1275,7 +1285,7 @@ export default function App() {
 
     // Save single batch to Postgres and report the actual outcome.
     try {
-      const response = await fetch(`/api/sql/projects/${encodeURIComponent(projectId)}/batches`, {
+      const response = await projectApiFetch(`/api/sql/projects/${encodeURIComponent(projectId)}/batches`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ batch: normalizedBatch })
@@ -1330,7 +1340,7 @@ export default function App() {
     }));
 
     try {
-      await fetch(`/api/sql/projects/${projectId}/batches/${batchId}`, {
+      await projectApiFetch(`/api/sql/projects/${encodeURIComponent(projectId)}/batches/${encodeURIComponent(batchId)}`, {
         method: "DELETE"
       });
     } catch (e) {
@@ -1358,7 +1368,7 @@ export default function App() {
 
     // 1. Fetch fresh copy from Postgres SQL endpoint
     try {
-      const sqlRes = await fetch(`/api/sql/projects/${selectedId}`);
+      const sqlRes = await projectApiFetch(`/api/sql/projects/${encodeURIComponent(selectedId)}`);
       if (sqlRes.ok) {
         const sqlData = await sqlRes.json();
         if (sqlData.success && sqlData.project) {
@@ -1376,13 +1386,13 @@ export default function App() {
       try {
         const devId = getDeviceId();
         const userIdToUse = auth.currentUser ? auth.currentUser.uid : devId;
-        const cached = localStorage.getItem("local_sft_project") || localStorage.getItem(`cached_projects_${userIdToUse}`);
+        const cached = localStorage.getItem(`cached_projects_${userIdToUse}`);
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed)) {
-            const found = parsed.find((p: any) => p.id === selectedId);
+            const found = parsed.find((p: any) => p.id === selectedId && p.userId === userIdToUse);
             if (found) selected = found;
-          } else if (parsed && parsed.id === selectedId) {
+          } else if (parsed && parsed.id === selectedId && parsed.userId === userIdToUse) {
             selected = parsed;
           }
         }
@@ -1626,7 +1636,7 @@ export default function App() {
     setNotification({ text: `Created and opened "${finalName}"!`, type: "success" });
 
     // Non-blocking background save to database (one single write, no re-fetching all projects)
-    fetch("/api/sql/projects", {
+    projectApiFetch("/api/sql/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1703,7 +1713,7 @@ export default function App() {
 
     // Background delete from database
     try {
-      await fetch(`/api/sql/projects/${id}`, { method: "DELETE" });
+      await projectApiFetch(`/api/sql/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
     } catch (sqlErr) {
       console.warn("Postgres delete notice:", sqlErr);
     }
@@ -1776,7 +1786,7 @@ export default function App() {
                   batches: parsed.batches || []
                 };
 
-                await fetch("/api/sql/projects", {
+                await projectApiFetch("/api/sql/projects", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify(payload)
@@ -1814,7 +1824,7 @@ export default function App() {
               // Auto-save initial workspace as their first project in Postgres
               const defaultProjId = `project-${Date.now()}`;
               try {
-                await fetch("/api/sql/projects", {
+                await projectApiFetch("/api/sql/projects", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({

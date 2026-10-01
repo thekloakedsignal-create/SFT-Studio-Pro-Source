@@ -24,7 +24,7 @@ const models = [
   "llama-4-maverick", "mimo-v2.5-pro", "minimax-m2.5", "mistral-3-14B", "nemotron-3-nano-omni"
 ];
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "fastFailure" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const delays: number[] = [];
@@ -49,11 +49,15 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       calls.push(request);
       concurrent++;
       peakConcurrent = Math.max(peakConcurrent, concurrent);
+      if (mode === "fastFailure" && request.model !== firstModel) {
+        return await new Promise(() => {});
+      }
       await Promise.resolve();
       concurrent--;
       const isPrimary = request.model === firstModel;
       const isBackup = !models.slice(0, 5).includes(request.model);
-      const status = ((mode === "primary529" || mode === "both529") && isPrimary)
+      const status = (mode === "fastFailure" && isPrimary) ? 503
+        : ((mode === "primary529" || mode === "both529") && isPrimary)
         || (mode === "both529" && isBackup) ? 529
         : mode === "503" && isPrimary ? 503 : 200;
       const example = { messages: [
@@ -128,6 +132,18 @@ test("other HTTP failures and invalid content do not cause retries or top-ups", 
     assert.equal(response.body.success, false);
     assert.match(response.body.error, /4 of 5/);
   }
+});
+
+test("an unrecoverable request fails promptly instead of waiting on hanging sibling models", async () => {
+  const f = fixture("fastFailure");
+  const outcome = await Promise.race([
+    f.generate(),
+    new Promise(resolve => setTimeout(() => resolve("still waiting"), 500))
+  ]);
+  assert.notEqual(outcome, "still waiting");
+  assert.equal((outcome as any).statusCode, 500);
+  assert.match((outcome as any).body.error, /stopped after 0 of 5 examples/);
+  assert.equal(f.calls.length, 5);
 });
 
 test("preserved schedules and two-second spacing cover every supported batch size", async () => {
