@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import { randomUUID } from "node:crypto";
 import fs from "fs";
 import dotenv from "dotenv";
 import mammoth from "mammoth";
@@ -970,20 +971,33 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
   const jsonMode = Boolean(params.config?.responseSchema) || params.config?.responseMimeType === "application/json";
 
   console.log(`[DigitalOcean Chat Completions] Request to model ${targetModel} (max_tokens: ${maxTokensToUse})...`);
-  const completionResponse = await fetch("https://inference.do-ai.run/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${doApiKey.trim()}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: targetModel,
-      messages: baseMessages,
-      temperature: params.config?.temperature ?? 0.7,
-      max_tokens: maxTokensToUse,
-      ...(jsonMode ? { response_format: { type: "json_object" } } : {})
-    })
-  });
+  let completionResponse: Response;
+  try {
+    completionResponse = await fetch("https://inference.do-ai.run/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${doApiKey.trim()}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: targetModel,
+        messages: baseMessages,
+        temperature: params.config?.temperature ?? 0.7,
+        max_tokens: maxTokensToUse,
+        ...(jsonMode ? { response_format: { type: "json_object" } } : {})
+      }),
+      signal: AbortSignal.timeout(120_000)
+    });
+  } catch (error: any) {
+    const cause = error?.cause;
+    const detail = cause?.code
+      ? `${cause.code}${cause.message ? `: ${cause.message}` : ""}`
+      : cause?.message || error?.message || "Unknown network error";
+    if (error?.name === "TimeoutError") {
+      throw new Error("DigitalOcean Chat Completions request timed out after 120 seconds.");
+    }
+    throw new Error(`DigitalOcean Chat Completions transport error: ${detail}`);
+  }
   const completionBody = await completionResponse.text();
   let completion: any;
   try {
@@ -1314,6 +1328,33 @@ Balancing all three yields a helpful response that supports voluntary choice and
 
 // API Routes
 
+type GenerationJob = {
+  status: "running" | "complete" | "error";
+  createdAt: number;
+  updatedAt: number;
+  progress: { completed: number; total: number };
+  result?: { success: true; examples: any[]; source: string };
+  error?: string;
+};
+
+const generationJobs = new Map<string, GenerationJob>();
+const GENERATION_JOB_RETENTION_MS = 60 * 60 * 1000;
+
+app.get("/api/generate/jobs/:jobId", (req, res) => {
+  const job = generationJobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ success: false, error: "Generation job not found or expired." });
+  }
+
+  return res.json({
+    success: true,
+    status: job.status,
+    progress: job.progress,
+    ...(job.status === "complete" ? { result: job.result } : {}),
+    ...(job.status === "error" ? { error: job.error } : {})
+  });
+});
+
 // 1. Generate SFT Batch
 app.post("/api/generate", async (req, res) => {
   const {
@@ -1340,9 +1381,35 @@ app.post("/api/generate", async (req, res) => {
       error: `Batch size must be one of: ${SUPPORTED_GENERATION_BATCH_SIZES.join(", ")}.`
     });
   }
-  const wantsProgressStream = req.body?.stream === true;
+  const useJobPolling = req.body?.jobMode === true;
+  let generationJobId: string | undefined;
+  if (useJobPolling) {
+    const now = Date.now();
+    for (const [id, job] of generationJobs) {
+      if (job.status !== "running" && now - job.updatedAt > GENERATION_JOB_RETENTION_MS) {
+        generationJobs.delete(id);
+      }
+    }
+
+    generationJobId = randomUUID();
+    generationJobs.set(generationJobId, {
+      status: "running",
+      createdAt: now,
+      updatedAt: now,
+      progress: { completed: 0, total: countNum }
+    });
+    res.status(202).json({
+      success: true,
+      jobId: generationJobId,
+      status: "running",
+      progress: { completed: 0, total: countNum }
+    });
+  }
+
+  const wantsProgressStream = req.body?.stream === true && !useJobPolling;
   let progressStreamStarted = false;
   const startProgressStream = () => {
+    if (useJobPolling) return;
     if (!wantsProgressStream || progressStreamStarted) return;
     res.status(200);
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -1353,6 +1420,17 @@ app.post("/api/generate", async (req, res) => {
     progressStreamStarted = true;
   };
   const sendProgressEvent = (payload: Record<string, unknown>) => {
+    if (generationJobId) {
+      const job = generationJobs.get(generationJobId);
+      if (job && payload.type === "progress") {
+        job.progress.completed = Math.min(
+          job.progress.total,
+          Number(payload.completedCount) || job.progress.completed
+        );
+        job.updatedAt = Date.now();
+      }
+      return;
+    }
     if (!progressStreamStarted || res.writableEnded || res.destroyed) return;
     res.write(`data: ${JSON.stringify(payload)}\n\n`);
   };
@@ -2010,6 +2088,16 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       examples: formattedExamples, 
       source: `DigitalOcean Inference (${generationModels.join(", ")})`
     };
+    if (generationJobId) {
+      const job = generationJobs.get(generationJobId);
+      if (job) {
+        job.status = "complete";
+        job.progress.completed = formattedExamples.length;
+        job.result = generationResponse;
+        job.updatedAt = Date.now();
+      }
+      return;
+    }
     if (progressStreamStarted) {
       sendProgressEvent({ type: "complete", ...generationResponse });
       return res.end();
@@ -2017,6 +2105,15 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     return res.json(generationResponse);
   } catch (error: any) {
     console.error("DigitalOcean batch generation error:", error);
+    if (generationJobId) {
+      const job = generationJobs.get(generationJobId);
+      if (job) {
+        job.status = "error";
+        job.error = formatAIErrorMessage(error);
+        job.updatedAt = Date.now();
+      }
+      return;
+    }
     if (progressStreamStarted) {
       sendProgressEvent({
         type: "error",
