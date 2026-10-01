@@ -2084,7 +2084,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     const formattedExamples = allExamples.map(example => sanitizeExample(example, turnMode));
 
     const generationResponse = {
-      success: true, 
+      success: true as const,
       examples: formattedExamples, 
       source: `DigitalOcean Inference (${generationModels.join(", ")})`
     };

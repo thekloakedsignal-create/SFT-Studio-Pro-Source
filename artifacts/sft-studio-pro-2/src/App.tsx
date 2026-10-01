@@ -1988,34 +1988,28 @@ export default function App() {
       let accumulatedExamples: any[] = [];
       let lastSource = "Generator";
       let serverBatchId: string | null = null;
-      const progressByTask = new Map<string, number>();
-      let streamedProgressCount = 0;
+      const progressByChunk = new Map<number, number>();
+      let completedProgressCount = 0;
 
-      const updateStreamedProgress = (subChunkIdx: number, taskId: string, generatedCount: number) => {
-        const key = `${subChunkIdx}:${taskId}`;
-        const nextCount = Math.max(0, generatedCount);
-        const previousCount = progressByTask.get(key) || 0;
-        progressByTask.set(key, nextCount);
-        streamedProgressCount = Math.max(0, streamedProgressCount + nextCount - previousCount);
+      const updateJobProgress = (subChunkIdx: number, completedCount: number) => {
+        const nextCount = Math.min(subChunkCounts[subChunkIdx], Math.max(0, completedCount));
+        const previousCount = progressByChunk.get(subChunkIdx) || 0;
+        progressByChunk.set(subChunkIdx, nextCount);
+        completedProgressCount = Math.max(0, completedProgressCount + nextCount - previousCount);
         setGenerationProgress({
-          current: Math.min(batchSize, streamedProgressCount),
+          current: Math.min(batchSize, completedProgressCount),
           total: batchSize,
-          percent: Math.min(100, Math.round((streamedProgressCount / batchSize) * 100))
+          percent: Math.min(100, Math.round((completedProgressCount / batchSize) * 100))
         });
       };
 
-      const clearStreamedProgress = (subChunkIdx: number) => {
-        const prefix = `${subChunkIdx}:`;
-        for (const [key, count] of progressByTask) {
-          if (key.startsWith(prefix)) {
-            streamedProgressCount = Math.max(0, streamedProgressCount - count);
-            progressByTask.delete(key);
-          }
-        }
+      const clearJobProgress = (subChunkIdx: number) => {
+        completedProgressCount = Math.max(0, completedProgressCount - (progressByChunk.get(subChunkIdx) || 0));
+        progressByChunk.delete(subChunkIdx);
         setGenerationProgress({
-          current: Math.min(batchSize, streamedProgressCount),
+          current: Math.min(batchSize, completedProgressCount),
           total: batchSize,
-          percent: Math.min(100, Math.round((streamedProgressCount / batchSize) * 100))
+          percent: Math.min(100, Math.round((completedProgressCount / batchSize) * 100))
         });
       };
 
@@ -2042,69 +2036,56 @@ export default function App() {
                 representativePrompt: project.representativePrompt,
                 representativeCompletion: project.representativeCompletion,
                 count: countToGen,
-                stream: true
+                jobMode: true
               })
             });
 
+            const startData = await res.json();
+            if (!res.ok || !startData?.success) {
+              throw new Error(startData?.error || `Generation request failed (${res.status}).`);
+            }
+            if (startData.status !== "running" || typeof startData.jobId !== "string") {
+              throw new Error("Generation server did not return a valid job.");
+            }
+
             let data: any;
-            if (res.headers.get("content-type")?.includes("text/event-stream")) {
-              const reader = res.body?.getReader();
-              if (!reader) throw new Error("Generation progress stream is unavailable.");
+            while (true) {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              const statusRes = await fetch(`/api/generate/jobs/${encodeURIComponent(startData.jobId)}`, {
+                cache: "no-store"
+              });
+              const statusData = await statusRes.json();
 
-              const decoder = new TextDecoder();
-              let buffer = "";
-              let completedPayload: any = null;
-              const processFrame = (frame: string) => {
-                const dataLine = frame.split(/\r?\n/).find(line => line.startsWith("data:"));
-                if (!dataLine) return;
-                const payload = JSON.parse(dataLine.slice(5).trim());
-                if (payload.type === "progress" && typeof payload.taskId === "string") {
-                  updateStreamedProgress(
-                    currentSubIdx,
-                    payload.taskId,
-                    Number(payload.generatedCount) || 0
-                  );
-                } else if (payload.type === "complete") {
-                  completedPayload = payload;
-                } else if (payload.type === "error") {
-                  throw new Error(payload.error || "Generation failed.");
-                }
-              };
-
-              while (true) {
-                const { done, value } = await reader.read();
-                buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-                let frameEnd = buffer.indexOf("\n\n");
-                while (frameEnd >= 0) {
-                  processFrame(buffer.slice(0, frameEnd));
-                  buffer = buffer.slice(frameEnd + 2);
-                  frameEnd = buffer.indexOf("\n\n");
-                }
-                if (done) {
-                  if (buffer.trim()) processFrame(buffer);
-                  break;
-                }
+              if (!statusRes.ok || !statusData?.success) {
+                throw new Error(statusData?.error || `Generation status check failed (${statusRes.status}).`);
               }
-              data = completedPayload;
-            } else {
-              data = await res.json();
+              if (statusData.progress && Number.isFinite(Number(statusData.progress.completed))) {
+                updateJobProgress(currentSubIdx, Number(statusData.progress.completed));
+              }
+              if (statusData.status === "error") {
+                throw new Error(statusData.error || "Generation failed.");
+              }
+              if (statusData.status === "complete") {
+                data = statusData.result;
+                break;
+              }
+              if (statusData.status !== "running") {
+                throw new Error("Generation server returned an unknown job status.");
+              }
             }
 
-            if (!res.ok || !data?.success) {
-              throw new Error(data?.error || `Generation request failed (${res.status}).`);
-            }
-            if (data.success && Array.isArray(data.examples) && data.examples.length > 0) {
+            if (data?.success && Array.isArray(data.examples) && data.examples.length > 0) {
               if (data.source) lastSource = data.source;
               if ((data.batchId || data.id) && !serverBatchId) {
                 serverBatchId = data.batchId || data.id;
               }
               return data.examples;
             } else {
-              throw new Error(data.error || "Sub-batch returned empty response");
+              throw new Error(data?.error || "Sub-batch returned empty response");
             }
         } catch (err: any) {
           console.warn(`[Batch Orchestrator] Sub-batch ${currentSubIdx + 1} failed:`, err?.message || err);
-          clearStreamedProgress(currentSubIdx);
+          clearJobProgress(currentSubIdx);
           throw err;
         }
       };
@@ -2116,7 +2097,7 @@ export default function App() {
           const results = await runSubChunk(count, index);
           if (results.length > 0) {
             accumulatedExamples.push(...results);
-            const currentCount = Math.max(streamedProgressCount, accumulatedExamples.length);
+            const currentCount = Math.max(completedProgressCount, accumulatedExamples.length);
             setGenerationProgress({
               current: Math.min(batchSize, currentCount),
               total: batchSize,
@@ -2128,8 +2109,8 @@ export default function App() {
 
       await Promise.all(workers);
 
-      if (accumulatedExamples.length === 0) {
-        throw new Error("Generation engine could not synthesize examples. Please check network connection and try again.");
+      if (accumulatedExamples.length !== batchSize) {
+        throw new Error(`Generation returned ${accumulatedExamples.length} of ${batchSize} requested examples. The incomplete batch was not saved.`);
       }
 
       // Format unique IDs for generated items
