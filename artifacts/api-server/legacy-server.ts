@@ -691,6 +691,17 @@ app.get("/api/contact/inquiries", (_req, res) => {
 });
 
 // Helper to safely extract text from a DigitalOcean Chat Completions response
+function createDigitalOceanRequestTimeoutError(model: string, timeoutMs: number): Error {
+  return Object.assign(
+    new Error(`DigitalOcean Chat Completions request for ${model} timed out after ${timeoutMs} milliseconds.`),
+    { code: "DO_REQUEST_TIMEOUT", model, timeoutMs }
+  );
+}
+
+function isDigitalOceanRequestTimeout(error: any): boolean {
+  return error?.code === "DO_REQUEST_TIMEOUT" || error?.name === "TimeoutError";
+}
+
 function extractResponseText(res: any): string {
   if (!res) return "";
   if (typeof res.text === "string") return res.text;
@@ -848,7 +859,12 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
   const jsonMode = Boolean(params.config?.responseSchema) || params.config?.responseMimeType === "application/json";
 
   console.log(`[DigitalOcean Chat Completions] Request to model ${targetModel} (max_tokens: ${maxTokensToUse})...`);
+  const timeoutMs = Number.isFinite(params.timeoutMs) && params.timeoutMs > 0
+    ? Math.floor(params.timeoutMs)
+    : 120_000;
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
   let completionResponse: Response;
+  let completionBody: string;
   try {
     completionResponse = await fetch("https://inference.do-ai.run/v1/chat/completions", {
       method: "POST",
@@ -863,19 +879,19 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         max_tokens: maxTokensToUse,
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
-      signal: AbortSignal.timeout(120_000)
+      signal: timeoutSignal
     });
+    completionBody = await completionResponse.text();
   } catch (error: any) {
+    if (timeoutSignal.aborted || error?.name === "TimeoutError") {
+      throw createDigitalOceanRequestTimeoutError(targetModel, timeoutMs);
+    }
     const cause = error?.cause;
     const detail = cause?.code
       ? `${cause.code}${cause.message ? `: ${cause.message}` : ""}`
       : cause?.message || error?.message || "Unknown network error";
-    if (error?.name === "TimeoutError") {
-      throw new Error("DigitalOcean Chat Completions request timed out after 120 seconds.");
-    }
     throw new Error(`DigitalOcean Chat Completions transport error: ${detail}`);
   }
-  const completionBody = await completionResponse.text();
   let completion: any;
   try {
     completion = JSON.parse(completionBody);
