@@ -2110,15 +2110,16 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     }
 
     let allExamples: any[] = [];
-    taskOutputs.forEach((arr, idx) => {
-      if (Array.isArray(arr)) {
-        arr.forEach((ex, exIdx) => {
+    taskOutputs.forEach((stackOutputs, stackIndex) => {
+      stackOutputs.forEach((modelExamples, modelIndex) => {
+        if (!Array.isArray(modelExamples)) return;
+        modelExamples.forEach((example, exampleIndex) => {
           allExamples.push(sanitizeExample({
-            ...ex,
-            id: `gen-${idx}-${exIdx}-${Date.now()}`
+            ...example,
+            id: `gen-${stackIndex}-${modelIndex}-${exampleIndex}-${Date.now()}`
           }, turnMode));
         });
-      }
+      });
     });
     recoveryExamples.forEach((example, index) => {
       allExamples.push(sanitizeExample({

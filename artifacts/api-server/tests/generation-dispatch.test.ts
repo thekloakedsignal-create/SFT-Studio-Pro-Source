@@ -24,6 +24,13 @@ const models = [
   "llama-4-maverick", "mimo-v2.5-pro", "minimax-m2.5", "mistral-3-14B", "nemotron-3-nano-omni"
 ];
 
+function hasRenderableMessages(example: any): boolean {
+  return Array.isArray(example?.messages)
+    && ["user", "assistant"].every(role => example.messages.some((message: any) =>
+      message?.role === role && typeof message.content === "string" && message.content.trim().length > 0
+    ));
+}
+
 function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
@@ -176,6 +183,7 @@ test("real dispatcher launches the preserved initial models concurrently and cou
   const response = await f.generate();
   assert.equal(response.body.success, true);
   assert.equal(response.body.examples.length, 5);
+  assert.ok(response.body.examples.every(hasRenderableMessages));
   assert.equal(response.body.batchId, "fixture-uuid-1");
   assert.deepEqual(f.calls.map(call => call.model), models.slice(0, 5));
   assert.equal(f.peak(), 5);
@@ -190,6 +198,7 @@ test("a stalled model is skipped in later stacks and GLM fills all missing examp
     const response = await f.generate(25);
     assert.equal(response.body.success, true);
     assert.equal(response.body.examples.length, 25);
+    assert.ok(response.body.examples.every(hasRenderableMessages));
     assert.equal(response.body.partial, undefined);
     assert.equal(f.calls.filter(call => call.model === "qwen3.5-397b-a17b").length, 1);
     assert.equal(f.calls.at(-1).model, firstModel);
@@ -256,6 +265,8 @@ test("a job returns its server-generated batch ID immediately and preserves it i
   assert.equal(job.body.status, "complete");
   assert.equal(job.body.batchId, started.body.batchId);
   assert.equal(job.body.result.batchId, started.body.batchId);
+  assert.equal(job.body.result.examples.length, 5);
+  assert.ok(job.body.result.examples.every(hasRenderableMessages));
 });
 
 test("timed-out model stacks preserve completed examples and the same batch ID in job results", async () => {
