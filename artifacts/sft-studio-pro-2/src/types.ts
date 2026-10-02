@@ -60,6 +60,9 @@ export interface SFTBatch {
   examplesCount: number;
   examples: SFTExample[];
   status: "Pending" | "Approved" | "Rejected";
+  partial?: boolean;
+  requestedExamples?: number;
+  partialReason?: string;
   timestamp: string;
   description?: string;
   specialInstructions?: string;

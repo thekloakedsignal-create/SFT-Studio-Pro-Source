@@ -1215,11 +1215,20 @@ Balancing all three yields a helpful response that supports voluntary choice and
 // API Routes
 
 type GenerationJob = {
-  status: "running" | "complete" | "error";
+  status: "running" | "complete" | "partial" | "error";
+  batchId: string;
   createdAt: number;
   updatedAt: number;
   progress: { completed: number; total: number };
-  result?: { success: true; examples: any[]; source: string };
+  result?: {
+    success: true;
+    batchId: string;
+    examples: any[];
+    source: string;
+    partial?: true;
+    requestedCount?: number;
+    partialReason?: string;
+  };
   error?: string;
 };
 
@@ -1235,8 +1244,9 @@ app.get("/api/generate/jobs/:jobId", (req, res) => {
   return res.json({
     success: true,
     status: job.status,
+    batchId: job.batchId,
     progress: job.progress,
-    ...(job.status === "complete" ? { result: job.result } : {}),
+    ...(job.status === "complete" || job.status === "partial" ? { result: job.result } : {}),
     ...(job.status === "error" ? { error: job.error } : {})
   });
 });
@@ -1267,6 +1277,7 @@ app.post("/api/generate", async (req, res) => {
       error: `Batch size must be one of: ${SUPPORTED_GENERATION_BATCH_SIZES.join(", ")}.`
     });
   }
+  const generationBatchId = randomUUID();
   const useJobPolling = req.body?.jobMode === true;
   let generationJobId: string | undefined;
   if (useJobPolling) {
@@ -1280,6 +1291,7 @@ app.post("/api/generate", async (req, res) => {
     generationJobId = randomUUID();
     generationJobs.set(generationJobId, {
       status: "running",
+      batchId: generationBatchId,
       createdAt: now,
       updatedAt: now,
       progress: { completed: 0, total: countNum }
@@ -1287,6 +1299,7 @@ app.post("/api/generate", async (req, res) => {
     res.status(202).json({
       success: true,
       jobId: generationJobId,
+      batchId: generationBatchId,
       status: "running",
       progress: { completed: 0, total: countNum }
     });
@@ -1474,6 +1487,7 @@ REASONING TEMPLATE FORMAT:
     const generationModels = getGenerationModels();
     const generationStacks = createModelGenerationStacks(countNum, generationModels);
     const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);
+    const taskOutputs: Array<Array<any[] | undefined>> = generationStacks.map(stack => new Array(stack.length));
     let completedExampleCount = 0;
 
     for (let c = 0; c < generationStacks.length; c++) {
@@ -1858,6 +1872,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           }
 
           completedExampleCount += generated.length;
+          taskOutputs[c][modelIndex] = generated;
           sendProgressEvent({
             type: "progress",
             taskId: `${c}:${modelIndex}:${responseModel}`,
@@ -1877,18 +1892,49 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     }
 
     startProgressStream();
-    const taskOutputs: any[][] = [];
     for (let stackIndex = 0; stackIndex < chunkTasks.length; stackIndex++) {
       if (stackIndex > 0) await new Promise((resolve) => setTimeout(resolve, 2000));
       try {
         // Each task already applies the sole allowed 529 fallback. Fail the job as
         // soon as one task is unrecoverable instead of waiting for every slow request.
-        taskOutputs.push(...await Promise.all(chunkTasks[stackIndex].map(task => task())));
+        await Promise.all(chunkTasks[stackIndex].map(task => task()));
       } catch (error: any) {
         const detail = formatAIErrorMessage(error);
+        const partialExamples = taskOutputs
+          .flatMap(stack => stack.flatMap(examples => examples || []))
+          .slice(0, countNum)
+          .map((example, index) => sanitizeExample({
+            ...example,
+            id: `gen-${index}-${Date.now()}`
+          }, turnMode));
+        if (partialExamples.length > 0) {
+          const partialResponse = {
+            success: true as const,
+            batchId: generationBatchId,
+            examples: partialExamples,
+            source: `DigitalOcean Inference (${generationModels.join(", ")})`,
+            partial: true as const,
+            requestedCount: countNum,
+            partialReason: detail
+          };
+          if (generationJobId) {
+            const job = generationJobs.get(generationJobId);
+            if (job) {
+              job.status = "partial";
+              job.progress.completed = partialExamples.length;
+              job.result = partialResponse;
+              job.updatedAt = Date.now();
+            }
+            return;
+          }
+          if (progressStreamStarted) {
+            sendProgressEvent({ type: "partial", ...partialResponse });
+            return res.end();
+          }
+          return res.json(partialResponse);
+        }
         throw new Error(
-          `Generation stopped after ${completedExampleCount} of ${countNum} examples completed. `
-          + `The incomplete batch was not saved. ${detail}`
+          `Generation stopped after ${completedExampleCount} of ${countNum} examples completed. ${detail}`
         );
       }
     }
@@ -1922,6 +1968,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
 
     const generationResponse = {
       success: true as const,
+      batchId: generationBatchId,
       examples: formattedExamples, 
       source: `DigitalOcean Inference (${generationModels.join(", ")})`
     };
