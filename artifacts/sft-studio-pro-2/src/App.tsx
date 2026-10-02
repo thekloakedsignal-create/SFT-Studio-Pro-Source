@@ -2072,6 +2072,7 @@ export default function App() {
       }
 
       let accumulatedExamples: any[] = [];
+      let partialReason: string | null = null;
       let lastSource = "Generator";
       let serverBatchId: string | null = null;
       const progressByChunk = new Map<number, number>();
@@ -2133,6 +2134,9 @@ export default function App() {
             if (startData.status !== "running" || typeof startData.jobId !== "string") {
               throw new Error("Generation server did not return a valid job.");
             }
+            if (typeof startData.batchId === "string" && startData.batchId) {
+              serverBatchId = startData.batchId;
+            }
 
             let data: any;
             while (true) {
@@ -2151,8 +2155,11 @@ export default function App() {
               if (statusData.status === "error") {
                 throw new Error(statusData.error || "Generation failed.");
               }
-              if (statusData.status === "complete") {
+              if (statusData.status === "complete" || statusData.status === "partial") {
                 data = statusData.result;
+                if (typeof statusData.batchId === "string" && statusData.batchId) {
+                  serverBatchId = statusData.batchId;
+                }
                 break;
               }
               if (statusData.status !== "running") {
@@ -2164,6 +2171,11 @@ export default function App() {
               if (data.source) lastSource = data.source;
               if ((data.batchId || data.id) && !serverBatchId) {
                 serverBatchId = data.batchId || data.id;
+              }
+              if (data.partial === true) {
+                partialReason = typeof data.partialReason === "string" && data.partialReason.trim()
+                  ? data.partialReason
+                  : "One or more model requests did not finish.";
               }
               return data.examples;
             } else {
@@ -2195,8 +2207,11 @@ export default function App() {
 
       await Promise.all(workers);
 
-      if (accumulatedExamples.length !== batchSize) {
+      if (!partialReason && accumulatedExamples.length !== batchSize) {
         throw new Error(`Generation returned ${accumulatedExamples.length} of ${batchSize} requested examples. The incomplete batch was not saved.`);
+      }
+      if (accumulatedExamples.length === 0) {
+        throw new Error("Generation did not return any examples to save.");
       }
       if (accumulatedExamples.some(ex => !Array.isArray(ex?.messages)
         || !["user", "assistant"].every(role => ex.messages.some((m: any) =>
@@ -2221,6 +2236,11 @@ export default function App() {
         examplesCount: finalExamples.length,
         examples: finalExamples,
         status: "Pending",
+        ...(partialReason ? {
+          partial: true,
+          requestedExamples: batchSize,
+          partialReason
+        } : {}),
         timestamp: new Date().toISOString().replace("T", " "),
         description: batchDesc,
         specialInstructions: batchInstructions,
@@ -2234,8 +2254,10 @@ export default function App() {
       const saved = await saveBatch(generationProjectId, newBatch);
       if (saved) {
         setNotification({
-          text: `Generated ${finalExamples.length}/${batchSize} examples and saved to "${project.name}".${activeProjectId.current !== generationProjectId ? " Open that project to review the batch." : ""}`,
-          type: "success"
+          text: partialReason
+            ? `Saved a partial batch with ${finalExamples.length}/${batchSize} examples to "${project.name}". Review the completed examples below.${activeProjectId.current !== generationProjectId ? " Open that project to review the batch." : ""}`
+            : `Generated ${finalExamples.length}/${batchSize} examples and saved to "${project.name}".${activeProjectId.current !== generationProjectId ? " Open that project to review the batch." : ""}`,
+          type: partialReason ? "info" : "success"
         });
       }
     } catch (err: any) {
@@ -5160,7 +5182,9 @@ export default function App() {
                         latestGeneratorBatch.status === "Rejected" ? "bg-red-500/10 text-red-400 border-red-500/20" :
                         "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse"
                       }`}>
-                        Status: {latestGeneratorBatch.status}
+                        {latestGeneratorBatch.partial
+                          ? `Partial · ${latestGeneratorBatch.examples.length}/${latestGeneratorBatch.requestedExamples || latestGeneratorBatch.examples.length} · ${latestGeneratorBatch.status}`
+                          : `Status: ${latestGeneratorBatch.status}`}
                       </span>
                     )}
                   </div>
@@ -5172,6 +5196,15 @@ export default function App() {
                         <div className="space-y-1">
                           <div className="text-slate-200 font-semibold">{latestGeneratorBatch.name}</div>
                           <div className="text-[10px] text-slate-500 font-mono">Timestamp: {latestGeneratorBatch.timestamp}</div>
+                          {latestGeneratorBatch.partial && (
+                            <div role="status" className="flex items-start gap-1.5 pt-1 text-[11px] text-amber-300">
+                              <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                              <span>
+                                Saved {latestGeneratorBatch.examples.length} of {latestGeneratorBatch.requestedExamples || latestGeneratorBatch.examples.length} requested examples.
+                                {latestGeneratorBatch.partialReason ? ` ${latestGeneratorBatch.partialReason}` : ""}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
                           {latestGeneratorBatch.status === "Pending" ? (
@@ -6355,7 +6388,7 @@ export default function App() {
                       >
                         {batches.map(b => (
                           <option key={b.id} value={b.id} className="bg-slate-950 text-slate-200">
-                            {b.name} ({b.examplesCount} sfts - {b.status})
+                            {b.name} ({b.examplesCount} sfts - {b.partial ? "Partial - " : ""}{b.status})
                           </option>
                         ))}
                       </select>

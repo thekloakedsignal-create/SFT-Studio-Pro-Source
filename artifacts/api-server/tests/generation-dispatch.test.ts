@@ -24,10 +24,11 @@ const models = [
   "llama-4-maverick", "mimo-v2.5-pro", "minimax-m2.5", "mistral-3-14B", "nemotron-3-nano-omni"
 ];
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "fastFailure" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "fastFailure" | "partialFailure" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const delays: number[] = [];
+  let uuidCount = 0;
   let concurrent = 0;
   let peakConcurrent = 0;
   const context = {
@@ -41,11 +42,12 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
     process: { env: { GRADIENT_MODEL_ACCESS_KEY: "offline-fixture-only-not-a-secret" } },
     console: { log() {}, warn() {}, error() {} },
     AbortSignal: { timeout() { return undefined; } },
-    randomUUID: () => "fixture-job",
+    randomUUID: () => `fixture-uuid-${++uuidCount}`,
     setTimeout(callback: Function, delay: number) { delays.push(delay); callback(); },
     async fetch(url: string, options: any) {
       assert.equal(url, "https://inference.do-ai.run/v1/chat/completions");
       const request = JSON.parse(options.body);
+      const requestNumber = calls.length + 1;
       calls.push(request);
       concurrent++;
       peakConcurrent = Math.max(peakConcurrent, concurrent);
@@ -59,7 +61,9 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       const status = (mode === "fastFailure" && isPrimary) ? 503
         : ((mode === "primary529" || mode === "both529") && isPrimary)
         || (mode === "both529" && isBackup) ? 529
-        : mode === "503" && isPrimary ? 503 : 200;
+        : mode === "503" && isPrimary ? 503
+        : mode === "partialFailure" && requestNumber === 11 ? 503
+        : 200;
       const example = { messages: [
         { role: "user", content: `Question for ${request.model}` },
         { role: "assistant", content: `Answer from ${request.model}.` }
@@ -79,15 +83,24 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
   return {
     calls, delays,
     peak: () => peakConcurrent,
-    async generate(count = 5) {
+    async generate(count = 5, jobMode = false) {
       const response: any = {
         statusCode: 200, body: undefined,
         status(value: number) { this.statusCode = value; return this; },
         json(value: any) { this.body = value; return this; }
       };
       await routes.get("POST /api/generate")!({
-        body: { count, templateType: "Single Turn", targetTask: "Offline fixture" }
+        body: { count, jobMode, templateType: "Single Turn", targetTask: "Offline fixture" }
       }, response);
+      return response;
+    },
+    async job(jobId: string) {
+      const response: any = {
+        statusCode: 200, body: undefined,
+        status(value: number) { this.statusCode = value; return this; },
+        json(value: any) { this.body = value; return this; }
+      };
+      await routes.get("GET /api/generate/jobs/:jobId")!({ params: { jobId } }, response);
       return response;
     }
   };
@@ -98,6 +111,7 @@ test("real dispatcher launches the preserved initial models concurrently and cou
   const response = await f.generate();
   assert.equal(response.body.success, true);
   assert.equal(response.body.examples.length, 5);
+  assert.equal(response.body.batchId, "fixture-uuid-1");
   assert.deepEqual(f.calls.map(call => call.model), models.slice(0, 5));
   assert.equal(f.peak(), 5);
   assert.deepEqual(f.delays, []);
@@ -114,23 +128,57 @@ test("HTTP 529 triggers exactly one distinct configured backup request", async (
   assert.notEqual(f.calls[5].model, firstModel);
 });
 
-test("a failed 529 backup is not retried again and a partial batch cannot succeed", async () => {
+test("a failed 529 backup is not retried again and completed examples return as a partial batch", async () => {
   const f = fixture("both529");
   const response = await f.generate();
   assert.equal(f.calls.length, 6);
-  assert.equal(response.statusCode, 500);
-  assert.equal(response.body.success, false);
-  assert.match(response.body.error, /4 of 5/);
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.success, true);
+  assert.equal(response.body.partial, true);
+  assert.ok(response.body.examples.length > 0);
+  assert.ok(response.body.examples.length < 5);
+  assert.equal(response.body.batchId, "fixture-uuid-1");
+  assert.match(response.body.partialReason, /backup model/i);
 });
 
-test("other HTTP failures and invalid content do not cause retries or top-ups", async () => {
+test("a job returns its server-generated batch ID immediately and preserves it in the final result", async () => {
+  const f = fixture();
+  const started = await f.generate(5, true);
+  assert.equal(started.statusCode, 202);
+  assert.equal(started.body.batchId, "fixture-uuid-1");
+  assert.notEqual(started.body.batchId, started.body.jobId);
+  const job = await f.job(started.body.jobId);
+  assert.equal(job.body.status, "complete");
+  assert.equal(job.body.batchId, started.body.batchId);
+  assert.equal(job.body.result.batchId, started.body.batchId);
+});
+
+test("timed-out model stacks preserve completed examples and the same batch ID in job results", async () => {
+  const f = fixture("partialFailure");
+  const started = await f.generate(25, true);
+  assert.equal(started.statusCode, 202);
+  const job = await f.job(started.body.jobId);
+  assert.equal(job.body.status, "partial");
+  assert.equal(job.body.result.success, true);
+  assert.equal(job.body.result.partial, true);
+  assert.equal(job.body.result.batchId, started.body.batchId);
+  assert.equal(job.body.batchId, started.body.batchId);
+  assert.ok(job.body.result.examples.length >= 10);
+  assert.ok(job.body.result.examples.length < 25);
+  assert.equal(job.body.result.requestedCount, 25);
+  assert.ok(job.body.result.partialReason);
+});
+
+test("other HTTP failures and invalid content do not retry or top up", async () => {
   for (const mode of ["503", "invalid"] as const) {
     const f = fixture(mode);
     const response = await f.generate();
     assert.equal(f.calls.length, 5);
-    assert.equal(response.statusCode, 500);
-    assert.equal(response.body.success, false);
-    assert.match(response.body.error, /4 of 5/);
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.success, true);
+    assert.equal(response.body.partial, true);
+    assert.ok(response.body.examples.length > 0);
+    assert.ok(response.body.examples.length < 5);
   }
 });
 

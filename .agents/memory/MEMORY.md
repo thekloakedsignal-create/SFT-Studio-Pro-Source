@@ -1,2 +1,2 @@
-- [SFT generation constraints](sft-generation-constraints.md) — Use individual DigitalOcean Chat Completions calls; never Model Synthesis or changes to templates and batch choices.
+- [SFT generation constraints](sft-generation-constraints.md) — Keep direct DigitalOcean calls and 529-only backup; save completed output as a marked partial batch after failures.
 - [Batch snapshot compatibility](batch-snapshot-compatibility.md) — Preserve newer incremental saves and deletions when older clients submit whole-project snapshots.
