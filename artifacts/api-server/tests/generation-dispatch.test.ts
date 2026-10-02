@@ -24,12 +24,17 @@ const models = [
   "llama-4-maverick", "mimo-v2.5-pro", "minimax-m2.5", "mistral-3-14B", "nemotron-3-nano-omni"
 ];
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "fastFailure" | "partialFailure" | "timeoutQwen" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const delays: number[] = [];
   const timeoutValues: number[] = [];
+  let fixtureNow = 1_700_000_000_000;
+  const FixtureDate = class extends Date {
+    static now() { return fixtureNow; }
+  };
   let uuidCount = 0;
+  let qwenCallCount = 0;
   let concurrent = 0;
   let peakConcurrent = 0;
   const context = {
@@ -40,16 +45,26 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
     },
     Type: { OBJECT: "object", ARRAY: "array", STRING: "string", NUMBER: "number", BOOLEAN: "boolean" },
     ChatCompletionsHttpError, isProviderOverload, normalizeText, parseGeneratedExamples, sanitizeExample,
+    logger: { warn() {}, info() {}, error() {} },
     process: { env: { GRADIENT_MODEL_ACCESS_KEY: "offline-fixture-only-not-a-secret" } },
     console: { log() {}, warn() {}, error() {} },
     AbortSignal: {
       timeout(timeoutMs: number) {
         timeoutValues.push(timeoutMs);
         return { aborted: false };
+      },
+      any(signals: AbortSignal[]) {
+        return signals.find(signal => "addEventListener" in signal) || signals[0];
       }
     },
+    AbortController,
+    Date: FixtureDate,
     randomUUID: () => `fixture-uuid-${++uuidCount}`,
-    setTimeout(callback: Function, delay: number) { delays.push(delay); callback(); },
+    setTimeout(callback: Function, delay: number) {
+      delays.push(delay);
+      fixtureNow += delay;
+      callback();
+    },
     async fetch(url: string, options: any) {
       assert.equal(url, "https://inference.do-ai.run/v1/chat/completions");
       const request = JSON.parse(options.body);
@@ -66,6 +81,39 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
         timeoutError.name = "TimeoutError";
         throw timeoutError;
       }
+      if (mode === "abortDuplicateQwen" && request.model === "qwen3.5-397b-a17b") {
+        qwenCallCount++;
+        if (qwenCallCount === 1) {
+          concurrent--;
+          const timeoutError = new Error("fixture request timeout");
+          timeoutError.name = "TimeoutError";
+          throw timeoutError;
+        }
+        if (qwenCallCount === 2) {
+          return await new Promise((resolve, reject) => {
+            const signal = options.signal as AbortSignal;
+            if (signal.aborted) {
+              concurrent--;
+              const abortError = new Error("fixture sibling request aborted");
+              abortError.name = "AbortError";
+              reject(abortError);
+              return;
+            }
+            signal.addEventListener("abort", () => {
+              concurrent--;
+              const abortError = new Error("fixture sibling request aborted");
+              abortError.name = "AbortError";
+              reject(abortError);
+            }, { once: true });
+          });
+        }
+      }
+      if (mode === "timeoutAllInitial" && requestNumber <= 20) {
+        concurrent--;
+        const timeoutError = new Error("fixture request timeout");
+        timeoutError.name = "TimeoutError";
+        throw timeoutError;
+      }
       await Promise.resolve();
       concurrent--;
       const isPrimary = request.model === firstModel;
@@ -74,14 +122,11 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
         : ((mode === "primary529" || mode === "both529") && isPrimary)
         || (mode === "both529" && isBackup) ? 529
         : mode === "503" && isPrimary ? 503
+        : mode === "504Qwen" && request.model === "qwen3.5-397b-a17b" ? 504
         : mode === "partialFailure" && requestNumber === 11 ? 503
         : 200;
-      const example = { messages: [
-        { role: "user", content: `Question for ${request.model}` },
-        { role: "assistant", content: `Answer from ${request.model}.` }
-      ] };
       const userPrompt = request.messages.find((message: any) => message.role === "user")?.content || "";
-      const requestedCount = Number(userPrompt.match(/Generate exactly (\\d+) examples\\./)?.[1]) || 1;
+      const requestedCount = Number(userPrompt.match(/Generate exactly (\d+) examples\./)?.[1]) || 1;
       const requestedExamples = Array.from({ length: requestedCount }, (_, index) => ({
         messages: [
           { role: "user", content: `Question ${index + 1} for ${request.model}` },
@@ -135,7 +180,47 @@ test("real dispatcher launches the preserved initial models concurrently and cou
   assert.deepEqual(f.calls.map(call => call.model), models.slice(0, 5));
   assert.equal(f.peak(), 5);
   assert.deepEqual(f.delays, []);
+  assert.ok(f.timeoutValues.every(timeoutMs => timeoutMs === 5000));
   assert.equal(f.calls.every(call => call.max_tokens === 4096 && call.response_format.type === "json_object"), true);
+});
+
+test("a stalled model is skipped in later stacks and GLM fills all missing examples in one request", async () => {
+  for (const mode of ["timeoutQwen", "504Qwen"] as const) {
+    const f = fixture(mode);
+    const response = await f.generate(25);
+    assert.equal(response.body.success, true);
+    assert.equal(response.body.examples.length, 25);
+    assert.equal(response.body.partial, undefined);
+    assert.equal(f.calls.filter(call => call.model === "qwen3.5-397b-a17b").length, 1);
+    assert.equal(f.calls.at(-1).model, firstModel);
+    const recoveryPrompt = f.calls.at(-1).messages.find((message: any) => message.role === "user").content;
+    assert.match(recoveryPrompt, /Generate exactly 3 examples\./);
+    assert.equal(f.timeoutValues.at(-1), 15000);
+    assert.ok(f.timeoutValues.slice(0, -1).every(timeoutMs => timeoutMs === 5000));
+  }
+});
+
+test("batches over 50 examples receive a proportionally longer total timeout", async () => {
+  const f = fixture("timeoutAllInitial");
+  const response = await f.generate(250);
+  assert.equal(response.body.success, true);
+  assert.equal(response.body.examples.length, 250);
+  assert.equal(f.calls.length, 21);
+  assert.equal(f.calls.at(-1).model, firstModel);
+  const fallbackTimeout = f.timeoutValues.at(-1) ?? 0;
+  assert.equal(fallbackTimeout, 576000);
+  assert.ok(fallbackTimeout > 120000);
+});
+
+test("stopping a stalled model aborts its duplicate in-flight request", async () => {
+  const f = fixture("abortDuplicateQwen");
+  const response = await f.generate(200);
+  assert.equal(response.body.success, true);
+  assert.equal(response.body.examples.length, 200);
+  assert.equal(f.calls.filter(call => call.model === "qwen3.5-397b-a17b").length, 2);
+  assert.equal(f.calls.at(-1).model, firstModel);
+  const recoveryPrompt = f.calls.at(-1).messages.find((message: any) => message.role === "user").content;
+  assert.match(recoveryPrompt, /Generate exactly 20 examples\./);
 });
 
 test("HTTP 529 triggers exactly one distinct configured backup request", async () => {

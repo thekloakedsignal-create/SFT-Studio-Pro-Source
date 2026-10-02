@@ -699,7 +699,10 @@ function createDigitalOceanRequestTimeoutError(model: string, timeoutMs: number)
 }
 
 function isDigitalOceanRequestTimeout(error: any): boolean {
-  return error?.code === "DO_REQUEST_TIMEOUT" || error?.name === "TimeoutError";
+  return error?.code === "DO_REQUEST_TIMEOUT" ||
+    error?.name === "TimeoutError" ||
+    error?.status === 408 ||
+    error?.status === 504;
 }
 
 function extractResponseText(res: any): string {
@@ -863,6 +866,9 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
     ? Math.floor(params.timeoutMs)
     : 120_000;
   const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const abortSignal = params.abortSignal
+    ? AbortSignal.any([timeoutSignal, params.abortSignal])
+    : timeoutSignal;
   let completionResponse: Response;
   let completionBody: string;
   try {
@@ -879,11 +885,11 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         max_tokens: maxTokensToUse,
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
-      signal: timeoutSignal
+      signal: abortSignal
     });
     completionBody = await completionResponse.text();
   } catch (error: any) {
-    if (timeoutSignal.aborted || error?.name === "TimeoutError") {
+    if (timeoutSignal.aborted || params.abortSignal?.aborted || error?.name === "TimeoutError") {
       throw createDigitalOceanRequestTimeoutError(targetModel, timeoutMs);
     }
     const cause = error?.cause;
@@ -1508,6 +1514,9 @@ REASONING TEMPLATE FORMAT:
     }
 
     const generationModels = getGenerationModels();
+    const modelAbortControllers = new Map(
+      generationModels.map(model => [model, new AbortController()])
+    );
     const generationStacks = createModelGenerationStacks(countNum, generationModels);
     const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);
     const taskOutputs: Array<Array<any[] | undefined>> = generationStacks.map(stack => new Array(stack.length));
@@ -1851,7 +1860,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             model: string,
             requestedCount = currentChunkSize,
             prompt = fullPrompt,
-            requestedTimeoutMs = SFT_SINGLE_EXAMPLE_TIMEOUT_MS
+            requestedTimeoutMs = SFT_SINGLE_EXAMPLE_TIMEOUT_MS,
+            ignoreModelAbort = false
           ) => {
             const remainingBatchMs = generationDeadline - Date.now();
             const timeoutMs = Math.min(requestedTimeoutMs, remainingBatchMs);
@@ -1862,7 +1872,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               model,
               contents: prompt,
               config: configObj,
-              timeoutMs
+              timeoutMs,
+              ...(ignoreModelAbort ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
             });
             const parsed = parseGeneratedExamples(extractResponseText(response), turnMode);
             if (parsed.length === 0) {
@@ -1876,7 +1887,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 model,
                 requestedCount,
                 promptForExampleCount(requestedCount),
-                timeoutMs
+                timeoutMs,
+                model === "glm-5.3-flash"
               );
           }
 
@@ -1885,8 +1897,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           try {
             if (stalledModels.has(targetModel)) {
               timedOutExampleCount += currentChunkSize;
-              console.warn(
-                `[Batch Stack ${c + 1} Model ${targetModel}] skipped because an earlier request for this model timed out.`
+              logger.warn(
+                { model: targetModel, stack: c + 1, batchId: generationBatchId },
+                "Skipping a model after its earlier request timed out"
               );
               return [];
             }
@@ -1894,9 +1907,11 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           } catch (primaryError: any) {
             if (isDigitalOceanRequestTimeout(primaryError)) {
               stalledModels.add(targetModel);
+              modelAbortControllers.get(targetModel)?.abort();
               timedOutExampleCount += currentChunkSize;
-              console.warn(
-                `[Batch Stack ${c + 1} Model ${targetModel}] timed out; it will be skipped for the rest of this batch.`
+              logger.warn(
+                { model: targetModel, stack: c + 1, timeoutMs: SFT_SINGLE_EXAMPLE_TIMEOUT_MS, batchId: generationBatchId },
+                "Model request timed out; skipping it for the rest of this batch"
               );
               return [];
             }
@@ -1922,8 +1937,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             if (!backupModel) throw primaryError;
 
             backupModelsUsed.add(backupModel);
-            console.warn(
-              `[Batch Stack ${c + 1} Model ${targetModel}] received HTTP 529; retrying once with backup model ${backupModel}.`
+            logger.warn(
+              { model: targetModel, backupModel, stack: c + 1, batchId: generationBatchId },
+              "Model returned HTTP 529; trying its one permitted backup"
             );
 
             try {
@@ -1931,9 +1947,11 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             } catch (backupError: any) {
               if (isDigitalOceanRequestTimeout(backupError)) {
                 stalledModels.add(backupModel);
+                modelAbortControllers.get(backupModel)?.abort();
                 timedOutExampleCount += currentChunkSize;
-                console.warn(
-                  `[Batch Stack ${c + 1} Backup Model ${backupModel}] timed out; this example will be included in the GLM fill batch.`
+                logger.warn(
+                  { model: backupModel, stack: c + 1, batchId: generationBatchId },
+                  "Backup model timed out; its example will be included in the GLM fill batch"
                 );
                 return [];
               }
@@ -2034,8 +2052,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       if (recoveryTimeoutMs <= 0 || !requestExamplesForMissingBatch) {
         recoveryFailureReason = `The ${generationTimeoutMs / 1000}-second total batch time limit expired before the GLM fill request could start.`;
       } else {
-        console.warn(
-          `[Batch Recovery] ${timedOutExampleCount} example(s) are missing after model timeout(s); asking ${recoveryModel} to generate them in one batch.`
+        logger.warn(
+          { model: recoveryModel, missingCount: timedOutExampleCount, batchId: generationBatchId },
+          "Requesting one GLM batch to replace examples from timed-out model requests"
         );
         try {
           recoveryExamples = await requestExamplesForMissingBatch(
@@ -2052,8 +2071,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               recoveryFailureReason = "GLM returned HTTP 529 and no distinct, available backup model remains.";
             } else {
               recoveryModel = backupModel;
-              console.warn(
-                `[Batch Recovery] GLM returned HTTP 529; using the one permitted distinct backup model ${backupModel}.`
+              logger.warn(
+                { model: "glm-5.3-flash", backupModel, missingCount: timedOutExampleCount, batchId: generationBatchId },
+                "GLM recovery returned HTTP 529; trying one distinct backup model"
               );
               try {
                 recoveryExamples = await requestExamplesForMissingBatch(
@@ -2067,7 +2087,10 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               }
             }
           } else {
-            if (isDigitalOceanRequestTimeout(recoveryError)) stalledModels.add(recoveryModel);
+            if (isDigitalOceanRequestTimeout(recoveryError)) {
+              stalledModels.add(recoveryModel);
+              modelAbortControllers.get(recoveryModel)?.abort();
+            }
             recoveryFailureReason = `GLM recovery failed: ${formatAIErrorMessage(recoveryError)}`;
           }
         }
