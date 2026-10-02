@@ -1,5 +1,21 @@
 [
   {
+    "id": "project-1790975975977",
+    "userId": "0l3DRt7a96NkbBJ736dNKf1mASn1",
+    "name": "General Instruction Tuner",
+    "settings": {
+      "name": "General Instruction Tuner",
+      "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+      "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+      "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+      "selectedPreset": "General Use AI",
+      "representativePrompt": "Explain photosynthesis in simple terms.",
+      "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
+    },
+    "batches": [],
+    "updatedAt": "2026-10-02T21:19:36.019Z"
+  },
+  {
     "id": "project-1790742482031",
     "userId": "device-4h8x8l38s1p1790736980351",
     "name": "SFT Project 4",

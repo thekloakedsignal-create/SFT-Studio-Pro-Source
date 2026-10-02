@@ -3599,7 +3599,7 @@ export default function App() {
       ? compiledDataset.validationSet.map(ex => formatExampleForExport(ex, fmt))
       : [];
 
-    const sampleItems = formattedTraining;
+    const sampleItems = formattedTraining.slice(0, 3);
     
     const previewPayload = {
       targetSchemaFormat: fmt,
