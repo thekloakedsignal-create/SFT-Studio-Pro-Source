@@ -180,7 +180,7 @@ test("real dispatcher launches the preserved initial models concurrently and cou
   assert.deepEqual(f.calls.map(call => call.model), models.slice(0, 5));
   assert.equal(f.peak(), 5);
   assert.deepEqual(f.delays, []);
-  assert.ok(f.timeoutValues.every(timeoutMs => timeoutMs === 5000));
+  assert.ok(f.timeoutValues.every(timeoutMs => timeoutMs === 10000));
   assert.equal(f.calls.every(call => call.max_tokens === 4096 && call.response_format.type === "json_object"), true);
 });
 
@@ -195,8 +195,8 @@ test("a stalled model is skipped in later stacks and GLM fills all missing examp
     assert.equal(f.calls.at(-1).model, firstModel);
     const recoveryPrompt = f.calls.at(-1).messages.find((message: any) => message.role === "user").content;
     assert.match(recoveryPrompt, /Generate exactly 3 examples\./);
-    assert.equal(f.timeoutValues.at(-1), 15000);
-    assert.ok(f.timeoutValues.slice(0, -1).every(timeoutMs => timeoutMs === 5000));
+    assert.equal(f.timeoutValues.at(-1), 30000);
+    assert.ok(f.timeoutValues.slice(0, -1).every(timeoutMs => timeoutMs === 10000));
   }
 });
 
