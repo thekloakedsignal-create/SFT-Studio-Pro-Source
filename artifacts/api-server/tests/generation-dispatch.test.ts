@@ -24,10 +24,11 @@ const models = [
   "llama-4-maverick", "mimo-v2.5-pro", "minimax-m2.5", "mistral-3-14B", "nemotron-3-nano-omni"
 ];
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "fastFailure" | "partialFailure" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "fastFailure" | "partialFailure" | "timeoutQwen" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const delays: number[] = [];
+  const timeoutValues: number[] = [];
   let uuidCount = 0;
   let concurrent = 0;
   let peakConcurrent = 0;
@@ -41,7 +42,12 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
     ChatCompletionsHttpError, isProviderOverload, normalizeText, parseGeneratedExamples, sanitizeExample,
     process: { env: { GRADIENT_MODEL_ACCESS_KEY: "offline-fixture-only-not-a-secret" } },
     console: { log() {}, warn() {}, error() {} },
-    AbortSignal: { timeout() { return undefined; } },
+    AbortSignal: {
+      timeout(timeoutMs: number) {
+        timeoutValues.push(timeoutMs);
+        return { aborted: false };
+      }
+    },
     randomUUID: () => `fixture-uuid-${++uuidCount}`,
     setTimeout(callback: Function, delay: number) { delays.push(delay); callback(); },
     async fetch(url: string, options: any) {
@@ -53,6 +59,12 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       peakConcurrent = Math.max(peakConcurrent, concurrent);
       if (mode === "fastFailure" && request.model !== firstModel) {
         return await new Promise(() => {});
+      }
+      if (mode === "timeoutQwen" && request.model === "qwen3.5-397b-a17b") {
+        concurrent--;
+        const timeoutError = new Error("fixture request timeout");
+        timeoutError.name = "TimeoutError";
+        throw timeoutError;
       }
       await Promise.resolve();
       concurrent--;
@@ -68,9 +80,17 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
         { role: "user", content: `Question for ${request.model}` },
         { role: "assistant", content: `Answer from ${request.model}.` }
       ] };
+      const userPrompt = request.messages.find((message: any) => message.role === "user")?.content || "";
+      const requestedCount = Number(userPrompt.match(/Generate exactly (\\d+) examples\\./)?.[1]) || 1;
+      const requestedExamples = Array.from({ length: requestedCount }, (_, index) => ({
+        messages: [
+          { role: "user", content: `Question ${index + 1} for ${request.model}` },
+          { role: "assistant", content: `Answer ${index + 1} from ${request.model}.` }
+        ]
+      }));
       const content = mode === "invalid" && isPrimary
         ? "This is prose, not a JSON training example."
-        : JSON.stringify({ examples: [{ messages: [] }, example] });
+        : JSON.stringify({ examples: [{ messages: [] }, ...requestedExamples] });
       const response = status === 200
         ? { choices: [{ message: { content: [
           { type: "text", text: content.slice(0, 30) }, { type: "text", text: content.slice(30) }
@@ -81,7 +101,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
   };
   vm.runInNewContext(compiled.code, context);
   return {
-    calls, delays,
+    calls, delays, timeoutValues,
     peak: () => peakConcurrent,
     async generate(count = 5, jobMode = false) {
       const response: any = {

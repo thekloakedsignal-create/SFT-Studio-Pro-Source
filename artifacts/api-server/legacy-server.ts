@@ -965,6 +965,8 @@ const DEFAULT_GENERATION_MODEL_GROUPS = [
   ],
 ];
 const SUPPORTED_GENERATION_BATCH_SIZES = [5, 10, 25, 50, 100, 200, 250] as const;
+const SFT_SINGLE_EXAMPLE_TIMEOUT_MS = 5_000;
+const SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS = 120_000;
 
 function getGenerationModels(): string[] {
   return DEFAULT_GENERATION_MODEL_GROUPS.flat().map((model) => normalizeModel(model));
@@ -1294,6 +1296,11 @@ app.post("/api/generate", async (req, res) => {
     });
   }
   const generationBatchId = randomUUID();
+  const generationTimeoutMs = Math.ceil(countNum / 50) * SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS;
+  const generationDeadline = Date.now() + generationTimeoutMs;
+  const stalledModels = new Set<string>();
+  let timedOutExampleCount = 0;
+  let requestExamplesForMissingBatch: ((model: string, count: number, timeoutMs: number) => Promise<any[]>) | undefined;
   const useJobPolling = req.body?.jobMode === true;
   let generationJobId: string | undefined;
   if (useJobPolling) {
@@ -1830,24 +1837,69 @@ This task generates direct ${turnMode} assistant responses. ${turnMode} response
 Every assistant response MUST begin immediately with the direct, substantive answer to the user.
 No internal deliberation, planning, or reasoning fields are permitted.`
           };
-          const requestExamplesFromModel = async (model: string) => {
+          const promptForExampleCount = (requestedCount: number) => fullPrompt
+            .replace(
+              `exactly ${currentChunkSize} high-quality, diverse SFT training examples`,
+              `exactly ${requestedCount} high-quality, diverse SFT training examples`
+            )
+            .replace(`ALL ${currentChunkSize} examples`, `ALL ${requestedCount} examples`)
+            .replace(
+              `Generate exactly ${currentChunkSize} examples.`,
+              `Generate exactly ${requestedCount} examples.`
+            );
+          const requestExamplesFromModel = async (
+            model: string,
+            requestedCount = currentChunkSize,
+            prompt = fullPrompt,
+            requestedTimeoutMs = SFT_SINGLE_EXAMPLE_TIMEOUT_MS
+          ) => {
+            const remainingBatchMs = generationDeadline - Date.now();
+            const timeoutMs = Math.min(requestedTimeoutMs, remainingBatchMs);
+            if (timeoutMs <= 0) {
+              throw createDigitalOceanRequestTimeoutError(model, 0);
+            }
             const response = await callDigitalOceanChatCompletions({
               model,
-              contents: fullPrompt,
-              config: configObj
+              contents: prompt,
+              config: configObj,
+              timeoutMs
             });
             const parsed = parseGeneratedExamples(extractResponseText(response), turnMode);
             if (parsed.length === 0) {
               throw new Error(`Model ${model} returned no valid, non-empty SFT examples.`);
             }
-            return parsed.slice(0, currentChunkSize);
+            return parsed.slice(0, requestedCount);
           };
+          if (!requestExamplesForMissingBatch) {
+            requestExamplesForMissingBatch = (model, requestedCount, timeoutMs) =>
+              requestExamplesFromModel(
+                model,
+                requestedCount,
+                promptForExampleCount(requestedCount),
+                timeoutMs
+              );
+          }
 
           let responseModel = targetModel;
           let generated: any[] = [];
           try {
+            if (stalledModels.has(targetModel)) {
+              timedOutExampleCount += currentChunkSize;
+              console.warn(
+                `[Batch Stack ${c + 1} Model ${targetModel}] skipped because an earlier request for this model timed out.`
+              );
+              return [];
+            }
             generated = await requestExamplesFromModel(targetModel);
           } catch (primaryError: any) {
+            if (isDigitalOceanRequestTimeout(primaryError)) {
+              stalledModels.add(targetModel);
+              timedOutExampleCount += currentChunkSize;
+              console.warn(
+                `[Batch Stack ${c + 1} Model ${targetModel}] timed out; it will be skipped for the rest of this batch.`
+              );
+              return [];
+            }
             if (!isProviderOverload(primaryError)) {
               throw primaryError;
             }
@@ -1856,14 +1908,17 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               model =>
                 model !== targetModel &&
                 !scheduledStackModels.has(model) &&
-                !backupModelsUsed.has(model)
+                !backupModelsUsed.has(model) &&
+                !stalledModels.has(model)
             );
             const availableBackupModels = unusedBackupModels.length > 0
               ? unusedBackupModels
               : generationModels.filter(
-                  model => model !== targetModel && !backupModelsUsed.has(model)
+                  model => model !== targetModel &&
+                    !backupModelsUsed.has(model) &&
+                    !stalledModels.has(model)
                 );
-            const backupModel = availableBackupModels[0] || generationModels.find(model => model !== targetModel);
+            const backupModel = availableBackupModels[0];
             if (!backupModel) throw primaryError;
 
             backupModelsUsed.add(backupModel);
@@ -1874,6 +1929,14 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             try {
               generated = await requestExamplesFromModel(backupModel);
             } catch (backupError: any) {
+              if (isDigitalOceanRequestTimeout(backupError)) {
+                stalledModels.add(backupModel);
+                timedOutExampleCount += currentChunkSize;
+                console.warn(
+                  `[Batch Stack ${c + 1} Backup Model ${backupModel}] timed out; this example will be included in the GLM fill batch.`
+                );
+                return [];
+              }
               const backupMessage = String(backupError?.message || backupError || "Unknown backup model error");
               throw new Error(
                 `Model ${targetModel} returned HTTP 529; backup model ${backupModel} failed: ${backupMessage}`
@@ -1909,10 +1972,14 @@ No internal deliberation, planning, or reasoning fields are permitted.`
 
     startProgressStream();
     for (let stackIndex = 0; stackIndex < chunkTasks.length; stackIndex++) {
-      if (stackIndex > 0) await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (stackIndex > 0) {
+        const remainingBatchMs = generationDeadline - Date.now();
+        const spacingMs = Math.min(2000, Math.max(0, remainingBatchMs));
+        if (spacingMs > 0) await new Promise((resolve) => setTimeout(resolve, spacingMs));
+      }
       try {
         // Each task already applies the sole allowed 529 fallback. Fail the job as
-        // soon as one task is unrecoverable instead of waiting for every slow request.
+        // soon as one task is unrecoverable instead of waiting for every sibling.
         await Promise.all(chunkTasks[stackIndex].map(task => task()));
       } catch (error: any) {
         const detail = formatAIErrorMessage(error);
@@ -1955,6 +2022,70 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       }
     }
 
+    let recoveryExamples: any[] = [];
+    let recoveryFailureReason: string | null = null;
+    let recoveryModel = "glm-5.3-flash";
+    if (timedOutExampleCount > 0) {
+      const remainingBatchMs = generationDeadline - Date.now();
+      const recoveryTimeoutMs = Math.min(
+        remainingBatchMs,
+        Math.max(SFT_SINGLE_EXAMPLE_TIMEOUT_MS, timedOutExampleCount * SFT_SINGLE_EXAMPLE_TIMEOUT_MS)
+      );
+      if (recoveryTimeoutMs <= 0 || !requestExamplesForMissingBatch) {
+        recoveryFailureReason = `The ${generationTimeoutMs / 1000}-second total batch time limit expired before the GLM fill request could start.`;
+      } else {
+        console.warn(
+          `[Batch Recovery] ${timedOutExampleCount} example(s) are missing after model timeout(s); asking ${recoveryModel} to generate them in one batch.`
+        );
+        try {
+          recoveryExamples = await requestExamplesForMissingBatch(
+            recoveryModel,
+            timedOutExampleCount,
+            recoveryTimeoutMs
+          );
+        } catch (recoveryError: any) {
+          if (isProviderOverload(recoveryError)) {
+            const backupModel = generationModels.find(
+              model => model !== recoveryModel && !stalledModels.has(model)
+            );
+            if (!backupModel) {
+              recoveryFailureReason = "GLM returned HTTP 529 and no distinct, available backup model remains.";
+            } else {
+              recoveryModel = backupModel;
+              console.warn(
+                `[Batch Recovery] GLM returned HTTP 529; using the one permitted distinct backup model ${backupModel}.`
+              );
+              try {
+                recoveryExamples = await requestExamplesForMissingBatch(
+                  recoveryModel,
+                  timedOutExampleCount,
+                  recoveryTimeoutMs
+                );
+              } catch (backupError: any) {
+                if (isDigitalOceanRequestTimeout(backupError)) stalledModels.add(backupModel);
+                recoveryFailureReason = `The recovery backup model ${backupModel} failed: ${formatAIErrorMessage(backupError)}`;
+              }
+            }
+          } else {
+            if (isDigitalOceanRequestTimeout(recoveryError)) stalledModels.add(recoveryModel);
+            recoveryFailureReason = `GLM recovery failed: ${formatAIErrorMessage(recoveryError)}`;
+          }
+        }
+        if (recoveryExamples.length < timedOutExampleCount && !recoveryFailureReason) {
+          recoveryFailureReason = `${recoveryModel} returned ${recoveryExamples.length} of ${timedOutExampleCount} missing examples.`;
+        }
+        completedExampleCount += recoveryExamples.length;
+        sendProgressEvent({
+          type: "progress",
+          taskId: `recovery:${recoveryModel}`,
+          model: recoveryModel,
+          generatedCount: recoveryExamples.length,
+          completedCount: completedExampleCount,
+          total: countNum
+        });
+      }
+    }
+
     let allExamples: any[] = [];
     taskOutputs.forEach((arr, idx) => {
       if (Array.isArray(arr)) {
@@ -1966,12 +2097,48 @@ No internal deliberation, planning, or reasoning fields are permitted.`
         });
       }
     });
+    recoveryExamples.forEach((example, index) => {
+      allExamples.push(sanitizeExample({
+        ...example,
+        id: `gen-recovery-${index}-${Date.now()}`
+      }, turnMode));
+    });
 
     if (allExamples.length === 0) {
       throw new Error("No examples were returned by the generation engine. Please retry with a smaller batch or check connection.");
     }
 
     if (allExamples.length < countNum) {
+      if (timedOutExampleCount > 0) {
+        const formattedPartialExamples = allExamples
+          .slice(0, countNum)
+          .map(example => sanitizeExample(example, turnMode));
+        const modelList = [...stalledModels].join(", ") || "one or more models";
+        const partialResponse = {
+          success: true as const,
+          batchId: generationBatchId,
+          examples: formattedPartialExamples,
+          source: `DigitalOcean Inference (${generationModels.join(", ")})`,
+          partial: true as const,
+          requestedCount: countNum,
+          partialReason: `Timed out model(s): ${modelList}. ${recoveryFailureReason || "GLM could not fill all missing examples."}`
+        };
+        if (generationJobId) {
+          const job = generationJobs.get(generationJobId);
+          if (job) {
+            job.status = "partial";
+            job.progress.completed = formattedPartialExamples.length;
+            job.result = partialResponse;
+            job.updatedAt = Date.now();
+          }
+          return;
+        }
+        if (progressStreamStarted) {
+          sendProgressEvent({ type: "partial", ...partialResponse });
+          return res.end();
+        }
+        return res.json(partialResponse);
+      }
       throw new Error(`Generation returned ${allExamples.length} of ${countNum} requested examples.`);
     }
 
