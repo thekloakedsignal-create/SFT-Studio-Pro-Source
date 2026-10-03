@@ -4206,7 +4206,7 @@ export default function App() {
       </AnimatePresence>
 
       <main className="flex-1 max-w-[1720px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-5">
-        <div className="kk-workspace-panel grid grid-cols-1 lg:grid-cols-12 gap-5 p-2 sm:p-2.5">
+        <div className="kk-workspace-panel grid grid-cols-1 lg:grid-cols-12 gap-5">
         
         {/* Tab Sidebar Navigation (Desktop) & Tabs bar (Mobile) */}
         <div className="lg:col-span-3 xl:col-span-2 flex flex-col gap-3">
