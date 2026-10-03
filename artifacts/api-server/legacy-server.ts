@@ -1381,13 +1381,13 @@ app.post("/api/generate", async (req, res) => {
       "Single Turn";
     const reasoningFormatInstruction = `
 REASONING TEMPLATE — EXACT FETCH RESPONSE FORMAT (Reasoning batches only):
-- The fetch handler reads the generated JSON from the first Chat Completions choice's message.content. Put the complete batch JSON in that content.
+- The fetch handler reads generated text from the first Chat Completions choice's message.content. That content must be one valid JSON object with the required response shape below.
 - Return one valid JSON object with exactly one top-level property, "examples". Its value must be an array of example objects. Do not return a bare array, a single example object, or a differently named wrapper.
 - Each item in "examples" must be an object with a "messages" array. Each Reasoning example must contain a user message followed by an assistant message; do not add a system message or extra turns. Keep any instruction markers required by the selected format in the appropriate message content.
 - The assistant message's "content" must be one string containing, in this order: <think>, a non-empty concise explanation of the key reasoning steps, </think>, and the final answer. Put the reasoning inside these tags in assistant content; the response parser extracts it into the separate reasoning field shown by the UI.
 - In the JSON string, encode line breaks as \\n. Do not put reasoning in a top-level field or a separate "reasoning" or "reasoning_content" message property. Do not put the final answer inside the tags.
 - Use this only for the Reasoning template. Create new content for the requested task and persona.
-- Complete batch-format example:
+- Response-format example:
 {"examples":[{"messages":[{"role":"user","content":"What is 2 + 3?"},{"role":"assistant","content":"<think>\\nI add 2 and 3 to get 5.\\n</think>\\nThe answer is 5."}]}]}
 `;
 
