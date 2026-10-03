@@ -1,2 +1,3 @@
 - [SFT generation constraints](sft-generation-constraints.md) — Keep direct DigitalOcean calls and 529-only backup; save completed output as a marked partial batch after failures.
 - [Batch snapshot compatibility](batch-snapshot-compatibility.md) — Preserve newer incremental saves and deletions when older clients submit whole-project snapshots.
+- [Architecture change scope](architecture-change-scope.md) — This app's architecture is deliberate; don't infer extra changes or alter workflow behavior without approval.
