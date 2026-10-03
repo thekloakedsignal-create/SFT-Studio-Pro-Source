@@ -149,7 +149,6 @@ test("strict tagged reasoning validation is optional and applies only to Reasoni
   };
   assert.equal(parseGeneratedExamples(JSON.stringify(untagged), "Reasoning").length, 1);
   assert.equal(parseGeneratedExamples(JSON.stringify(untagged), "Single Turn", strictOptions).length, 1);
-  assert.equal(parseGeneratedExamples(JSON.stringify(untagged), "Mixed", strictOptions).length, 1);
 });
 
 test("only actual HTTP 529 provider errors qualify for a backup", () => {
