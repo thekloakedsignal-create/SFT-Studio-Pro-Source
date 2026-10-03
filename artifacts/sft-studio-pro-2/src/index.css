@@ -413,7 +413,7 @@ pre {
 /* Each workspace card owns its solid fill and border. The layout wrapper
    does not paint over its children or infer colors from utility substrings. */
 .sft-panel {
-  background-color: #48484e;
+  background-color: #000000;
   border: 2px solid #35353b;
   --field-surface: #f2f2f5;
   --field-ink: #8422d1;
