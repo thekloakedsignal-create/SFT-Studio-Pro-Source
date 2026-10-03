@@ -5,7 +5,7 @@ import vm from "node:vm";
 import { transform } from "esbuild";
 import {
   ChatCompletionsHttpError, isProviderOverload, normalizeText,
-  parseGeneratedExamples, sanitizeExample
+  parseGeneratedExamples, parseReasoningExamples, sanitizeExample
 } from "../src/lib/generation-response.ts";
 
 // Actual legacy dispatch/provider adapter, with a fixture-only fetch and immediate
@@ -31,7 +31,7 @@ function hasRenderableMessages(example: any): boolean {
     ));
 }
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const delays: number[] = [];
@@ -51,7 +51,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       post(route: string, handler: Function) { routes.set(`POST ${route}`, handler); }
     },
     Type: { OBJECT: "object", ARRAY: "array", STRING: "string", NUMBER: "number", BOOLEAN: "boolean" },
-    ChatCompletionsHttpError, isProviderOverload, normalizeText, parseGeneratedExamples, sanitizeExample,
+    ChatCompletionsHttpError, isProviderOverload, normalizeText, parseGeneratedExamples, parseReasoningExamples, sanitizeExample,
     logger: { warn() {}, info() {}, error() {} },
     process: { env: { GRADIENT_MODEL_ACCESS_KEY: "offline-fixture-only-not-a-secret" } },
     console: { log() {}, warn() {}, error() {} },
@@ -83,6 +83,17 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
         return await new Promise(() => {});
       }
       if (mode === "timeoutQwen" && request.model === "qwen3.5-397b-a17b") {
+        concurrent--;
+        const timeoutError = new Error("fixture request timeout");
+        timeoutError.name = "TimeoutError";
+        throw timeoutError;
+      }
+      if (
+        mode === "timeoutRecoveryAll"
+        || (mode === "timeoutRecovery"
+          && ((request.model === "qwen3.5-397b-a17b" && requestNumber === 2)
+            || (request.model === firstModel && requestNumber > 5)))
+      ) {
         concurrent--;
         const timeoutError = new Error("fixture request timeout");
         timeoutError.name = "TimeoutError";
@@ -220,7 +231,9 @@ test("Multi Turn prompt requests the JSON-object envelope required by the provid
   const prompt = f.calls[0].messages.find((message: any) => message.role === "user").content;
   assert.match(prompt, /Return them as one JSON object with an "examples" array/);
   assert.match(prompt, /Do not return a top-level JSON array/);
-  assert.ok(f.calls.every(call => call.response_format.type === "json_object"));
+  assert.ok(f.calls.every(call => JSON.stringify(call.response_format) === JSON.stringify({ type: "json_object" })));
+  assert.ok(f.calls.every(call => call.reasoning_effort === "none"));
+  assert.doesNotMatch(f.calls[0].messages.find((message: any) => message.role === "system").content, /Return valid JSON that matches this schema/);
 });
 
 test("Reasoning batch jobs extract tagged thinking into the UI reasoning field", async () => {
@@ -243,7 +256,11 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   assert.match(prompt, /exactly one non-empty <think>\.\.\.<\/think> block followed by a non-empty final answer/);
   assert.match(prompt, /Return them as one JSON object with an "examples" array/);
   assert.doesNotMatch(prompt, /Return them as a JSON array of examples/);
-  assert.ok(f.calls.every(call => call.response_format.type === "json_object" && call.reasoning_effort === "medium"));
+  assert.ok(f.calls.every(call =>
+    JSON.stringify(call.response_format) === JSON.stringify({ type: "json_object" })
+    && call.reasoning_effort === "none"
+    && !Object.hasOwn(call, "json_schema")
+  ));
 
   const systemPrompt = f.calls[0].messages.find((message: any) => message.role === "system").content;
   const schemaPrefix = "Return valid JSON that matches this schema: ";
@@ -262,6 +279,26 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   assert.match(messagesSchema.prefixItems[1].properties.content.pattern, /<think>/);
 });
 
+test("Reasoning timeout recovery updates the schema to the requested fill count", async () => {
+  const f = fixture("timeoutQwen");
+  const started = await f.generate(25, true, "Reasoning");
+  const job = await f.job(started.body.jobId);
+
+  assert.equal(job.body.status, "complete");
+  assert.equal(job.body.result.examples.length, 25);
+  const recoveryCall = f.calls.at(-1);
+  const recoveryPrompt = recoveryCall.messages.find((message: any) => message.role === "user").content;
+  assert.match(recoveryPrompt, /Generate exactly 3 examples\./);
+
+  const systemPrompt = recoveryCall.messages.find((message: any) => message.role === "system").content;
+  const schemaPrefix = "Return valid JSON that matches this schema: ";
+  const schemaOffset = systemPrompt.indexOf(schemaPrefix);
+  assert.notEqual(schemaOffset, -1);
+  const responseSchema = JSON.parse(systemPrompt.slice(schemaOffset + schemaPrefix.length));
+  assert.equal(responseSchema.properties.examples.minItems, 3);
+  assert.equal(responseSchema.properties.examples.maxItems, 3);
+});
+
 test("Reasoning batch jobs reject responses that omit the required think block", async () => {
   const f = fixture("malformedReasoning");
   const started = await f.generate(5, true, "Reasoning");
@@ -269,7 +306,29 @@ test("Reasoning batch jobs reject responses that omit the required think block",
 
   assert.equal(job.body.status, "error");
   assert.equal(job.body.result, undefined);
+  assert.equal(job.body.failureCategory, "invalid_reasoning_content");
   assert.equal(f.calls.length, 5);
+});
+
+test("Reasoning timeout failures expose only a safe category through job status", async () => {
+  for (const [mode, expectedStatus] of [
+    ["timeoutRecovery", "partial"],
+    ["timeoutRecoveryAll", "error"]
+  ] as const) {
+    const f = fixture(mode);
+    const started = await f.generate(5, true, "Reasoning");
+    const job = await f.job(started.body.jobId);
+
+    assert.equal(job.body.status, expectedStatus);
+    assert.equal(job.body.failureCategory, "provider_timeout");
+    if (expectedStatus === "partial") {
+      assert.ok(job.body.result.examples.length > 0);
+      assert.ok(job.body.result.examples.length < 5);
+    } else {
+      assert.equal(job.body.result, undefined);
+    }
+    assert.equal(f.calls.length, 6);
+  }
 });
 
 test("a stalled model is skipped in later stacks and GLM fills all missing examples in one request", async () => {

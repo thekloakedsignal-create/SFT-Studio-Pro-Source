@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  ChatCompletionsHttpError, isProviderOverload, normalizeText, parseGeneratedExamples,
+  ChatCompletionsHttpError, isProviderOverload, normalizeText, parseGeneratedExamples, parseReasoningExamples,
   sanitizeExample, sanitizeMessage
 } from "../src/lib/generation-response.ts";
 
@@ -156,6 +156,49 @@ test("strict tagged reasoning validation is optional and applies only to Reasoni
   };
   assert.equal(parseGeneratedExamples(JSON.stringify(untagged), "Reasoning").length, 1);
   assert.equal(parseGeneratedExamples(JSON.stringify(untagged), "Single Turn", strictOptions).length, 1);
+});
+
+test("strict Reasoning parsing returns safe failure categories and enforces the requested count", () => {
+  assert.deepEqual(parseReasoningExamples("", 1), {
+    examples: [],
+    failureCategory: "empty_response"
+  });
+  assert.deepEqual(parseReasoningExamples("{broken", 1), {
+    examples: [],
+    failureCategory: "invalid_json"
+  });
+  assert.deepEqual(parseReasoningExamples(JSON.stringify({ data: [] }), 1), {
+    examples: [],
+    failureCategory: "invalid_envelope"
+  });
+  assert.deepEqual(parseReasoningExamples(JSON.stringify({ examples: [{ messages: [] }] }), 1), {
+    examples: [],
+    failureCategory: "invalid_example_structure"
+  });
+  assert.deepEqual(parseReasoningExamples(JSON.stringify({
+    examples: [{
+      messages: [
+        { role: "user", content: "Q" },
+        { role: "assistant", content: "<think>Trace.</think>\nAnswer.<think>" }
+      ]
+    }]
+  }), 1), {
+    examples: [],
+    failureCategory: "invalid_reasoning_content"
+  });
+  const validBatch = JSON.stringify({
+    examples: [{
+      messages: [
+        { role: "user", content: "Q" },
+        { role: "assistant", content: "<think>Trace.</think>\nAnswer." }
+      ]
+    }]
+  });
+  assert.deepEqual(parseReasoningExamples(validBatch, 2), {
+    examples: [],
+    failureCategory: "wrong_example_count"
+  });
+  assert.equal(parseReasoningExamples(validBatch, 1).examples.length, 1);
 });
 
 test("only actual HTTP 529 provider errors qualify for a backup", () => {

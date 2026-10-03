@@ -12,7 +12,8 @@ import { optionalAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { logger } from "./src/lib/logger.ts";
 import {
   ChatCompletionsHttpError, isProviderOverload, normalizeText,
-  parseGeneratedExamples, sanitizeExample, sanitizeMessage
+  parseGeneratedExamples, parseReasoningExamples, sanitizeExample, sanitizeMessage,
+  type ReasoningParseFailureCategory
 } from "./src/lib/generation-response.ts";
 import {
   mergeBatchRecords, mergeProjectSnapshot, removeBatch, sqlBatchData, visibleBatches
@@ -705,6 +706,25 @@ function isDigitalOceanRequestTimeout(error: any): boolean {
     error?.status === 504;
 }
 
+type GenerationFailureCategory = ReasoningParseFailureCategory | "provider_timeout" | "provider_error";
+
+function getReasoningFailureCategory(error: any): GenerationFailureCategory {
+  const category = error?.failureCategory;
+  if ([
+    "empty_response",
+    "invalid_json",
+    "invalid_envelope",
+    "wrong_example_count",
+    "invalid_example_structure",
+    "invalid_reasoning_content",
+    "provider_timeout",
+    "provider_error"
+  ].includes(category)) {
+    return category as GenerationFailureCategory;
+  }
+  return isDigitalOceanRequestTimeout(error) ? "provider_timeout" : "provider_error";
+}
+
 function extractResponseText(res: any): string {
   if (!res) return "";
   if (typeof res.text === "string") return res.text;
@@ -1255,6 +1275,7 @@ type GenerationJob = {
     partialReason?: string;
   };
   error?: string;
+  failureCategory?: GenerationFailureCategory;
 };
 
 const generationJobs = new Map<string, GenerationJob>();
@@ -1272,7 +1293,8 @@ app.get("/api/generate/jobs/:jobId", (req, res) => {
     batchId: job.batchId,
     progress: job.progress,
     ...(job.status === "complete" || job.status === "partial" ? { result: job.result } : {}),
-    ...(job.status === "error" ? { error: job.error } : {})
+    ...(job.status === "error" ? { error: job.error } : {}),
+    ...(job.failureCategory ? { failureCategory: job.failureCategory } : {})
   });
 });
 
@@ -1308,6 +1330,7 @@ app.post("/api/generate", async (req, res) => {
   const stalledModels = new Set<string>();
   let timedOutExampleCount = 0;
   let requestExamplesForMissingBatch: ((model: string, count: number, timeoutMs: number) => Promise<any[]>) | undefined;
+  let isReasoningGeneration = false;
   const useJobPolling = req.body?.jobMode === true;
   let generationJobId: string | undefined;
   if (useJobPolling) {
@@ -1379,6 +1402,7 @@ app.post("/api/generate", async (req, res) => {
       (tTypeLower.includes("reasoning") || tTypeLower.includes("cot")) ? "Reasoning" :
       (tTypeLower.includes("mixed") || tTypeLower.includes("mix")) ? "Mixed" :
       "Single Turn";
+    isReasoningGeneration = turnMode === "Reasoning";
     const reasoningFormatInstruction = `
 REASONING TEMPLATE FORMAT:
 - Return exactly one JSON object with only an "examples" array.
@@ -1866,7 +1890,6 @@ REASONING TEMPLATE FORMAT:
                 }
               : {}),
             ...(turnMode !== "Reasoning" && turnMode !== "Mixed" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-            ...(turnMode === "Reasoning" ? { reasoningEffort: "medium" } : {}),
             systemInstruction: turnMode === "Reasoning"
               ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
 
@@ -1906,6 +1929,22 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             requestedTimeoutMs = SFT_SINGLE_EXAMPLE_TIMEOUT_MS,
             ignoreModelAbort = false
           ) => {
+            const requestConfig = turnMode === "Reasoning"
+              ? {
+                  ...configObj,
+                  responseSchema: {
+                    ...configObj.responseSchema,
+                    properties: {
+                      ...configObj.responseSchema.properties,
+                      examples: {
+                        ...configObj.responseSchema.properties.examples,
+                        minItems: requestedCount,
+                        maxItems: requestedCount
+                      }
+                    }
+                  }
+                }
+              : configObj;
             const remainingBatchMs = generationDeadline - Date.now();
             const timeoutMs = Math.min(requestedTimeoutMs, remainingBatchMs);
             if (timeoutMs <= 0) {
@@ -1914,13 +1953,23 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             const response = await callDigitalOceanChatCompletions({
               model,
               contents: prompt,
-              config: configObj,
+              config: requestConfig,
               timeoutMs,
               ...(ignoreModelAbort ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
             });
-            const parsed = parseGeneratedExamples(extractResponseText(response), turnMode, {
-              requireThinkTaggedReasoning: turnMode === "Reasoning"
-            });
+            let parsed: any[];
+            if (turnMode === "Reasoning") {
+              const result = parseReasoningExamples(extractResponseText(response), requestedCount);
+              if (result.examples.length === 0) {
+                throw Object.assign(
+                  new Error(`Model ${model} returned no valid, non-empty SFT examples.`),
+                  { failureCategory: result.failureCategory ?? "invalid_envelope" }
+                );
+              }
+              parsed = result.examples;
+            } else {
+              parsed = parseGeneratedExamples(extractResponseText(response), turnMode);
+            }
             if (parsed.length === 0) {
               throw new Error(`Model ${model} returned no valid, non-empty SFT examples.`);
             }
@@ -2069,6 +2118,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               job.status = "partial";
               job.progress.completed = partialExamples.length;
               job.result = partialResponse;
+              if (turnMode === "Reasoning") {
+                job.failureCategory = getReasoningFailureCategory(error);
+              }
               job.updatedAt = Date.now();
             }
             return;
@@ -2079,14 +2131,16 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           }
           return res.json(partialResponse);
         }
-        throw new Error(
-          `Generation stopped after ${completedExampleCount} of ${countNum} examples completed. ${detail}`
+        throw Object.assign(
+          new Error(`Generation stopped after ${completedExampleCount} of ${countNum} examples completed. ${detail}`),
+          { failureCategory: turnMode === "Reasoning" ? getReasoningFailureCategory(error) : undefined }
         );
       }
     }
 
     let recoveryExamples: any[] = [];
     let recoveryFailureReason: string | null = null;
+    let recoveryFailureCategory: GenerationFailureCategory | undefined;
     let recoveryModel = "glm-5.3";
     if (timedOutExampleCount > 0) {
       const remainingBatchMs = generationDeadline - Date.now();
@@ -2096,6 +2150,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       );
       if (recoveryTimeoutMs <= 0 || !requestExamplesForMissingBatch) {
         recoveryFailureReason = `The ${generationTimeoutMs / 1000}-second total batch time limit expired before the GLM fill request could start.`;
+        if (turnMode === "Reasoning") recoveryFailureCategory = "provider_timeout";
       } else {
         logger.warn(
           { model: recoveryModel, missingCount: timedOutExampleCount, batchId: generationBatchId },
@@ -2108,6 +2163,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             recoveryTimeoutMs
           );
         } catch (recoveryError: any) {
+          if (turnMode === "Reasoning") {
+            recoveryFailureCategory = getReasoningFailureCategory(recoveryError);
+          }
           if (isProviderOverload(recoveryError)) {
             const backupModel = generationModels.find(
               model => model !== recoveryModel && !stalledModels.has(model)
@@ -2128,6 +2186,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 );
               } catch (backupError: any) {
                 if (isDigitalOceanRequestTimeout(backupError)) stalledModels.add(backupModel);
+                if (turnMode === "Reasoning") {
+                  recoveryFailureCategory = getReasoningFailureCategory(backupError);
+                }
                 recoveryFailureReason = `The recovery backup model ${backupModel} failed: ${formatAIErrorMessage(backupError)}`;
               }
             }
@@ -2174,7 +2235,14 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     });
 
     if (allExamples.length === 0) {
-      throw new Error("No examples were returned by the generation engine. Please retry with a smaller batch or check connection.");
+      throw Object.assign(
+        new Error("No examples were returned by the generation engine. Please retry with a smaller batch or check connection."),
+        {
+          failureCategory: turnMode === "Reasoning"
+            ? recoveryFailureCategory ?? (timedOutExampleCount > 0 ? "provider_timeout" : "provider_error")
+            : undefined
+        }
+      );
     }
 
     if (allExamples.length < countNum) {
@@ -2198,6 +2266,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             job.status = "partial";
             job.progress.completed = formattedPartialExamples.length;
             job.result = partialResponse;
+            if (turnMode === "Reasoning") {
+              job.failureCategory = recoveryFailureCategory ?? "provider_timeout";
+            }
             job.updatedAt = Date.now();
           }
           return;
@@ -2246,6 +2317,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       if (job) {
         job.status = "error";
         job.error = formatAIErrorMessage(error);
+        if (isReasoningGeneration) {
+          job.failureCategory = getReasoningFailureCategory(error);
+        }
         job.updatedAt = Date.now();
       }
       return;

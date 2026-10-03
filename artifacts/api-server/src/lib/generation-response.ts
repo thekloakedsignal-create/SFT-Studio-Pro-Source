@@ -98,13 +98,26 @@ const roleAliases: Record<string, string> = {
   developer: "developer", tool: "tool"
 };
 
-function hasThinkTaggedAssistantResponse(example: unknown): boolean {
-  if (!isRecord(example)) return false;
-  if (Object.keys(example).some(key => key !== "messages")) return false;
-  if (!Array.isArray(example.messages) || example.messages.length !== 2) return false;
+export type ReasoningParseFailureCategory =
+  | "empty_response"
+  | "invalid_json"
+  | "invalid_envelope"
+  | "wrong_example_count"
+  | "invalid_example_structure"
+  | "invalid_reasoning_content";
+
+export type ReasoningParseResult = {
+  examples: any[];
+  failureCategory?: ReasoningParseFailureCategory;
+};
+
+function getThinkTaggedExampleFailure(example: unknown): "invalid_example_structure" | "invalid_reasoning_content" | undefined {
+  if (!isRecord(example)) return "invalid_example_structure";
+  if (Object.keys(example).some(key => key !== "messages")) return "invalid_example_structure";
+  if (!Array.isArray(example.messages) || example.messages.length !== 2) return "invalid_example_structure";
 
   const [userMessage, assistantMessage] = example.messages;
-  if (!isRecord(userMessage) || !isRecord(assistantMessage)) return false;
+  if (!isRecord(userMessage) || !isRecord(assistantMessage)) return "invalid_example_structure";
   if (
     Object.keys(userMessage).some(key => key !== "role" && key !== "content")
     || Object.keys(assistantMessage).some(key => key !== "role" && key !== "content")
@@ -113,24 +126,65 @@ function hasThinkTaggedAssistantResponse(example: unknown): boolean {
     || typeof userMessage.content !== "string"
     || !userMessage.content.trim()
     || typeof assistantMessage.content !== "string"
-  ) return false;
+  ) return "invalid_example_structure";
 
   const content = assistantMessage.content;
   const thinkBlocks = Array.from(content.matchAll(/<think>([\s\S]*?)<\/think>/gi));
-  if (thinkBlocks.length !== 1) return false;
+  const openTags = Array.from(content.matchAll(/<think>/gi)).length;
+  const closeTags = Array.from(content.matchAll(/<\/think>/gi)).length;
+  if (thinkBlocks.length !== 1 || openTags !== 1 || closeTags !== 1) return "invalid_reasoning_content";
 
   const [thinkBlock] = thinkBlocks;
   const thinkStart = thinkBlock.index;
-  if (thinkStart === undefined || !thinkBlock[1].trim()) return false;
+  if (thinkStart === undefined || !thinkBlock[1].trim()) return "invalid_reasoning_content";
 
   const prefix = content.slice(0, thinkStart).trim();
-  if (prefix && !/^###\s*Response:\s*$/i.test(prefix)) return false;
+  if (prefix && !/^###\s*Response:\s*$/i.test(prefix)) return "invalid_reasoning_content";
 
   const answer = content
     .slice(thinkStart + thinkBlock[0].length)
     .replace(/(?:<\/s>|<\|im_end\|>)+\s*$/gi, "")
     .trim();
-  return answer.length > 0;
+  return answer.length > 0 ? undefined : "invalid_reasoning_content";
+}
+
+/** Strict Reasoning-only parser; failures expose categories, never generated text. */
+export function parseReasoningExamples(rawContent: unknown, expectedCount?: number): ReasoningParseResult {
+  const text = normalizeText(rawContent);
+  if (!text) return { examples: [], failureCategory: "empty_response" };
+
+  if (/```(?:jsonl|ndjson|json)?[ \t]*\r?\n?[\s\S]*?```/i.test(text)) {
+    return { examples: [], failureCategory: "invalid_envelope" };
+  }
+
+  let batch: unknown;
+  try {
+    batch = JSON.parse(text);
+  } catch {
+    return { examples: [], failureCategory: "invalid_json" };
+  }
+
+  if (
+    !isRecord(batch)
+    || Object.keys(batch).length !== 1
+    || !Array.isArray(batch.examples)
+    || batch.examples.length === 0
+  ) return { examples: [], failureCategory: "invalid_envelope" };
+
+  if (expectedCount !== undefined && batch.examples.length !== expectedCount) {
+    return { examples: [], failureCategory: "wrong_example_count" };
+  }
+
+  for (const example of batch.examples) {
+    const failureCategory = getThinkTaggedExampleFailure(example);
+    if (failureCategory) return { examples: [], failureCategory };
+  }
+
+  const examples = batch.examples.map(example => sanitizeExample(example, "Reasoning"));
+  if (!examples.every(isValidExample)) {
+    return { examples: [], failureCategory: "invalid_example_structure" };
+  }
+  return { examples };
 }
 
 export function sanitizeMessage(msg: any, templateType?: string): { role: string; content: string; reasoning?: string } {
@@ -271,23 +325,7 @@ export function parseGeneratedExamples(
     && templateType === "Reasoning";
 
   if (requireThinkTaggedReasoning) {
-    if (fenced.length > 0) return [];
-    let batch: unknown;
-    try {
-      batch = JSON.parse(text);
-    } catch {
-      return [];
-    }
-    if (
-      !isRecord(batch)
-      || Object.keys(batch).length !== 1
-      || !Array.isArray(batch.examples)
-      || batch.examples.length === 0
-      || !batch.examples.every(hasThinkTaggedAssistantResponse)
-    ) return [];
-
-    const examples = batch.examples.map(example => sanitizeExample(example, templateType));
-    return examples.every(isValidExample) ? examples : [];
+    return parseReasoningExamples(text).examples;
   }
 
   return regions.flatMap(parseJsonValues).flatMap(unwrapExamples)
