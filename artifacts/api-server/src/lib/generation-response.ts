@@ -139,7 +139,7 @@ function getThinkTaggedExampleFailure(example: unknown): "invalid_example_struct
   if (thinkStart === undefined || !thinkBlock[1].trim()) return "invalid_reasoning_content";
 
   const prefix = content.slice(0, thinkStart).trim();
-  if (prefix && !/^###\s*Response:\s*$/i.test(prefix)) return "invalid_reasoning_content";
+  if (prefix) return "invalid_reasoning_content";
 
   const answer = content
     .slice(thinkStart + thinkBlock[0].length)

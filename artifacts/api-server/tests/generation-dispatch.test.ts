@@ -256,6 +256,7 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   assert.match(prompt, /exactly one non-empty <think>\.\.\.<\/think> block followed by a non-empty final answer/);
   assert.match(prompt, /Return them as one JSON object with an "examples" array/);
   assert.doesNotMatch(prompt, /Return them as a JSON array of examples/);
+  assert.doesNotMatch(prompt, /Alpaca|Mistral|### Response:|\[INST\]/i);
   assert.ok(f.calls.every(call =>
     JSON.stringify(call.response_format) === JSON.stringify({ type: "json_object" })
     && call.reasoning_effort === "none"
@@ -276,7 +277,18 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   assert.equal(messagesSchema.minItems, 2);
   assert.equal(messagesSchema.maxItems, 2);
   assert.deepEqual(Array.from(messagesSchema.prefixItems, (item: any) => item.properties.role.enum[0]), ["user", "assistant"]);
-  assert.match(messagesSchema.prefixItems[1].properties.content.pattern, /<think>/);
+  const contentPattern = new RegExp(messagesSchema.prefixItems[1].properties.content.pattern);
+  for (const content of [
+    "<think>Trace.</think>\nAnswer.",
+    "<THINK>Trace.</THINK>\nAnswer."
+  ]) assert.equal(contentPattern.test(content), true);
+  for (const content of [
+    "### Response:\n<think>Trace.</think>\nAnswer.",
+    "<think> </think>\nAnswer.",
+    "<think>Trace.</think>",
+    "<think>Trace.</think>\nAnswer.<think>Second.</think>",
+    "<think>Trace.</think>\n<|im_end|>"
+  ]) assert.equal(contentPattern.test(content), false);
 });
 
 test("Reasoning timeout recovery updates the schema to the requested fill count", async () => {
@@ -306,11 +318,11 @@ test("Reasoning batch jobs reject responses that omit the required think block",
 
   assert.equal(job.body.status, "error");
   assert.equal(job.body.result, undefined);
-  assert.equal(job.body.failureCategory, "invalid_reasoning_content");
+  assert.equal(Object.hasOwn(job.body, "failureCategory"), false);
   assert.equal(f.calls.length, 5);
 });
 
-test("Reasoning timeout failures expose only a safe category through job status", async () => {
+test("Reasoning timeout failure categories remain internal to job status", async () => {
   for (const [mode, expectedStatus] of [
     ["timeoutRecovery", "partial"],
     ["timeoutRecoveryAll", "error"]
@@ -320,7 +332,7 @@ test("Reasoning timeout failures expose only a safe category through job status"
     const job = await f.job(started.body.jobId);
 
     assert.equal(job.body.status, expectedStatus);
-    assert.equal(job.body.failureCategory, "provider_timeout");
+    assert.equal(Object.hasOwn(job.body, "failureCategory"), false);
     if (expectedStatus === "partial") {
       assert.ok(job.body.result.examples.length > 0);
       assert.ok(job.body.result.examples.length < 5);

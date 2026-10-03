@@ -114,7 +114,7 @@ test("strict tagged reasoning validation is optional and applies only to Reasoni
     examples: [{
       messages: [
         { role: "user", content: "Q" },
-        { role: "assistant", content: "### Response:\n<think>Check the format.</think>\nA complete answer." }
+        { role: "assistant", content: "<think>Check the format.</think>\nA complete answer." }
       ]
     }]
   };
@@ -122,13 +122,14 @@ test("strict tagged reasoning validation is optional and applies only to Reasoni
   const parsed = parseGeneratedExamples(JSON.stringify(valid), "Reasoning", strictOptions);
   assert.equal(parsed.length, 1);
   assert.equal(parsed[0].messages[1].reasoning, "Check the format.");
-  assert.equal(parsed[0].messages[1].content, "### Response:\n\nA complete answer.");
+  assert.equal(parsed[0].messages[1].content, "A complete answer.");
 
   const invalidExamples = [
     { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "A plain answer without a trace." }] },
     { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "<think> </think>\nAnswer." }] },
     { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "<think>Trace without a final answer.</think>" }] },
     { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "Unrequested preamble.\n<think>Trace.</think>\nAnswer." }] },
+    { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "### Response:\n<think>Trace.</think>\nAnswer." }] },
     { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "<think>Trace.</think>\nAnswer.\n<think>Second trace.</think>" }] },
     { messages: [{ role: "system", content: "No system message." }, { role: "user", content: "Q" }, { role: "assistant", content: "<think>Trace.</think>\nAnswer." }] },
     { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "<think>Trace.</think>\nAnswer." }, { role: "assistant", content: "<think>Extra turn.</think>\nAnswer." }] },

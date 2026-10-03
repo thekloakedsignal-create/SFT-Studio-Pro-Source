@@ -1293,8 +1293,7 @@ app.get("/api/generate/jobs/:jobId", (req, res) => {
     batchId: job.batchId,
     progress: job.progress,
     ...(job.status === "complete" || job.status === "partial" ? { result: job.result } : {}),
-    ...(job.status === "error" ? { error: job.error } : {}),
-    ...(job.failureCategory ? { failureCategory: job.failureCategory } : {})
+    ...(job.status === "error" ? { error: job.error } : {})
   });
 });
 
@@ -1407,15 +1406,13 @@ app.post("/api/generate", async (req, res) => {
 REASONING TEMPLATE FORMAT:
 - Return exactly one JSON object with only an "examples" array.
 - Each example must contain exactly two messages, in order: one user message, then one assistant message. Do not include system messages, extra turns, or extra properties.
-- The assistant message's "content" must contain exactly one non-empty <think>...</think> block followed by a non-empty final answer.
+- Assistant content must start with exactly one non-empty <think>...</think> block, followed by a non-empty final answer.
 - Required assistant content shape: "<think>\n[Concise explanation of the key reasoning steps]\n</think>\n[Final answer]".
-- Preserve required instruction markers; for Alpaca, keep "### Response:" before the <think> block.
 - Formatting example:
 {"examples":[{"messages":[{"role":"user","content":"What is 2 + 3?"},{"role":"assistant","content":"<think>\nI add 2 and 3 to get 5.\n</think>\nThe answer is 5."}]}]}
 - Use this only as a formatting example; create new content for the requested task and persona.
 - Never omit either tag, put the final answer inside the tags, or use the format for any template other than Reasoning.
 - Do not emit separate "reasoning" or "reasoning_content" properties.
-- Keep the selected template's message roles and any required instruction markers.
 `;
 
     // Define response schema to guarantee format
@@ -1444,8 +1441,8 @@ REASONING TEMPLATE FORMAT:
                   role: { type: Type.STRING, enum: ["assistant"] },
                   content: {
                     type: Type.STRING,
-                    description: "Exactly one non-empty <think>...</think> block followed by a non-empty final answer. Alpaca may prefix it with ### Response:.",
-                    pattern: "^(?:###\\s*Response:\\s*)?<think>[\\s\\S]*\\S[\\s\\S]*</think>[\\s\\S]*\\S[\\s\\S]*$"
+                    description: "Content starts with exactly one non-empty <think>...</think> block, followed by a non-empty final answer.",
+                    pattern: "^(?![\\s\\S]*<[Tt][Hh][Ii][Nn][Kk]>[\\s\\S]*<[Tt][Hh][Ii][Nn][Kk]>)(?![\\s\\S]*<\\/[Tt][Hh][Ii][Nn][Kk]>[\\s\\S]*<\\/[Tt][Hh][Ii][Nn][Kk]>)<[Tt][Hh][Ii][Nn][Kk]>(?:(?!<\\/[Tt][Hh][Ii][Nn][Kk]>)[\\s\\S])*\\S(?:(?!<\\/[Tt][Hh][Ii][Nn][Kk]>)[\\s\\S])*<\\/[Tt][Hh][Ii][Nn][Kk]>(?!\\s*(?:(?:<\\/s>|<\\|im_end\\|>)+\\s*)?$)[\\s\\S]*\\S[\\s\\S]*$"
                   }
                 },
                 required: ["role", "content"],
