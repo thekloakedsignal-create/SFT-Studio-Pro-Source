@@ -4012,7 +4012,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
       {/* Top Banner Navigation */}
-      <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+      <header className="kk-dark border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
           
           <div className="flex items-center justify-between md:justify-start gap-3">
@@ -7096,7 +7096,7 @@ export default function App() {
                           </button>
                         </div>
                       </div>
-                      <pre className="text-[10px] text-slate-300 font-mono bg-slate-900/60 p-3.5 rounded-xl overflow-x-auto max-h-60 custom-scrollbar whitespace-pre border border-slate-800">
+                      <pre className="kk-dark text-[10px] text-slate-300 font-mono bg-slate-900/60 p-3.5 rounded-xl overflow-x-auto max-h-60 custom-scrollbar whitespace-pre border border-slate-800">
                         {exportedPreview}
                       </pre>
                     </div>
@@ -7145,7 +7145,7 @@ export default function App() {
                   </div>
 
                   {/* Messages Scroll Area */}
-                  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 custom-scrollbar">
+                  <div className="kk-dark flex-1 overflow-y-auto px-6 py-4 space-y-4 custom-scrollbar">
                     {expertMessages.length === 0 && (
                       <div className="h-full min-h-[320px] flex flex-col items-center justify-center text-center p-8 space-y-3">
                         <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl text-emerald-400 shadow-sm">
@@ -7192,7 +7192,7 @@ export default function App() {
                                         </span>
                                         <CopyCodeButton text={part.content} />
                                       </div>
-                                      <pre className="bg-slate-950/90 text-emerald-300 text-[11px] p-3 overflow-x-auto font-mono whitespace-pre custom-scrollbar">
+                                      <pre className="kk-dark bg-slate-950/90 text-emerald-300 text-[11px] p-3 overflow-x-auto font-mono whitespace-pre custom-scrollbar">
                                         {part.content}
                                       </pre>
                                     </div>

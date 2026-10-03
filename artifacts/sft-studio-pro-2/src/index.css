@@ -13,6 +13,32 @@
   --color-brand-700: #15803d;
   --color-brand-900: #14532d;
 
+
+  /* Kreative palette: ivory surfaces (inverted slate), charcoal ink, plum/mauve accents */
+  --color-white: #1f1c22;
+  --color-black: #f4f1ea;
+  --color-slate-50: #1a181d; --color-slate-100: #24212a; --color-slate-200: #2e2a33;
+  --color-slate-300: #3d3842; --color-slate-400: #57505c; --color-slate-500: #6c6470;
+  --color-slate-600: #8a828c; --color-slate-700: #c9c3c6; --color-slate-750: #d6d1d2;
+  --color-slate-800: #dcd7d6; --color-slate-850: #e3dfdc; --color-slate-900: #ebe8e3;
+  --color-slate-950: #f6f3ec;
+  --color-gray-50: #f6f3ec;
+  /* Semantic statuses keep their hues, deepened for ivory contrast */
+  --color-green-300: #2f7a45; --color-green-400: #276b3b; --color-green-500: #3f9a5a;
+  --color-yellow-300: #8a6410; --color-yellow-400: #7a560a;
+  --color-amber-300: #8f5a0c; --color-amber-400: #7d4d08;
+  --color-red-300: #a3302c; --color-red-400: #962824;
+  --color-rose-300: #9e2f4b; --color-rose-400: #8f2641;
+  --color-orange-300: #9a4a12; --color-orange-400: #8a400c;
+  --color-emerald-50: #f7eff6; --color-emerald-100: #efe1ed; --color-emerald-200: #e2cde0; --color-emerald-300: #6e4a72; --color-emerald-400: #5d3b62; --color-emerald-500: #dcc6dc; --color-emerald-600: #cfb2cf; --color-emerald-700: #a682a6; --color-emerald-800: #c9a9c8; --color-emerald-900: #4a2f4e; --color-emerald-950: #f3e9f1;
+  --color-blue-50: #f7eff6; --color-blue-100: #efe1ed; --color-blue-200: #e2cde0; --color-blue-300: #6e4a72; --color-blue-400: #5d3b62; --color-blue-500: #dcc6dc; --color-blue-600: #cfb2cf; --color-blue-700: #a682a6; --color-blue-800: #c9a9c8; --color-blue-900: #4a2f4e; --color-blue-950: #f3e9f1;
+  --color-purple-50: #f7eff6; --color-purple-100: #efe1ed; --color-purple-200: #e2cde0; --color-purple-300: #6e4a72; --color-purple-400: #5d3b62; --color-purple-500: #dcc6dc; --color-purple-600: #cfb2cf; --color-purple-700: #a682a6; --color-purple-800: #c9a9c8; --color-purple-900: #4a2f4e; --color-purple-950: #f3e9f1;
+  --color-indigo-50: #f7eff6; --color-indigo-100: #efe1ed; --color-indigo-200: #e2cde0; --color-indigo-300: #6e4a72; --color-indigo-400: #5d3b62; --color-indigo-500: #dcc6dc; --color-indigo-600: #cfb2cf; --color-indigo-700: #a682a6; --color-indigo-800: #c9a9c8; --color-indigo-900: #4a2f4e; --color-indigo-950: #f3e9f1;
+  --color-violet-50: #f7eff6; --color-violet-100: #efe1ed; --color-violet-200: #e2cde0; --color-violet-300: #6e4a72; --color-violet-400: #5d3b62; --color-violet-500: #dcc6dc; --color-violet-600: #cfb2cf; --color-violet-700: #a682a6; --color-violet-800: #c9a9c8; --color-violet-900: #4a2f4e; --color-violet-950: #f3e9f1;
+  --color-teal-50: #f7eff6; --color-teal-100: #efe1ed; --color-teal-200: #e2cde0; --color-teal-300: #6e4a72; --color-teal-400: #5d3b62; --color-teal-500: #dcc6dc; --color-teal-600: #cfb2cf; --color-teal-700: #a682a6; --color-teal-800: #c9a9c8; --color-teal-900: #4a2f4e; --color-teal-950: #f3e9f1;
+  --color-cyan-50: #f7eff6; --color-cyan-100: #efe1ed; --color-cyan-200: #e2cde0; --color-cyan-300: #6e4a72; --color-cyan-400: #5d3b62; --color-cyan-500: #dcc6dc; --color-cyan-600: #cfb2cf; --color-cyan-700: #a682a6; --color-cyan-800: #c9a9c8; --color-cyan-900: #4a2f4e; --color-cyan-950: #f3e9f1;
+  --color-sky-50: #f7eff6; --color-sky-100: #efe1ed; --color-sky-200: #e2cde0; --color-sky-300: #6e4a72; --color-sky-400: #5d3b62; --color-sky-500: #dcc6dc; --color-sky-600: #cfb2cf; --color-sky-700: #a682a6; --color-sky-800: #c9a9c8; --color-sky-900: #4a2f4e; --color-sky-950: #f3e9f1;
+
   --radius-xs: 0px;
   --radius-sm: 0px;
   --radius-md: 0px;
@@ -39,8 +65,8 @@ html {
 body {
   font-family: var(--font-sans);
   letter-spacing: 0.035em;
-  background-color: #020617;
-  color: #f8fafc;
+  background-color: #f4f1ea;
+  color: #1f1c22;
 }
 
 /* Universal wide font tracking and full-width border coverage */
@@ -73,26 +99,26 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #cfb2cf;
   border-radius: 0px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #a682a6;
 }
 
 /* Make editable text inside inputs and textareas a highly distinctive, elegant mint green */
 textarea, 
 input[type="text"], 
 input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]) {
-  color: #34d399 !important; /* Elegant mint green */
+  color: #4a2f4e !important; /* Deep plum */
   font-family: var(--font-mono) !important; /* Highly technical and readable JetBrains Mono */
 }
 
 /* Also style placeholder text to fit beautifully with the mint color scheme */
 textarea::placeholder,
 input::placeholder {
-  color: #475569 !important; /* Elegant readable slate grey */
+  color: #8a828c !important; /* Elegant readable slate grey */
 }
 
 /* Universal text and font containment: prevent any text, token, or filename from breaking out of its container */
@@ -111,3 +137,30 @@ pre, code, kbd, samp, .font-mono {
 }
 
 
+
+/* Charcoal ink on mauve accent fills */
+[class*="bg-emerald-4"],[class*="bg-emerald-5"],[class*="bg-emerald-6"],
+[class*="bg-blue-4"],[class*="bg-blue-5"],[class*="bg-blue-6"],
+[class*="bg-purple-5"],[class*="bg-purple-6"] { color: #1f1c22; }
+[class*="bg-emerald-"].text-slate-950,[class*="bg-blue-"].text-slate-950,[class*="bg-purple-"].text-slate-950,
+[class*="from-emerald"].text-slate-950 { color: #1f1c22 !important; }
+
+/* Scoped charcoal panels (header, code previews, chat) — re-declare tokens locally */
+.kk-dark {
+  --color-white: #f4f1ea; --color-black: #141216;
+  --color-slate-50: #f6f3ec; --color-slate-100: #ece7e2; --color-slate-200: #e2dcd8;
+  --color-slate-300: #d3ccd0; --color-slate-400: #b2a9b4; --color-slate-500: #968d99;
+  --color-slate-600: #7a727d; --color-slate-700: #4a454d; --color-slate-750: #3f3a42;
+  --color-slate-800: #38343b; --color-slate-850: #2e2a31; --color-slate-900: #29262c;
+  --color-slate-950: #1f1c22;
+  --color-emerald-300: #e2cde0; --color-emerald-400: #d4b6d2; --color-emerald-500: #b994b8;
+  --color-blue-300: #e2cde0; --color-blue-400: #d4b6d2; --color-blue-500: #b994b8;
+  --color-purple-300: #e2cde0; --color-purple-400: #d4b6d2;
+  --color-emerald-950: #3a2a3c; --color-blue-950: #3a2a3c; --color-purple-950: #3a2a3c;
+  --color-green-400: #8fd3a3; --color-green-500: #5fbf7c;
+  --color-red-400: #f0a19c; --color-amber-400: #e9c27a; --color-yellow-400: #e9cf7a;
+  background-color: #1f1c22;
+  color: #ece7e2;
+}
+.kk-dark textarea, .kk-dark input:not([type="checkbox"]):not([type="radio"]) { color: #e2cde0 !important; }
+.kk-dark .custom-scrollbar::-webkit-scrollbar-thumb, .kk-dark.custom-scrollbar::-webkit-scrollbar-thumb { background: #4a454d; }

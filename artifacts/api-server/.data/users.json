@@ -24,5 +24,13 @@
     "limit": 5000,
     "redeemedCode": null,
     "updatedAt": "2026-09-30T07:51:15.283Z"
+  },
+  "7i11Rpcqbdcz7O5nWB88k25rorG2": {
+    "uid": "7i11Rpcqbdcz7O5nWB88k25rorG2",
+    "email": "sftstudentgroup@yahoo.com",
+    "subscriptionStatus": "Free",
+    "limit": 5000,
+    "redeemedCode": null,
+    "updatedAt": "2026-10-03T21:59:47.535Z"
   }
 }
