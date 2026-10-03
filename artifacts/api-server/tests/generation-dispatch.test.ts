@@ -141,7 +141,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       const isPrimary = request.model === firstModel;
       const isBackup = !models.slice(0, 5).includes(request.model);
       const status = (mode === "fastFailure" && isPrimary) ? 503
-        : mode === "reasoningSiblingDelay" && isPrimary ? 503
+        : mode === "reasoningSiblingDelay" && isPrimary && requestNumber === 1 ? 503
         : ((mode === "primary529" || mode === "both529") && isPrimary)
         || (mode === "both529" && isBackup) ? 529
         : mode === "503" && isPrimary ? 503
@@ -297,15 +297,17 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   ]) assert.equal(contentPattern.test(content), false);
 });
 
-test("Reasoning jobs wait for in-flight sibling workers before saving a partial result", async () => {
+test("Reasoning jobs use the fill worker for missing examples and return a full batch", async () => {
   const f = fixture("reasoningSiblingDelay");
   const started = await f.generate(5, true, "Reasoning");
   const job = await f.job(started.body.jobId);
 
-  assert.equal(job.body.status, "partial");
-  assert.equal(job.body.result.partial, true);
-  assert.equal(job.body.result.examples.length, 4);
-  assert.equal(f.calls.length, 5);
+  assert.equal(job.body.status, "complete");
+  assert.equal(job.body.result.partial, undefined);
+  assert.equal(job.body.result.examples.length, 5);
+  assert.equal(f.calls.length, 6);
+  assert.equal(f.calls.at(-1).model, firstModel);
+  assert.match(f.calls.at(-1).messages.find((message: any) => message.role === "user").content, /Generate exactly 1 examples\./);
   assert.ok(job.body.result.examples.every(hasRenderableMessages));
 });
 
@@ -337,7 +339,7 @@ test("Reasoning batch jobs reject responses that omit the required think block",
   assert.equal(job.body.status, "error");
   assert.equal(job.body.result, undefined);
   assert.equal(Object.hasOwn(job.body, "failureCategory"), false);
-  assert.equal(f.calls.length, 5);
+  assert.equal(f.calls.length, 6);
 });
 
 test("Reasoning timeout failure categories remain internal to job status", async () => {
