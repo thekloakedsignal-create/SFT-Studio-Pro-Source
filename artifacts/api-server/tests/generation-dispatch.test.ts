@@ -31,7 +31,7 @@ function hasRenderableMessages(example: any): boolean {
     ));
 }
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" | "reasoningEarlyFailure" | "reasoningSlotTimeout" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const delays: number[] = [];
@@ -75,14 +75,24 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
     async fetch(url: string, options: any) {
       assert.equal(url, "https://inference.do-ai.run/v1/chat/completions");
       const request = JSON.parse(options.body);
+      const userPrompt = request.messages.find((message: any) => message.role === "user")?.content || "";
+      const isReasoning = userPrompt.includes('selected TEMPLATE TYPE: "Reasoning"');
       const requestNumber = calls.length + 1;
       calls.push(request);
       concurrent++;
       peakConcurrent = Math.max(peakConcurrent, concurrent);
+      if (mode === "reasoningSlotTimeout" && requestNumber === 2) {
+        concurrent--;
+        throw Object.assign(new Error("fixture slot timeout"), { name: "TimeoutError" });
+      }
+      if ((mode === "reasoningEarlyFailure" || mode === "reasoningSlotTimeout") && requestNumber >= 3) {
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(options.signal.aborted, false, "A sibling failure must not cancel this slot");
+      }
       if (mode === "fastFailure" && request.model !== firstModel) {
         return await new Promise(() => {});
       }
-      if (mode === "timeoutQwen" && request.model === "qwen3.5-397b-a17b") {
+      if (mode === "timeoutQwen" && (isReasoning ? requestNumber % 10 === 2 : request.model === "qwen3.5-397b-a17b")) {
         concurrent--;
         const timeoutError = new Error("fixture request timeout");
         timeoutError.name = "TimeoutError";
@@ -91,7 +101,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       if (
         mode === "timeoutRecoveryAll"
         || (mode === "timeoutRecovery"
-          && ((request.model === "qwen3.5-397b-a17b" && requestNumber === 2)
+          && (((isReasoning || request.model === "qwen3.5-397b-a17b") && requestNumber === 2)
             || (request.model === firstModel && requestNumber > 5)))
       ) {
         concurrent--;
@@ -136,17 +146,16 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       concurrent--;
       const isPrimary = request.model === firstModel;
       const isBackup = !models.slice(0, 5).includes(request.model);
-      const status = (mode === "fastFailure" && isPrimary) ? 503
+      const status = (mode === "reasoningEarlyFailure" && requestNumber === 2) ? 503
+        : (mode === "fastFailure" && isPrimary) ? 503
         : ((mode === "primary529" || mode === "both529") && isPrimary)
         || (mode === "both529" && isBackup) ? 529
         : mode === "503" && isPrimary ? 503
         : mode === "504Qwen" && request.model === "qwen3.5-397b-a17b" ? 504
         : mode === "partialFailure" && requestNumber === 11 ? 503
         : 200;
-      const userPrompt = request.messages.find((message: any) => message.role === "user")?.content || "";
       const requestedCount = Number(userPrompt.match(/Generate exactly (\d+) examples\./)?.[1]) || 1;
       const isMultiTurn = userPrompt.includes('selected TEMPLATE TYPE: "Multi Turn"');
-      const isReasoning = userPrompt.includes('selected TEMPLATE TYPE: "Reasoning"');
       const requestedExamples = Array.from({ length: requestedCount }, (_, index) => ({
         messages: isMultiTurn
           ? [
@@ -220,6 +229,26 @@ test("real dispatcher launches the preserved initial models concurrently and cou
   assert.deepEqual(f.delays, []);
   assert.ok(f.timeoutValues.every(timeoutMs => timeoutMs === 20000));
   assert.equal(f.calls.every(call => call.max_tokens === 4096 && call.response_format.type === "json_object"), true);
+});
+
+test("Reasoning retains delayed sibling responses after an early failure", async () => {
+  const f = fixture("reasoningEarlyFailure");
+  const response = await f.generate(5, false, "Reasoning");
+  assert.equal(response.body.partial, true);
+  assert.equal(response.body.examples.length, 4);
+  assert.equal(f.calls.length, 5);
+  assert.ok(f.calls.every(call => call.model === "nemotron-3-ultra-550b"));
+});
+
+test("one Reasoning timeout neither cancels siblings nor skips later Nemotron slots", async () => {
+  const f = fixture("reasoningSlotTimeout");
+  const response = await f.generate(25, false, "Reasoning");
+  assert.equal(response.body.success, true);
+  assert.equal(response.body.partial, undefined);
+  assert.equal(response.body.examples.length, 25);
+  assert.equal(f.calls.filter(call => call.model === "nemotron-3-ultra-550b").length, 25);
+  assert.equal(f.calls.length, 26);
+  assert.equal(f.calls.at(-1).model, "glm-5.3");
 });
 
 test("Multi Turn prompt requests the JSON-object envelope required by the provider", async () => {

@@ -14,3 +14,9 @@ The DigitalOcean adapter's verified request format is `json_object`, with respon
 **Why:** The user asked for the smallest internally consistent change and stopped further web research; the workspace code demonstrates JSON-object mode but not a native schema payload.
 
 **How to apply:** Preserve JSON-object mode and keep strict schema constraints Reasoning-only until the integration itself establishes native structured-output support.
+
+Treat repeated Reasoning model slots as independent requests, not one shared failure domain. Collect in-flight sibling results before finalizing a partial batch.
+
+**Why:** Assigning the same Nemotron model to every slot made model-wide cancellation affect all slots; fail-fast finalization could also omit responses that completed later. The user requested a minimal fix for only one response completing.
+
+**How to apply:** Keep Reasoning timeout isolation and result collection separate from the existing Single Turn/Multi Turn failure policy. Preserve model selection, batch sizes, timing, and recovery limits unless explicitly asked to change them.

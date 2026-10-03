@@ -1743,7 +1743,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               contents: prompt,
               config: requestConfig,
               timeoutMs,
-              ...(ignoreModelAbort ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
+              ...(ignoreModelAbort || isReasoningGeneration ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
             });
             let parsed: any[];
             if (turnMode === "Reasoning") {
@@ -1777,7 +1777,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           let responseModel = targetModel;
           let generated: any[] = [];
           try {
-            if (stalledModels.has(targetModel)) {
+            if (!isReasoningGeneration && stalledModels.has(targetModel)) {
               timedOutExampleCount += currentChunkSize;
               logger.warn(
                 { model: targetModel, stack: c + 1, batchId: generationBatchId },
@@ -1789,11 +1789,13 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           } catch (primaryError: any) {
             if (isDigitalOceanRequestTimeout(primaryError)) {
               stalledModels.add(targetModel);
-              modelAbortControllers.get(targetModel)?.abort();
+              if (!isReasoningGeneration) modelAbortControllers.get(targetModel)?.abort();
               timedOutExampleCount += currentChunkSize;
               logger.warn(
                 { model: targetModel, stack: c + 1, timeoutMs: SFT_SINGLE_EXAMPLE_TIMEOUT_MS, batchId: generationBatchId },
-                "Model request timed out; skipping it for the rest of this batch"
+                isReasoningGeneration
+                  ? "Reasoning request timed out; leaving independent slots running"
+                  : "Model request timed out; skipping it for the rest of this batch"
               );
               return [];
             }
@@ -1878,9 +1880,15 @@ No internal deliberation, planning, or reasoning fields are permitted.`
         if (spacingMs > 0) await new Promise((resolve) => setTimeout(resolve, spacingMs));
       }
       try {
-        // Each task already applies the sole allowed 529 fallback. Fail the job as
-        // soon as one task is unrecoverable instead of waiting for every sibling.
-        await Promise.all(chunkTasks[stackIndex].map(task => task()));
+        // Reasoning slots share a model, but their results are independent.
+        // Collect all in-flight results before saving a partial batch.
+        if (isReasoningGeneration) {
+          const results = await Promise.allSettled(chunkTasks[stackIndex].map(task => task()));
+          const failure = results.find(result => result.status === "rejected");
+          if (failure?.status === "rejected") throw failure.reason;
+        } else {
+          await Promise.all(chunkTasks[stackIndex].map(task => task()));
+        }
       } catch (error: any) {
         const detail = formatAIErrorMessage(error);
         const partialExamples = taskOutputs
