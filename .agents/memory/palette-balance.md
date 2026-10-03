@@ -13,6 +13,8 @@ The user specifies “Purple for font and highlighted selections.”
 
 Keep writing bright metallic purple, not fuchsia or pink. “Bright like fuchsia” describes intensity, not hue. The user repeatedly rejects the washed-out, “paste or a film over it” appearance. Locked editing fields must remain legible rather than fading their text.
 
+Avoid pale metallic highlight gradients and lavender lettering. In the user's screenshot these contribute to the “pasty” appearance; keep purple saturated and text crisp, without white sheen over selected tabs.
+
 All palette work is aesthetic only: do not change function or access rules. Nothing should look greyed out, whether accessible or not; unavailable controls retain full-color styling.
 
 **Why:** The user explicitly clarified this standing scope and appearance rule.
@@ -27,4 +29,4 @@ Use bright metallic-purple writing and dark-grey borders around the whole app.
 
 **Why:** The user explicitly requested this contrast treatment.
 
-**How to apply:** Preserve the mixed light/charcoal workspace and vivid metallic-purple text with clear dark-grey framing. The top panel inner box is medium grey; the main workspace content box is medium-dark grey, explicitly not black. Shade individual boxes directly rather than adding blanket background overrides.
+**How to apply:** Follow the user's latest three-layer clarification: light grey on the far outside, dark-grey main panels, near-white grey inner/dialogue boxes. Inner editing fields use readable saturated purple on near-white; panel labels remain bright metallic purple. Shade individual boxes directly rather than adding blanket background overrides.

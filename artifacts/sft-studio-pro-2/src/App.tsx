@@ -4008,7 +4008,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
+    <div className="sft-app-frame min-h-screen text-slate-100 flex flex-col font-sans">
       {/* Top Banner Navigation */}
       <header className="sft-charcoal border-b border-slate-800">
         <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
