@@ -29,4 +29,4 @@ Use bright metallic-purple writing and dark-grey borders around the whole app.
 
 **Why:** The user explicitly requested this contrast treatment.
 
-**How to apply:** Follow the user's latest correction: light grey on the far outside, solid black main work-area panels, near-white grey inner/dialogue boxes. The explicit request to make the main work area black supersedes the earlier dark-grey instruction for those panels. Inner editing fields use readable saturated purple on near-white; panel labels remain bright metallic purple. Shade individual boxes directly rather than adding blanket background overrides.
+**How to apply:** Follow the user's latest correction: light grey on the far outside, solid black main work-area panels, light-purple main text, and bright-purple writing inside near-white/light-grey inner boxes. These explicit requests supersede the earlier dark-grey panel and saturated main-text directions. Shade individual boxes directly rather than adding blanket background overrides.

@@ -332,14 +332,14 @@ input:disabled {
 .sft-charcoal,
 .sft-panel,
 pre {
-  --heading-ink: #bd58ff;
-  --accent-ink: #bd58ff;
-  --color-slate-50: #c46fff;
-  --color-slate-100: #c46fff;
-  --color-slate-200: #c46fff;
-  --color-slate-300: #c46fff;
-  --color-slate-400: #c46fff;
-  --color-slate-500: #c46fff;
+  --heading-ink: #d6afff;
+  --accent-ink: #d6afff;
+  --color-slate-50: #d6afff;
+  --color-slate-100: #d6afff;
+  --color-slate-200: #d6afff;
+  --color-slate-300: #d6afff;
+  --color-slate-400: #d6afff;
+  --color-slate-500: #d6afff;
   --color-slate-600: #797985;
   --color-slate-700: #5e5e66;
   --color-slate-750: #505057;
@@ -348,7 +348,7 @@ pre {
   --color-slate-900: #2b2b31;
   --color-slate-950: #111114;
   background-color: #222226;
-  color: #c46fff;
+  color: #d6afff;
   color-scheme: dark;
 }
 
@@ -417,15 +417,15 @@ pre {
   border: 2px solid #35353b;
   --field-surface: #f2f2f5;
   --field-ink: #8422d1;
-  --heading-ink: #bd58ff;
-  --accent-ink: #bd58ff;
+  --heading-ink: #d6afff;
+  --accent-ink: #d6afff;
 }
 
 .sft-top-panel-inner {
   background-color: #f2f2f5;
   --accent-ink: #8422d1;
-  --color-slate-200: #2e064a;
-  --color-slate-500: #2e064a;
+  --color-slate-200: #8422d1;
+  --color-slate-500: #8422d1;
 }
 
 .sft-top-control {
