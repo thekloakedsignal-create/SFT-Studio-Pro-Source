@@ -730,8 +730,99 @@
       "representativePrompt": "Explain photosynthesis in simple terms.",
       "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
     },
-    "batches": [],
-    "updatedAt": "2026-10-02T21:19:36.019Z"
+    "batches": [
+      {
+        "id": "d2441308-9818-4685-98e6-c0414cb3b1f8",
+        "batchId": "d2441308-9818-4685-98e6-c0414cb3b1f8",
+        "name": "General Instruction following and explanations",
+        "source": "Generator",
+        "templateType": "Reasoning",
+        "examplesCount": 5,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Explain how a mechanical watch movement keeps time without a battery."
+              },
+              {
+                "role": "assistant",
+                "content": "A mechanical watch keeps time using a wound mainspring that powers a gear train. The escapement and balance wheel work together to regulate the energy release into precise, regular intervals, driving the hands forward at a consistent pace without needing a battery.",
+                "reasoning": "A mechanical watch uses a mainspring to store energy when wound. This energy is released slowly through a gear train. The escapement mechanism regulates the release by locking and unlocking the gear train at precise intervals, typically driven by a balance wheel oscillating back and forth. This controlled release moves the watch hands at a steady rate, keeping time without any electrical power source."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791071424179-0"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Explain the concept of opportunity cost using the example of a student deciding between studying for an exam and going to a concert."
+              },
+              {
+                "role": "assistant",
+                "content": "Opportunity cost is the value of the next best alternative you give up when making a decision. In this scenario, the student has two mutually exclusive options: studying for the exam or attending the concert. If the student chooses to study, the opportunity cost is the enjoyment, social experience, and relaxation they would have gained from the concert. Conversely, if they choose the concert, the opportunity cost is the potential improvement in their exam grade and the long-term academic benefits that come with it. The concept highlights that every choice has a trade-off, and the true \"cost\" of a decision is not just monetary, but the lost benefits of the path not taken.",
+                "reasoning": "I define opportunity cost as the value of the next best alternative forgone. I apply this to the student's choice: studying vs. concert. I identify the benefits of each option (better grade vs. enjoyment). I determine that the opportunity cost of studying is the missed concert experience, and the opportunity cost of the concert is the potential grade improvement. I structure the explanation clearly with the definition, application, and conclusion."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791071424179-1"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Can you explain the difference between a lunar eclipse and a solar eclipse in simple terms?"
+              },
+              {
+                "role": "assistant",
+                "content": "A solar eclipse happens when the Moon passes directly between the Earth and the Sun, blocking the Sun's light from reaching Earth. A lunar eclipse occurs when the Earth passes directly between the Sun and the Moon, casting a shadow on the Moon. In short: solar eclipse = Moon blocks Sun; lunar eclipse = Earth blocks sunlight from Moon. Solar eclipses are only visible from a small path on Earth, while lunar eclipses are visible from anywhere on the night side of Earth.",
+                "reasoning": "I need to explain the key difference between lunar and solar eclipses clearly. A solar eclipse happens when the Moon blocks the Sun from Earth's view, while a lunar eclipse occurs when Earth blocks sunlight from reaching the Moon. I'll structure the answer by defining each event, stating the alignment of celestial bodies, and noting visibility differences."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791071424179-2"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Explain the mechanism of a quantum computer's qubit superposition and how it differs from classical bits."
+              },
+              {
+                "role": "assistant",
+                "content": "A classical bit is strictly either 0 or 1 at any moment. A qubit, by contrast, can exist in a superposition—a complex linear combination—of the |0⟩ and |1⟩ states simultaneously. This superposition allows a quantum computer to process a vast number of possibilities in parallel. When measured, the qubit collapses probabilistically to either 0 or 1. Additionally, qubits can become entangled, creating correlations stronger than any classical correlation, and quantum interference can amplify correct computational paths while canceling incorrect ones—features that give quantum algorithms their potential speedup over classical counterparts.",
+                "reasoning": "First, define classical bits as binary states (0 or 1). Then, explain qubits as quantum two-level systems that can exist in a linear combination of basis states, enabling superposition. Highlight that measurement collapses the superposition to a definite state, unlike classical bits which are always definite. Mention entanglement and interference as key quantum resources that have no classical analogue."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791071424179-3"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "I've been hearing a lot about 'economies of scope' lately. Could you explain what this concept means in business and how it differs from economies of scale, perhaps with a real-world example?"
+              },
+              {
+                "role": "assistant",
+                "content": "Economies of scope refer to the cost advantage a business gains by producing a wider variety of products together rather than separately. It occurs when the joint production cost is less than the sum of stand-alone costs for each product. \n\nThis differs from **economies of scale**, which describe cost savings achieved by increasing the production volume of a *single* product (spreading fixed costs over more units). Economies of scope are about *variety*; economies of scale are about *volume*.\n\n**Real-world example:** A major automotive manufacturer like Toyota. By producing sedans, SUVs, and trucks on shared platforms (using common chassis, engines, and electronics), they reduce the average cost per vehicle across the lineup compared to building dedicated factories and supply chains for each distinct model.",
+                "reasoning": "I will define economies of scope, contrast it with economies of scale, and provide a concrete real-world example. First, I define economies of scope as cost advantages from producing a variety of products together rather than separately. Next, I distinguish it from economies of scale, which are cost advantages from increasing the volume of a single product. Finally, I select a clear real-world example: a large automaker producing cars, trucks, and SUVs on shared platforms to illustrate scope economies."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791071424179-4"
+          }
+        ],
+        "status": "Pending",
+        "timestamp": "2026-10-03 23:50:24.179Z",
+        "description": "General Instruction following and explanations",
+        "specialInstructions": "Prioritize clear, informative, and direct explanations.",
+        "temporaryConstraints": "None"
+      }
+    ],
+    "updatedAt": "2026-10-03T23:50:24.248Z"
   },
   {
     "id": "project-1790742482031",
