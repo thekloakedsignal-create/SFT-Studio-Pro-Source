@@ -164,3 +164,86 @@ pre, code, kbd, samp, .font-mono {
 }
 .kk-dark textarea, .kk-dark input:not([type="checkbox"]):not([type="radio"]) { color: #e2cde0 !important; }
 .kk-dark .custom-scrollbar::-webkit-scrollbar-thumb, .kk-dark.custom-scrollbar::-webkit-scrollbar-thumb { background: #4a454d; }
+
+/* Work surface: layered charcoal with high-contrast ivory text and mauve accents */
+.sft-workspace {
+  --color-white: #f5f0eb;
+  --color-black: #141216;
+  --color-gray-50: #26232a;
+  --color-gray-100: #302c34;
+  --color-slate-50: #f7f2ee;
+  --color-slate-100: #ece6e9;
+  --color-slate-200: #ded6dc;
+  --color-slate-300: #d2c9d1;
+  --color-slate-400: #c0b6c1;
+  --color-slate-500: #a99fac;
+  --color-slate-600: #8e8492;
+  --color-slate-700: #716875;
+  --color-slate-750: #514b56;
+  --color-slate-800: #433e47;
+  --color-slate-850: #302c34;
+  --color-slate-900: #242128;
+  --color-slate-950: #19171c;
+  --color-emerald-50: #f7eff6;
+  --color-emerald-100: #efe1ed;
+  --color-emerald-200: #e2cde0;
+  --color-emerald-300: #e2cde0;
+  --color-emerald-400: #d4b6d2;
+  --color-emerald-500: #c29fc0;
+  --color-emerald-600: #b18cad;
+  --color-emerald-700: #a17a9d;
+  --color-emerald-800: #4a354c;
+  --color-emerald-900: #38293a;
+  --color-blue-50: #f7eff6;
+  --color-blue-100: #efe1ed;
+  --color-blue-200: #e2cde0;
+  --color-blue-300: #e2cde0;
+  --color-blue-400: #d4b6d2;
+  --color-blue-500: #c29fc0;
+  --color-blue-600: #b18cad;
+  --color-blue-700: #a17a9d;
+  --color-blue-800: #4a354c;
+  --color-blue-900: #38293a;
+  --color-purple-300: #e2cde0;
+  --color-purple-400: #d4b6d2;
+  --color-purple-500: #c29fc0;
+  --color-purple-600: #b18cad;
+  --color-purple-800: #4a354c;
+  --color-purple-950: #38293a;
+  background-color: #242128;
+  color: #f0eaf0;
+}
+
+.sft-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+.sft-workspace textarea,
+.sft-workspace select {
+  color: #f1eaf1 !important;
+  background-color: #19171c;
+  border-color: #65586a;
+}
+
+.sft-workspace [class*="text-slate-700"] {
+  color: #b5acb9 !important;
+}
+
+.sft-workspace input::placeholder,
+.sft-workspace textarea::placeholder {
+  color: #aaa0ad !important;
+  opacity: 1;
+}
+
+.sft-workspace input:focus,
+.sft-workspace textarea:focus,
+.sft-workspace select:focus {
+  border-color: #c29fc0;
+  outline: 2px solid rgb(194 159 192 / 28%);
+  outline-offset: 1px;
+}
+
+.sft-workspace .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #65586a;
+}
+
+.sft-workspace .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #9d7e9d;
+}
