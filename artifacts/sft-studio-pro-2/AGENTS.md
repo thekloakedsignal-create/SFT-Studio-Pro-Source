@@ -16,4 +16,4 @@
 
 4. **Data Registry Approval Policy**:
    - All generated, converted, or imported batches MUST start with `status: "Pending"` and must NOT be added to the active Data Registry until explicitly reviewed and approved by the user.
-   - **Exception**: TRiAD alignment batches are pre-aligned preference sets and are the ONLY batches that enter the Data Registry directly as `Approved`.
+   - **Exception**: TRiAD URL-import batches are the ONLY batches that enter the Data Registry directly as `Approved`.

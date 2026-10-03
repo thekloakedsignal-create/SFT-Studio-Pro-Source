@@ -1046,72 +1046,6 @@ function createModelGenerationStacks(
   return stacks;
 }
 
-// Helper to expand examples to requested sizes (150, 300, 750)
-function expandTRiADExamples(count: number, systemPrompt: string, templateType: string = "Single Turn", instructTemplate: string = "ChatML") {
-  const result: any[] = [];
-  for (let i = 0; i < count; i++) {
-    const base = BASE_TRIAD_EXAMPLES[i % BASE_TRIAD_EXAMPLES.length];
-    
-    let messages: any[] = [];
-    if (templateType === "Reasoning") {
-      messages = [
-        { role: "user", content: base.prompt },
-        {
-          role: "assistant",
-          reasoning: `Analyzing alignment principles for the given query:
-- Freedom (Autonomy): Respect the user's agency and self-direction. Avoid unsolicited preachy or lecturing tones.
-- Truth (Accuracy): Provide objective, clear-eyed realism and clear parameters.
-- Kindness (Compassion): Maintain a constructive, supportive, and non-coercive tone.
-Balancing all three yields a helpful response that supports voluntary choice and respectful feedback.`,
-          content: base.response_helpful
-        }
-      ];
-    } else if (templateType === "Multi Turn") {
-      messages = [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: base.prompt },
-        { role: "assistant", content: base.response_helpful },
-        { role: "user", content: "How do these choices balance autonomy and care?" },
-        { role: "assistant", content: "Autonomy ensures that you hold final authority over your choices and limits. Care ensures that you approach others with patience, empathy, and active listening. Balancing both allows boundaries to exist without creating conflict." }
-      ];
-    } else if (templateType === "Instruction Template") {
-      if (instructTemplate === "Alpaca") {
-        messages = [
-          { role: "system", content: systemPrompt || "You are a helpful assistant." },
-          { role: "user", content: `### Instruction:\n${base.prompt}` },
-          { role: "assistant", content: `### Response:\n${base.response_helpful}` }
-        ];
-      } else if (instructTemplate === "Mistral") {
-        messages = [
-          { role: "system", content: systemPrompt || "You are a helpful assistant." },
-          { role: "user", content: `[INST] ${base.prompt} [/INST]` },
-          { role: "assistant", content: base.response_helpful }
-        ];
-      } else {
-        // ChatML default: <|im_start|>system...<|im_end|><|im_start|>user...<|im_end|><|im_start|>assistant...<|im_end|>
-        messages = [
-          { role: "system", content: systemPrompt || "You are a helpful assistant." },
-          { role: "user", content: base.prompt },
-          { role: "assistant", content: base.response_helpful }
-        ];
-      }
-    } else {
-      // Default: Single Turn
-      messages = [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: base.prompt },
-        { role: "assistant", content: base.response_helpful }
-      ];
-    }
-
-    result.push({
-      id: `triad-${i + 1}`,
-      messages
-    });
-  }
-  return result;
-}
-
 // API Routes
 
 type GenerationJob = {
@@ -4215,19 +4149,23 @@ function parseCsvToExamples(csvText: string): any[] {
   // Parse header
   const headers = parseCsvRow(lines[0]);
   const promptIdx = headers.findIndex(h => /prompt|instruction|input/i.test(h));
-  const helpfulIdx = headers.findIndex(h => /helpful|response_helpful|response|output/i.test(h));
+  const responseIdx = headers.findIndex(
+    h => !/harmful|rejected|negative/i.test(h) && /helpful|response|output|answer|completion/i.test(h)
+  );
+  if (promptIdx === -1 || responseIdx === -1) return [];
 
   const examples: any[] = [];
   for (let i = 1; i < lines.length; i++) {
     const row = parseCsvRow(lines[i]);
     if (row.length === 0 || row.join("").trim() === "") continue;
 
-    const promptVal = promptIdx !== -1 && row[promptIdx] ? row[promptIdx] : `Prompt #${i}`;
-    const helpfulVal = helpfulIdx !== -1 && row[helpfulIdx] ? row[helpfulIdx] : "Helpful response.";
+    const promptVal = row[promptIdx]?.trim();
+    const responseVal = row[responseIdx]?.trim();
+    if (!promptVal || !responseVal) continue;
 
     examples.push({
       prompt: promptVal,
-      response_helpful: helpfulVal
+      response: responseVal
     });
   }
 
@@ -4296,41 +4234,47 @@ async function fetchDatasetFromUrl(url: string, size: number, systemPrompt: stri
     parsedExamples = parseCsvToExamples(responseText);
   }
 
-  // 4. Fallback to raw lines if everything else fails
   if (parsedExamples.length === 0) {
-    parsedExamples = lines.map((line) => ({
-      prompt: line,
-      response_helpful: `Helpful response addressing: ${line}`
-    }));
+    throw new Error("The dataset must be JSON, JSONL, or CSV with complete prompt and response fields.");
   }
 
   const result: any[] = [];
-  for (let i = 0; i < size; i++) {
-    const base = parsedExamples[i % parsedExamples.length];
+  for (let i = 0; i < Math.min(size, parsedExamples.length); i++) {
+    const base = parsedExamples[i];
     if (!base) continue;
 
     let messages: any[] = [];
     if (base.messages && Array.isArray(base.messages)) {
       // Filter out any pre-existing system messages, then prepend the dynamic user-configured systemPrompt
-      const cleanMessages = base.messages.filter((m: any) => m.role !== "system");
+      const cleanMessages = base.messages.filter(
+        (m: any) => m && m.role !== "system" && typeof m.content === "string" && m.content.trim()
+      );
+      const hasUserMessage = cleanMessages.some((m: any) => m.role === "user");
+      const hasAssistantMessage = cleanMessages.some((m: any) => m.role === "assistant");
+      if (!hasUserMessage || !hasAssistantMessage) continue;
       messages = [
         { role: "system", content: systemPrompt || "You are SFT Studio Pro, a helpful assistant." },
         ...cleanMessages
       ];
     } else {
-      const prompt = base.prompt || base.instruction || base.input || `Example Prompt #${i + 1}`;
-      const helpful = base.response_helpful || base.helpful || base.response || base.output || "Aligned response.";
+      const prompt = base.prompt || base.instruction || base.input;
+      const response = base.response || base.output || base.answer || base.completion || base.response_helpful || base.helpful;
+      if (typeof prompt !== "string" || !prompt.trim() || typeof response !== "string" || !response.trim()) continue;
       messages = [
         { role: "system", content: systemPrompt || "You are SFT Studio Pro, a helpful assistant." },
         { role: "user", content: prompt },
-        { role: "assistant", content: helpful }
+        { role: "assistant", content: response }
       ];
     }
 
     result.push({
-      id: `triad-${i + 1}`,
+      id: `triad-${result.length + 1}`,
       messages
     });
+  }
+
+  if (result.length === 0) {
+    throw new Error("The dataset contains no complete prompt/response examples.");
   }
 
   return result;
@@ -4338,20 +4282,19 @@ async function fetchDatasetFromUrl(url: string, size: number, systemPrompt: stri
 
 // 4. TRiAD Alignment Import
 app.post("/api/triad-generate", async (req, res) => {
-  const { systemPrompt, size, templateType, instructTemplate, customUrl } = req.body;
+  const { systemPrompt, size, customUrl } = req.body;
   const count = parseInt(size) || 150;
-  
+  const datasetUrl = typeof customUrl === "string" ? customUrl.trim() : "";
+  if (!/^https?:\/\//i.test(datasetUrl)) {
+    return res.status(400).json({ success: false, error: "A dataset URL is required." });
+  }
+
   try {
-    let examples;
-    if (customUrl && customUrl.trim().startsWith("http")) {
-      examples = await fetchDatasetFromUrl(customUrl, count, systemPrompt);
-    } else {
-      examples = expandTRiADExamples(count, systemPrompt, templateType, instructTemplate || "ChatML");
-    }
-    res.json({ success: true, count: examples.length, examples });
+    const examples = await fetchDatasetFromUrl(datasetUrl, count, systemPrompt);
+    return res.json({ success: true, count: examples.length, examples });
   } catch (err: any) {
     console.error("TRiAD alignment import error:", err);
-    res.status(500).json({ success: false, error: err.message || err });
+    return res.status(500).json({ success: false, error: err.message || err });
   }
 });
 

@@ -2742,9 +2742,14 @@ export default function App() {
       setNotification({ text: "Project definition must be saved and locked before importing TRiAD datasets.", type: "error" });
       return;
     }
+    const datasetUrl = triadUrls[triadSize]?.trim();
+    if (!datasetUrl) {
+      setNotification({ text: "Enter a dataset URL before importing.", type: "error" });
+      return;
+    }
     if (!checkGenerationLimit(triadSize)) return;
     setIsTriadImporting(true);
-    setNotification({ text: `Injecting project's System Prompt into ${triadSize} TRiAD examples...`, type: "info" });
+    setNotification({ text: `Importing up to ${triadSize} examples from the dataset URL...`, type: "info" });
 
     try {
       const res = await fetch("/api/triad-generate", {
@@ -2753,9 +2758,7 @@ export default function App() {
         body: JSON.stringify({
           systemPrompt: project.systemPrompt,
           size: triadSize,
-          templateType: triadTemplate,
-          instructTemplate: project.instructTemplate || InstructTemplate.CHATML,
-          customUrl: triadUrls[triadSize]
+          customUrl: datasetUrl
         })
       });
 
@@ -2765,14 +2768,14 @@ export default function App() {
         const newBatch: SFTBatch = {
           id: generatedBatchId,
           batchId: generatedBatchId,
-          name: `TRiAD Alignment Dataset (${triadSize}x)`,
+          name: `TRiAD Alignment Dataset (${data.examples.length}x)`,
           source: "TRiAD Alignment",
           templateType: triadTemplate,
           examplesCount: data.examples.length,
           examples: data.examples,
           status: "Approved", // TRiAD goes straight in
           timestamp: new Date().toISOString().slice(0, 16).replace("T", " "),
-          description: "Alignment reinforcement preferences."
+          description: "Imported from an external dataset URL."
         };
 
         setBatches(prev => [...prev, newBatch]);
@@ -6050,48 +6053,22 @@ export default function App() {
                       <div className="flex items-center justify-between">
                         <h2 className="text-base font-bold text-white flex items-center gap-2">
                           <ShieldAlert className="h-5 w-5 text-amber-400" />
-                          TRiAD Core Foundation
+                          Import TRiAD Dataset
                         </h2>
                         <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full font-mono uppercase font-semibold">
-                          Optional
+                          External source
                         </span>
                       </div>
                       <p className="text-xs text-slate-200 font-medium mt-1">
-                        Establish your model’s behavioral foundation before domain-specific training.
+                        Import examples from your own hosted dataset.
                       </p>
                     </div>
 
-                    {/* Prebuilt libraries section */}
+                    {/* External dataset requirements */}
                     <div className="bg-slate-900/40 border border-slate-800/60 p-4 rounded-xl mb-6">
                       <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-                        The optional TRiAD Core dataset provides a balanced supervised learning foundation built on the three core principles of Freedom, Truth, and Kindness. Rather than acting as a post-training control layer, these examples become part of the model’s initial training corpus, helping establish stable behavioral patterns from the beginning.
+                        Provide a URL to a CSV, JSON, or JSONL dataset with complete prompt and response examples. The importer uses source records only; it does not generate fallback examples or repeat records to fill the selected size.
                       </p>
-                      
-                      <h4 className="text-[11px] font-semibold text-slate-200 mb-2">
-                        This optional dataset includes:
-                      </h4>
-                      <div className="space-y-1.5 text-[11px] text-slate-300 font-sans">
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-amber-400 font-bold">•</span>
-                          <span><strong>Freedom foundation:</strong> Agency, choice-awareness, and refusal to coerce</span>
-                        </div>
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-amber-400 font-bold">•</span>
-                          <span><strong>Truth foundation:</strong> Intellectual honesty, factuality, and transparent epistemic calibration</span>
-                        </div>
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-amber-400 font-bold">•</span>
-                          <span><strong>Kindness foundation:</strong> Constructive helpfulness, dignity, and benevolent engagement</span>
-                        </div>
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-amber-400 font-bold">•</span>
-                          <span><strong>Integrated FTK:</strong> Multi-dimensional balance scenarios resolving potential friction points</span>
-                        </div>
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-amber-400 font-bold">•</span>
-                          <span><strong>Dynamic Prompt Injection:</strong> Automatic injection of your project’s system prompt into every training record</span>
-                        </div>
-                      </div>
                     </div>
 
                     {/* Pre-script injection visualizer */}
@@ -6110,7 +6087,7 @@ export default function App() {
 
                     {/* TRiAD Template Selection */}
                     <div className="mb-5">
-                      <label className="block text-xs font-semibold text-slate-300 mb-2">Target Alignment Template Format</label>
+                        <label className="block text-xs font-semibold text-slate-300 mb-2">Batch Template Type</label>
                       {project.projectFormat === ProjectFormat.INSTRUCTION ? (
                         <div className="p-3 bg-purple-950/20 border border-purple-800/40 rounded-xl flex flex-wrap items-center justify-between gap-2 overflow-hidden min-w-0">
                           <div className="flex items-center gap-2 min-w-0">
@@ -6147,13 +6124,13 @@ export default function App() {
                         </div>
                       )}
                       <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
-                        Forces the pre-generated alignment corpus to structure itself cleanly under this schema, with your system prompt injected dynamically.
+                        Records the selected batch type; imported source messages are preserved.
                       </p>
                     </div>
 
                     {/* Sizes Selection */}
                     <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-2">Available Import Size</label>
+                        <label className="block text-xs font-semibold text-slate-300 mb-2">Maximum Import Size</label>
                       <div className="grid grid-cols-3 gap-2 mb-4">
                         {[150, 300, 750].map((size) => (
                           <button
@@ -6174,18 +6151,19 @@ export default function App() {
                       {/* Custom URL Input */}
                       <div className="bg-slate-900/40 border border-slate-800 p-3.5 rounded-xl">
                         <label className="block text-[11px] font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
-                          <span>Google Drive or Web URL for {triadSize}x Dataset</span>
-                          <span className="text-[9px] text-slate-500 font-normal italic">Optional fallback to built-in set</span>
+                          <span>Dataset URL for up to {triadSize} examples</span>
+                          <span className="text-[9px] text-slate-500 font-normal italic">Required</span>
                         </label>
                         <input
                           type="url"
                           placeholder="https://drive.google.com/file/d/.../view"
+                          required
                           value={triadUrls[triadSize] || ""}
                           onChange={(e) => setTriadUrls(prev => ({ ...prev, [triadSize]: e.target.value }))}
                           className="w-full text-xs font-mono bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-300 focus:outline-none focus:border-amber-500/50"
                         />
                         <p className="text-[9px] text-slate-500 mt-1 leading-relaxed">
-                          Enter your Google Drive file shareable link or a CSV/JSON download URL containing the unique, real datasets.
+                          Enter a Google Drive share link or a direct CSV, JSON, or JSONL download URL.
                         </p>
                       </div>
                     </div>
@@ -6194,10 +6172,10 @@ export default function App() {
                   <div className="border-t border-slate-800/60 pt-5 mt-6 flex items-center justify-between">
                     <span className="text-xs text-slate-500">You may skip this step entirely</span>
                     <button
-                      disabled={isTriadImporting || isFieldsUnlocked || !selectedProjectId}
+                      disabled={isTriadImporting || isFieldsUnlocked || !selectedProjectId || !triadUrls[triadSize]?.trim()}
                       onClick={handleTriadImport}
                       className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
-                        isFieldsUnlocked || !selectedProjectId
+                        isFieldsUnlocked || !selectedProjectId || !triadUrls[triadSize]?.trim()
                           ? "bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed opacity-60"
                           : "bg-amber-500 hover:bg-amber-600 text-slate-950"
                       }`}
@@ -6205,13 +6183,15 @@ export default function App() {
                       {isTriadImporting ? (
                         <>
                           <RefreshCw className="h-4 w-4 animate-spin text-slate-950" />
-                          <span>Injecting & Importing...</span>
+                          <span>Importing Dataset...</span>
                         </>
                       ) : (isFieldsUnlocked || !selectedProjectId) ? (
                         <>
                           <Lock className="h-4 w-4 text-slate-500" />
                           <span>Import Locked (Save & Lock First)</span>
                         </>
+                      ) : !triadUrls[triadSize]?.trim() ? (
+                        <span>Enter Dataset URL</span>
                       ) : (
                         <>
                           <PlusCircle className="h-4 w-4 text-slate-950" />
