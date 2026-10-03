@@ -2173,9 +2173,7 @@ export default function App() {
                 serverBatchId = data.batchId || data.id;
               }
               if (data.partial === true) {
-                partialReason = typeof data.partialReason === "string" && data.partialReason.trim()
-                  ? data.partialReason
-                  : "One or more model requests did not finish.";
+                partialReason = "Some examples could not be generated.";
               }
               return data.examples;
             } else {
@@ -2261,7 +2259,7 @@ export default function App() {
         });
       }
     } catch (err: any) {
-      setNotification({ text: `Synthesis Error: ${err.message || err}`, type: "error" });
+      setNotification({ text: "Generation failed. Please try again.", type: "error" });
     } finally {
       setIsGenerating(false);
       setTimeout(() => setGenerationProgress(null), 3000);
@@ -5201,7 +5199,6 @@ export default function App() {
                               <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                               <span>
                                 Saved {latestGeneratorBatch.examples.length} of {latestGeneratorBatch.requestedExamples || latestGeneratorBatch.examples.length} requested examples.
-                                {latestGeneratorBatch.partialReason ? ` ${latestGeneratorBatch.partialReason}` : ""}
                               </span>
                             </div>
                           )}
