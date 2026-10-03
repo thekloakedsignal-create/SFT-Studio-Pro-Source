@@ -4068,7 +4068,7 @@ export default function App() {
                 {/* Left: Live example stats */}
                 <div className="flex items-center gap-1.5 shrink-0 text-[11px]">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span className="text-slate-200 font-bold">{registryStats.total}</span>
+                  <span className="kk-neon-example-count">{registryStats.total}</span>
                   <span className="text-slate-500">ex.</span>
                 </div>
 
@@ -4365,7 +4365,7 @@ export default function App() {
               <div className="space-y-1.5 font-mono text-[11px]">
                 <div className="flex justify-between text-slate-400">
                   <span>Total Examples:</span>
-                  <span className="text-slate-200 font-bold">{registryStats.total}</span>
+                  <span className="kk-neon-example-count">{registryStats.total}</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Pending Approval:</span>
@@ -5261,10 +5261,10 @@ export default function App() {
                         items={latestGeneratorBatch.examples}
                         title="Generated SFT Examples"
                         renderItem={(ex: SFTExample, exIdx: number) => (
-                          <div key={exIdx} className="bg-slate-900/50 border border-slate-800/70 rounded-xl p-3 sm:p-4 relative overflow-hidden group">
+                          <div key={exIdx} className="bg-slate-900/50 border border-slate-800/70 rounded-xl p-3 sm:p-4 relative overflow-hidden group kk-example-card">
                             {/* Example Header with Controls */}
                             <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-slate-800/60">
-                              <span className="font-mono text-xs font-bold text-slate-300">
+                              <span className="font-mono text-xs font-bold kk-example-label">
                                 Example #{exIdx + 1}
                               </span>
                               <div className="flex items-center gap-1.5">
@@ -5951,10 +5951,10 @@ export default function App() {
                         items={latestDocBatch.examples}
                         title="Converted SFT Examples"
                         renderItem={(ex: SFTExample, exIdx: number) => (
-                          <div key={exIdx} className="bg-slate-900/50 border border-slate-800/70 rounded-xl p-3 sm:p-4 relative overflow-hidden group">
+                          <div key={exIdx} className="bg-slate-900/50 border border-slate-800/70 rounded-xl p-3 sm:p-4 relative overflow-hidden group kk-example-card">
                             {/* Example Header with Controls */}
                             <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-slate-800/60">
-                              <span className="font-mono text-xs font-bold text-slate-300">
+                              <span className="font-mono text-xs font-bold kk-example-label">
                                 Example #{exIdx + 1}
                               </span>
                               <div className="flex items-center gap-1.5">
@@ -6242,10 +6242,10 @@ export default function App() {
                         items={latestTriadBatch.examples}
                         title="TRiAD Alignment Examples"
                         renderItem={(ex: SFTExample, exIdx: number) => (
-                          <div key={exIdx} className="bg-slate-900/50 border border-slate-800/70 rounded-xl p-3 sm:p-4 relative overflow-hidden group">
+                          <div key={exIdx} className="bg-slate-900/50 border border-slate-800/70 rounded-xl p-3 sm:p-4 relative overflow-hidden group kk-example-card">
                             {/* Example Header with Controls */}
                             <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-slate-800/60">
-                              <span className="font-mono text-xs font-bold text-slate-300">
+                              <span className="font-mono text-xs font-bold kk-example-label">
                                 Example #{exIdx + 1}
                               </span>
                               <div className="flex items-center gap-1.5">
@@ -6676,12 +6676,12 @@ export default function App() {
                           return (
                             <div
                               key={`batch-${currentBatch.id}-ex-${originalIndex}`}
-                              className={`rounded-xl p-4 relative overflow-hidden group border transition-all duration-300 ${borderClass} ${bgClass} ${ringClass}`}
+                              className={`rounded-xl p-4 relative overflow-hidden group border transition-all duration-300 kk-example-card ${borderClass} ${bgClass} ${ringClass}`}
                             >
                               {/* Header with Example # and actions */}
                               <div className="flex items-center justify-between mb-3 border-b border-slate-800/60 pb-2">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-mono text-xs font-bold text-slate-300">
+                                  <span className="font-mono text-xs font-bold kk-example-label">
                                     Example #{originalIndex + 1}
                                   </span>
                                   {isFlagged ? (
