@@ -111,10 +111,12 @@ test("reasoning is retained only in supported templates; user/system text is pre
 
 test("strict tagged reasoning validation is optional and applies only to Reasoning", () => {
   const valid = {
-    messages: [
-      { role: "user", content: "Q" },
-      { role: "assistant", content: "### Response:\n<think>Check the format.</think>\nA complete answer." }
-    ]
+    examples: [{
+      messages: [
+        { role: "user", content: "Q" },
+        { role: "assistant", content: "### Response:\n<think>Check the format.</think>\nA complete answer." }
+      ]
+    }]
   };
   const strictOptions = { requireThinkTaggedReasoning: true };
   const parsed = parseGeneratedExamples(JSON.stringify(valid), "Reasoning", strictOptions);
@@ -122,23 +124,28 @@ test("strict tagged reasoning validation is optional and applies only to Reasoni
   assert.equal(parsed[0].messages[1].reasoning, "Check the format.");
   assert.equal(parsed[0].messages[1].content, "### Response:\n\nA complete answer.");
 
-  for (const content of [
-    "A plain answer without a trace.",
-    "<think> </think>\nAn answer after an empty trace.",
-    "<think>Trace without a final answer.</think>",
-    "Unrequested preamble.\n<think>Trace.</think>\nAnswer.",
-    "<think>Trace.</think>\nAnswer.\n<think>Second trace.</think>"
+  const invalidExamples = [
+    { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "A plain answer without a trace." }] },
+    { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "<think> </think>\nAnswer." }] },
+    { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "<think>Trace without a final answer.</think>" }] },
+    { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "Unrequested preamble.\n<think>Trace.</think>\nAnswer." }] },
+    { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "<think>Trace.</think>\nAnswer.\n<think>Second trace.</think>" }] },
+    { messages: [{ role: "system", content: "No system message." }, { role: "user", content: "Q" }, { role: "assistant", content: "<think>Trace.</think>\nAnswer." }] },
+    { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "<think>Trace.</think>\nAnswer." }, { role: "assistant", content: "<think>Extra turn.</think>\nAnswer." }] },
+    { messages: [{ role: "human", content: "Q" }, { role: "gpt", content: "<think>Trace.</think>\nAnswer." }] },
+    { messages: [{ role: "user", content: "Q" }, { role: "assistant", reasoning: "Separate field.", content: "<think>Trace.</think>\nAnswer." }] },
+    { messages: [{ role: "user", content: "Q" }, { role: "assistant", content: "<think>Trace.</think>\nAnswer." }], extra: true }
+  ];
+  for (const example of invalidExamples) {
+    assert.deepEqual(parseGeneratedExamples(JSON.stringify({ examples: [example] }), "Reasoning", strictOptions), []);
+  }
+  for (const nonContractResponse of [
+    JSON.stringify(valid.examples),
+    JSON.stringify({ data: valid.examples }),
+    `\`\`\`json\n${JSON.stringify(valid)}\n\`\`\``,
+    `${JSON.stringify(valid)}\n${JSON.stringify(valid)}`
   ]) {
-    const example = {
-      messages: [
-        { role: "user", content: "Q" },
-        { role: "assistant", content }
-      ]
-    };
-    assert.deepEqual(
-      parseGeneratedExamples(JSON.stringify(example), "Reasoning", strictOptions),
-      []
-    );
+    assert.deepEqual(parseGeneratedExamples(nonContractResponse, "Reasoning", strictOptions), []);
   }
 
   const untagged = {

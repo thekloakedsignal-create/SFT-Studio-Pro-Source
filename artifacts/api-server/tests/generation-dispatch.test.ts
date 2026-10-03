@@ -157,7 +157,11 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       }));
       const content = mode === "invalid" && isPrimary
         ? "This is prose, not a JSON training example."
-        : JSON.stringify({ examples: [{ messages: [] }, ...requestedExamples] });
+        : JSON.stringify({
+            examples: isReasoning
+              ? requestedExamples
+              : [{ messages: [] }, ...requestedExamples]
+          });
       const response = status === 200
         ? { choices: [{ message: { content: [
           { type: "text", text: content.slice(0, 30) }, { type: "text", text: content.slice(30) }
@@ -235,9 +239,11 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   }
   const prompt = f.calls[0].messages.find((message: any) => message.role === "user").content;
   assert.match(prompt, /selected TEMPLATE TYPE: "Reasoning"/);
+  assert.match(prompt, /Each example must contain exactly two messages, in order: one user message, then one assistant message/);
+  assert.match(prompt, /exactly one non-empty <think>\.\.\.<\/think> block followed by a non-empty final answer/);
   assert.match(prompt, /Return them as one JSON object with an "examples" array/);
   assert.doesNotMatch(prompt, /Return them as a JSON array of examples/);
-  assert.ok(f.calls.every(call => call.response_format.type === "json_object"));
+  assert.ok(f.calls.every(call => call.response_format.type === "json_object" && call.reasoning_effort === "medium"));
 
   const systemPrompt = f.calls[0].messages.find((message: any) => message.role === "system").content;
   const schemaPrefix = "Return valid JSON that matches this schema: ";
@@ -245,7 +251,15 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   assert.notEqual(schemaOffset, -1);
   const responseSchema = JSON.parse(systemPrompt.slice(schemaOffset + schemaPrefix.length));
   assert.equal(String(responseSchema.type).toLowerCase(), "object");
+  assert.equal(responseSchema.additionalProperties, false);
   assert.equal(String(responseSchema.properties.examples.type).toLowerCase(), "array");
+  assert.equal(responseSchema.properties.examples.minItems, 1);
+  assert.equal(responseSchema.properties.examples.maxItems, 1);
+  const messagesSchema = responseSchema.properties.examples.items.properties.messages;
+  assert.equal(messagesSchema.minItems, 2);
+  assert.equal(messagesSchema.maxItems, 2);
+  assert.deepEqual(Array.from(messagesSchema.prefixItems, (item: any) => item.properties.role.enum[0]), ["user", "assistant"]);
+  assert.match(messagesSchema.prefixItems[1].properties.content.pattern, /<think>/);
 });
 
 test("Reasoning batch jobs reject responses that omit the required think block", async () => {

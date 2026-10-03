@@ -100,46 +100,37 @@ const roleAliases: Record<string, string> = {
 
 function hasThinkTaggedAssistantResponse(example: unknown): boolean {
   if (!isRecord(example)) return false;
+  if (Object.keys(example).some(key => key !== "messages")) return false;
+  if (!Array.isArray(example.messages) || example.messages.length !== 2) return false;
 
-  let rawMessages = example.messages;
-  if (!Array.isArray(rawMessages)) {
-    if (Array.isArray(example.conversations)) {
-      rawMessages = example.conversations;
-    } else {
-      const assistantContent = example.response ?? example.output ?? example.assistant
-        ?? example.completion ?? example.answer;
-      rawMessages = assistantContent === undefined
-        ? []
-        : [{ role: "assistant", content: assistantContent }];
-    }
-  }
+  const [userMessage, assistantMessage] = example.messages;
+  if (!isRecord(userMessage) || !isRecord(assistantMessage)) return false;
+  if (
+    Object.keys(userMessage).some(key => key !== "role" && key !== "content")
+    || Object.keys(assistantMessage).some(key => key !== "role" && key !== "content")
+    || userMessage.role !== "user"
+    || assistantMessage.role !== "assistant"
+    || typeof userMessage.content !== "string"
+    || !userMessage.content.trim()
+    || typeof assistantMessage.content !== "string"
+  ) return false;
 
-  const assistantMessages = rawMessages.filter((message: any) => {
-    const rawRole = isRecord(message) ? message.role ?? message.from : undefined;
-    return typeof rawRole === "string"
-      && (roleAliases[rawRole.toLowerCase()] || rawRole) === "assistant";
-  });
-  if (assistantMessages.length === 0) return false;
+  const content = assistantMessage.content;
+  const thinkBlocks = Array.from(content.matchAll(/<think>([\s\S]*?)<\/think>/gi));
+  if (thinkBlocks.length !== 1) return false;
 
-  return assistantMessages.every((message: any) => {
-    const rawContent = isRecord(message) ? message.content ?? message.value : message;
-    const content = normalizeMessageText(rawContent);
-    const thinkBlocks = Array.from(content.matchAll(/<think>([\s\S]*?)<\/think>/gi));
-    if (thinkBlocks.length !== 1) return false;
+  const [thinkBlock] = thinkBlocks;
+  const thinkStart = thinkBlock.index;
+  if (thinkStart === undefined || !thinkBlock[1].trim()) return false;
 
-    const [thinkBlock] = thinkBlocks;
-    const thinkStart = thinkBlock.index;
-    if (thinkStart === undefined || !thinkBlock[1].trim()) return false;
+  const prefix = content.slice(0, thinkStart).trim();
+  if (prefix && !/^###\s*Response:\s*$/i.test(prefix)) return false;
 
-    const prefix = content.slice(0, thinkStart).trim();
-    if (prefix && !/^###\s*Response:\s*$/i.test(prefix)) return false;
-
-    const answer = content
-      .slice(thinkStart + thinkBlock[0].length)
-      .replace(/(?:<\/s>|<\|im_end\|>)+\s*$/gi, "")
-      .trim();
-    return answer.length > 0;
-  });
+  const answer = content
+    .slice(thinkStart + thinkBlock[0].length)
+    .replace(/(?:<\/s>|<\|im_end\|>)+\s*$/gi, "")
+    .trim();
+  return answer.length > 0;
 }
 
 export function sanitizeMessage(msg: any, templateType?: string): { role: string; content: string; reasoning?: string } {
@@ -278,8 +269,28 @@ export function parseGeneratedExamples(
   const regions = fenced.length > 0 ? fenced.map(match => match[1].trim()) : [text];
   const requireThinkTaggedReasoning = options.requireThinkTaggedReasoning === true
     && templateType === "Reasoning";
+
+  if (requireThinkTaggedReasoning) {
+    if (fenced.length > 0) return [];
+    let batch: unknown;
+    try {
+      batch = JSON.parse(text);
+    } catch {
+      return [];
+    }
+    if (
+      !isRecord(batch)
+      || Object.keys(batch).length !== 1
+      || !Array.isArray(batch.examples)
+      || batch.examples.length === 0
+      || !batch.examples.every(hasThinkTaggedAssistantResponse)
+    ) return [];
+
+    const examples = batch.examples.map(example => sanitizeExample(example, templateType));
+    return examples.every(isValidExample) ? examples : [];
+  }
+
   return regions.flatMap(parseJsonValues).flatMap(unwrapExamples)
-    .filter(example => !requireThinkTaggedReasoning || hasThinkTaggedAssistantResponse(example))
     .map(example => sanitizeExample(example, templateType)).filter(isValidExample);
 }
 

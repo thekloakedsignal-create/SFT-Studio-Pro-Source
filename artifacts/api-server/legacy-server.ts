@@ -883,7 +883,7 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         messages: baseMessages,
         temperature: params.config?.temperature ?? 0.7,
         max_tokens: maxTokensToUse,
-        reasoning_effort: "none",
+        reasoning_effort: params.config?.reasoningEffort ?? "none",
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
       signal: abortSignal
@@ -1381,21 +1381,60 @@ app.post("/api/generate", async (req, res) => {
       "Single Turn";
     const reasoningFormatInstruction = `
 REASONING TEMPLATE FORMAT:
-- Every assistant response in this Reasoning batch must contain exactly one non-empty <think>...</think> block followed by a non-empty final answer.
-- Required shape: "<think>\n[Concise explanation of the key reasoning steps]\n</think>\n[Final answer]".
+- Return exactly one JSON object with only an "examples" array.
+- Each example must contain exactly two messages, in order: one user message, then one assistant message. Do not include system messages, extra turns, or extra properties.
+- The assistant message's "content" must contain exactly one non-empty <think>...</think> block followed by a non-empty final answer.
+- Required assistant content shape: "<think>\n[Concise explanation of the key reasoning steps]\n</think>\n[Final answer]".
 - Preserve required instruction markers; for Alpaca, keep "### Response:" before the <think> block.
-- Return the batch as one JSON object with an "examples" array. Do not return a top-level array.
 - Formatting example:
 {"examples":[{"messages":[{"role":"user","content":"What is 2 + 3?"},{"role":"assistant","content":"<think>\nI add 2 and 3 to get 5.\n</think>\nThe answer is 5."}]}]}
 - Use this only as a formatting example; create new content for the requested task and persona.
 - Never omit either tag, put the final answer inside the tags, or use the format for any template other than Reasoning.
-- Do not emit a separate "reasoning" or "reasoning_content" property.
+- Do not emit separate "reasoning" or "reasoning_content" properties.
 - Keep the selected template's message roles and any required instruction markers.
 `;
 
     // Define response schema to guarantee format
     let schemaProperty: any = {};
-    if (isInstruct) {
+    if (turnMode === "Reasoning") {
+      schemaProperty = {
+        type: Type.OBJECT,
+        properties: {
+          messages: {
+            type: Type.ARRAY,
+            minItems: 2,
+            maxItems: 2,
+            prefixItems: [
+              {
+                type: Type.OBJECT,
+                properties: {
+                  role: { type: Type.STRING, enum: ["user"] },
+                  content: { type: Type.STRING }
+                },
+                required: ["role", "content"],
+                additionalProperties: false
+              },
+              {
+                type: Type.OBJECT,
+                properties: {
+                  role: { type: Type.STRING, enum: ["assistant"] },
+                  content: {
+                    type: Type.STRING,
+                    description: "Exactly one non-empty <think>...</think> block followed by a non-empty final answer. Alpaca may prefix it with ### Response:.",
+                    pattern: "^(?:###\\s*Response:\\s*)?<think>[\\s\\S]*\\S[\\s\\S]*</think>[\\s\\S]*\\S[\\s\\S]*$"
+                  }
+                },
+                required: ["role", "content"],
+                additionalProperties: false
+              }
+            ],
+            items: false
+          }
+        },
+        required: ["messages"],
+        additionalProperties: false
+      };
+    } else if (isInstruct) {
       if (turnMode === "Single Turn" || turnMode === "Multi Turn") {
         schemaProperty = {
           type: Type.OBJECT,
@@ -1415,7 +1454,7 @@ REASONING TEMPLATE FORMAT:
           required: ["messages"]
         };
       } else {
-        // Reasoning or Mixed in Instruct Format
+        // Mixed in Instruct Format
         schemaProperty = {
           type: Type.OBJECT,
           properties: {
@@ -1466,27 +1505,6 @@ REASONING TEMPLATE FORMAT:
               properties: {
                 role: { type: Type.STRING },
                 content: { type: Type.STRING }
-              },
-              required: ["role", "content"]
-            }
-          }
-        },
-        required: ["messages"]
-      };
-    } else if (turnMode === "Reasoning") {
-      schemaProperty = {
-        type: Type.OBJECT,
-        properties: {
-          messages: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                role: { type: Type.STRING },
-                content: {
-                  type: Type.STRING,
-                  description: "Assistant content must contain <think>...</think> followed by the final answer."
-                }
               },
               required: ["role", "content"]
             }
@@ -1835,13 +1853,20 @@ REASONING TEMPLATE FORMAT:
                   responseSchema: {
                     type: Type.OBJECT,
                     properties: {
-                      examples: { type: Type.ARRAY, items: schemaProperty }
+                      examples: {
+                        type: Type.ARRAY,
+                        minItems: currentChunkSize,
+                        maxItems: currentChunkSize,
+                        items: schemaProperty
+                      }
                     },
-                    required: ["examples"]
+                    required: ["examples"],
+                    additionalProperties: false
                   }
                 }
               : {}),
             ...(turnMode !== "Reasoning" && turnMode !== "Mixed" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+            ...(turnMode === "Reasoning" ? { reasoningEffort: "medium" } : {}),
             systemInstruction: turnMode === "Reasoning"
               ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
 
