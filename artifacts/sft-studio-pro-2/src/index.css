@@ -270,11 +270,12 @@ main [class~="opacity-45"] { opacity: .72; }
 
 /* Dark gray fills for only the two outer panels marked in the screenshot. */
 .kk-header [class~="bg-slate-900/60"] {
-  background-color: #3a3a3a !important;
+  background-color: #2a2a2a !important;
 }
 
 .kk-workspace-panel {
-  background-color: #3a3a3a !important;
+  background-color: #2a2a2a !important;
+  border: 2px solid #181818 !important;
 }
 
 .kk-workspace-panel > div {
@@ -289,18 +290,21 @@ main [class~="opacity-45"] { opacity: .72; }
   font-weight: 700 !important;
 }
 
-.kk-header [class~="bg-slate-900/60"],
-.kk-workspace-panel {
-  border: 2px solid #292929 !important;
+.kk-header [class~="bg-slate-900/60"] {
+  border: 2px solid #171717 !important;
+}
+
+.kk-workspace-panel :is(h1, h2, h3, h4, h5, h6, p, span, label, a):not(button *):not(a *) {
+  color: #5d3a75 !important;
+}
+
+.kk-header [class~="bg-slate-900/60"] :is(h1, h2, h3, h4, h5, h6, p, span, label):not(button *) {
+  color: #d9b8e9 !important;
 }
 
 .kk-header [class~="bg-slate-900/60"] [class~="border"][class*="border-slate-"] {
   border-width: 2px !important;
   border-color: #4a4a4a !important;
-}
-
-.kk-workspace-panel [class~="border"][class*="border-slate-"]:not(button):not(input):not(textarea):not(select) {
-  border: 0 !important;
 }
 
 #root > div:has(> .kk-header) > main :is(
