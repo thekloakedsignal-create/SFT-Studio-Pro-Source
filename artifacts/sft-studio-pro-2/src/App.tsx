@@ -3796,6 +3796,8 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between font-sans selection:bg-green-500/20 selection:text-green-300">
         {/* Decorative ambient blobs */}
+        <div className="fixed top-0 left-1/4 w-96 h-96 bg-green-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 z-10">
           <div className="w-full max-w-md bg-slate-950 border border-slate-800/80 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
@@ -4008,9 +4010,9 @@ export default function App() {
   }
 
   return (
-    <div className="sft-app-frame min-h-screen text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
       {/* Top Banner Navigation */}
-      <header className="sft-charcoal border-b border-slate-800">
+      <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
           
           <div className="flex items-center justify-between md:justify-start gap-3">
@@ -4058,7 +4060,7 @@ export default function App() {
           </div>
 
           {/* Real-time Project Status Hub & Controls Panel */}
-          <div className="sft-top-panel-inner p-2 sm:p-2.5 rounded-xl border border-slate-800 w-full md:w-auto">
+          <div className="bg-slate-900/60 p-2 sm:p-2.5 rounded-xl border border-slate-800/80 w-full md:w-auto">
             <div className="flex flex-col gap-2">
               
               {/* Row 1 (Top): Project Selector with expanded horizontal space & live stats */}
@@ -4071,7 +4073,7 @@ export default function App() {
                 </div>
 
                 {/* Right: Project Dropdown with generous horizontal space & Delete Icon */}
-                <div className="sft-top-control flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs flex-1 min-w-[200px] sm:min-w-[280px]">
+                <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 px-2.5 py-1 rounded-lg text-xs flex-1 min-w-[200px] sm:min-w-[280px]">
                   <FolderOpen className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                   <select
                     key={dropdownKey}
@@ -4131,7 +4133,7 @@ export default function App() {
                 <button
                   onClick={() => setShowCustomPackageModal(true)}
                   title="Contact Support"
-                  className="sft-top-control flex items-center justify-center gap-1.5 px-2.5 h-7.5 text-xs font-semibold text-slate-200 hover:text-emerald-400 rounded-lg transition cursor-pointer w-full"
+                  className="flex items-center justify-center gap-1.5 px-2.5 h-7.5 text-xs font-semibold text-slate-200 hover:text-emerald-400 hover:bg-slate-950 bg-slate-950/80 border border-slate-800 hover:border-emerald-500/40 rounded-lg transition cursor-pointer w-full"
                 >
                   <HelpCircle className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                   <span className="truncate">Support</span>
@@ -4141,7 +4143,7 @@ export default function App() {
                 <button
                   onClick={() => setShowAccountModal(true)}
                   title="Account Details & Settings"
-                  className="sft-top-control flex items-center justify-center gap-1.5 px-2.5 h-7.5 text-xs font-semibold text-slate-200 hover:text-blue-400 rounded-lg transition cursor-pointer w-full"
+                  className="flex items-center justify-center gap-1.5 px-2.5 h-7.5 text-xs font-semibold text-slate-200 hover:text-blue-400 hover:bg-slate-950 bg-slate-950/80 border border-slate-800 hover:border-blue-500/40 rounded-lg transition cursor-pointer w-full"
                 >
                   <User className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                   <span className="truncate">Account</span>
@@ -4149,7 +4151,7 @@ export default function App() {
 
                 {/* 3. Auth User Session / Sign In Button (bottom right) */}
                 {currentUser ? (
-                  <div className="sft-top-control flex items-center justify-between px-2 h-7.5 rounded-lg w-full">
+                  <div className="flex items-center justify-between bg-slate-950/80 px-2 h-7.5 rounded-lg border border-slate-800 w-full">
                     {currentUser.photoURL ? (
                       <img
                         src={currentUser.photoURL}
@@ -4207,7 +4209,7 @@ export default function App() {
         
         {/* Tab Sidebar Navigation (Desktop) & Tabs bar (Mobile) */}
         <div className="lg:col-span-3 xl:col-span-2 flex flex-col gap-3">
-          <div className="sft-charcoal bg-slate-950/30 border border-slate-800/60 p-2 rounded-xl flex flex-row lg:flex-col gap-1 overflow-x-auto custom-scrollbar">
+          <div className="bg-slate-950/30 border border-slate-800/60 p-2 rounded-xl flex flex-row lg:flex-col gap-1 overflow-x-auto custom-scrollbar">
             
             <button
               id="tab-define"
@@ -4352,7 +4354,7 @@ export default function App() {
           </div>
 
           {/* Consolidated Sidebar Overview Panel (Replaces 3 redundant separate bordered cards) */}
-          <div className="sft-charcoal bg-slate-950/30 border border-slate-800/60 p-3.5 rounded-xl hidden lg:flex flex-col gap-3.5 text-xs">
+          <div className="bg-slate-950/30 border border-slate-800/60 p-3.5 rounded-xl hidden lg:flex flex-col gap-3.5 text-xs">
             {/* Quick Metrics */}
             <div>
               <h3 className="font-semibold text-slate-300 mb-2 flex items-center gap-2 text-xs">
@@ -4458,7 +4460,7 @@ export default function App() {
         </div>
 
         {/* Tab Contents Frame */}
-        <div className="sft-content lg:col-span-9 xl:col-span-10 flex flex-col gap-6 min-w-0">
+        <div className="lg:col-span-9 xl:col-span-10 flex flex-col gap-6 min-w-0">
           <AnimatePresence mode="wait">
             
             {/* TAB 1: DEFINITIONS & BATCH GENERATION */}
@@ -4471,7 +4473,7 @@ export default function App() {
                 className="space-y-6"
               >
                 {/* Preset Selection & Project Definition Card */}
-                <div className="sft-panel p-5 sm:p-6 rounded-xl">
+                <div className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/70 pb-4 mb-6">
                     <div>
                       <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -4927,7 +4929,7 @@ export default function App() {
                 </div>
 
                 {/* Batch Generator Settings Card */}
-                <div className="sft-panel p-6 rounded-2xl relative overflow-hidden">
+                <div className="bg-slate-950/40 border border-slate-800/80 p-6 rounded-2xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 h-32 w-32 bg-green-500/5 rounded-full blur-3xl pointer-events-none" />
                   
                   <div className="border-b border-slate-800 pb-4 mb-6">
@@ -5160,7 +5162,7 @@ export default function App() {
                 </div>
 
                 {/* Batch Generator Review & Approval Card */}
-                <div className="sft-panel p-5 sm:p-6 rounded-xl space-y-4">
+                <div className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl space-y-4">
                   <div className="border-b border-slate-800/70 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -5364,7 +5366,7 @@ export default function App() {
                 className="space-y-6 min-w-0"
               >
                 {/* Document SFT pipeline */}
-                <div className="sft-panel p-5 sm:p-6 rounded-xl flex flex-col justify-between min-w-0">
+                <div className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl flex flex-col justify-between min-w-0">
                   <div>
                     <div className="border-b border-slate-800/70 pb-4 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
@@ -5865,7 +5867,7 @@ export default function App() {
 
                 {/* Document Conversion Review & Approval Card */}
                 {latestDocBatch && (
-                  <div id="doc-conversion-review-card" className="sft-panel p-5 sm:p-6 rounded-xl space-y-4 scroll-mt-6">
+                  <div id="doc-conversion-review-card" className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl space-y-4 scroll-mt-6">
                     <div className="border-b border-slate-800/70 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
                         <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -6046,7 +6048,7 @@ export default function App() {
                 className="space-y-6 min-w-0"
               >
                 {/* TRiAD Alignment Import pipeline */}
-                <div className="sft-panel p-5 sm:p-6 rounded-xl flex flex-col justify-between min-w-0">
+                <div className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl flex flex-col justify-between min-w-0">
                   <div>
                     <div className="border-b border-slate-800/70 pb-4 mb-5">
                       <div className="flex items-center justify-between">
@@ -6203,7 +6205,7 @@ export default function App() {
 
                 {/* TRiAD Alignment Review & Inspection Card */}
                 {latestTriadBatch && (
-                  <div className="sft-panel p-5 sm:p-6 rounded-xl space-y-4">
+                  <div className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl space-y-4">
                     <div className="border-b border-slate-800/70 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
                         <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -6337,7 +6339,7 @@ export default function App() {
                 className="space-y-6"
               >
                 {/* Batch Selector & AI grading Header */}
-                <div className="sft-panel p-5 sm:p-6 rounded-xl">
+                <div className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/70 pb-4 mb-6">
                     <div>
                       <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -6509,7 +6511,7 @@ export default function App() {
                 {/* AI Suggestions & Flagged Issues layout */}
                 {activeReport && (
                   <>
-                    <div className="sft-panel p-5 rounded-2xl mb-6">
+                    <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-2xl mb-6">
                        <h2 className="text-lg font-bold text-white mb-2">Batch Assessment Summary</h2>
                        <p className="text-sm text-slate-400">
                          Assessed <span className="text-white font-semibold">{currentBatch.examples.length}</span> examples. 
@@ -6519,7 +6521,7 @@ export default function App() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Issues List */}
-                      <div className="sft-panel p-5 rounded-2xl">
+                      <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-2xl">
                         <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
                           <ShieldAlert className="h-4 w-4 text-amber-400" />
                           Flagged SFT Compliance Issues
@@ -6547,7 +6549,7 @@ export default function App() {
                       </div>
 
                       {/* Optimization Suggestions */}
-                      <div className="sft-panel p-5 rounded-2xl">
+                      <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-2xl">
                         <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
                           <Sparkles className="h-4 w-4 text-green-400" />
                           AI Synthesis Suggestions
@@ -6569,7 +6571,7 @@ export default function App() {
 
                 {/* SFT Conversation Inspector List (Editable items with scroll-through rendering) */}
                 {currentBatch && (
-                  <div className="sft-panel p-5 sm:p-6 rounded-xl">
+                  <div className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl">
                     <div className="border-b border-slate-800/70 pb-4 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -6809,7 +6811,7 @@ export default function App() {
                 className="grid grid-cols-1 md:grid-cols-12 gap-6"
               >
                 {/* Left side: completed batches lists */}
-                <div className="sft-panel md:col-span-7 p-5 sm:p-6 rounded-xl space-y-4 min-w-0">
+                <div className="md:col-span-7 bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl space-y-4 min-w-0">
                   <div>
                     <h2 className="text-lg font-bold text-white flex items-center gap-2">
                       <Database className="h-5 w-5 text-emerald-400" />
@@ -6876,7 +6878,7 @@ export default function App() {
                 {/* Right side: Combined Dataset compile & validation */}
                 <div className="md:col-span-5 flex flex-col gap-6 min-w-0">
                   {/* final export card */}
-                  <div className="sft-panel p-5 sm:p-6 rounded-xl flex-1 flex flex-col justify-between">
+                  <div className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl flex-1 flex flex-col justify-between">
                     <div>
                       <div className="border-b border-slate-800 pb-4 mb-4">
                         <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -7068,7 +7070,7 @@ export default function App() {
 
                   {/* live preview of exported format */}
                   {exportedPreview && (
-                    <div id="dataset-formatted-preview" className="sft-panel p-5 rounded-xl space-y-3 scroll-mt-20">
+                    <div id="dataset-formatted-preview" className="bg-slate-950/30 border border-slate-800/50 p-5 rounded-xl space-y-3 scroll-mt-20">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <h3 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                           <Code className="h-3.5 w-3.5 text-blue-400" />
@@ -7112,7 +7114,7 @@ export default function App() {
                 exit={{ opacity: 0, y: -8 }}
                 className="w-full max-w-5xl mx-auto"
               >
-                <div className="sft-panel rounded-xl flex flex-col h-[720px] overflow-hidden shadow-lg">
+                <div className="bg-slate-950/30 border border-slate-800/50 rounded-xl flex flex-col h-[720px] overflow-hidden shadow-lg">
                   {/* Chat Header */}
                   <div className="flex items-center justify-between border-b border-slate-800/70 px-6 py-4 bg-slate-900/30">
                     <div className="flex items-center gap-3 min-w-0">
@@ -7251,7 +7253,7 @@ export default function App() {
                   </div>
 
                   {/* Prominent, Obvious Prompt Box */}
-                  <div className="sft-charcoal sft-composer p-4 sm:p-5 border-t-2 border-slate-700/80 bg-slate-900/80 shadow-2xl">
+                  <div className="p-4 sm:p-5 border-t-2 border-slate-700/80 bg-slate-900/80 shadow-2xl">
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
@@ -7650,7 +7652,7 @@ export default function App() {
       )}
 
       {/* Rich Human-Made Supporting Footer */}
-      <footer className="sft-charcoal border-t border-slate-800/80 py-10 mt-16 bg-slate-950/60 text-slate-400">
+      <footer className="border-t border-slate-800/80 py-10 mt-16 bg-slate-950/60 text-slate-400">
         <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8 text-xs">
           {/* Col 1: Brand */}
           <div className="space-y-3">

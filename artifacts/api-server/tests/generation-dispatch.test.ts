@@ -5,7 +5,8 @@ import vm from "node:vm";
 import { transform } from "esbuild";
 import {
   ChatCompletionsHttpError, isProviderOverload, normalizeText,
-  parseGeneratedExamples, parseReasoningExamples, sanitizeExample
+  parseGeneratedExamples, parseReasoningExamples, sanitizeExample,
+  encodeReasoningProviderText, decodeReasoningProviderText
 } from "../src/lib/generation-response.ts";
 
 // Actual legacy dispatch/provider adapter, with a fixture-only fetch and immediate
@@ -31,7 +32,7 @@ function hasRenderableMessages(example: any): boolean {
     ));
 }
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" | "reasoningEarlyFailure" | "reasoningSlotTimeout" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" | "reasoningEarlyFailure" | "reasoningSlotTimeout" | "singleEarlyFailures" | "rejectArrayInstruction" | "singleRecovery12" = "success", recoveryOutcome: "success" | "timeout" | "529" | "deadline" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const delays: number[] = [];
@@ -52,6 +53,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
     },
     Type: { OBJECT: "object", ARRAY: "array", STRING: "string", NUMBER: "number", BOOLEAN: "boolean" },
     ChatCompletionsHttpError, isProviderOverload, normalizeText, parseGeneratedExamples, parseReasoningExamples, sanitizeExample,
+    encodeReasoningProviderText, decodeReasoningProviderText,
     logger: { warn() {}, info() {}, error() {} },
     process: { env: { GRADIENT_MODEL_ACCESS_KEY: "offline-fixture-only-not-a-secret" } },
     console: { log() {}, warn() {}, error() {} },
@@ -75,22 +77,35 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
     async fetch(url: string, options: any) {
       assert.equal(url, "https://inference.do-ai.run/v1/chat/completions");
       const request = JSON.parse(options.body);
+      const userPrompt = request.messages.find((message: any) => message.role === "user")?.content || "";
+      const isReasoning = userPrompt.includes('selected TEMPLATE TYPE: "Reasoning"');
       const requestNumber = calls.length + 1;
       calls.push(request);
       concurrent++;
       peakConcurrent = Math.max(peakConcurrent, concurrent);
+      if (mode === "singleRecovery12") {
+        const modelCallCount = calls.filter(call => call.model === request.model).length;
+        if ((request.model === "qwen3.5-397b-a17b" && modelCallCount === 1)
+          || (request.model === firstModel && modelCallCount === 2)
+          || (request.model === "deepseek-4-flash" && modelCallCount === 3)
+          || (requestNumber === 42 && recoveryOutcome === "timeout")) {
+          concurrent--;
+          throw Object.assign(new Error("fixture timeout"), { name: "TimeoutError" });
+        }
+        if (requestNumber === 42 && recoveryOutcome === "deadline") fixtureNow += 120000;
+      }
       if (mode === "reasoningSlotTimeout" && requestNumber === 2) {
         concurrent--;
         throw Object.assign(new Error("fixture slot timeout"), { name: "TimeoutError" });
       }
-      if ((mode === "reasoningEarlyFailure" || mode === "reasoningSlotTimeout") && requestNumber >= 3) {
+      if ((mode === "reasoningEarlyFailure" || mode === "reasoningSlotTimeout" || mode === "singleEarlyFailures") && requestNumber >= 3) {
         await new Promise(resolve => setImmediate(resolve));
         assert.equal(options.signal.aborted, false, "A sibling failure must not cancel this slot");
       }
       if (mode === "fastFailure" && request.model !== firstModel) {
         return await new Promise(() => {});
       }
-      if (mode === "timeoutQwen" && request.model === "qwen3.5-397b-a17b") {
+      if (mode === "timeoutQwen" && (isReasoning ? requestNumber % 10 === 2 : request.model === "qwen3.5-397b-a17b")) {
         concurrent--;
         const timeoutError = new Error("fixture request timeout");
         timeoutError.name = "TimeoutError";
@@ -99,8 +114,8 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       if (
         mode === "timeoutRecoveryAll"
         || (mode === "timeoutRecovery"
-          && ((request.model === "qwen3.5-397b-a17b" && requestNumber === 2)
-            || (request.model === firstModel && requestNumber > 5)))
+          && (((isReasoning || request.model === "qwen3.5-397b-a17b") && requestNumber === 2)
+            || ((isReasoning || request.model === firstModel) && requestNumber > 5)))
       ) {
         concurrent--;
         const timeoutError = new Error("fixture request timeout");
@@ -145,6 +160,9 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       const isPrimary = request.model === firstModel;
       const isBackup = !models.slice(0, 5).includes(request.model);
       const status = (mode === "reasoningEarlyFailure" && requestNumber === 2) ? 503
+        : (mode === "singleRecovery12" && requestNumber === 42 && recoveryOutcome === "529") ? 529
+        : (mode === "singleEarlyFailures" && requestNumber >= 7 && requestNumber <= 10) ? 503
+        : (mode === "rejectArrayInstruction" && userPrompt.includes("Return them as a JSON array of examples.")) ? 400
         : (mode === "fastFailure" && isPrimary) ? 503
         : ((mode === "primary529" || mode === "both529") && isPrimary)
         || (mode === "both529" && isBackup) ? 529
@@ -152,10 +170,9 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
         : mode === "504Qwen" && request.model === "qwen3.5-397b-a17b" ? 504
         : mode === "partialFailure" && requestNumber === 11 ? 503
         : 200;
-      const userPrompt = request.messages.find((message: any) => message.role === "user")?.content || "";
       const requestedCount = Number(userPrompt.match(/Generate exactly (\d+) examples\./)?.[1]) || 1;
-      const isMultiTurn = userPrompt.includes('selected TEMPLATE TYPE: "Multi Turn"');
-      const isReasoning = userPrompt.includes('selected TEMPLATE TYPE: "Reasoning"');
+      const isMultiTurn = userPrompt.includes('selected TEMPLATE TYPE: "Multi Turn"')
+        || userPrompt.includes("For this request, generate Multi Turn:");
       const requestedExamples = Array.from({ length: requestedCount }, (_, index) => ({
         messages: isMultiTurn
           ? [
@@ -170,7 +187,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
               {
                 role: "assistant",
                 content: isReasoning && mode !== "malformedReasoning"
-                  ? `<think>Check the answer format for ${request.model}.</think>\nAnswer ${index + 1} from ${request.model}.`
+                  ? `<sft_reasoning>Check the answer format for ${request.model}.</sft_reasoning>\nAnswer ${index + 1} from ${request.model}.`
                   : `Answer ${index + 1} from ${request.model}.`
               }
             ]
@@ -194,14 +211,14 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
   return {
     calls, delays, timeoutValues,
     peak: () => peakConcurrent,
-    async generate(count = 5, jobMode = false, templateType = "Single Turn") {
+    async generate(count = 5, jobMode = false, templateType = "Single Turn", instructTemplate?: string) {
       const response: any = {
         statusCode: 200, body: undefined,
         status(value: number) { this.statusCode = value; return this; },
         json(value: any) { this.body = value; return this; }
       };
       await routes.get("POST /api/generate")!({
-          body: { count, jobMode, templateType, targetTask: "Offline fixture" }
+          body: { count, jobMode, templateType, instructTemplate, targetTask: "Offline fixture" }
       }, response);
       return response;
     },
@@ -246,9 +263,9 @@ test("one Reasoning timeout neither cancels siblings nor skips later Nemotron sl
   assert.equal(response.body.success, true);
   assert.equal(response.body.partial, undefined);
   assert.equal(response.body.examples.length, 25);
-  assert.equal(f.calls.filter(call => call.model === "nemotron-3-ultra-550b").length, 25);
+  assert.equal(f.calls.filter(call => call.model === "nemotron-3-ultra-550b").length, 26);
   assert.equal(f.calls.length, 26);
-  assert.equal(f.calls.at(-1).model, "glm-5.3");
+  assert.equal(f.calls.at(-1).model, "nemotron-3-ultra-550b");
 });
 
 test("Multi Turn prompt requests the JSON-object envelope required by the provider", async () => {
@@ -263,6 +280,24 @@ test("Multi Turn prompt requests the JSON-object envelope required by the provid
   assert.ok(f.calls.every(call => JSON.stringify(call.response_format) === JSON.stringify({ type: "json_object" })));
   assert.ok(f.calls.every(call => call.reasoning_effort === "none"));
   assert.doesNotMatch(f.calls[0].messages.find((message: any) => message.role === "system").content, /Return valid JSON that matches this schema/);
+});
+
+test("Mixed requests only alternating Single Turn and Multi Turn across all instruction formats", async () => {
+  for (const format of [undefined, "Alpaca", "Mistral", "ChatML"]) {
+    const f = fixture();
+    const response = await f.generate(10, false, "Mixed", format);
+    assert.equal(response.body.examples.length, 10);
+    assert.equal(response.body.examples.filter((example: any) => example.messages.length === 5).length, 5);
+    assert.equal(response.body.examples.filter((example: any) => example.messages.length === 2).length, 5);
+    for (const [index, call] of f.calls.entries()) {
+      const prompt = call.messages.find((message: any) => message.role === "user").content;
+      assert.ok(prompt.includes(`For this request, generate ${index % 2 ? "Multi Turn" : "Single Turn"}:`));
+      assert.match(prompt, /Mixed contains only Single Turn and Multi Turn, never Reasoning/);
+      assert.doesNotMatch(prompt, /- Reasoning:|For reasoning examples ONLY/);
+      assert.match(call.messages[0].content, /ZERO CHAIN-OF-THOUGHT/);
+      assert.equal(call.reasoning_effort, "none");
+    }
+  }
 });
 
 test("Reasoning batch jobs extract tagged thinking into the UI reasoning field", async () => {
@@ -281,8 +316,12 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   }
   const prompt = f.calls[0].messages.find((message: any) => message.role === "user").content;
   assert.match(prompt, /selected TEMPLATE TYPE: "Reasoning"/);
+  const formattingExample = prompt.split("- Formatting example:\n")[1].split("\n- Escape all line breaks")[0];
+  assert.equal(parseReasoningExamples(decodeReasoningProviderText(formattingExample), 1).examples.length, 1);
+  assert.ok(f.calls.every(call => call.model === "nemotron-3-ultra-550b"));
   assert.match(prompt, /Each example must contain exactly two messages, in order: one user message, then one assistant message/);
-  assert.match(prompt, /Assistant content must start with exactly one non-empty <think>\.\.\.<\/think> block, followed by a non-empty final answer/);
+  assert.match(prompt, /Assistant content must start with exactly one non-empty <sft_reasoning>\.\.\.<\/sft_reasoning> block, followed by a non-empty final answer/);
+  assert.ok(f.calls.every(call => !JSON.stringify(call.messages).includes("<think>")));
   assert.match(prompt, /Return them as one JSON object with an "examples" array/);
   assert.doesNotMatch(prompt, /Return them as a JSON array of examples/);
   assert.doesNotMatch(prompt, /Alpaca|Mistral|### Response:|\[INST\]/i);
@@ -311,14 +350,14 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
     "<think>Trace.</think>\nAnswer.",
     "<THINK>Trace.</THINK>\nAnswer.",
     " \n<think>Trace.</think>\nAnswer."
-  ]) assert.equal(contentPattern.test(content), true);
+  ]) assert.equal(contentPattern.test(encodeReasoningProviderText(content)), true);
   for (const content of [
     "### Response:\n<think>Trace.</think>\nAnswer.",
     "<think> </think>\nAnswer.",
     "<think>Trace.</think>",
     "<think>Trace.</think>\nAnswer.<think>Second.</think>",
     "<think>Trace.</think>\n<|im_end|>"
-  ]) assert.equal(contentPattern.test(content), false);
+  ]) assert.equal(contentPattern.test(encodeReasoningProviderText(content)), false);
 });
 
 test("Reasoning timeout recovery updates the schema to the requested fill count", async () => {
@@ -373,10 +412,10 @@ test("Reasoning timeout failure categories remain internal to job status", async
   }
 });
 
-test("a stalled model is skipped in later stacks and GLM fills all missing examples in one request", async () => {
+test("Multi Turn retains its single GLM fill request after model timeouts", async () => {
   for (const mode of ["timeoutQwen", "504Qwen"] as const) {
     const f = fixture(mode);
-    const response = await f.generate(25);
+    const response = await f.generate(25, false, "Multi Turn");
     assert.equal(response.body.success, true);
     assert.equal(response.body.examples.length, 25);
     assert.ok(response.body.examples.every(hasRenderableMessages));
@@ -392,7 +431,7 @@ test("a stalled model is skipped in later stacks and GLM fills all missing examp
 
 test("batches over 50 examples receive a proportionally longer total timeout", async () => {
   const f = fixture("timeoutAllInitial");
-  const response = await f.generate(250);
+  const response = await f.generate(250, false, "Multi Turn");
   assert.equal(response.body.success, true);
   assert.equal(response.body.examples.length, 250);
   assert.equal(f.calls.length, 21);
@@ -404,13 +443,57 @@ test("batches over 50 examples receive a proportionally longer total timeout", a
 
 test("stopping a stalled model aborts its duplicate in-flight request", async () => {
   const f = fixture("abortDuplicateQwen");
-  const response = await f.generate(200);
+  const response = await f.generate(200, false, "Multi Turn");
   assert.equal(response.body.success, true);
   assert.equal(response.body.examples.length, 200);
   assert.equal(f.calls.filter(call => call.model === "qwen3.5-397b-a17b").length, 2);
   assert.equal(f.calls.at(-1).model, firstModel);
   const recoveryPrompt = f.calls.at(-1).messages.find((message: any) => message.role === "user").content;
   assert.match(recoveryPrompt, /Generate exactly 20 examples\./);
+});
+
+test("Single Turn recovers 12 missing examples individually, preserving the original 38", async () => {
+  const f = fixture("singleRecovery12");
+  const response = await f.generate(50);
+  assert.equal(response.body.examples.length, 50);
+  assert.equal(response.body.partial, undefined);
+  assert.equal(f.calls.length, 53);
+  const replacements = f.calls.slice(41);
+  assert.equal(replacements.length, 12);
+  assert.ok(replacements.every(call => call.model === firstModel
+    && call.messages.find((message: any) => message.role === "user").content.includes("Generate exactly 1 examples.")));
+  assert.equal(f.peak(), 10);
+  assert.ok(f.timeoutValues.every(timeout => timeout <= 20000));
+  assert.equal(response.body.examples.filter((example: any) => example.id.startsWith("gen-recovery-")).length, 12);
+});
+
+test("one Single Turn replacement timeout does not discard successful siblings or cause a retry loop", async () => {
+  const f = fixture("singleRecovery12", "timeout");
+  const response = await f.generate(50);
+  assert.equal(response.body.examples.length, 49);
+  assert.equal(response.body.partial, true);
+  assert.equal(response.body.requestedCount, 50);
+  assert.equal(f.calls.length, 53);
+});
+
+test("Single Turn recovery honors one distinct-model backup only for HTTP 529", async () => {
+  const f = fixture("singleRecovery12", "529");
+  const response = await f.generate(50);
+  assert.equal(response.body.examples.length, 50);
+  assert.equal(response.body.partial, undefined);
+  assert.equal(f.calls.length, 54);
+  const backups = f.calls.slice(41).filter(call => call.model !== firstModel);
+  assert.equal(backups.length, 1);
+  assert.equal(backups[0].model, "gemma-4-31B-it");
+});
+
+test("Single Turn stops starting replacement requests when the existing batch deadline expires", async () => {
+  const f = fixture("singleRecovery12", "deadline");
+  const response = await f.generate(50);
+  assert.equal(f.calls.length, 42);
+  assert.equal(response.body.examples.length, 39);
+  assert.equal(response.body.partial, true);
+  assert.match(response.body.partialReason, /deadline expired/);
 });
 
 test("HTTP 529 triggers exactly one distinct configured backup request", async () => {
@@ -479,16 +562,38 @@ test("other HTTP failures and invalid content do not retry or top up", async () 
   }
 });
 
-test("an unrecoverable request fails promptly instead of waiting on hanging sibling models", async () => {
+test("Multi Turn retains fail-fast behavior for an unrecoverable request", async () => {
   const f = fixture("fastFailure");
   const outcome = await Promise.race([
-    f.generate(),
+    f.generate(5, false, "Multi Turn"),
     new Promise(resolve => setTimeout(() => resolve("still waiting"), 500))
   ]);
   assert.notEqual(outcome, "still waiting");
   assert.equal((outcome as any).statusCode, 500);
   assert.match((outcome as any).body.error, /stopped after 0 of 5 examples/);
   assert.equal(f.calls.length, 5);
+});
+
+test("Single Turn 50-example batch uses the provider-required JSON object envelope", async () => {
+  const f = fixture("rejectArrayInstruction");
+  const response = await f.generate(50);
+  assert.equal(response.body.examples.length, 50);
+  assert.equal(response.body.partial, undefined);
+  assert.equal(f.calls.length, 50);
+  assert.ok(f.calls.every(call => call.response_format.type === "json_object"
+    && call.messages.find((message: any) => message.role === "user").content.includes('one JSON object with an "examples" array')));
+});
+
+test("Single Turn does not end a 50-example batch after only six successes in its first stack", async () => {
+  const f = fixture("singleEarlyFailures");
+  const response = await f.generate(50);
+  assert.equal(f.calls.length, 50, "All originally scheduled calls must run, without retries");
+  assert.equal(response.body.examples.length, 46);
+  assert.equal(response.body.partial, true, "Provider failures must remain honestly marked partial");
+  assert.equal(response.body.requestedCount, 50);
+  assert.equal(response.body.batchId, "fixture-uuid-1");
+  assert.equal(f.peak(), 10);
+  assert.deepEqual(f.delays, [2000, 2000, 2000, 2000]);
 });
 
 test("preserved schedules and two-second spacing cover every supported batch size", async () => {
