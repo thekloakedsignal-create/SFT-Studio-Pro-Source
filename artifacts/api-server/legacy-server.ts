@@ -883,7 +883,6 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         messages: baseMessages,
         temperature: params.config?.temperature ?? 0.7,
         max_tokens: maxTokensToUse,
-        ...(params.config?.reasoningEffort === "none" ? { reasoning_effort: "none" } : {}),
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
       signal: abortSignal
@@ -1821,7 +1820,6 @@ REASONING TEMPLATE FORMAT:
           const configObj: any = {
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
-            reasoningEffort: "none",
             ...(turnMode === "Reasoning"
               ? { responseSchema: { type: Type.ARRAY, items: schemaProperty } }
               : {}),

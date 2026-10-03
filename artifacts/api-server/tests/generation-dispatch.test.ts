@@ -190,7 +190,6 @@ test("real dispatcher launches the preserved initial models concurrently and cou
   assert.deepEqual(f.delays, []);
   assert.ok(f.timeoutValues.every(timeoutMs => timeoutMs === 20000));
   assert.equal(f.calls.every(call => call.max_tokens === 4096 && call.response_format.type === "json_object"), true);
-  assert.equal(f.calls.every(call => call.reasoning_effort === "none"), true);
 });
 
 test("a stalled model is skipped in later stacks and GLM fills all missing examples in one request", async () => {

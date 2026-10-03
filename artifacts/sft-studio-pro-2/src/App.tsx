@@ -518,7 +518,7 @@ export default function App() {
   const [docTemplate, setDocTemplate] = useState<TemplateType>(TemplateType.SINGLE_TURN);
   const [docCount, setDocCount] = useState<number>(8); // AI estimated example count
   const [literatureTheme, setLiteratureTheme] = useState<string>("");
-  const [extractionModel, setExtractionModel] = useState("glm-5.3-flash");
+  const [extractionModel, setExtractionModel] = useState("glm-5.3");
   const [isConverting, setIsConverting] = useState(false);
   const [isAnalyzingDoc, setIsAnalyzingDoc] = useState(false);
   const [docSuggestionExplanation, setDocSuggestionExplanation] = useState("");

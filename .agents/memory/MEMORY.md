@@ -1,3 +1,2 @@
 - [SFT generation constraints](sft-generation-constraints.md) — Keep direct DigitalOcean calls and 529-only backup; save completed output as a marked partial batch after failures.
 - [Batch snapshot compatibility](batch-snapshot-compatibility.md) — Preserve newer incremental saves and deletions when older clients submit whole-project snapshots.
-- [DigitalOcean model compatibility](digitalocean-model-compatibility.md) — Verify reasoning suppression and chat-template support per model; model IDs can respond differently to common request settings.
