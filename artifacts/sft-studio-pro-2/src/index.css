@@ -5,13 +5,13 @@
   --font-sans: "Playfair Display", Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  --color-brand-50: #f0fdf4;
-  --color-brand-100: #dcfce7;
-  --color-brand-200: #bbf7d0;
-  --color-brand-500: #22c55e;
-  --color-brand-600: #16a34a;
-  --color-brand-700: #15803d;
-  --color-brand-900: #14532d;
+  --color-brand-50: #f5f5f4;
+  --color-brand-100: #e8e8e6;
+  --color-brand-200: #d2d2d0;
+  --color-brand-500: #725578;
+  --color-brand-600: #62486a;
+  --color-brand-700: #533c5b;
+  --color-brand-900: #342a3a;
 
 
   /* Reference palette: neutral grays, black work surfaces, and metallic purple accents */
@@ -23,30 +23,24 @@
   --color-slate-800: #d2d2d0; --color-slate-850: #dfdfdd; --color-slate-900: #fbfbfa;
   --color-slate-950: #ececea;
   --color-gray-50: #f2f2f1;
-  --color-green-300: #2f7a45; --color-green-400: #276b3b; --color-green-500: #3f9a5a;
-  --color-yellow-300: #8a6410; --color-yellow-400: #7a560a;
-  --color-amber-300: #8f5a0c; --color-amber-400: #7d4d08;
-  --color-red-300: #a3302c; --color-red-400: #962824;
-  --color-rose-300: #9e2f4b; --color-rose-400: #8f2641;
-  --color-orange-300: #9a4a12; --color-orange-400: #8a400c;
-  --color-emerald-50: #f6f1f8; --color-emerald-100: #eee4f2; --color-emerald-200: #e2d2ea; --color-emerald-300: #6a3f7c; --color-emerald-400: #5b3270; --color-emerald-500: #b48ac4; --color-emerald-600: #9f74b2; --color-emerald-700: #8a5e9e; --color-emerald-800: #d8c3e1; --color-emerald-900: #4a2a5c; --color-emerald-950: #f1e8f5;
-  --color-blue-50: #f6f1f8; --color-blue-100: #eee4f2; --color-blue-200: #e2d2ea; --color-blue-300: #6a3f7c; --color-blue-400: #5b3270; --color-blue-500: #b48ac4; --color-blue-600: #9f74b2; --color-blue-700: #8a5e9e; --color-blue-800: #d8c3e1; --color-blue-900: #4a2a5c; --color-blue-950: #f1e8f5;
-  --color-purple-50: #f6f1f8; --color-purple-100: #eee4f2; --color-purple-200: #e2d2ea; --color-purple-300: #6a3f7c; --color-purple-400: #5b3270; --color-purple-500: #b48ac4; --color-purple-600: #9f74b2; --color-purple-700: #8a5e9e; --color-purple-800: #d8c3e1; --color-purple-900: #4a2a5c; --color-purple-950: #f1e8f5;
-  --color-indigo-50: #f6f1f8; --color-indigo-100: #eee4f2; --color-indigo-200: #e2d2ea; --color-indigo-300: #6a3f7c; --color-indigo-400: #5b3270; --color-indigo-500: #b48ac4; --color-indigo-600: #9f74b2; --color-indigo-700: #8a5e9e; --color-indigo-800: #d8c3e1; --color-indigo-900: #4a2a5c; --color-indigo-950: #f1e8f5;
-  --color-violet-50: #f6f1f8; --color-violet-100: #eee4f2; --color-violet-200: #e2d2ea; --color-violet-300: #6a3f7c; --color-violet-400: #5b3270; --color-violet-500: #b48ac4; --color-violet-600: #9f74b2; --color-violet-700: #8a5e9e; --color-violet-800: #d8c3e1; --color-violet-900: #4a2a5c; --color-violet-950: #f1e8f5;
-  --color-teal-50: #f6f1f8; --color-teal-100: #eee4f2; --color-teal-200: #e2d2ea; --color-teal-300: #6a3f7c; --color-teal-400: #5b3270; --color-teal-500: #b48ac4; --color-teal-600: #9f74b2; --color-teal-700: #8a5e9e; --color-teal-800: #d8c3e1; --color-teal-900: #4a2a5c; --color-teal-950: #f1e8f5;
-  --color-cyan-50: #f6f1f8; --color-cyan-100: #eee4f2; --color-cyan-200: #e2d2ea; --color-cyan-300: #6a3f7c; --color-cyan-400: #5b3270; --color-cyan-500: #b48ac4; --color-cyan-600: #9f74b2; --color-cyan-700: #8a5e9e; --color-cyan-800: #d8c3e1; --color-cyan-900: #4a2a5c; --color-cyan-950: #f1e8f5;
-  --color-sky-50: #f6f1f8; --color-sky-100: #eee4f2; --color-sky-200: #e2d2ea; --color-sky-300: #6a3f7c; --color-sky-400: #5b3270; --color-sky-500: #b48ac4; --color-sky-600: #9f74b2; --color-sky-700: #8a5e9e; --color-sky-800: #d8c3e1; --color-sky-900: #4a2a5c; --color-sky-950: #f1e8f5;
+  --color-green-50: #f7f7f6; --color-green-100: #eeeeec; --color-green-200: #dcdcd9; --color-green-300: #8e7996; --color-green-400: #795f84; --color-green-500: #725578; --color-green-600: #62486a; --color-green-700: #533c5b; --color-green-800: #44334b; --color-green-900: #342a3a; --color-green-950: #211b25;
+  --color-yellow-50: #f7f7f6; --color-yellow-100: #eeeeec; --color-yellow-200: #dcdcd9; --color-yellow-300: #8e7996; --color-yellow-400: #795f84; --color-yellow-500: #725578; --color-yellow-600: #62486a; --color-yellow-700: #533c5b; --color-yellow-800: #44334b; --color-yellow-900: #342a3a; --color-yellow-950: #211b25;
+  --color-amber-50: #f7f7f6; --color-amber-100: #eeeeec; --color-amber-200: #dcdcd9; --color-amber-300: #8e7996; --color-amber-400: #795f84; --color-amber-500: #725578; --color-amber-600: #62486a; --color-amber-700: #533c5b; --color-amber-800: #44334b; --color-amber-900: #342a3a; --color-amber-950: #211b25;
+  --color-red-50: #f7f7f6; --color-red-100: #eeeeec; --color-red-200: #dcdcd9; --color-red-300: #8e7996; --color-red-400: #795f84; --color-red-500: #725578; --color-red-600: #62486a; --color-red-700: #533c5b; --color-red-800: #44334b; --color-red-900: #342a3a; --color-red-950: #211b25;
+  --color-rose-50: #f7f7f6; --color-rose-100: #eeeeec; --color-rose-200: #dcdcd9; --color-rose-300: #8e7996; --color-rose-400: #795f84; --color-rose-500: #725578; --color-rose-600: #62486a; --color-rose-700: #533c5b; --color-rose-800: #44334b; --color-rose-900: #342a3a; --color-rose-950: #211b25;
+  --color-orange-50: #f7f7f6; --color-orange-100: #eeeeec; --color-orange-200: #dcdcd9; --color-orange-300: #8e7996; --color-orange-400: #795f84; --color-orange-500: #725578; --color-orange-600: #62486a; --color-orange-700: #533c5b; --color-orange-800: #44334b; --color-orange-900: #342a3a; --color-orange-950: #211b25;
+  --color-emerald-50: #f7f7f6; --color-emerald-100: #eeeeec; --color-emerald-200: #dcdcd9; --color-emerald-300: #8e7996; --color-emerald-400: #795f84; --color-emerald-500: #725578; --color-emerald-600: #62486a; --color-emerald-700: #533c5b; --color-emerald-800: #44334b; --color-emerald-900: #342a3a; --color-emerald-950: #211b25;
+  --color-blue-50: #f7f7f6; --color-blue-100: #eeeeec; --color-blue-200: #dcdcd9; --color-blue-300: #8e7996; --color-blue-400: #795f84; --color-blue-500: #725578; --color-blue-600: #62486a; --color-blue-700: #533c5b; --color-blue-800: #44334b; --color-blue-900: #342a3a; --color-blue-950: #211b25;
+  --color-purple-50: #f7f7f6; --color-purple-100: #eeeeec; --color-purple-200: #dcdcd9; --color-purple-300: #8e7996; --color-purple-400: #795f84; --color-purple-500: #725578; --color-purple-600: #62486a; --color-purple-700: #533c5b; --color-purple-800: #44334b; --color-purple-900: #342a3a; --color-purple-950: #211b25;
+  --color-indigo-50: #f7f7f6; --color-indigo-100: #eeeeec; --color-indigo-200: #dcdcd9; --color-indigo-300: #8e7996; --color-indigo-400: #795f84; --color-indigo-500: #725578; --color-indigo-600: #62486a; --color-indigo-700: #533c5b; --color-indigo-800: #44334b; --color-indigo-900: #342a3a; --color-indigo-950: #211b25;
+  --color-violet-50: #f7f7f6; --color-violet-100: #eeeeec; --color-violet-200: #dcdcd9; --color-violet-300: #8e7996; --color-violet-400: #795f84; --color-violet-500: #725578; --color-violet-600: #62486a; --color-violet-700: #533c5b; --color-violet-800: #44334b; --color-violet-900: #342a3a; --color-violet-950: #211b25;
+  --color-teal-50: #f7f7f6; --color-teal-100: #eeeeec; --color-teal-200: #dcdcd9; --color-teal-300: #8e7996; --color-teal-400: #795f84; --color-teal-500: #725578; --color-teal-600: #62486a; --color-teal-700: #533c5b; --color-teal-800: #44334b; --color-teal-900: #342a3a; --color-teal-950: #211b25;
+  --color-cyan-50: #f7f7f6; --color-cyan-100: #eeeeec; --color-cyan-200: #dcdcd9; --color-cyan-300: #8e7996; --color-cyan-400: #795f84; --color-cyan-500: #725578; --color-cyan-600: #62486a; --color-cyan-700: #533c5b; --color-cyan-800: #44334b; --color-cyan-900: #342a3a; --color-cyan-950: #211b25;
+  --color-sky-50: #f7f7f6; --color-sky-100: #eeeeec; --color-sky-200: #dcdcd9; --color-sky-300: #8e7996; --color-sky-400: #795f84; --color-sky-500: #725578; --color-sky-600: #62486a; --color-sky-700: #533c5b; --color-sky-800: #44334b; --color-sky-900: #342a3a; --color-sky-950: #211b25;
 
   /* Metallic purple accents, sampled against the supplied reference */
-  --color-emerald-300: #8e7996; --color-emerald-400: #795f84; --color-emerald-500: #725578; --color-emerald-600: #62486a; --color-emerald-700: #533c5b; --color-emerald-800: #44334b;
-  --color-blue-300: #8e7996; --color-blue-400: #795f84; --color-blue-500: #725578; --color-blue-600: #62486a; --color-blue-700: #533c5b; --color-blue-800: #44334b;
-  --color-purple-300: #8e7996; --color-purple-400: #795f84; --color-purple-500: #725578; --color-purple-600: #62486a; --color-purple-700: #533c5b; --color-purple-800: #44334b;
-  --color-indigo-300: #8e7996; --color-indigo-400: #795f84; --color-indigo-500: #725578; --color-indigo-600: #62486a; --color-indigo-700: #533c5b; --color-indigo-800: #44334b;
-  --color-violet-300: #8e7996; --color-violet-400: #795f84; --color-violet-500: #725578; --color-violet-600: #62486a; --color-violet-700: #533c5b; --color-violet-800: #44334b;
-  --color-teal-300: #8e7996; --color-teal-400: #795f84; --color-teal-500: #725578; --color-teal-600: #62486a; --color-teal-700: #533c5b; --color-teal-800: #44334b;
-  --color-cyan-300: #8e7996; --color-cyan-400: #795f84; --color-cyan-500: #725578; --color-cyan-600: #62486a; --color-cyan-700: #533c5b; --color-cyan-800: #44334b;
-  --color-sky-300: #8e7996; --color-sky-400: #795f84; --color-sky-500: #725578; --color-sky-600: #62486a; --color-sky-700: #533c5b; --color-sky-800: #44334b;
+  --color-fuchsia-50: #f7f7f6; --color-fuchsia-100: #eeeeec; --color-fuchsia-200: #dcdcd9; --color-fuchsia-300: #8e7996; --color-fuchsia-400: #795f84; --color-fuchsia-500: #725578; --color-fuchsia-600: #62486a; --color-fuchsia-700: #533c5b; --color-fuchsia-800: #44334b; --color-fuchsia-900: #342a3a; --color-fuchsia-950: #211b25;
+  --color-pink-50: #f7f7f6; --color-pink-100: #eeeeec; --color-pink-200: #dcdcd9; --color-pink-300: #8e7996; --color-pink-400: #795f84; --color-pink-500: #725578; --color-pink-600: #62486a; --color-pink-700: #533c5b; --color-pink-800: #44334b; --color-pink-900: #342a3a; --color-pink-950: #211b25;
 
   --radius-xs: 0px;
   --radius-sm: 0px;
@@ -116,20 +110,25 @@ body {
   background: #8a8a88;
 }
 
-/* Make editable text inside inputs and textareas a highly distinctive, elegant mint green */
+/* Ordinary forms use the reference's light work surface; only the chat composer is black. */
 textarea, 
 input[type="text"], 
+input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]),
+select {
+  color: #202020 !important;
+  background-color: #f7f7f6;
+  border-color: #777777;
+}
+textarea,
+input[type="text"],
 input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]) {
-  color: #f2f0ea !important;
-  background-color: #0e0e0e !important;
-  border-color: #3a3a3a !important;
-  font-family: var(--font-mono) !important; /* Highly technical and readable JetBrains Mono */
+  font-family: var(--font-mono) !important;
 }
 
-/* Also style placeholder text to fit beautifully with the mint color scheme */
+/* Readable muted placeholders on light form fields. */
 textarea::placeholder,
 input::placeholder {
-  color: #8f8f8d !important; /* Elegant readable slate grey */
+  color: #686868 !important;
 }
 
 /* Universal text and font containment: prevent any text, token, or filename from breaking out of its container */
@@ -165,31 +164,60 @@ pre, code, kbd, samp, .font-mono {
   color: #fff;
   border: 1px solid #a18aa7;
 }
-.sft-workspace [class~="bg-green-500/15"] {
+button:is([class~="bg-green-500"], [class~="bg-green-600"], [class~="bg-green-400"]) {
+  background: linear-gradient(180deg, #8c7395 0%, #725578 48%, #57405f 100%) !important;
+  color: #fff !important;
+  border-color: #aa95b0 !important;
+}
+button:is([class~="bg-green-500"], [class~="bg-green-600"], [class~="bg-green-400"]):hover:not(:disabled) {
+  background: linear-gradient(180deg, #9a81a2 0%, #806386 48%, #644b6c 100%) !important;
+}
+button:is([class~="bg-green-500/15"], [class~="bg-green-500/10"]) {
   background: linear-gradient(180deg, #806589 0%, #65496f 100%) !important;
   color: #fff !important;
   border-color: #a18aa7 !important;
 }
-.sft-workspace [class~="bg-green-500/15"] [class~="text-green-400"] { color: #fff !important; }
-.sft-workspace [class~="bg-green-500"][class~="text-slate-950"],
-.sft-workspace [class~="bg-green-400"][class~="text-slate-950"] {
+button:is([class~="bg-green-500/15"], [class~="bg-green-500/10"]) [class~="text-green-400"] { color: #fff !important; }
+main button[class~="bg-blue-600/20"] {
+  background: linear-gradient(180deg, #806589 0%, #65496f 100%) !important;
+  color: #fff !important;
+  border-color: #a18aa7 !important;
+}
+button[class~="bg-amber-400/15"] {
+  background: linear-gradient(180deg, #8c7395 0%, #725578 48%, #57405f 100%) !important;
+  color: #fff !important;
+  border-color: #aa95b0 !important;
+}
+button[class~="bg-amber-400/15"] :is(.text-amber-300,.text-amber-200) { color: #fff !important; }
+main [class~="bg-green-500"][class~="text-slate-950"],
+main [class~="bg-green-400"][class~="text-slate-950"] {
   background: linear-gradient(180deg, #8c7395 0%, #725578 48%, #57405f 100%) !important;
   color: #fff !important;
   border-color: #aa95b0 !important;
 }
 
-/* Medium-gray control strips */
-.kk-strip { background-color: #7d7d7d !important; color: #111111; border-color: #686868 !important; }
-.kk-strip :is(.text-slate-400,.text-slate-500,.text-slate-600) { color: #1e1e1e; }
+/* Darker gray control strips add contrast without darkening the reading surface. */
+.kk-strip { background-color: #5f5f5f !important; color: #f1f1f1; border-color: #444444 !important; }
+.kk-strip :is(.text-slate-400,.text-slate-500,.text-slate-600) { color: #f1f1f1; }
 
 /* Light neutral header bar */
 .kk-header { background-color: #e3e3e1 !important; border-color: #c4c4c2 !important; }
+img[src="/favicon.svg"] { filter: hue-rotate(112deg) saturate(.76); }
+.kk-header [class~="bg-green-500/10"] {
+  background-color: #d4d4d2 !important;
+  color: #414141 !important;
+  border-color: #a4a4a2 !important;
+}
+
+/* Keep unavailable controls visibly disabled without washing their labels out. */
+main button:disabled,
+main [class~="opacity-45"] { opacity: .72; }
 
 /* Charcoal code panels */
 .kk-code {
-  background-color: #373b46 !important; color: #e8e6e1 !important; border-color: #4b4e57 !important;
+  background-color: #2d2d2d !important; color: #e8e6e1 !important; border-color: #444444 !important;
   --color-slate-300: #e2e0db; --color-slate-400: #c8c6c6; --color-slate-500: #aeacad;
-  --color-emerald-300: #c49fca; --color-emerald-400: #c49fca;
+  --color-emerald-300: #a488aa; --color-emerald-400: #a488aa;
 }
 
 /* True black composer surface */
@@ -197,6 +225,8 @@ pre, code, kbd, samp, .font-mono {
   background-color: #000 !important;
   border-color: #292929 !important;
   --color-slate-300: #e8e6e1; --color-slate-400: #c8c6c6; --color-slate-500: #aaa8aa; --color-slate-600: #89878a;
-  --color-emerald-300: #ba95c1; --color-emerald-400: #ba95c1;
+  --color-emerald-300: #a488aa; --color-emerald-400: #a488aa;
 }
-.kk-composer input, .kk-composer textarea { background-color: #000 !important; border-color: #3a3a3a !important; }
+.kk-composer .text-white { color: #f0eeee !important; }
+.kk-composer input, .kk-composer textarea { color: #f0eeee !important; background-color: #000 !important; border-color: #3a3a3a !important; }
+.kk-composer input::placeholder, .kk-composer textarea::placeholder { color: #aaa !important; }
