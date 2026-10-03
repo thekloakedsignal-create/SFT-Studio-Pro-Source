@@ -13,6 +13,7 @@ import { logger } from "./src/lib/logger.ts";
 import {
   ChatCompletionsHttpError, isProviderOverload, normalizeText,
   parseGeneratedExamples, parseReasoningExamples, sanitizeExample, sanitizeMessage,
+  encodeReasoningProviderText, decodeReasoningProviderText,
   type ReasoningParseFailureCategory
 } from "./src/lib/generation-response.ts";
 import {
@@ -1744,14 +1745,18 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             }
             const response = await callDigitalOceanChatCompletions({
               model,
-              contents: prompt,
-              config: requestConfig,
+              contents: isReasoningGeneration ? encodeReasoningProviderText(prompt) : prompt,
+              config: isReasoningGeneration
+                ? JSON.parse(encodeReasoningProviderText(JSON.stringify(requestConfig)))
+                : requestConfig,
               timeoutMs,
               ...(ignoreModelAbort || isReasoningGeneration ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
             });
             let parsed: any[];
             if (turnMode === "Reasoning") {
-              const result = parseReasoningExamples(extractResponseText(response), requestedCount);
+              const result = parseReasoningExamples(
+                decodeReasoningProviderText(extractResponseText(response)), requestedCount
+              );
               if (result.examples.length === 0) {
                 throw Object.assign(
                   new Error(`Model ${model} returned no valid, non-empty SFT examples.`),

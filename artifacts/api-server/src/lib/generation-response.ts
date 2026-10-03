@@ -1,6 +1,19 @@
 // Pure response handling: no provider calls, persistence, or invented training text.
 type RecordValue = Record<string, any>;
 
+// Avoid provider reasoning parsers consuming literal <think> tags inside JSON.
+// This encoding is transport-only; dataset validation still requires <think>.
+export function encodeReasoningProviderText(text: string): string {
+  return text.replace(/<think>/gi, "<sft_reasoning>")
+    .replace(/<\/think>/gi, "</sft_reasoning>")
+    .replaceAll("[Tt][Hh][Ii][Nn][Kk]", "[Ss][Ff][Tt]_[Rr][Ee][Aa][Ss][Oo][Nn][Ii][Nn][Gg]");
+}
+
+export function decodeReasoningProviderText(text: string): string {
+  return text.replace(/<sft_reasoning>/gi, "<think>")
+    .replace(/<\/sft_reasoning>/gi, "</think>");
+}
+
 function isRecord(value: unknown): value is RecordValue {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }

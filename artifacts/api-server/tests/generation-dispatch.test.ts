@@ -5,7 +5,8 @@ import vm from "node:vm";
 import { transform } from "esbuild";
 import {
   ChatCompletionsHttpError, isProviderOverload, normalizeText,
-  parseGeneratedExamples, parseReasoningExamples, sanitizeExample
+  parseGeneratedExamples, parseReasoningExamples, sanitizeExample,
+  encodeReasoningProviderText, decodeReasoningProviderText
 } from "../src/lib/generation-response.ts";
 
 // Actual legacy dispatch/provider adapter, with a fixture-only fetch and immediate
@@ -52,6 +53,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
     },
     Type: { OBJECT: "object", ARRAY: "array", STRING: "string", NUMBER: "number", BOOLEAN: "boolean" },
     ChatCompletionsHttpError, isProviderOverload, normalizeText, parseGeneratedExamples, parseReasoningExamples, sanitizeExample,
+    encodeReasoningProviderText, decodeReasoningProviderText,
     logger: { warn() {}, info() {}, error() {} },
     process: { env: { GRADIENT_MODEL_ACCESS_KEY: "offline-fixture-only-not-a-secret" } },
     console: { log() {}, warn() {}, error() {} },
@@ -170,7 +172,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
               {
                 role: "assistant",
                 content: isReasoning && mode !== "malformedReasoning"
-                  ? `<think>Check the answer format for ${request.model}.</think>\nAnswer ${index + 1} from ${request.model}.`
+                  ? `<sft_reasoning>Check the answer format for ${request.model}.</sft_reasoning>\nAnswer ${index + 1} from ${request.model}.`
                   : `Answer ${index + 1} from ${request.model}.`
               }
             ]
@@ -282,10 +284,11 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   const prompt = f.calls[0].messages.find((message: any) => message.role === "user").content;
   assert.match(prompt, /selected TEMPLATE TYPE: "Reasoning"/);
   const formattingExample = prompt.split("- Formatting example:\n")[1].split("\n- Escape all line breaks")[0];
-  assert.equal(parseReasoningExamples(formattingExample, 1).examples.length, 1);
+  assert.equal(parseReasoningExamples(decodeReasoningProviderText(formattingExample), 1).examples.length, 1);
   assert.ok(f.calls.every(call => call.model === "nemotron-3-ultra-550b"));
   assert.match(prompt, /Each example must contain exactly two messages, in order: one user message, then one assistant message/);
-  assert.match(prompt, /Assistant content must start with exactly one non-empty <think>\.\.\.<\/think> block, followed by a non-empty final answer/);
+  assert.match(prompt, /Assistant content must start with exactly one non-empty <sft_reasoning>\.\.\.<\/sft_reasoning> block, followed by a non-empty final answer/);
+  assert.ok(f.calls.every(call => !JSON.stringify(call.messages).includes("<think>")));
   assert.match(prompt, /Return them as one JSON object with an "examples" array/);
   assert.doesNotMatch(prompt, /Return them as a JSON array of examples/);
   assert.doesNotMatch(prompt, /Alpaca|Mistral|### Response:|\[INST\]/i);
@@ -314,14 +317,14 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
     "<think>Trace.</think>\nAnswer.",
     "<THINK>Trace.</THINK>\nAnswer.",
     " \n<think>Trace.</think>\nAnswer."
-  ]) assert.equal(contentPattern.test(content), true);
+  ]) assert.equal(contentPattern.test(encodeReasoningProviderText(content)), true);
   for (const content of [
     "### Response:\n<think>Trace.</think>\nAnswer.",
     "<think> </think>\nAnswer.",
     "<think>Trace.</think>",
     "<think>Trace.</think>\nAnswer.<think>Second.</think>",
     "<think>Trace.</think>\n<|im_end|>"
-  ]) assert.equal(contentPattern.test(content), false);
+  ]) assert.equal(contentPattern.test(encodeReasoningProviderText(content)), false);
 });
 
 test("Reasoning timeout recovery updates the schema to the requested fill count", async () => {
