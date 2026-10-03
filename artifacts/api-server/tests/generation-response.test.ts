@@ -98,6 +98,10 @@ test("reasoning is retained only in supported templates; user/system text is pre
     { role: "user", content: "Analysis: explain the field named response." },
     { role: "assistant", content: "<think>Check the format.</think>\nA complete final answer." }
   ];
+  const reasoningBatch = parseGeneratedExamples(JSON.stringify({ examples: [{ messages }] }), "Reasoning");
+  assert.equal(reasoningBatch.length, 1);
+  assert.equal(reasoningBatch[0].messages[1].reasoning, "Check the format.");
+  assert.equal(reasoningBatch[0].messages[1].content, "A complete final answer.");
   for (const template of ["Reasoning", "Mixed"]) {
     const example = parseGeneratedExamples(JSON.stringify({ messages }), template)[0];
     assert.equal(example.messages[1].reasoning, "Check the format.");
