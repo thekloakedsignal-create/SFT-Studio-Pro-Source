@@ -282,15 +282,16 @@ body {
   background: #c77dff;
 }
 
-/* Light-grey editing surfaces balance the charcoal chrome and reduce bright-on-black glare. */
+/* Bright purple-fuchsia writing on black editing surfaces. */
 textarea,
 select,
 input:not([type]),
 input:is([type="text"], [type="email"], [type="password"], [type="number"], [type="search"], [type="url"], [type="tel"]) {
-  background-color: #ffffff !important;
-  color: #46115f !important;
-  border-color: #777781;
-  color-scheme: light;
+  background-color: #070709 !important;
+  color: #ef70ff !important;
+  caret-color: #f6a5ff;
+  border: 2px solid #505056;
+  color-scheme: dark;
 }
 
 textarea,
@@ -301,26 +302,28 @@ input:is([type="text"], [type="email"], [type="password"], [type="number"], [typ
 
 textarea::placeholder,
 input::placeholder {
-  color: #654175 !important;
+  color: #d98be6 !important;
   opacity: 1;
 }
 
 select option {
-  background-color: #ffffff;
-  color: #46115f;
+  background-color: #070709;
+  color: #ef70ff;
 }
 
 textarea:focus,
 select:focus,
 input:focus {
-  border-color: #963de5;
+  border-color: #e25aff;
+  outline: 2px solid #e25aff;
+  outline-offset: 2px;
 }
 
 textarea:disabled,
 select:disabled,
 input:disabled {
-  background-color: #b8b8c0 !important;
-  color: #55555f !important;
+  background-color: #202024 !important;
+  color: #c49bcc !important;
 }
 
 /* Explicit dark zones against the light workspace, matching the reference's
@@ -355,11 +358,11 @@ pre {
 .sft-composer,
 .sft-composer input {
   background-color: #09090c !important;
-  color: #dfc4f0 !important;
+  color: #ef70ff !important;
 }
 
 .sft-composer input::placeholder {
-  color: #b79bc8 !important;
+  color: #d98be6 !important;
 }
 
 .text-white,
@@ -426,6 +429,26 @@ pre {
 
 .sft-charcoal button[id^="tab-"]:not(:disabled):hover {
   border-color: #c782ff;
+}
+
+/* A continuous charcoal frame and solid dividers, not translucent grey outlines. */
+#root > .min-h-screen {
+  border: 4px solid #45454b;
+}
+
+:is(.border, .border-2, .border-t, .border-b, .border-l, .border-r, .border-t-2),
+.sft-content [class*="bg-slate-950/"]:not(.sft-charcoal):not(.sft-composer),
+.sft-content > div > div {
+  border-color: #505056;
+}
+
+:is([role="dialog"], [role="menu"], [role="listbox"], [data-radix-popper-content-wrapper] > div) {
+  border-color: #505056;
+}
+
+.sft-charcoal button[id^="tab-"].shadow-sm,
+[role="tab"][data-state="active"] {
+  border-color: #bc61ff;
 }
 
 /* Universal text and font containment: prevent any text, token, or filename from breaking out of its container */

@@ -16,3 +16,9 @@ The user specifies “Purple for font and highlighted selections.”
 **How to apply:** Use readable deep purple text on light surfaces and lighter purple on charcoal, with purple selection highlights.
 
 Avoid low-opacity white panels over grey and muted grey-purple lettering: the user describes that treatment as “greyed out.” Keep working panels opaque and the purple text visibly saturated.
+
+Input boxes should have black backgrounds and bright, almost-fuchsia purple writing. Use dark-grey borders around the whole app.
+
+**Why:** The user explicitly requested this contrast treatment.
+
+**How to apply:** Preserve the mixed light/charcoal workspace, but use black editing fields with vivid purple-fuchsia text and clear dark-grey framing.
