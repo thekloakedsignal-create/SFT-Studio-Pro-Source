@@ -230,3 +230,9 @@ main [class~="opacity-45"] { opacity: .72; }
 .kk-composer .text-white { color: #f0eeee !important; }
 .kk-composer input, .kk-composer textarea { color: #f0eeee !important; background-color: #000 !important; border-color: #3a3a3a !important; }
 .kk-composer input::placeholder, .kk-composer textarea::placeholder { color: #aaa !important; }
+
+/* Solid outer frame; inset outline adds no layout dimensions. */
+#root {
+  outline: 2px solid #000;
+  outline-offset: -2px;
+}
