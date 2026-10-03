@@ -272,7 +272,12 @@ main [class~="opacity-45"] { opacity: .72; }
   outline-offset: -2px;
 }
 
-/* Keep the marked header distinct; the main workspace wrapper has no box border. */
+/* Strong signed-in work-area palette; leave the workspace wrapper unboxed. */
+#root > div:has(> .kk-header) {
+  background-color: #17141c !important;
+  color: #f4eef8;
+}
+
 .kk-header [class~="bg-slate-900/60"] {
   background-color: #2a2a2a !important;
 }
@@ -283,7 +288,37 @@ main [class~="opacity-45"] { opacity: .72; }
 }
 
 .kk-workspace-panel > div {
-  background-color: #fbfbfa;
+  background-color: transparent !important;
+}
+
+.kk-workspace-panel [class~="bg-slate-950/20"] { background-color: #211a28 !important; }
+.kk-workspace-panel [class~="bg-slate-950/30"] { background-color: #2a2233 !important; }
+.kk-workspace-panel [class~="bg-slate-950/60"] { background-color: #1d1724 !important; }
+.kk-workspace-panel [class~="bg-slate-950"] { background-color: #151119 !important; }
+.kk-workspace-panel [class~="bg-slate-900/10"] { background-color: #261d31 !important; }
+.kk-workspace-panel [class~="bg-slate-900/30"] { background-color: #30233d !important; }
+.kk-workspace-panel [class~="bg-slate-900/40"] { background-color: #382644 !important; }
+.kk-workspace-panel [class~="bg-slate-900/50"] { background-color: #412e50 !important; }
+.kk-workspace-panel [class~="bg-slate-900/60"] { background-color: #352640 !important; }
+.kk-workspace-panel [class~="bg-slate-900/80"] { background-color: #2c2037 !important; }
+.kk-workspace-panel [class~="bg-slate-900"] { background-color: #33253f !important; }
+.kk-workspace-panel [class~="bg-slate-800"] { background-color: #493854 !important; }
+.kk-workspace-panel [class~="bg-slate-700"] { background-color: #60496f !important; }
+
+.kk-workspace-panel select {
+  background-color: #33253f !important;
+  color: #f7f2fa !important;
+  border-color: #a16dbb !important;
+}
+
+#root > div:has(> .kk-header) > footer {
+  background-color: #211a28 !important;
+  color: #eee5f2 !important;
+  border-color: #765687 !important;
+}
+
+#root > div:has(> .kk-header) > footer [class*="text-slate-"] {
+  color: #ded1e7 !important;
 }
 
 /* Stronger typography and outer frames inside the two highlighted panels. */
@@ -298,41 +333,54 @@ main [class~="opacity-45"] { opacity: .72; }
   border: 2px solid #171717 !important;
 }
 
-.kk-workspace-panel :is(h1, h2, h3, h4, h5, h6, p, span, label, a):not(button *):not(a *):not(.kk-code *):not(.kk-composer *):not(.kk-example-label):not(.kk-neon-example-count) {
-  color: #32113f !important;
+.kk-workspace-panel :is(h1, h2, h3, h4, h5, h6):not(button *):not(.kk-code *):not(.kk-composer *) {
+  color: #f0d8ff !important;
+}
+
+.kk-workspace-panel :is(p, span, label, a):not(button *):not(a *):not(.kk-code *):not(.kk-composer *):not(.kk-example-label):not(.kk-neon-example-count) {
+  color: #f4eef8 !important;
 }
 
 .kk-workspace-panel [class*="text-slate-"]:not(button *):not(.kk-code *):not(.kk-composer *) {
-  color: #281033 !important;
+  color: #ded1e7 !important;
+}
+
+.kk-workspace-panel [class~="text-white"] {
+  color: #ffffff !important;
 }
 
 .kk-header [class~="bg-slate-900/60"] :is(h1, h2, h3, h4, h5, h6, p, span, label):not(button *):not(.kk-neon-example-count) {
   color: #efd8ff !important;
 }
 
+.kk-workspace-panel [class*="border-slate-"] {
+  border-color: #8c68a2 !important;
+}
+
 .kk-workspace-panel [class~="border"][class*="border-slate-"] {
   border-width: 2px !important;
-  border-color: #3c2c46 !important;
 }
 
 .kk-workspace-panel .kk-example-card[class~="border"] {
-  border: 2px solid #30203a !important;
-  border-left: 6px solid #7e22ce !important;
+  background-color: #30223b !important;
+  border: 2px solid #8c68a2 !important;
+  border-left: 7px solid #d000ff !important;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 32%);
 }
 
 .kk-workspace-panel .kk-example-card > div:first-child {
-  border-bottom: 2px solid #543467 !important;
+  border-bottom: 2px solid #9c73b2 !important;
 }
 
 .kk-workspace-panel span.kk-example-label {
-  color: #a600ff !important;
-  text-shadow: 0 0 4px rgb(166 0 255 / 48%);
+  color: #d000ff !important;
+  text-shadow: 0 0 6px rgb(208 0 255 / 58%);
 }
 
 .kk-header [class~="bg-slate-900/60"] span.kk-neon-example-count,
 .kk-workspace-panel span.kk-neon-example-count {
-  color: #a600ff !important;
-  text-shadow: 0 0 5px rgb(166 0 255 / 68%), 0 0 12px rgb(166 0 255 / 36%);
+  color: #d000ff !important;
+  text-shadow: 0 0 5px rgb(208 0 255 / 72%), 0 0 12px rgb(208 0 255 / 48%);
 }
 
 #root > div:has(> .kk-header) > main :is(
