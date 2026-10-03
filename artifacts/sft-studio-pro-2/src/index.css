@@ -236,3 +236,69 @@ main [class~="opacity-45"] { opacity: .72; }
   outline: 2px solid #000;
   outline-offset: -2px;
 }
+
+/* Dark neutral palette is scoped to the working app, not the sign-in screen. */
+#root > div:has(> .kk-header) > main,
+.kk-header [class~="bg-slate-900/60"] {
+  --color-white: #f5f5f4;
+  --color-black: #000000;
+  --color-slate-50: #f5f5f5;
+  --color-slate-100: #eeeeee;
+  --color-slate-200: #dddddd;
+  --color-slate-300: #c8c8c8;
+  --color-slate-400: #b2b2b2;
+  --color-slate-500: #999999;
+  --color-slate-600: #7e7e7e;
+  --color-slate-700: #646464;
+  --color-slate-750: #535353;
+  --color-slate-800: #444444;
+  --color-slate-850: #333333;
+  --color-slate-900: #292929;
+  --color-slate-950: #1c1c1c;
+}
+
+#root > div:has(> .kk-header) > main {
+  background-color: #282828 !important;
+}
+
+.kk-header [class~="bg-slate-900/60"] {
+  background-color: #3a3a3a !important;
+  border-color: #595959 !important;
+  color: #eeeeee;
+}
+
+.kk-header [class~="bg-slate-900/60"] [class~="bg-slate-950/80"] {
+  background-color: #292929 !important;
+  border-color: #555555 !important;
+}
+
+.kk-header [class~="bg-slate-900/60"] select {
+  background-color: transparent !important;
+  color: #eeeeee !important;
+}
+
+#root > div:has(> .kk-header) > main [class~="bg-slate-950/30"] {
+  background-color: #3a3a3a !important;
+  border-color: #585858 !important;
+}
+
+#root > div:has(> .kk-header) > main :is(
+  textarea,
+  input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"])
+) {
+  background-color: #000000 !important;
+  color: #c77dff !important;
+  border-color: #67477a !important;
+  caret-color: #d69bfa;
+  opacity: 1 !important;
+}
+
+#root > div:has(> .kk-header) > main :is(textarea, input)::placeholder {
+  color: #a978c0 !important;
+  opacity: 1;
+}
+
+#root > div:has(> .kk-header) > main :is(textarea, input):focus {
+  border-color: #c77dff !important;
+  box-shadow: 0 0 0 1px rgb(199 125 255 / 28%);
+}

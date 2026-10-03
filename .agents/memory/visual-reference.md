@@ -3,10 +3,10 @@ name: SFT visual reference
 description: User's screenshot-based palette requirements and contrast correction.
 ---
 
-Use the user's supplied screenshot as the exact visual reference for color changes. Ignore the surrounding iOS/Replit interface. Match its neutral gray controls, near-white reading surface, charcoal code panels, true-black composer, and metallic purple accents. Do not substitute pale lavender for metallic purple.
+Use the user's latest marked screenshots as the exact visual reference. The project toolbar and main workspace panels marked in pink should be dark gray. Workspace text inputs and textareas should have black backgrounds with bright metallic-purple text. Keep the separate title/header area and purple actions as shown; do not substitute pale lavender for metallic purple.
 
-The user specifically requested “More contrast with dark greys and blacks in the work area. Contrast and sharp clear readability,” with some black but not too much. Keep the work color-only: preserve layout, typography, and behavior.
+Keep the work color-only: preserve layout, typography, and behavior. Verify the working guest workspace rather than relying on the sign-in page.
 
-**Why:** The user repeatedly corrected color mismatches and explicitly rejected changing layout or behavior while asking for the screenshot's palette.
+**Why:** The user annotated the exact workspace panels and fields; checking only the sign-in screen failed to verify the requested app surfaces.
 
-**How to apply:** Refer to the embedded website in the supplied image when making palette decisions. Keep most reading surfaces near-white, add charcoal selectively for contrast, reserve true black for the composer, and keep the purple metallic; change only color values.
+**How to apply:** Scope color changes to the marked workspace panels and text boxes. Keep the existing layout, typography, interactions, and unmarked header unchanged.
