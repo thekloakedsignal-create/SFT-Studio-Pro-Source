@@ -279,17 +279,45 @@ body {
   background: #c77dff;
 }
 
-/* Keep editable content light against the dark palette. */
-textarea, 
-input[type="text"], 
-input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]) {
-  color: #d1d1d7 !important;
+/* Light-grey editing surfaces balance the charcoal chrome and reduce bright-on-black glare. */
+textarea,
+select,
+input:not([type]),
+input:is([type="text"], [type="email"], [type="password"], [type="number"], [type="search"], [type="url"], [type="tel"]) {
+  background-color: #d4d4da !important;
+  color: #242429 !important;
+  border-color: #96969f;
+  color-scheme: light;
+}
+
+textarea,
+input:not([type]),
+input:is([type="text"], [type="email"], [type="password"], [type="number"], [type="search"], [type="url"], [type="tel"]) {
   font-family: var(--font-mono) !important;
 }
 
 textarea::placeholder,
 input::placeholder {
-  color: #a9a9b2 !important;
+  color: #62626c !important;
+  opacity: 1;
+}
+
+select option {
+  background-color: #d4d4da;
+  color: #242429;
+}
+
+textarea:focus,
+select:focus,
+input:focus {
+  border-color: #963de5;
+}
+
+textarea:disabled,
+select:disabled,
+input:disabled {
+  background-color: #b8b8c0 !important;
+  color: #55555f !important;
 }
 
 /* Universal text and font containment: prevent any text, token, or filename from breaking out of its container */
