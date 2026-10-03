@@ -31,7 +31,7 @@ function hasRenderableMessages(example: any): boolean {
     ));
 }
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const delays: number[] = [];
@@ -134,8 +134,10 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
         : 200;
       const userPrompt = request.messages.find((message: any) => message.role === "user")?.content || "";
       const requestedCount = Number(userPrompt.match(/Generate exactly (\d+) examples\./)?.[1]) || 1;
+      const isMultiTurn = userPrompt.includes('selected TEMPLATE TYPE: "Multi Turn"');
+      const isReasoning = userPrompt.includes('selected TEMPLATE TYPE: "Reasoning"');
       const requestedExamples = Array.from({ length: requestedCount }, (_, index) => ({
-        messages: userPrompt.includes('selected TEMPLATE TYPE: "Multi Turn"')
+        messages: isMultiTurn
           ? [
               { role: "system", content: "You are helpful." },
               { role: "user", content: `Question ${index + 1} for ${request.model}` },
@@ -145,7 +147,12 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
             ]
           : [
               { role: "user", content: `Question ${index + 1} for ${request.model}` },
-              { role: "assistant", content: `Answer ${index + 1} from ${request.model}.` }
+              {
+                role: "assistant",
+                content: isReasoning && mode !== "malformedReasoning"
+                  ? `<think>Check the answer format for ${request.model}.</think>\nAnswer ${index + 1} from ${request.model}.`
+                  : `Answer ${index + 1} from ${request.model}.`
+              }
             ]
       }));
       const content = mode === "invalid" && isPrimary
@@ -210,6 +217,35 @@ test("Multi Turn prompt requests the JSON-object envelope required by the provid
   assert.match(prompt, /Return them as one JSON object with an "examples" array/);
   assert.match(prompt, /Do not return a top-level JSON array/);
   assert.ok(f.calls.every(call => call.response_format.type === "json_object"));
+});
+
+test("Reasoning batch jobs extract tagged thinking into the UI reasoning field", async () => {
+  const f = fixture();
+  const started = await f.generate(5, true, "Reasoning");
+  const job = await f.job(started.body.jobId);
+
+  assert.equal(job.body.status, "complete");
+  assert.equal(job.body.result.examples.length, 5);
+  for (const example of job.body.result.examples) {
+    const assistant = example.messages.find((message: any) => message.role === "assistant");
+    const answerMatch = assistant.content.match(/^Answer 1 from (.+)\.$/);
+    assert.ok(answerMatch);
+    assert.equal(assistant.reasoning, `Check the answer format for ${answerMatch[1]}.`);
+    assert.equal(assistant.content.includes("<think>"), false);
+  }
+  const prompt = f.calls[0].messages.find((message: any) => message.role === "user").content;
+  assert.match(prompt, /selected TEMPLATE TYPE: "Reasoning"/);
+  assert.ok(f.calls.every(call => call.response_format.type === "json_object"));
+});
+
+test("Reasoning batch jobs reject responses that omit the required think block", async () => {
+  const f = fixture("malformedReasoning");
+  const started = await f.generate(5, true, "Reasoning");
+  const job = await f.job(started.body.jobId);
+
+  assert.equal(job.body.status, "error");
+  assert.equal(job.body.result, undefined);
+  assert.equal(f.calls.length, 5);
 });
 
 test("a stalled model is skipped in later stacks and GLM fills all missing examples in one request", async () => {

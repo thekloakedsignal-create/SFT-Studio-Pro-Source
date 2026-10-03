@@ -109,6 +109,49 @@ test("reasoning is retained only in supported templates; user/system text is pre
   assert.equal(sanitizeMessage({ role: "assistant", content: { response: "Answer.", reasoning: "Check." } }, "Reasoning").reasoning, "Check.");
 });
 
+test("strict tagged reasoning validation is optional and applies only to Reasoning", () => {
+  const valid = {
+    messages: [
+      { role: "user", content: "Q" },
+      { role: "assistant", content: "### Response:\n<think>Check the format.</think>\nA complete answer." }
+    ]
+  };
+  const strictOptions = { requireThinkTaggedReasoning: true };
+  const parsed = parseGeneratedExamples(JSON.stringify(valid), "Reasoning", strictOptions);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].messages[1].reasoning, "Check the format.");
+  assert.equal(parsed[0].messages[1].content, "### Response:\n\nA complete answer.");
+
+  for (const content of [
+    "A plain answer without a trace.",
+    "<think> </think>\nAn answer after an empty trace.",
+    "<think>Trace without a final answer.</think>",
+    "Unrequested preamble.\n<think>Trace.</think>\nAnswer.",
+    "<think>Trace.</think>\nAnswer.\n<think>Second trace.</think>"
+  ]) {
+    const example = {
+      messages: [
+        { role: "user", content: "Q" },
+        { role: "assistant", content }
+      ]
+    };
+    assert.deepEqual(
+      parseGeneratedExamples(JSON.stringify(example), "Reasoning", strictOptions),
+      []
+    );
+  }
+
+  const untagged = {
+    messages: [
+      { role: "user", content: "Q" },
+      { role: "assistant", content: "A plain answer." }
+    ]
+  };
+  assert.equal(parseGeneratedExamples(JSON.stringify(untagged), "Reasoning").length, 1);
+  assert.equal(parseGeneratedExamples(JSON.stringify(untagged), "Single Turn", strictOptions).length, 1);
+  assert.equal(parseGeneratedExamples(JSON.stringify(untagged), "Mixed", strictOptions).length, 1);
+});
+
 test("only actual HTTP 529 provider errors qualify for a backup", () => {
   assert.equal(isProviderOverload(new ChatCompletionsHttpError(529, "overloaded")), true);
   for (const status of [400, 401, 429, 500, 503]) {

@@ -1880,7 +1880,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               timeoutMs,
               ...(ignoreModelAbort ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
             });
-            const parsed = parseGeneratedExamples(extractResponseText(response), turnMode);
+            const parsed = parseGeneratedExamples(extractResponseText(response), turnMode, {
+              requireThinkTaggedReasoning: turnMode === "Reasoning"
+            });
             if (parsed.length === 0) {
               throw new Error(`Model ${model} returned no valid, non-empty SFT examples.`);
             }

@@ -98,6 +98,50 @@ const roleAliases: Record<string, string> = {
   developer: "developer", tool: "tool"
 };
 
+function hasThinkTaggedAssistantResponse(example: unknown): boolean {
+  if (!isRecord(example)) return false;
+
+  let rawMessages = example.messages;
+  if (!Array.isArray(rawMessages)) {
+    if (Array.isArray(example.conversations)) {
+      rawMessages = example.conversations;
+    } else {
+      const assistantContent = example.response ?? example.output ?? example.assistant
+        ?? example.completion ?? example.answer;
+      rawMessages = assistantContent === undefined
+        ? []
+        : [{ role: "assistant", content: assistantContent }];
+    }
+  }
+
+  const assistantMessages = rawMessages.filter((message: any) => {
+    const rawRole = isRecord(message) ? message.role ?? message.from : undefined;
+    return typeof rawRole === "string"
+      && (roleAliases[rawRole.toLowerCase()] || rawRole) === "assistant";
+  });
+  if (assistantMessages.length === 0) return false;
+
+  return assistantMessages.every((message: any) => {
+    const rawContent = isRecord(message) ? message.content ?? message.value : message;
+    const content = normalizeMessageText(rawContent);
+    const thinkBlocks = Array.from(content.matchAll(/<think>([\s\S]*?)<\/think>/gi));
+    if (thinkBlocks.length !== 1) return false;
+
+    const [thinkBlock] = thinkBlocks;
+    const thinkStart = thinkBlock.index;
+    if (thinkStart === undefined || !thinkBlock[1].trim()) return false;
+
+    const prefix = content.slice(0, thinkStart).trim();
+    if (prefix && !/^###\s*Response:\s*$/i.test(prefix)) return false;
+
+    const answer = content
+      .slice(thinkStart + thinkBlock[0].length)
+      .replace(/(?:<\/s>|<\|im_end\|>)+\s*$/gi, "")
+      .trim();
+    return answer.length > 0;
+  });
+}
+
 export function sanitizeMessage(msg: any, templateType?: string): { role: string; content: string; reasoning?: string } {
   const rawRole = isRecord(msg) ? msg.role ?? msg.from : undefined;
   const role = typeof rawRole === "string" ? roleAliases[rawRole.toLowerCase()] || rawRole : "";
@@ -223,12 +267,19 @@ function parseJsonValues(text: string): any[] {
 }
 
 /** Validate and normalize before the caller counts or truncates anything. */
-export function parseGeneratedExamples(rawContent: unknown, templateType?: string): any[] {
+export function parseGeneratedExamples(
+  rawContent: unknown,
+  templateType?: string,
+  options: { requireThinkTaggedReasoning?: boolean } = {}
+): any[] {
   const text = normalizeText(rawContent);
   if (!text) return [];
   const fenced = Array.from(text.matchAll(/```(?:jsonl|ndjson|json)?[ \t]*\r?\n?([\s\S]*?)```/gi));
   const regions = fenced.length > 0 ? fenced.map(match => match[1].trim()) : [text];
+  const requireThinkTaggedReasoning = options.requireThinkTaggedReasoning === true
+    && templateType === "Reasoning";
   return regions.flatMap(parseJsonValues).flatMap(unwrapExamples)
+    .filter(example => !requireThinkTaggedReasoning || hasThinkTaggedAssistantResponse(example))
     .map(example => sanitizeExample(example, templateType)).filter(isValidExample);
 }
 
