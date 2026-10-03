@@ -1442,7 +1442,7 @@ REASONING TEMPLATE FORMAT:
                   content: {
                     type: Type.STRING,
                     description: "Content starts with exactly one non-empty <think>...</think> block, followed by a non-empty final answer.",
-                    pattern: "^(?![\\s\\S]*<[Tt][Hh][Ii][Nn][Kk]>[\\s\\S]*<[Tt][Hh][Ii][Nn][Kk]>)(?![\\s\\S]*<\\/[Tt][Hh][Ii][Nn][Kk]>[\\s\\S]*<\\/[Tt][Hh][Ii][Nn][Kk]>)<[Tt][Hh][Ii][Nn][Kk]>(?:(?!<\\/[Tt][Hh][Ii][Nn][Kk]>)[\\s\\S])*\\S(?:(?!<\\/[Tt][Hh][Ii][Nn][Kk]>)[\\s\\S])*<\\/[Tt][Hh][Ii][Nn][Kk]>(?!\\s*(?:(?:<\\/s>|<\\|im_end\\|>)+\\s*)?$)[\\s\\S]*\\S[\\s\\S]*$"
+                    pattern: "^\\s*(?![\\s\\S]*<[Tt][Hh][Ii][Nn][Kk]>[\\s\\S]*<[Tt][Hh][Ii][Nn][Kk]>)(?![\\s\\S]*<\\/[Tt][Hh][Ii][Nn][Kk]>[\\s\\S]*<\\/[Tt][Hh][Ii][Nn][Kk]>)<[Tt][Hh][Ii][Nn][Kk]>(?:(?!<\\/[Tt][Hh][Ii][Nn][Kk]>)[\\s\\S])*\\S(?:(?!<\\/[Tt][Hh][Ii][Nn][Kk]>)[\\s\\S])*<\\/[Tt][Hh][Ii][Nn][Kk]>(?!\\s*(?:(?:<\\/s>|<\\|im_end\\|>)+\\s*)?$)[\\s\\S]*\\S[\\s\\S]*$"
                   }
                 },
                 required: ["role", "content"],

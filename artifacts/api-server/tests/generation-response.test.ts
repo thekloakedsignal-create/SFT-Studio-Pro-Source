@@ -200,6 +200,15 @@ test("strict Reasoning parsing returns safe failure categories and enforces the 
     failureCategory: "wrong_example_count"
   });
   assert.equal(parseReasoningExamples(validBatch, 1).examples.length, 1);
+  const leadingWhitespaceBatch = JSON.stringify({
+    examples: [{
+      messages: [
+        { role: "user", content: "Q" },
+        { role: "assistant", content: " \n<think>Trace.</think>\nAnswer." }
+      ]
+    }]
+  });
+  assert.equal(parseReasoningExamples(leadingWhitespaceBatch, 1).examples.length, 1);
 });
 
 test("only actual HTTP 529 provider errors qualify for a backup", () => {

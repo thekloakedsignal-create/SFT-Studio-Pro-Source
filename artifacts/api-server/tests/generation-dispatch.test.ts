@@ -253,7 +253,7 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   const prompt = f.calls[0].messages.find((message: any) => message.role === "user").content;
   assert.match(prompt, /selected TEMPLATE TYPE: "Reasoning"/);
   assert.match(prompt, /Each example must contain exactly two messages, in order: one user message, then one assistant message/);
-  assert.match(prompt, /exactly one non-empty <think>\.\.\.<\/think> block followed by a non-empty final answer/);
+  assert.match(prompt, /Assistant content must start with exactly one non-empty <think>\.\.\.<\/think> block, followed by a non-empty final answer/);
   assert.match(prompt, /Return them as one JSON object with an "examples" array/);
   assert.doesNotMatch(prompt, /Return them as a JSON array of examples/);
   assert.doesNotMatch(prompt, /Alpaca|Mistral|### Response:|\[INST\]/i);
@@ -280,7 +280,8 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   const contentPattern = new RegExp(messagesSchema.prefixItems[1].properties.content.pattern);
   for (const content of [
     "<think>Trace.</think>\nAnswer.",
-    "<THINK>Trace.</THINK>\nAnswer."
+    "<THINK>Trace.</THINK>\nAnswer.",
+    " \n<think>Trace.</think>\nAnswer."
   ]) assert.equal(contentPattern.test(content), true);
   for (const content of [
     "### Response:\n<think>Trace.</think>\nAnswer.",
