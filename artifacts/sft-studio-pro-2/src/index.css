@@ -411,8 +411,27 @@ pre {
 /* Remove the translucent grey wash from working panels. Keep intentional
    charcoal regions and the black composer distinct. */
 .sft-content [class*="bg-slate-950/"]:not(.sft-charcoal):not(.sft-composer) {
-  background-color: #ffffff;
+  background-color: #505056;
   border-color: #9696a0;
+}
+
+.sft-top-panel-inner {
+  background-color: #77777e;
+  --color-slate-200: #fff0ff;
+  --color-slate-500: #fff0ff;
+}
+
+.sft-content.sft-charcoal {
+  background-color: transparent;
+  --heading-ink: #ffadff;
+  --accent-ink: #ffadff;
+  --color-slate-400: #efd4f7;
+  --color-slate-500: #e6c8ef;
+}
+
+.sft-content textarea {
+  background-color: #48484e !important;
+  color: #ffadff !important;
 }
 
 .sft-content > div > div {

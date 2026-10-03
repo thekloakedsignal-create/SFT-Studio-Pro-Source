@@ -21,4 +21,4 @@ Input boxes should have black backgrounds and bright, almost-fuchsia purple writ
 
 **Why:** The user explicitly requested this contrast treatment.
 
-**How to apply:** Preserve the mixed light/charcoal workspace, but use black editing fields with vivid purple-fuchsia text and clear dark-grey framing.
+**How to apply:** Preserve the mixed light/charcoal workspace and vivid purple-fuchsia text with clear dark-grey framing. The user's later correction takes precedence for the top panel and workspace: top panel inner box is medium grey; main workspace content box is medium-dark grey, explicitly not black.

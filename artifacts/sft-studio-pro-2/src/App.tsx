@@ -4060,7 +4060,7 @@ export default function App() {
           </div>
 
           {/* Real-time Project Status Hub & Controls Panel */}
-          <div className="bg-slate-900/60 p-2 sm:p-2.5 rounded-xl border border-slate-800/80 w-full md:w-auto">
+          <div className="sft-top-panel-inner bg-slate-900/60 p-2 sm:p-2.5 rounded-xl border border-slate-800/80 w-full md:w-auto">
             <div className="flex flex-col gap-2">
               
               {/* Row 1 (Top): Project Selector with expanded horizontal space & live stats */}
@@ -4460,7 +4460,7 @@ export default function App() {
         </div>
 
         {/* Tab Contents Frame */}
-        <div className="sft-content lg:col-span-9 xl:col-span-10 flex flex-col gap-6 min-w-0">
+        <div className="sft-content sft-charcoal lg:col-span-9 xl:col-span-10 flex flex-col gap-6 min-w-0">
           <AnimatePresence mode="wait">
             
             {/* TAB 1: DEFINITIONS & BATCH GENERATION */}
