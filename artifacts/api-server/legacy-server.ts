@@ -4765,7 +4765,7 @@ ${appContext ? `CURRENT PROJECT CONTEXT:
 
 GUIDELINES:
 - When a user asks how to do something, tell them which tab to click and what steps to take.
-- Answer questions on fine-tuning concepts (e.g. SFT vs DPO vs RLHF, optimal dataset sizing, formatting differences, negative constraints).
+- Answer questions on fine-tuning workflows, optimal dataset sizing, formatting differences, and negative constraints.
 - Keep responses readable, utilizing clean formatting with bullet points and code blocks when appropriate.`;
 
     const response = await callDigitalOceanAI(client, {

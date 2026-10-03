@@ -1562,8 +1562,8 @@ export default function App() {
         completion: "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
       },
       [InstructTemplate.ALPACA]: {
-        prompt: "### Instruction:\nAnalyze the core trade-offs between supervised fine-tuning (SFT) and direct preference optimization (DPO).\n\n### Input:\nContext: Post-training curriculum design.",
-        completion: "### Response:\nSupervised Fine-Tuning (SFT) teaches the model core capabilities, domain formatting, and persona structures through direct prompt-completion demonstration. Direct Preference Optimization (DPO) aligns existing capabilities to human preference pairs (chosen vs. rejected) without altering base knowledge or requiring a separate reward model."
+        prompt: "### Instruction:\nExplain why the sky appears blue.\n\n### Input:\nContext: Atmospheric light scattering.",
+        completion: "### Response:\nThe sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
       },
       [InstructTemplate.MISTRAL]: {
         prompt: "[INST] Explain why the sky appears blue. [/INST]",
@@ -4665,8 +4665,8 @@ export default function App() {
                                     completion: "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
                                   },
                                   [InstructTemplate.ALPACA]: {
-                                    prompt: "### Instruction:\nAnalyze the core trade-offs between supervised fine-tuning (SFT) and direct preference optimization (DPO).\n\n### Input:\nContext: Post-training curriculum design.",
-                                    completion: "### Response:\nSupervised Fine-Tuning (SFT) teaches the model core capabilities, domain formatting, and persona structures through direct prompt-completion demonstration. Direct Preference Optimization (DPO) aligns existing capabilities to human preference pairs (chosen vs. rejected) without altering base knowledge or requiring a separate reward model."
+                                    prompt: "### Instruction:\nExplain why the sky appears blue.\n\n### Input:\nContext: Atmospheric light scattering.",
+                                    completion: "### Response:\nThe sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
                                   },
                                   [InstructTemplate.MISTRAL]: {
                                     prompt: "[INST] Explain why the sky appears blue. [/INST]",
@@ -4744,8 +4744,8 @@ export default function App() {
                                           completion: "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
                                         },
                                         [InstructTemplate.ALPACA]: {
-                                          prompt: "### Instruction:\nAnalyze the core trade-offs between supervised fine-tuning (SFT) and direct preference optimization (DPO).\n\n### Input:\nContext: Post-training curriculum design.",
-                                          completion: "### Response:\nSupervised Fine-Tuning (SFT) teaches the model core capabilities, domain formatting, and persona structures through direct prompt-completion demonstration. Direct Preference Optimization (DPO) aligns existing capabilities to human preference pairs (chosen vs. rejected) without altering base knowledge or requiring a separate reward model."
+                                          prompt: "### Instruction:\nExplain why the sky appears blue.\n\n### Input:\nContext: Atmospheric light scattering.",
+                                          completion: "### Response:\nThe sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
                                         },
                                         [InstructTemplate.MISTRAL]: {
                                           prompt: "[INST] Explain why the sky appears blue. [/INST]",
