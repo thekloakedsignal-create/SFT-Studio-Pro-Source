@@ -1650,7 +1650,7 @@ ${JSON.stringify({ examples: [{ messages: [
         Generate exactly ${currentChunkSize} examples. ${
           turnMode === "Reasoning"
             ? `Return them as one JSON object with an "examples" array, for example {"examples":[...]}. Do not return a top-level JSON array.`
-            : turnMode === "Multi Turn" || turnMode === "Mixed"
+            : turnMode === "Single Turn" || turnMode === "Multi Turn" || turnMode === "Mixed"
             ? `Return them as one JSON object with an "examples" array, for example {"examples":[...]}. Do not return a top-level JSON array.`
             : `Return them as a JSON array of examples.`
         }
@@ -1871,6 +1871,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       }
     }
 
+    let singleTurnFailure: unknown;
     startProgressStream();
     for (let stackIndex = 0; stackIndex < chunkTasks.length; stackIndex++) {
       if (stackIndex > 0) {
@@ -1879,12 +1880,15 @@ No internal deliberation, planning, or reasoning fields are permitted.`
         if (spacingMs > 0) await new Promise((resolve) => setTimeout(resolve, spacingMs));
       }
       try {
-        // Reasoning slots share a model, but their results are independent.
-        // Collect all in-flight results before saving a partial batch.
-        if (isReasoningGeneration) {
+        // Collect independent responses before finalizing. Single Turn also
+        // finishes later scheduled stacks; a failed slot must not cancel them.
+        if (isReasoningGeneration || turnMode === "Single Turn") {
           const results = await Promise.allSettled(chunkTasks[stackIndex].map(task => task()));
           const failure = results.find(result => result.status === "rejected");
-          if (failure?.status === "rejected") throw failure.reason;
+          if (failure?.status === "rejected") {
+            if (turnMode === "Single Turn") singleTurnFailure ??= failure.reason;
+            else throw failure.reason;
+          }
         } else {
           await Promise.all(chunkTasks[stackIndex].map(task => task()));
         }
@@ -2041,7 +2045,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     }
 
     if (allExamples.length < countNum) {
-      if (timedOutExampleCount > 0) {
+      if (timedOutExampleCount > 0 || (turnMode === "Single Turn" && singleTurnFailure !== undefined)) {
         const formattedPartialExamples = allExamples
           .slice(0, countNum)
           .map(example => sanitizeExample(example, turnMode));
@@ -2053,7 +2057,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           source: `DigitalOcean Inference (${generationModels.join(", ")})`,
           partial: true as const,
           requestedCount: countNum,
-          partialReason: `Timed out model(s): ${modelList}. ${recoveryFailureReason || "GLM could not fill all missing examples."}`
+          partialReason: singleTurnFailure !== undefined
+            ? formatAIErrorMessage(singleTurnFailure)
+            : `Timed out model(s): ${modelList}. ${recoveryFailureReason || "GLM could not fill all missing examples."}`
         };
         if (generationJobId) {
           const job = generationJobs.get(generationJobId);

@@ -32,7 +32,7 @@ function hasRenderableMessages(example: any): boolean {
     ));
 }
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" | "reasoningEarlyFailure" | "reasoningSlotTimeout" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" | "reasoningEarlyFailure" | "reasoningSlotTimeout" | "singleEarlyFailures" | "rejectArrayInstruction" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const delays: number[] = [];
@@ -87,7 +87,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
         concurrent--;
         throw Object.assign(new Error("fixture slot timeout"), { name: "TimeoutError" });
       }
-      if ((mode === "reasoningEarlyFailure" || mode === "reasoningSlotTimeout") && requestNumber >= 3) {
+      if ((mode === "reasoningEarlyFailure" || mode === "reasoningSlotTimeout" || mode === "singleEarlyFailures") && requestNumber >= 3) {
         await new Promise(resolve => setImmediate(resolve));
         assert.equal(options.signal.aborted, false, "A sibling failure must not cancel this slot");
       }
@@ -149,6 +149,8 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       const isPrimary = request.model === firstModel;
       const isBackup = !models.slice(0, 5).includes(request.model);
       const status = (mode === "reasoningEarlyFailure" && requestNumber === 2) ? 503
+        : (mode === "singleEarlyFailures" && requestNumber >= 7 && requestNumber <= 10) ? 503
+        : (mode === "rejectArrayInstruction" && userPrompt.includes("Return them as a JSON array of examples.")) ? 400
         : (mode === "fastFailure" && isPrimary) ? 503
         : ((mode === "primary529" || mode === "both529") && isPrimary)
         || (mode === "both529" && isBackup) ? 529
@@ -504,16 +506,38 @@ test("other HTTP failures and invalid content do not retry or top up", async () 
   }
 });
 
-test("an unrecoverable request fails promptly instead of waiting on hanging sibling models", async () => {
+test("Multi Turn retains fail-fast behavior for an unrecoverable request", async () => {
   const f = fixture("fastFailure");
   const outcome = await Promise.race([
-    f.generate(),
+    f.generate(5, false, "Multi Turn"),
     new Promise(resolve => setTimeout(() => resolve("still waiting"), 500))
   ]);
   assert.notEqual(outcome, "still waiting");
   assert.equal((outcome as any).statusCode, 500);
   assert.match((outcome as any).body.error, /stopped after 0 of 5 examples/);
   assert.equal(f.calls.length, 5);
+});
+
+test("Single Turn 50-example batch uses the provider-required JSON object envelope", async () => {
+  const f = fixture("rejectArrayInstruction");
+  const response = await f.generate(50);
+  assert.equal(response.body.examples.length, 50);
+  assert.equal(response.body.partial, undefined);
+  assert.equal(f.calls.length, 50);
+  assert.ok(f.calls.every(call => call.response_format.type === "json_object"
+    && call.messages.find((message: any) => message.role === "user").content.includes('one JSON object with an "examples" array')));
+});
+
+test("Single Turn does not end a 50-example batch after only six successes in its first stack", async () => {
+  const f = fixture("singleEarlyFailures");
+  const response = await f.generate(50);
+  assert.equal(f.calls.length, 50, "All originally scheduled calls must run, without retries");
+  assert.equal(response.body.examples.length, 46);
+  assert.equal(response.body.partial, true, "Provider failures must remain honestly marked partial");
+  assert.equal(response.body.requestedCount, 50);
+  assert.equal(response.body.batchId, "fixture-uuid-1");
+  assert.equal(f.peak(), 10);
+  assert.deepEqual(f.delays, [2000, 2000, 2000, 2000]);
 });
 
 test("preserved schedules and two-second spacing cover every supported batch size", async () => {
