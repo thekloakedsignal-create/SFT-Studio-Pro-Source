@@ -726,7 +726,7 @@ function normalizeModel(modelName?: string): string {
   if (candidate && !/^(?:gemini|vertex|google)(?:$|[\s:/_-])/i.test(candidate)) {
     return candidate;
   }
-  return process.env.DO_MODEL || "glm-5.3-flash";
+  return process.env.DO_MODEL || "glm-5.3";
 }
 
 // Clean human-readable error formatting for DigitalOcean inference errors
@@ -786,7 +786,7 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
   const targetModel = normalizeModel(
     isMultimodal
       ? requestedModel || process.env.DO_VISION_MODEL || "nemotron-nano-12b-v2-vl"
-      : requestedModel || process.env.DO_MODEL || "glm-5.3-flash"
+      : requestedModel || process.env.DO_MODEL || "glm-5.3"
   );
 
   const sysInst = params.config?.systemInstruction;
@@ -883,6 +883,7 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         messages: baseMessages,
         temperature: params.config?.temperature ?? 0.7,
         max_tokens: maxTokensToUse,
+        ...(params.config?.reasoningEffort === "none" ? { reasoning_effort: "none" } : {}),
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
       signal: abortSignal
@@ -945,7 +946,7 @@ function getDigitalOceanApiKey(): string {
 // Direct AI execution through DigitalOcean's Chat Completions endpoint.
 async function callDigitalOceanChatCompletions(params: any): Promise<any> {
   const doApiKey = getDigitalOceanApiKey();
-  console.log(`[DigitalOcean Inference] Executing request using model ${params.model || process.env.DO_MODEL || "glm-5.3-flash"}...`);
+  console.log(`[DigitalOcean Inference] Executing request using model ${params.model || process.env.DO_MODEL || "glm-5.3"}...`);
   return await callDigitalOceanInference(doApiKey.trim(), params);
 }
 
@@ -956,7 +957,7 @@ async function callDigitalOceanAI(initialClientOrParams: any, maybeParams?: any)
 
 const DEFAULT_GENERATION_MODEL_GROUPS = [
   [
-    "glm-5.3-flash",
+    "glm-5.3",
     "qwen3.5-397b-a17b",
     "gemma-4-31B-it",
     "deepseek-v4-pro",
@@ -965,8 +966,8 @@ const DEFAULT_GENERATION_MODEL_GROUPS = [
   [
     "llama-4-maverick",
     "mimo-v2.5-pro",
-    "minimax-m2.5",
-    "mistral-3-14B",
+    "qwen3.8-max",
+    "deepseek-4-flash",
     "nemotron-3-nano-omni",
   ],
 ];
@@ -1820,6 +1821,7 @@ REASONING TEMPLATE FORMAT:
           const configObj: any = {
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
+            reasoningEffort: "none",
             ...(turnMode === "Reasoning"
               ? { responseSchema: { type: Type.ARRAY, items: schemaProperty } }
               : {}),
@@ -1888,7 +1890,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 requestedCount,
                 promptForExampleCount(requestedCount),
                 timeoutMs,
-                model === "glm-5.3-flash"
+                model === "glm-5.3"
               );
           }
 
@@ -2042,7 +2044,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
 
     let recoveryExamples: any[] = [];
     let recoveryFailureReason: string | null = null;
-    let recoveryModel = "glm-5.3-flash";
+    let recoveryModel = "glm-5.3";
     if (timedOutExampleCount > 0) {
       const remainingBatchMs = generationDeadline - Date.now();
       const recoveryTimeoutMs = Math.min(
@@ -2072,7 +2074,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             } else {
               recoveryModel = backupModel;
               logger.warn(
-                { model: "glm-5.3-flash", backupModel, missingCount: timedOutExampleCount, batchId: generationBatchId },
+                { model: "glm-5.3", backupModel, missingCount: timedOutExampleCount, batchId: generationBatchId },
                 "GLM recovery returned HTTP 529; trying one distinct backup model"
               );
               try {

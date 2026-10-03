@@ -18,10 +18,10 @@ const dispatchSource = source.slice(
 assert.ok(dispatchSource.includes('app.post("/api/generate"'));
 const compiled = await transform(dispatchSource, { loader: "ts", format: "cjs", target: "node24" });
 
-const firstModel = "glm-5.3-flash";
+const firstModel = "glm-5.3";
 const models = [
   firstModel, "qwen3.5-397b-a17b", "gemma-4-31B-it", "deepseek-v4-pro", "nemotron-3-ultra-550b",
-  "llama-4-maverick", "mimo-v2.5-pro", "minimax-m2.5", "mistral-3-14B", "nemotron-3-nano-omni"
+  "llama-4-maverick", "mimo-v2.5-pro", "qwen3.8-max", "deepseek-4-flash", "nemotron-3-nano-omni"
 ];
 
 function hasRenderableMessages(example: any): boolean {
@@ -190,6 +190,7 @@ test("real dispatcher launches the preserved initial models concurrently and cou
   assert.deepEqual(f.delays, []);
   assert.ok(f.timeoutValues.every(timeoutMs => timeoutMs === 20000));
   assert.equal(f.calls.every(call => call.max_tokens === 4096 && call.response_format.type === "json_object"), true);
+  assert.equal(f.calls.every(call => call.reasoning_effort === "none"), true);
 });
 
 test("a stalled model is skipped in later stacks and GLM fills all missing examples in one request", async () => {
