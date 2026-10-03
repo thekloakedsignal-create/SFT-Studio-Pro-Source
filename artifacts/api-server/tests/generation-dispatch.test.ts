@@ -135,10 +135,18 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       const userPrompt = request.messages.find((message: any) => message.role === "user")?.content || "";
       const requestedCount = Number(userPrompt.match(/Generate exactly (\d+) examples\./)?.[1]) || 1;
       const requestedExamples = Array.from({ length: requestedCount }, (_, index) => ({
-        messages: [
-          { role: "user", content: `Question ${index + 1} for ${request.model}` },
-          { role: "assistant", content: `Answer ${index + 1} from ${request.model}.` }
-        ]
+        messages: userPrompt.includes('selected TEMPLATE TYPE: "Multi Turn"')
+          ? [
+              { role: "system", content: "You are helpful." },
+              { role: "user", content: `Question ${index + 1} for ${request.model}` },
+              { role: "assistant", content: `Answer ${index + 1} from ${request.model}.` },
+              { role: "user", content: `Follow-up ${index + 1} for ${request.model}` },
+              { role: "assistant", content: `Follow-up answer ${index + 1} from ${request.model}.` }
+            ]
+          : [
+              { role: "user", content: `Question ${index + 1} for ${request.model}` },
+              { role: "assistant", content: `Answer ${index + 1} from ${request.model}.` }
+            ]
       }));
       const content = mode === "invalid" && isPrimary
         ? "This is prose, not a JSON training example."
@@ -155,14 +163,14 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
   return {
     calls, delays, timeoutValues,
     peak: () => peakConcurrent,
-    async generate(count = 5, jobMode = false) {
+    async generate(count = 5, jobMode = false, templateType = "Single Turn") {
       const response: any = {
         statusCode: 200, body: undefined,
         status(value: number) { this.statusCode = value; return this; },
         json(value: any) { this.body = value; return this; }
       };
       await routes.get("POST /api/generate")!({
-        body: { count, jobMode, templateType: "Single Turn", targetTask: "Offline fixture" }
+          body: { count, jobMode, templateType, targetTask: "Offline fixture" }
       }, response);
       return response;
     },
@@ -190,6 +198,18 @@ test("real dispatcher launches the preserved initial models concurrently and cou
   assert.deepEqual(f.delays, []);
   assert.ok(f.timeoutValues.every(timeoutMs => timeoutMs === 20000));
   assert.equal(f.calls.every(call => call.max_tokens === 4096 && call.response_format.type === "json_object"), true);
+});
+
+test("Multi Turn prompt requests the JSON-object envelope required by the provider", async () => {
+  const f = fixture();
+  const response = await f.generate(5, false, "Multi Turn");
+  assert.equal(response.body.success, true);
+  assert.equal(response.body.examples.length, 5);
+  assert.ok(response.body.examples.every((example: any) => example.messages.length === 5));
+  const prompt = f.calls[0].messages.find((message: any) => message.role === "user").content;
+  assert.match(prompt, /Return them as one JSON object with an "examples" array/);
+  assert.match(prompt, /Do not return a top-level JSON array/);
+  assert.ok(f.calls.every(call => call.response_format.type === "json_object"));
 });
 
 test("a stalled model is skipped in later stacks and GLM fills all missing examples in one request", async () => {

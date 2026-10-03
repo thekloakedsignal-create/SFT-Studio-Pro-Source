@@ -1812,7 +1812,11 @@ REASONING TEMPLATE FORMAT:
         To guarantee dataset diversity, make sure that every generated example has a completely unique, creative, and distinct subject matter and scenario. Do NOT repeat or reuse scenarios, prompts, or topics. Every prompt and response should be highly original, realistic, and tailored to the requested persona.
 
         ${turnMode === "Reasoning" ? reasoningFormatInstruction : ""}
-        Generate exactly ${currentChunkSize} examples. Return them as a JSON array of examples.
+        Generate exactly ${currentChunkSize} examples. ${
+          turnMode === "Multi Turn"
+            ? `Return them as one JSON object with an "examples" array, for example {"examples":[...]}. Do not return a top-level JSON array.`
+            : `Return them as a JSON array of examples.`
+        }
       `;
 
       chunkTasks[c].push(async () => {
