@@ -14,7 +14,7 @@
   --color-brand-900: #14532d;
 
 
-  /* Kreative Kode Labs reference: neutral gray canvas, white reading surfaces, charcoal ink, lavender selection */
+  /* Reference palette: neutral grays, black work surfaces, and metallic purple accents */
   --color-white: #1c1c1c;
   --color-black: #f5f5f4;
   --color-slate-50: #111111; --color-slate-100: #1a1a1a; --color-slate-200: #232323;
@@ -37,6 +37,16 @@
   --color-teal-50: #f6f1f8; --color-teal-100: #eee4f2; --color-teal-200: #e2d2ea; --color-teal-300: #6a3f7c; --color-teal-400: #5b3270; --color-teal-500: #b48ac4; --color-teal-600: #9f74b2; --color-teal-700: #8a5e9e; --color-teal-800: #d8c3e1; --color-teal-900: #4a2a5c; --color-teal-950: #f1e8f5;
   --color-cyan-50: #f6f1f8; --color-cyan-100: #eee4f2; --color-cyan-200: #e2d2ea; --color-cyan-300: #6a3f7c; --color-cyan-400: #5b3270; --color-cyan-500: #b48ac4; --color-cyan-600: #9f74b2; --color-cyan-700: #8a5e9e; --color-cyan-800: #d8c3e1; --color-cyan-900: #4a2a5c; --color-cyan-950: #f1e8f5;
   --color-sky-50: #f6f1f8; --color-sky-100: #eee4f2; --color-sky-200: #e2d2ea; --color-sky-300: #6a3f7c; --color-sky-400: #5b3270; --color-sky-500: #b48ac4; --color-sky-600: #9f74b2; --color-sky-700: #8a5e9e; --color-sky-800: #d8c3e1; --color-sky-900: #4a2a5c; --color-sky-950: #f1e8f5;
+
+  /* Metallic purple accents, sampled against the supplied reference */
+  --color-emerald-300: #8e7996; --color-emerald-400: #795f84; --color-emerald-500: #725578; --color-emerald-600: #62486a; --color-emerald-700: #533c5b; --color-emerald-800: #44334b;
+  --color-blue-300: #8e7996; --color-blue-400: #795f84; --color-blue-500: #725578; --color-blue-600: #62486a; --color-blue-700: #533c5b; --color-blue-800: #44334b;
+  --color-purple-300: #8e7996; --color-purple-400: #795f84; --color-purple-500: #725578; --color-purple-600: #62486a; --color-purple-700: #533c5b; --color-purple-800: #44334b;
+  --color-indigo-300: #8e7996; --color-indigo-400: #795f84; --color-indigo-500: #725578; --color-indigo-600: #62486a; --color-indigo-700: #533c5b; --color-indigo-800: #44334b;
+  --color-violet-300: #8e7996; --color-violet-400: #795f84; --color-violet-500: #725578; --color-violet-600: #62486a; --color-violet-700: #533c5b; --color-violet-800: #44334b;
+  --color-teal-300: #8e7996; --color-teal-400: #795f84; --color-teal-500: #725578; --color-teal-600: #62486a; --color-teal-700: #533c5b; --color-teal-800: #44334b;
+  --color-cyan-300: #8e7996; --color-cyan-400: #795f84; --color-cyan-500: #725578; --color-cyan-600: #62486a; --color-cyan-700: #533c5b; --color-cyan-800: #44334b;
+  --color-sky-300: #8e7996; --color-sky-400: #795f84; --color-sky-500: #725578; --color-sky-600: #62486a; --color-sky-700: #533c5b; --color-sky-800: #44334b;
 
   --radius-xs: 0px;
   --radius-sm: 0px;
@@ -139,14 +149,37 @@ pre, code, kbd, samp, .font-mono {
 
 
 
-/* Primary action fills: pale lavender with purple ink */
-.text-slate-950:is(.bg-emerald-400,.bg-emerald-500,.bg-emerald-600,.bg-blue-500,.bg-blue-600,.bg-purple-500,.bg-purple-600,.from-emerald-500) { color: #3d2050; }
-.kk-primary { background-color: #e6d6ee; color: #4a2a5c; border: 1px solid #b48ac4; }
-.kk-primary:hover:not(:disabled) { background-color: #dcc7e7; }
-.kk-tab-active { background-color: #ece0f2; color: #5b3270; border: 1px solid #b48ac4; }
+/* Metallic purple actions: dark plated violet with a restrained brushed highlight */
+.text-slate-950:is(.bg-emerald-400,.bg-emerald-500,.bg-emerald-600,.bg-blue-500,.bg-blue-600,.bg-purple-500,.bg-purple-600,.from-emerald-500) { color: #f7f4f6; }
+.kk-primary {
+  background: linear-gradient(180deg, #8c7395 0%, #725578 48%, #57405f 100%);
+  color: #fff;
+  border: 1px solid #aa95b0;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 24%);
+}
+.kk-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #9a81a2 0%, #806386 48%, #644b6c 100%);
+}
+.kk-tab-active {
+  background: linear-gradient(180deg, #806589 0%, #65496f 100%);
+  color: #fff;
+  border: 1px solid #a18aa7;
+}
+.sft-workspace [class~="bg-green-500/15"] {
+  background: linear-gradient(180deg, #806589 0%, #65496f 100%) !important;
+  color: #fff !important;
+  border-color: #a18aa7 !important;
+}
+.sft-workspace [class~="bg-green-500/15"] [class~="text-green-400"] { color: #fff !important; }
+.sft-workspace [class~="bg-green-500"][class~="text-slate-950"],
+.sft-workspace [class~="bg-green-400"][class~="text-slate-950"] {
+  background: linear-gradient(180deg, #8c7395 0%, #725578 48%, #57405f 100%) !important;
+  color: #fff !important;
+  border-color: #aa95b0 !important;
+}
 
 /* Medium-gray control strips */
-.kk-strip { background-color: #8e8e8c !important; color: #111111; border-color: #6f6f6d !important; }
+.kk-strip { background-color: #7d7d7d !important; color: #111111; border-color: #686868 !important; }
 .kk-strip :is(.text-slate-400,.text-slate-500,.text-slate-600) { color: #1e1e1e; }
 
 /* Light neutral header bar */
@@ -154,10 +187,16 @@ pre, code, kbd, samp, .font-mono {
 
 /* Charcoal code panels */
 .kk-code {
-  background-color: #2b2b2d !important; color: #e8e6e1 !important; border-color: #3d3d40 !important;
-  --color-slate-300: #e2e0db; --color-emerald-300: #d9c3e6;
+  background-color: #373b46 !important; color: #e8e6e1 !important; border-color: #4b4e57 !important;
+  --color-slate-300: #e2e0db; --color-slate-400: #c8c6c6; --color-slate-500: #aeacad;
+  --color-emerald-300: #c49fca; --color-emerald-400: #c49fca;
 }
 
 /* True black composer surface */
-.kk-composer { background-color: #0a0a0a !important; border-color: #2a2a2a !important; }
-.kk-composer input, .kk-composer textarea { background-color: #0a0a0a !important; border-color: #3a3a3a !important; }
+.kk-composer {
+  background-color: #000 !important;
+  border-color: #292929 !important;
+  --color-slate-300: #e8e6e1; --color-slate-400: #c8c6c6; --color-slate-500: #aaa8aa; --color-slate-600: #89878a;
+  --color-emerald-300: #ba95c1; --color-emerald-400: #ba95c1;
+}
+.kk-composer input, .kk-composer textarea { background-color: #000 !important; border-color: #3a3a3a !important; }
