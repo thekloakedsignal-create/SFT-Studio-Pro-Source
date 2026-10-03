@@ -1384,7 +1384,7 @@ REASONING TEMPLATE FORMAT:
 - In every example in this Reasoning batch, the assistant "content" must start with <think>, contain a non-empty, concise explanation of the key reasoning steps, close with </think>, and then give the final answer.
 - Required shape: "<think>\n[Concise explanation of the key reasoning steps]\n</think>\n[Final answer]".
 - Formatting example:
-{"messages":[{"role":"user","content":"What is 2 + 3?"},{"role":"assistant","content":"<think>\nI add 2 and 3 to get 5.\n</think>\nThe answer is 5."}]}
+{"messages":[{"role":"user","content":"What is 2 + 3?"},{"role":"assistant","content":"<think>\\nI add 2 and 3 to get 5.\\n</think>\\nThe answer is 5."}]}
 - Use this only as a formatting example; create new content for the requested task and persona.
 - Never omit either tag, put the final answer inside the tags, or use the format for any template other than Reasoning.
 - Do not emit a separate "reasoning" or "reasoning_content" property.
@@ -1813,7 +1813,7 @@ REASONING TEMPLATE FORMAT:
 
         ${turnMode === "Reasoning" ? reasoningFormatInstruction : ""}
         Generate exactly ${currentChunkSize} examples. ${
-          turnMode === "Multi Turn"
+          turnMode === "Multi Turn" || turnMode === "Reasoning"
             ? `Return them as one JSON object with an "examples" array, for example {"examples":[...]}. Do not return a top-level JSON array.`
             : `Return them as a JSON array of examples.`
         }
@@ -1826,7 +1826,13 @@ REASONING TEMPLATE FORMAT:
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
             ...(turnMode === "Reasoning"
-              ? { responseSchema: { type: Type.ARRAY, items: schemaProperty } }
+              ? {
+                  responseSchema: {
+                    type: Type.OBJECT,
+                    properties: { examples: { type: Type.ARRAY, items: schemaProperty } },
+                    required: ["examples"]
+                  }
+                }
               : {}),
             ...(turnMode !== "Reasoning" && turnMode !== "Mixed" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
             systemInstruction: turnMode === "Reasoning"
