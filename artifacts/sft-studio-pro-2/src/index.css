@@ -129,20 +129,21 @@
   --color-yellow-900: var(--color-purple-900);
   --color-yellow-950: var(--color-purple-950);
 
-  /* Brighter neutral steps give the app visible charcoal surfaces instead of near-black panels. */
-  --color-slate-50: #f1f1f3;
-  --color-slate-100: #e1e1e5;
-  --color-slate-200: #d1d1d7;
-  --color-slate-300: #bdbdc5;
-  --color-slate-400: #a9a9b2;
-  --color-slate-500: #898990;
-  --color-slate-600: #74747c;
-  --color-slate-700: #5e5e66;
-  --color-slate-750: #505057;
-  --color-slate-800: #424249;
-  --color-slate-850: #35353b;
-  --color-slate-900: #2b2b31;
-  --color-slate-950: #19191e;
+  /* Legacy utility names now express dark ink on light paper.
+     Charcoal regions below restore the dark surface scale locally. */
+  --color-slate-50: #361546;
+  --color-slate-100: #452059;
+  --color-slate-200: #55286e;
+  --color-slate-300: #643778;
+  --color-slate-400: #715480;
+  --color-slate-500: #786384;
+  --color-slate-600: #85738c;
+  --color-slate-700: #91919a;
+  --color-slate-750: #a4a4ad;
+  --color-slate-800: #b8b8bf;
+  --color-slate-850: #cdCDD3;
+  --color-slate-900: #e2e2e5;
+  --color-slate-950: #fafafa;
   --color-gray-50: var(--color-slate-50);
   --color-gray-100: var(--color-slate-100);
   --color-gray-200: var(--color-slate-200);
@@ -204,25 +205,27 @@
 
 @layer base {
   :root {
-    color-scheme: dark;
-    --background: 270 5% 11%;
-    --foreground: 270 5% 90%;
-    --card: 268 5% 20%;
-    --card-foreground: 270 5% 90%;
-    --popover: 268 5% 23%;
-    --popover-foreground: 270 5% 92%;
+    color-scheme: light;
+    --heading-ink: #602481;
+    --accent-ink: #7727aa;
+    --background: 240 5% 89%;
+    --foreground: 279 47% 29%;
+    --card: 0 0% 98%;
+    --card-foreground: 279 47% 29%;
+    --popover: 0 0% 98%;
+    --popover-foreground: 279 47% 29%;
     --primary: 274 100% 75%;
     --primary-foreground: 270 16% 5%;
-    --secondary: 266 5% 29%;
-    --secondary-foreground: 270 5% 91%;
-    --muted: 266 5% 27%;
-    --muted-foreground: 265 6% 76%;
-    --accent: 274 35% 29%;
-    --accent-foreground: 270 8% 96%;
+    --secondary: 240 5% 83%;
+    --secondary-foreground: 279 47% 29%;
+    --muted: 240 5% 88%;
+    --muted-foreground: 279 21% 39%;
+    --accent: 274 60% 92%;
+    --accent-foreground: 274 65% 31%;
     --destructive: 274 55% 42%;
     --destructive-foreground: 270 10% 97%;
-    --border: 265 5% 34%;
-    --input: 265 5% 31%;
+    --border: 240 5% 65%;
+    --input: 240 5% 60%;
     --ring: 274 100% 75%;
     --radius: 0.75rem;
   }
@@ -236,9 +239,9 @@ html {
 body {
   font-family: var(--font-sans);
   letter-spacing: 0.035em;
-  background-color: #19191e;
-  color: #d1d1d7;
-  color-scheme: dark;
+  background-color: #e2e2e5;
+  color: #55286e;
+  color-scheme: light;
 }
 
 /* Universal wide font tracking and full-width border coverage */
@@ -284,8 +287,8 @@ textarea,
 select,
 input:not([type]),
 input:is([type="text"], [type="email"], [type="password"], [type="number"], [type="search"], [type="url"], [type="tel"]) {
-  background-color: #d4d4da !important;
-  color: #242429 !important;
+  background-color: #f5f5f7 !important;
+  color: #55286e !important;
   border-color: #96969f;
   color-scheme: light;
 }
@@ -298,13 +301,13 @@ input:is([type="text"], [type="email"], [type="password"], [type="number"], [typ
 
 textarea::placeholder,
 input::placeholder {
-  color: #62626c !important;
+  color: #786384 !important;
   opacity: 1;
 }
 
 select option {
-  background-color: #d4d4da;
-  color: #242429;
+  background-color: #f5f5f7;
+  color: #55286e;
 }
 
 textarea:focus,
@@ -318,6 +321,88 @@ select:disabled,
 input:disabled {
   background-color: #b8b8c0 !important;
   color: #55555f !important;
+}
+
+/* Explicit dark zones against the light workspace, matching the reference's
+   charcoal navigation and black code/composer blocks. */
+.sft-charcoal,
+pre {
+  --heading-ink: #e1b5ff;
+  --accent-ink: #d29aff;
+  --color-slate-50: #f5eaff;
+  --color-slate-100: #ead6f7;
+  --color-slate-200: #dfc4f0;
+  --color-slate-300: #d3b4e6;
+  --color-slate-400: #c5a6d8;
+  --color-slate-500: #b79bc8;
+  --color-slate-600: #797985;
+  --color-slate-700: #5e5e66;
+  --color-slate-750: #505057;
+  --color-slate-800: #424249;
+  --color-slate-850: #35353b;
+  --color-slate-900: #2b2b31;
+  --color-slate-950: #111114;
+  background-color: #303036;
+  color: #dfc4f0;
+  color-scheme: dark;
+}
+
+pre {
+  background-color: #111114 !important;
+  color: #dfc4f0;
+}
+
+.sft-composer,
+.sft-composer input {
+  background-color: #09090c !important;
+  color: #dfc4f0 !important;
+}
+
+.sft-composer input::placeholder {
+  color: #b79bc8 !important;
+}
+
+.text-white,
+.hover\:text-white:hover {
+  color: var(--heading-ink);
+}
+
+/* Foreground on bright, filled purple actions must stay dark regardless of
+   whether the surrounding region uses light or dark surfaces. */
+.text-slate-950 {
+  color: #151519;
+}
+
+.text-white:is(.bg-emerald-600, .bg-blue-600, .bg-blue-700, .bg-purple-600, .bg-red-600, .bg-green-600) {
+  color: #fafafa;
+}
+
+:is(
+  .text-purple-300, .text-purple-400, .text-purple-500,
+  .text-green-300, .text-green-400, .text-green-500,
+  .text-emerald-300, .text-emerald-400, .text-emerald-500,
+  .text-blue-200, .text-blue-300, .text-blue-400,
+  .text-amber-100, .text-amber-200, .text-amber-300, .text-amber-400, .text-amber-500,
+  .text-red-300, .text-red-400, .text-red-500, .text-red-600,
+  .text-yellow-400, .text-cyan-400, .text-teal-400, .text-sky-400, .text-indigo-400
+) {
+  color: var(--accent-ink);
+}
+
+/* Modal backdrops remain black; they must not inherit the light panel scale. */
+.fixed.inset-0[class*="bg-slate-950/"] {
+  background-color: rgb(0 0 0 / 68%);
+}
+
+::selection {
+  background-color: #8532b2 !important;
+  color: #faf5ff !important;
+}
+
+[role="tab"][data-state="active"] {
+  background-color: #ead9f5;
+  color: #602481;
+  box-shadow: inset 0 -2px 0 #a94ce5;
 }
 
 /* Universal text and font containment: prevent any text, token, or filename from breaking out of its container */

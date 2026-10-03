@@ -4012,7 +4012,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
       {/* Top Banner Navigation */}
-      <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+      <header className="sft-charcoal border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
           
           <div className="flex items-center justify-between md:justify-start gap-3">
@@ -4209,7 +4209,7 @@ export default function App() {
         
         {/* Tab Sidebar Navigation (Desktop) & Tabs bar (Mobile) */}
         <div className="lg:col-span-3 xl:col-span-2 flex flex-col gap-3">
-          <div className="bg-slate-950/30 border border-slate-800/60 p-2 rounded-xl flex flex-row lg:flex-col gap-1 overflow-x-auto custom-scrollbar">
+          <div className="sft-charcoal bg-slate-950/30 border border-slate-800/60 p-2 rounded-xl flex flex-row lg:flex-col gap-1 overflow-x-auto custom-scrollbar">
             
             <button
               id="tab-define"
@@ -4354,7 +4354,7 @@ export default function App() {
           </div>
 
           {/* Consolidated Sidebar Overview Panel (Replaces 3 redundant separate bordered cards) */}
-          <div className="bg-slate-950/30 border border-slate-800/60 p-3.5 rounded-xl hidden lg:flex flex-col gap-3.5 text-xs">
+          <div className="sft-charcoal bg-slate-950/30 border border-slate-800/60 p-3.5 rounded-xl hidden lg:flex flex-col gap-3.5 text-xs">
             {/* Quick Metrics */}
             <div>
               <h3 className="font-semibold text-slate-300 mb-2 flex items-center gap-2 text-xs">
@@ -7253,7 +7253,7 @@ export default function App() {
                   </div>
 
                   {/* Prominent, Obvious Prompt Box */}
-                  <div className="p-4 sm:p-5 border-t-2 border-slate-700/80 bg-slate-900/80 shadow-2xl">
+                  <div className="sft-charcoal sft-composer p-4 sm:p-5 border-t-2 border-slate-700/80 bg-slate-900/80 shadow-2xl">
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
@@ -7652,7 +7652,7 @@ export default function App() {
       )}
 
       {/* Rich Human-Made Supporting Footer */}
-      <footer className="border-t border-slate-800/80 py-10 mt-16 bg-slate-950/60 text-slate-400">
+      <footer className="sft-charcoal border-t border-slate-800/80 py-10 mt-16 bg-slate-950/60 text-slate-400">
         <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8 text-xs">
           {/* Col 1: Brand */}
           <div className="space-y-3">
