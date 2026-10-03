@@ -1303,9 +1303,7 @@ export default function App() {
         console.warn("Batch recovery cache cleanup failed:", error);
       }
       return true;
-    } catch (e: any) {
-      console.warn("Postgres batch save notice:", e);
-      setNotification({ text: `Batch is available for review, but was not saved to the database: ${e?.message || e}`, type: "error" });
+    } catch {
       return false;
     }
   };
@@ -2072,7 +2070,7 @@ export default function App() {
       }
 
       let accumulatedExamples: any[] = [];
-      let partialReason: string | null = null;
+      let hasPartialResult = false;
       let lastSource = "Generator";
       let serverBatchId: string | null = null;
       const progressByChunk = new Map<number, number>();
@@ -2173,14 +2171,13 @@ export default function App() {
                 serverBatchId = data.batchId || data.id;
               }
               if (data.partial === true) {
-                partialReason = "Some examples could not be generated.";
+                hasPartialResult = true;
               }
               return data.examples;
             } else {
               throw new Error(data?.error || "Sub-batch returned empty response");
             }
         } catch (err: any) {
-          console.warn(`[Batch Orchestrator] Sub-batch ${currentSubIdx + 1} failed:`, err?.message || err);
           clearJobProgress(currentSubIdx);
           throw err;
         }
@@ -2205,7 +2202,7 @@ export default function App() {
 
       await Promise.all(workers);
 
-      if (!partialReason && accumulatedExamples.length !== batchSize) {
+      if (!hasPartialResult && accumulatedExamples.length !== batchSize) {
         throw new Error(`Generation returned ${accumulatedExamples.length} of ${batchSize} requested examples. The incomplete batch was not saved.`);
       }
       if (accumulatedExamples.length === 0) {
@@ -2234,10 +2231,9 @@ export default function App() {
         examplesCount: finalExamples.length,
         examples: finalExamples,
         status: "Pending",
-        ...(partialReason ? {
+        ...(hasPartialResult ? {
           partial: true,
-          requestedExamples: batchSize,
-          partialReason
+          requestedExamples: batchSize
         } : {}),
         timestamp: new Date().toISOString().replace("T", " "),
         description: batchDesc,
@@ -2252,14 +2248,13 @@ export default function App() {
       const saved = await saveBatch(generationProjectId, newBatch);
       if (saved) {
         setNotification({
-          text: partialReason
+          text: hasPartialResult
             ? `Saved a partial batch with ${finalExamples.length}/${batchSize} examples to "${project.name}". Review the completed examples below.${activeProjectId.current !== generationProjectId ? " Open that project to review the batch." : ""}`
             : `Generated ${finalExamples.length}/${batchSize} examples and saved to "${project.name}".${activeProjectId.current !== generationProjectId ? " Open that project to review the batch." : ""}`,
-          type: partialReason ? "info" : "success"
+          type: hasPartialResult ? "info" : "success"
         });
       }
-    } catch (err: any) {
-      setNotification({ text: "Generation failed. Please try again.", type: "error" });
+    } catch {
     } finally {
       setIsGenerating(false);
       setTimeout(() => setGenerationProgress(null), 3000);
