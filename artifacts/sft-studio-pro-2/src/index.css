@@ -242,7 +242,7 @@ main [class~="opacity-45"] { opacity: .72; }
   background-color: #3a3a3a !important;
 }
 
-#root > div:has(> .kk-header) > main {
+.kk-workspace-panel {
   background-color: #3a3a3a !important;
 }
 
