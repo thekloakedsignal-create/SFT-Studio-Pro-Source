@@ -1281,7 +1281,7 @@ ${JSON.stringify({ examples: [{ messages: [
                   role: { type: Type.STRING },
                   content: {
                     type: Type.STRING,
-                    description: "For reasoning examples, include <think>...</think> followed by the final answer in this content string."
+                    description: "Direct assistant answers only. Mixed includes Single Turn and Multi Turn, never reasoning traces."
                   }
                 },
                 required: ["role", "content"]
@@ -1338,8 +1338,7 @@ ${JSON.stringify({ examples: [{ messages: [
               type: Type.OBJECT,
               properties: {
                 role: { type: Type.STRING },
-                content: { type: Type.STRING },
-                reasoning: { type: Type.STRING }
+                content: { type: Type.STRING }
               },
               required: ["role", "content"]
             }
@@ -1369,17 +1368,15 @@ ${JSON.stringify({ examples: [{ messages: [
       const fullPrompt = `
         You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
         Your task is to generate exactly ${currentChunkSize} high-quality, diverse SFT training examples (model stack ${c + 1} of ${generationStacks.length}).
+        ${turnMode === "Mixed" ? `Mixed contains only Single Turn and Multi Turn, never Reasoning.
+        For this request, generate ${(generationStacks.slice(0, c).reduce((sum, stack) => sum + stack.length, 0) + modelIndex) % 2 === 0 ? "Single Turn: one user/assistant exchange" : "Multi Turn: 2–4 user/assistant exchanges"}.
+        Preserve the selected instruction format when applicable.` : ""}
 
         ${turnMode === "Reasoning" ? `
         CRITICAL MANDATE — REASONING EXPLANATION:
         - In every Reasoning example, include a concise, clear explanation of the key steps and checks that support the final answer, written from the trainee assistant's perspective.
         - Place that explanation inside the required <think>...</think> block, then put the final answer after </think>.
         - Do not omit the explanation or either tag. Do not include meta commentary about generating dataset examples, prompt writing, or fine-tuning.
-        ` : turnMode === "Mixed" ? `
-        CRITICAL SCOPE RULE FOR CHAIN OF THOUGHT:
-        Chain of thought is for reasoning examples ONLY.
-        For Single Turn and Multi Turn responses, provide direct, high-quality assistant answers without any train of thought or reasoning traces.
-        For reasoning examples ONLY, write thinking traces in the FIRST PERSON from the trainee perspective.
         ` : `
         CRITICAL MANDATE — STRICT ZERO CHAIN OF THOUGHT (${turnMode.toUpperCase()} ONLY):
         This is a ${turnMode.toUpperCase()} dataset.
@@ -1477,7 +1474,7 @@ ${JSON.stringify({ examples: [{ messages: [
         Generate a dynamic, balanced mix across the batch:
         - Single Turn: system prompt, "### Instruction:\n{user}", "### Response:\n{assistant}"
         - Multi Turn: system prompt, alternating "### Instruction:\n{user_n}" and "### Response:\n{assistant_n}"
-        - Reasoning: NO system message, "### Instruction:\n{user}", "### Response:\n<think>\n{trainee's chain of thought to get to response (no generator meta reasoning)}\n</think>\n{final_answer}"
+        - Only Single Turn and Multi Turn; no reasoning examples, traces, or fields.
         `}
           ` : instructTemplate === "Mistral" ? `
         EXACT MANDATORY STRUCTURE FOR MISTRAL INSTRUCTION TEMPLATE (${turnMode}):
@@ -1531,7 +1528,7 @@ ${JSON.stringify({ examples: [{ messages: [
         Generate a dynamic, balanced mix across the batch:
         - Single Turn: [INST] {system}\n\n{user} [/INST] -> {assistant}
         - Multi Turn: [INST] {system}\n\n{user_1} [/INST] -> {assistant_1} -> [INST] {user_2} [/INST] -> {assistant_2}
-        - Reasoning: NO system message, [INST] {user} [/INST] -> <think>\n{trainee's chain of thought to get to response (no generator meta reasoning)}\n</think>\n{final_answer}
+        - Only Single Turn and Multi Turn; no reasoning examples, traces, or fields.
         `}
           ` : `
         EXACT MANDATORY STRUCTURE FOR CHATML INSTRUCTION TEMPLATE (${turnMode}):
@@ -1599,7 +1596,7 @@ ${JSON.stringify({ examples: [{ messages: [
         Generate a dynamic, balanced mix across the batch:
         - Single Turn: system prompt, user prompt, assistant response
         - Multi Turn: system prompt, multiple user and assistant turns
-        - Reasoning: NO system message, user prompt, assistant response formatted with <think>\n{trainee's chain of thought to get to response (no generator meta reasoning)}\n</think>\n{final_answer}
+        - Only Single Turn and Multi Turn; no reasoning examples, traces, or fields.
         `}
           `
         ) : turnMode === "Reasoning" ? `
@@ -1621,7 +1618,7 @@ ${JSON.stringify({ examples: [{ messages: [
         
         ${reasoningFormatInstruction}
         Do not add a system message or extra turns.
-        ` : templateType === "Multi Turn" ? `
+        ` : (templateType === "Multi Turn" || (turnMode === "Mixed" && (generationStacks.slice(0, c).reduce((sum, stack) => sum + stack.length, 0) + modelIndex) % 2 === 1)) ? `
         EXACT MANDATORY STRUCTURE FOR MULTI TURN TEMPLATE:
         Every single example in the JSON array MUST follow this exact structure:
         {
@@ -1653,7 +1650,7 @@ ${JSON.stringify({ examples: [{ messages: [
         Generate exactly ${currentChunkSize} examples. ${
           turnMode === "Reasoning"
             ? `Return them as one JSON object with an "examples" array, for example {"examples":[...]}. Do not return a top-level JSON array.`
-            : turnMode === "Multi Turn"
+            : turnMode === "Multi Turn" || turnMode === "Mixed"
             ? `Return them as one JSON object with an "examples" array, for example {"examples":[...]}. Do not return a top-level JSON array.`
             : `Return them as a JSON array of examples.`
         }
@@ -1682,7 +1679,7 @@ ${JSON.stringify({ examples: [{ messages: [
                   }
                 }
               : {}),
-            ...(turnMode !== "Reasoning" && turnMode !== "Mixed" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+            ...(turnMode !== "Reasoning" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
             systemInstruction: turnMode === "Reasoning"
               ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
 
@@ -1691,13 +1688,6 @@ For every example, provide a concise explanation of the key reasoning steps and 
 Place the explanation inside <think>...</think> in the assistant content and place the final answer after </think>.
 Do not omit the explanation or either tag. Do not include meta commentary about dataset synthesis, writing prompts, or instructions.
 ${reasoningFormatInstruction}`
-              : turnMode === "Mixed"
-              ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
-
-CRITICAL SCOPE RULE FOR CHAIN OF THOUGHT:
-Chain of thought is for reasoning examples ONLY.
-The generator should NEVER write the reasoning train of thought, thinking traces, or thought processes into single turn or multi turn responses. For Single Turn and Multi Turn responses, provide direct, high-quality assistant answers without any train of thought or reasoning traces.
-For reasoning examples ONLY, write thinking traces in the FIRST PERSON from the trainee perspective.`
               : `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
 
 ABSOLUTE ZERO CHAIN-OF-THOUGHT MANDATE (${turnMode.toUpperCase()}):
@@ -3286,20 +3276,20 @@ ${userInstructionsBlock}
 ${format === "single_turn" ? 'ALPACA — SINGLE TURN:\n{system}\n\n### Instruction:\n{user}\n\n### Response:\n{assistant}' :
   format === "multi_turn" ? 'ALPACA — MULTI TURN:\n{system}\n\n### Instruction:\n{user_1}\n\n### Response:\n{assistant_1}\n\n### Instruction:\n{user_2}\n\n### Response:\n{assistant_2}' :
   format === "reasoning" ? 'ALPACA — REASONING (NO system message):\n### Instruction:\n{user}\n\n### Response:\n<think>\n{reasoning}\n</think>\n{final_answer}' :
-  'ALPACA — MIXED: dynamic mix of Single Turn, Multi Turn, and Reasoning examples'}`
+  'ALPACA — MIXED: Single Turn and Multi Turn only; no reasoning examples or traces'}`
                 : instructTemplate === "Mistral"
                 ? `Mistral Instruction format (${format}):
 ${format === "single_turn" ? 'MISTRAL — SINGLE TURN:\n<s>[INST] {system}\n\n{user} [/INST] {assistant}</s>' :
   format === "multi_turn" ? 'MISTRAL — MULTI TURN:\n<s>[INST] {system}\n\n{user_1} [/INST] {assistant_1}</s>[INST] {user_2} [/INST] {assistant_2}</s>' :
   format === "reasoning" ? 'MISTRAL — REASONING (NO system message):\n<s>[INST] {user} [/INST] <think>\n{reasoning}\n</think>\n{final_answer}</s>' :
-  'MISTRAL — MIXED: dynamic mix of Single Turn, Multi Turn, and Reasoning examples'}`
+  'MISTRAL — MIXED: Single Turn and Multi Turn only; no reasoning examples or traces'}`
                 : `ChatML Instruction format (${format}):
 ${format === "single_turn" ? 'CHATML — SINGLE TURN:\n<|im_start|>system\n{system}<|im_end|>\n<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n{assistant}<|im_end|>' :
   format === "multi_turn" ? 'CHATML — MULTI TURN:\n<|im_start|>system\n{system}<|im_end|>\n<|im_start|>user\n{user_1}<|im_end|>\n<|im_start|>assistant\n{assistant_1}<|im_end|>\n<|im_start|>user\n{user_2}<|im_end|>\n<|im_start|>assistant\n{assistant_2}<|im_end|>' :
   format === "reasoning" ? 'CHATML — REASONING (NO system message):\n<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n<think>\n{reasoning}\n</think>\n{final_answer}<|im_end|>' :
-  'CHATML — MIXED: dynamic mix of Single Turn, Multi Turn, and Reasoning examples'}`)
+  'CHATML — MIXED: Single Turn and Multi Turn only; no reasoning examples or traces'}`)
             : format === "mixed"
-            ? "Vary format across examples: generate a balanced mix of single-turn Q&A, multi-turn dialogues, and reasoning examples"
+            ? "Generate a balanced mix of single-turn Q&A and multi-turn dialogues only. No reasoning examples, thinking traces, or reasoning fields."
             : format === "reasoning"
             ? "Requires step-by-step reasoning trace in 'reasoning' field"
             : format === "multi_turn"
@@ -3332,7 +3322,7 @@ QUALITY & SANITIZATION MANDATES:
 4. FORMAT OBSERVED:
    - If format is "reasoning", include a "reasoning" field or format assistant content with <think>\n{reasoning}\n</think>\n{final_answer}. DO NOT include a system message. CRITICAL: Reasoning within the template should always demonstrate a chain of thought the trainee will use to get to the response. No meta reasoning from the generator should be included.
    - If format is "multi_turn", construct 2-4 alternating user/assistant turns probing the subject.
-   - If format is "mixed", alternate between single-turn, multi-turn, and reasoning examples across the set.
+   - If format is "mixed", alternate between single-turn and multi-turn examples only. Never include reasoning examples, thinking traces, or reasoning fields.
    ${isInstructionTemplate && instructTemplate === "Alpaca" ? (format === "reasoning" ? '- Alpaca Reasoning: user prompt starts with "### Instruction:\n", assistant response starts with "### Response:\n<think>\n{reasoning}\n</think>\n{final_answer}". DO NOT include a system message.' : '- Alpaca Instruction: user prompt MUST start with "### Instruction:\n", and assistant response MUST start with "### Response:\n".') : ""}
    ${isInstructionTemplate && instructTemplate === "Mistral" ? (format === "reasoning" ? '- Mistral Reasoning: user prompt MUST be wrapped in [INST] ... [/INST], assistant response formatted with <think>\n{reasoning}\n</think>\n{final_answer}. DO NOT include a system message.' : '- Mistral Instruction: user prompt MUST be wrapped in [INST] ... [/INST].') : ""}
    ${isInstructionTemplate && (instructTemplate === "ChatML" || !instructTemplate) ? (format === "reasoning" ? '- ChatML Reasoning: clean user prompt, assistant response formatted with <think>\n{reasoning}\n</think>\n{final_answer}. DO NOT include a system message.' : '- ChatML Instruction: clean user prompt and high-quality assistant response.') : ""}
@@ -3361,7 +3351,7 @@ Return raw JSON without extra conversational text.
           config: {
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
-            ...(format !== "reasoning" && format !== "mixed" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+            ...(format !== "reasoning" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
             systemInstruction: format === "reasoning"
               ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis and conversion engine.
 
@@ -3369,12 +3359,6 @@ MANDATORY CHAIN-OF-THOUGHT DIRECTIVE (REASONING EXAMPLES ONLY):
 We want the models in training to learn reasoning chain of thought in the reasoning examples ONLY.
 You MUST write all thinking traces in the FIRST PERSON from the perspective of the trainee model working through the prompt (e.g., "The user is asking for... Let me first check... I need to verify... Therefore, the answer is...").
 ABSOLUTELY NO META REASONING FROM THE GENERATOR: Never include any generator meta commentary about dataset synthesis, writing prompts, or instructions. It must solely be the trainee model solving the problem.`
-              : format === "mixed"
-              ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis and conversion engine.
-
-CRITICAL SCOPE RULE FOR CHAIN OF THOUGHT:
-Chain of thought is for reasoning examples ONLY.
-The generator should NEVER write the reasoning train of thought, thinking traces, or thought processes into single turn or multi turn responses. For Single Turn and Multi Turn responses, provide direct, high-quality assistant answers without any train of thought or reasoning traces.`
               : `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis and conversion engine.
 
 ABSOLUTE ZERO CHAIN-OF-THOUGHT MANDATE:

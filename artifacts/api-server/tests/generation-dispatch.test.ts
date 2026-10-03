@@ -157,7 +157,8 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
         : mode === "partialFailure" && requestNumber === 11 ? 503
         : 200;
       const requestedCount = Number(userPrompt.match(/Generate exactly (\d+) examples\./)?.[1]) || 1;
-      const isMultiTurn = userPrompt.includes('selected TEMPLATE TYPE: "Multi Turn"');
+      const isMultiTurn = userPrompt.includes('selected TEMPLATE TYPE: "Multi Turn"')
+        || userPrompt.includes("For this request, generate Multi Turn:");
       const requestedExamples = Array.from({ length: requestedCount }, (_, index) => ({
         messages: isMultiTurn
           ? [
@@ -196,14 +197,14 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
   return {
     calls, delays, timeoutValues,
     peak: () => peakConcurrent,
-    async generate(count = 5, jobMode = false, templateType = "Single Turn") {
+    async generate(count = 5, jobMode = false, templateType = "Single Turn", instructTemplate?: string) {
       const response: any = {
         statusCode: 200, body: undefined,
         status(value: number) { this.statusCode = value; return this; },
         json(value: any) { this.body = value; return this; }
       };
       await routes.get("POST /api/generate")!({
-          body: { count, jobMode, templateType, targetTask: "Offline fixture" }
+          body: { count, jobMode, templateType, instructTemplate, targetTask: "Offline fixture" }
       }, response);
       return response;
     },
@@ -265,6 +266,24 @@ test("Multi Turn prompt requests the JSON-object envelope required by the provid
   assert.ok(f.calls.every(call => JSON.stringify(call.response_format) === JSON.stringify({ type: "json_object" })));
   assert.ok(f.calls.every(call => call.reasoning_effort === "none"));
   assert.doesNotMatch(f.calls[0].messages.find((message: any) => message.role === "system").content, /Return valid JSON that matches this schema/);
+});
+
+test("Mixed requests only alternating Single Turn and Multi Turn across all instruction formats", async () => {
+  for (const format of [undefined, "Alpaca", "Mistral", "ChatML"]) {
+    const f = fixture();
+    const response = await f.generate(10, false, "Mixed", format);
+    assert.equal(response.body.examples.length, 10);
+    assert.equal(response.body.examples.filter((example: any) => example.messages.length === 5).length, 5);
+    assert.equal(response.body.examples.filter((example: any) => example.messages.length === 2).length, 5);
+    for (const [index, call] of f.calls.entries()) {
+      const prompt = call.messages.find((message: any) => message.role === "user").content;
+      assert.ok(prompt.includes(`For this request, generate ${index % 2 ? "Multi Turn" : "Single Turn"}:`));
+      assert.match(prompt, /Mixed contains only Single Turn and Multi Turn, never Reasoning/);
+      assert.doesNotMatch(prompt, /- Reasoning:|For reasoning examples ONLY/);
+      assert.match(call.messages[0].content, /ZERO CHAIN-OF-THOUGHT/);
+      assert.equal(call.reasoning_effort, "none");
+    }
+  }
 });
 
 test("Reasoning batch jobs extract tagged thinking into the UI reasoning field", async () => {

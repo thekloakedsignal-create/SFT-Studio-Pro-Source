@@ -1,4 +1,4 @@
 - [SFT generation constraints](sft-generation-constraints.md) — Keep direct DigitalOcean calls and 529-only backup; save completed output as a marked partial batch after failures.
 - [Batch snapshot compatibility](batch-snapshot-compatibility.md) — Preserve newer incremental saves and deletions when older clients submit whole-project snapshots.
-- [Reasoning template scope](reasoning-template-scope.md) — Keep Reasoning-generation changes isolated; preserve Single Turn and Multi Turn templates and the shared model schedule.
+- [Reasoning and Mixed scope](reasoning-template-scope.md) — Keep Reasoning isolated; Mixed contains only Single Turn and Multi Turn, never reasoning.
 - [TRiAD import source](triad-import-source.md) — Keep TRiAD imports URL-based; do not restore embedded helpful/harmful seed examples or fallback records.

@@ -98,7 +98,7 @@ test("reasoning is retained only in supported templates; user/system text is pre
     { role: "user", content: "Analysis: explain the field named response." },
     { role: "assistant", content: "<think>Check the format.</think>\nA complete final answer." }
   ];
-  for (const template of ["Reasoning", "Mixed"]) {
+  for (const template of ["Reasoning"]) {
     const example = parseGeneratedExamples(JSON.stringify({ messages }), template)[0];
     assert.equal(example.messages[1].reasoning, "Check the format.");
     assert.equal(example.messages[1].content, "A complete final answer.");
@@ -107,6 +107,29 @@ test("reasoning is retained only in supported templates; user/system text is pre
   assert.equal(example.messages[0].content, messages[0].content);
   assert.equal(example.messages[1].reasoning, undefined);
   assert.equal(sanitizeMessage({ role: "assistant", content: { response: "Answer.", reasoning: "Check." } }, "Reasoning").reasoning, "Check.");
+});
+
+test("Mixed strips reasoning fields and traces while preserving single and multi turn answers", () => {
+  for (const template of ["Mixed", "mixed"]) {
+    const examples = parseGeneratedExamples(JSON.stringify({ examples: [
+      { reasoning: "Unwanted metadata", messages: [
+        { role: "user", content: "Question" },
+        { role: "assistant", content: "<think>Internal trace.</think>\nFirst answer.", reasoning: "Internal trace." }
+      ] },
+      { messages: [
+        { role: "user", content: "Question" },
+        { role: "assistant", content: "First answer.", reasoning_content: "Internal trace." },
+        { role: "user", content: "Follow-up" },
+        { role: "assistant", content: "<reasoning>Internal trace.</reasoning>\nSecond answer." }
+      ] }
+    ] }), template);
+    assert.equal(examples.length, 2);
+    assert.equal(examples[0].reasoning, undefined);
+    assert.equal(examples[0].messages[1].content, "First answer.");
+    assert.equal(examples[1].messages.length, 4);
+    assert.equal(examples[1].messages[3].content, "Second answer.");
+    assert.ok(examples.every(example => example.messages.every((message: any) => message.reasoning === undefined)));
+  }
 });
 
 test("strict tagged reasoning validation is optional and applies only to Reasoning", () => {

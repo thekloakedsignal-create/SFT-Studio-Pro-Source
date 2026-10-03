@@ -32,3 +32,9 @@ Treat `<think>` as a potentially reserved provider delimiter, not safe literal t
 **Why:** A user-authorized Nemotron diagnostic returned complete JSON objects lacking required tags and JSON suffixes missing their prefixes. The same concurrent diagnostic passed with transport-only delimiters restored before validation, supporting provider reasoning-delimiter handling as the cause; prompt escaping and concurrency fixes alone did not resolve it.
 
 **How to apply:** Keep the dataset's required `<think>` format unchanged. Apply transport encoding only to Reasoning prompts and schema instructions, never Single Turn or Multi Turn, and do not invent missing explanation text or weaken validation.
+
+Mixed must contain only a mix of Single Turn and Multi Turn, never Reasoning.
+
+**Why:** The user explicitly requested that the MIXED template exclude reasoning.
+
+**How to apply:** Apply this boundary to both generation and document conversion, including instruction-formatted output. Mixed must not preserve reasoning fields or thinking traces; leave the dedicated Reasoning template unchanged.

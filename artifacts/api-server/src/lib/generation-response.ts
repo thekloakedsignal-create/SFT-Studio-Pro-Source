@@ -102,7 +102,7 @@ export function stripCoTFromSingleTurn(text: string): string {
 }
 
 function allowsReasoning(templateType?: string): boolean {
-  return Boolean(templateType && /reason|mix/i.test(templateType));
+  return Boolean(templateType && /reason/i.test(templateType));
 }
 
 const roleAliases: Record<string, string> = {
