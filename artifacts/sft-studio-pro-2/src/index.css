@@ -272,14 +272,14 @@ main [class~="opacity-45"] { opacity: .72; }
   outline-offset: -2px;
 }
 
-/* Dark gray fills for only the two outer panels marked in the screenshot. */
+/* Keep the marked header distinct; the main workspace wrapper has no box border. */
 .kk-header [class~="bg-slate-900/60"] {
   background-color: #2a2a2a !important;
 }
 
 .kk-workspace-panel {
   background-color: transparent !important;
-  border: 12px solid #2a2a2a !important;
+  border: 0 !important;
 }
 
 .kk-workspace-panel > div {
