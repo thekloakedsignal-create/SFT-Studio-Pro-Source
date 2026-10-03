@@ -202,6 +202,7 @@ test("real dispatcher launches the preserved initial models concurrently and cou
   assert.ok(response.body.examples.every(hasRenderableMessages));
   assert.equal(response.body.batchId, "fixture-uuid-1");
   assert.deepEqual(f.calls.map(call => call.model), models.slice(0, 5));
+  assert.ok(f.calls.every(call => call.reasoning_effort === "none"));
   assert.equal(f.peak(), 5);
   assert.deepEqual(f.delays, []);
   assert.ok(f.timeoutValues.every(timeoutMs => timeoutMs === 20000));
@@ -231,6 +232,14 @@ test("Reasoning batches use only glm-5.3 and glm-5.2 concurrently and preserve t
     ["glm-5.3", "glm-5.2", "glm-5.3", "glm-5.2", "glm-5.3"]
   );
   assert.ok(f.calls.every(call => reasoningModels.includes(call.model)));
+  assert.deepEqual(
+    f.calls.map(call => [call.model, call.reasoning_effort]),
+    [
+      ["glm-5.3", "none"], ["glm-5.2", "medium"],
+      ["glm-5.3", "none"], ["glm-5.2", "medium"],
+      ["glm-5.3", "none"]
+    ]
+  );
   assert.equal(f.peak(), 2);
   assert.deepEqual(f.delays, [2000, 2000]);
   const prompt = f.calls[0].messages.find((message: any) => message.role === "user").content;
@@ -245,6 +254,7 @@ test("Reasoning HTTP 529 backup stays within glm-5.3 and glm-5.2", async () => {
   assert.equal(response.body.examples.length, 5);
   assert.ok(f.calls.every(call => reasoningModels.includes(call.model)));
   assert.ok(f.calls.some(call => call.model === "glm-5.2"));
+  assert.ok(f.calls.filter(call => call.model === "glm-5.2").every(call => call.reasoning_effort === "medium"));
 });
 
 test("Reasoning timeout recovery uses the other selected GLM and no third model", async () => {
@@ -254,6 +264,7 @@ test("Reasoning timeout recovery uses the other selected GLM and no third model"
   assert.equal(response.body.examples.length, 5);
   assert.ok(f.calls.every(call => reasoningModels.includes(call.model)));
   assert.equal(f.calls.at(-1).model, "glm-5.2");
+  assert.equal(f.calls.at(-1).reasoning_effort, "medium");
   assert.match(
     f.calls.at(-1).messages.find((message: any) => message.role === "user").content,
     /Generate exactly 3 examples\./

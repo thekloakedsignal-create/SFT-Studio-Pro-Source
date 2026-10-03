@@ -883,7 +883,7 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         messages: baseMessages,
         temperature: params.config?.temperature ?? 0.7,
         max_tokens: maxTokensToUse,
-        reasoning_effort: "none",
+        reasoning_effort: params.config?.reasoningEffort ?? "none",
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
       signal: abortSignal
@@ -1901,7 +1901,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             const response = await callDigitalOceanChatCompletions({
               model,
               contents: prompt,
-              config: configObj,
+              config: turnMode === "Reasoning" && model === "glm-5.2"
+                ? { ...configObj, reasoningEffort: "medium" }
+                : configObj,
               timeoutMs,
               ...(ignoreModelAbort ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
             });
