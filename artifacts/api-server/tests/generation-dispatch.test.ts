@@ -102,7 +102,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
         mode === "timeoutRecoveryAll"
         || (mode === "timeoutRecovery"
           && (((isReasoning || request.model === "qwen3.5-397b-a17b") && requestNumber === 2)
-            || (request.model === firstModel && requestNumber > 5)))
+            || ((isReasoning || request.model === firstModel) && requestNumber > 5)))
       ) {
         concurrent--;
         const timeoutError = new Error("fixture request timeout");
@@ -246,9 +246,9 @@ test("one Reasoning timeout neither cancels siblings nor skips later Nemotron sl
   assert.equal(response.body.success, true);
   assert.equal(response.body.partial, undefined);
   assert.equal(response.body.examples.length, 25);
-  assert.equal(f.calls.filter(call => call.model === "nemotron-3-ultra-550b").length, 25);
+  assert.equal(f.calls.filter(call => call.model === "nemotron-3-ultra-550b").length, 26);
   assert.equal(f.calls.length, 26);
-  assert.equal(f.calls.at(-1).model, "glm-5.3");
+  assert.equal(f.calls.at(-1).model, "nemotron-3-ultra-550b");
 });
 
 test("Multi Turn prompt requests the JSON-object envelope required by the provider", async () => {
@@ -281,6 +281,9 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   }
   const prompt = f.calls[0].messages.find((message: any) => message.role === "user").content;
   assert.match(prompt, /selected TEMPLATE TYPE: "Reasoning"/);
+  const formattingExample = prompt.split("- Formatting example:\n")[1].split("\n- Escape all line breaks")[0];
+  assert.equal(parseReasoningExamples(formattingExample, 1).examples.length, 1);
+  assert.ok(f.calls.every(call => call.model === "nemotron-3-ultra-550b"));
   assert.match(prompt, /Each example must contain exactly two messages, in order: one user message, then one assistant message/);
   assert.match(prompt, /Assistant content must start with exactly one non-empty <think>\.\.\.<\/think> block, followed by a non-empty final answer/);
   assert.match(prompt, /Return them as one JSON object with an "examples" array/);

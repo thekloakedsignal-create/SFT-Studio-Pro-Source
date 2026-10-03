@@ -1196,9 +1196,13 @@ REASONING TEMPLATE FORMAT:
 - Return exactly one JSON object with only an "examples" array.
 - Each example must contain exactly two messages, in order: one user message, then one assistant message. Do not include system messages, extra turns, or extra properties.
 - Assistant content must start with exactly one non-empty <think>...</think> block, followed by a non-empty final answer.
-- Required assistant content shape: "<think>\n[Concise explanation of the key reasoning steps]\n</think>\n[Final answer]".
+- Required assistant content shape: "<think>\\n[Concise explanation of the key reasoning steps]\\n</think>\\n[Final answer]".
 - Formatting example:
-{"examples":[{"messages":[{"role":"user","content":"What is 2 + 3?"},{"role":"assistant","content":"<think>\nI add 2 and 3 to get 5.\n</think>\nThe answer is 5."}]}]}
+${JSON.stringify({ examples: [{ messages: [
+  { role: "user", content: "What is 2 + 3?" },
+  { role: "assistant", content: "<think>\nI add 2 and 3 to get 5.\n</think>\nThe answer is 5." }
+] }] })}
+- Escape all line breaks inside JSON strings as \\n; never put literal line breaks inside a quoted JSON string.
 - Use this only as a formatting example; create new content for the requested task and persona.
 - Never omit either tag, put the final answer inside the tags, or use the format for any template other than Reasoning.
 - Do not emit separate "reasoning" or "reasoning_content" properties.
@@ -1937,7 +1941,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     let recoveryExamples: any[] = [];
     let recoveryFailureReason: string | null = null;
     let recoveryFailureCategory: GenerationFailureCategory | undefined;
-    let recoveryModel = "glm-5.3";
+    let recoveryModel = isReasoningGeneration ? "nemotron-3-ultra-550b" : "glm-5.3";
     if (timedOutExampleCount > 0) {
       const remainingBatchMs = generationDeadline - Date.now();
       const recoveryTimeoutMs = Math.min(
@@ -1950,7 +1954,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       } else {
         logger.warn(
           { model: recoveryModel, missingCount: timedOutExampleCount, batchId: generationBatchId },
-          "Requesting one GLM batch to replace examples from timed-out model requests"
+          "Requesting one recovery batch to replace examples from timed-out model requests"
         );
         try {
           recoveryExamples = await requestExamplesForMissingBatch(
@@ -1993,7 +1997,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               stalledModels.add(recoveryModel);
               modelAbortControllers.get(recoveryModel)?.abort();
             }
-            recoveryFailureReason = `GLM recovery failed: ${formatAIErrorMessage(recoveryError)}`;
+            recoveryFailureReason = `${recoveryModel} recovery failed: ${formatAIErrorMessage(recoveryError)}`;
           }
         }
         if (recoveryExamples.length < timedOutExampleCount && !recoveryFailureReason) {
