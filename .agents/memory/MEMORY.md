@@ -4,3 +4,4 @@
 - [TRiAD import source](triad-import-source.md) — Keep TRiAD imports URL-based; do not restore embedded helpful/harmful seed examples or fallback records.
 - [Document conversion intent](document-conversion-intent.md) — All three document types require content analysis and synthesis, not extraction of existing examples.
 - [QA scope](quality-audit-intent.md) — QA must combine formatting/template checks with semantic assessment, not replace either one.
+- [Visual reference](visual-reference.md) — Use the supplied screenshot for palette changes; preserve layout and prioritize sharp work-area contrast.
