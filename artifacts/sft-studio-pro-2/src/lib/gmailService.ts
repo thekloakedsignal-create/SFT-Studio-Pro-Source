@@ -45,23 +45,23 @@ export function buildRawEmail(data: SupportEmailData, targetInbox: string = SUPP
 <head>
   <meta charset="utf-8">
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #090d16; color: #e2e8f0; margin: 0; padding: 24px; }
-    .card { background-color: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 24px; max-width: 600px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-    .header { border-bottom: 1px solid #374151; padding-bottom: 16px; margin-bottom: 20px; }
-    .title { color: #10b981; font-size: 20px; font-weight: bold; margin: 0; }
-    .meta { font-size: 13px; color: #9ca3af; margin-top: 6px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #09080c; color: #e8e5eb; margin: 0; padding: 24px; }
+    .card { background-color: #141118; border: 1px solid #25212a; border-radius: 12px; padding: 24px; max-width: 600px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    .header { border-bottom: 1px solid #403c45; padding-bottom: 16px; margin-bottom: 20px; }
+    .title { color: #c77dff; font-size: 20px; font-weight: bold; margin: 0; }
+    .meta { font-size: 13px; color: #a49eae; margin-top: 6px; }
     .field { margin-bottom: 16px; }
-    .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; margin-bottom: 4px; font-weight: 600; }
-    .value { font-size: 14px; color: #f3f4f6; background-color: #030712; padding: 10px 14px; border-radius: 8px; border: 1px solid #1f2937; }
-    .message-box { white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: #f9fafb; background-color: #030712; padding: 12px 14px; border-radius: 8px; border: 1px solid #1f2937; }
-    .footer { font-size: 12px; color: #6b7280; text-align: center; margin-top: 24px; }
+    .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #a49eae; margin-bottom: 4px; font-weight: 600; }
+    .value { font-size: 14px; color: #e8e5eb; background-color: #09080c; padding: 10px 14px; border-radius: 8px; border: 1px solid #25212a; }
+    .message-box { white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: #ece9f0; background-color: #09080c; padding: 12px 14px; border-radius: 8px; border: 1px solid #25212a; }
+    .footer { font-size: 12px; color: #837d8c; text-align: center; margin-top: 24px; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="header">
       <h1 class="title">SFT Studio Pro &mdash; Support Inquiry</h1>
-      <div class="meta">From <strong>${escapeHtml(data.username)}</strong> &lt;<a href="mailto:${escapeHtml(data.userEmail)}" style="color: #38bdf8;">${escapeHtml(data.userEmail)}</a>&gt;</div>
+      <div class="meta">From <strong>${escapeHtml(data.username)}</strong> &lt;<a href="mailto:${escapeHtml(data.userEmail)}" style="color: #c77dff;">${escapeHtml(data.userEmail)}</a>&gt;</div>
     </div>
 
     <div class="field">
