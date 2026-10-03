@@ -29,6 +29,6 @@ Use only `nemotron-3-ultra-550b` for Reasoning, including timeout recovery; the 
 
 Treat `<think>` as a potentially reserved provider delimiter, not safe literal text inside generated JSON. Use a transport-only delimiter and restore dataset tags before strict validation.
 
-**Why:** A user-authorized five-request Nemotron diagnostic returned three complete JSON objects lacking required tags and two JSON suffixes missing their prefixes. This strongly suggests provider reasoning-delimiter handling; prompt escaping and concurrency fixes alone did not resolve it.
+**Why:** A user-authorized Nemotron diagnostic returned complete JSON objects lacking required tags and JSON suffixes missing their prefixes. The same concurrent diagnostic passed with transport-only delimiters restored before validation, supporting provider reasoning-delimiter handling as the cause; prompt escaping and concurrency fixes alone did not resolve it.
 
 **How to apply:** Keep the dataset's required `<think>` format unchanged. Apply transport encoding only to Reasoning prompts and schema instructions, never Single Turn or Multi Turn, and do not invent missing explanation text or weaken validation.
