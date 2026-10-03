@@ -1,13 +1,13 @@
 ---
-name: Reasoning template scope
-description: User-defined boundary for changes to SFT Reasoning batch generation.
+name: Reasoning worker reliability
+description: User-defined reliability requirements for SFT Reasoning batch generation.
 ---
 
-For Reasoning-generation work, change only the Reasoning template and its tests. Do not alter Single Turn or Multi Turn prompts, schemas, or behavior. Keep the shared concurrent model schedule, and wait for all already-launched Reasoning workers before finalizing a partial result.
+Keep the Reasoning template unchanged. Make reliability changes only to Reasoning dispatch, result collection, and tests; do not alter Single Turn or Multi Turn prompts, schemas, or behavior. When a Reasoning worker fails, start its replacement immediately while sibling workers continue. Retain successful sibling results, and return exactly the requested number of examples or an error—never a successful partial batch.
 
-**Why:** The user explicitly set and reinforced this scope while correcting Reasoning generation. A fast failure from one worker must not discard valid results still in flight from its siblings.
+**Why:** The user explicitly said the template is already correct, workers must run concurrently, failed slots should move quickly to another worker, and incomplete batches must not be returned.
 
-**How to apply:** Confine prompt, schema, validation, and result-collection changes to Reasoning-specific branches; do not change the shared model pool or scheduler.
+**How to apply:** Keep prompts and schemas untouched. Confine worker replacement and collection changes to Reasoning-specific branches; preserve the shared model pool and schedule. Wait for all launched sibling tasks in the active stack, and report an error if recovery cannot fill every requested slot.
 
 The DigitalOcean adapter's verified request format is `json_object`, with response-schema text added to the prompt. Do not infer or add a native JSON-schema request payload unless its exact shape is established by existing app integration material.
 

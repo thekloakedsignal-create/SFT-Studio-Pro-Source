@@ -34,6 +34,7 @@ function hasRenderableMessages(example: any): boolean {
 function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" | "reasoningSiblingDelay" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
+  const requestEvents: Array<{ type: "start" | "settled"; model: string }> = [];
   const delays: number[] = [];
   const timeoutValues: number[] = [];
   let fixtureNow = 1_700_000_000_000;
@@ -78,6 +79,9 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       const request = JSON.parse(options.body);
       const requestNumber = calls.length + 1;
       calls.push(request);
+      if (mode === "reasoningSiblingDelay") {
+        requestEvents.push({ type: "start", model: request.model });
+      }
       if (mode === "reasoningSiblingDelay" && request.model !== firstModel) {
         await new Promise<void>(resolve => setImmediate(resolve));
       }
@@ -183,12 +187,15 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
           { type: "text", text: content.slice(0, 30) }, { type: "text", text: content.slice(30) }
         ] } }] }
         : { error: { message: "fixture provider unavailable" } };
+      if (mode === "reasoningSiblingDelay") {
+        requestEvents.push({ type: "settled", model: request.model });
+      }
       return { ok: status === 200, status, statusText: "Fixture", async text() { return JSON.stringify(response); } };
     }
   };
   vm.runInNewContext(compiled.code, context);
   return {
-    calls, delays, timeoutValues,
+    calls, delays, timeoutValues, requestEvents,
     peak: () => peakConcurrent,
     async generate(count = 5, jobMode = false, templateType = "Single Turn") {
       const response: any = {
@@ -297,7 +304,7 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   ]) assert.equal(contentPattern.test(content), false);
 });
 
-test("Reasoning jobs use the fill worker for missing examples and return a full batch", async () => {
+test("Reasoning immediately replaces a failed worker while sibling workers are still running", async () => {
   const f = fixture("reasoningSiblingDelay");
   const started = await f.generate(5, true, "Reasoning");
   const job = await f.job(started.body.jobId);
@@ -306,29 +313,42 @@ test("Reasoning jobs use the fill worker for missing examples and return a full 
   assert.equal(job.body.result.partial, undefined);
   assert.equal(job.body.result.examples.length, 5);
   assert.equal(f.calls.length, 6);
-  assert.equal(f.calls.at(-1).model, firstModel);
+  assert.equal(f.calls.at(-1).model, "llama-4-maverick");
   assert.match(f.calls.at(-1).messages.find((message: any) => message.role === "user").content, /Generate exactly 1 examples\./);
+  const replacementStart = f.requestEvents.findIndex(event =>
+    event.type === "start" && event.model === "llama-4-maverick"
+  );
+  const firstSiblingSettlement = f.requestEvents.findIndex(event =>
+    event.type === "settled" && event.model !== firstModel
+  );
+  assert.ok(replacementStart >= 0);
+  assert.ok(firstSiblingSettlement >= 0);
+  assert.ok(replacementStart < firstSiblingSettlement);
   assert.ok(job.body.result.examples.every(hasRenderableMessages));
 });
 
-test("Reasoning timeout recovery updates the schema to the requested fill count", async () => {
+test("Reasoning timeout recovery replaces the failed slot with a correctly sized worker request", async () => {
   const f = fixture("timeoutQwen");
   const started = await f.generate(25, true, "Reasoning");
   const job = await f.job(started.body.jobId);
 
   assert.equal(job.body.status, "complete");
   assert.equal(job.body.result.examples.length, 25);
-  const recoveryCall = f.calls.at(-1);
-  const recoveryPrompt = recoveryCall.messages.find((message: any) => message.role === "user").content;
-  assert.match(recoveryPrompt, /Generate exactly 3 examples\./);
+  const replacementCall = f.calls.find(call =>
+    call.model === "glm-5.3"
+    && call.messages.find((message: any) => message.role === "user").content.includes("selected TEMPLATE TYPE: \"Reasoning\"")
+  );
+  assert.ok(replacementCall);
+  const replacementPrompt = replacementCall.messages.find((message: any) => message.role === "user").content;
+  assert.match(replacementPrompt, /Generate exactly 1 examples\./);
 
-  const systemPrompt = recoveryCall.messages.find((message: any) => message.role === "system").content;
+  const systemPrompt = replacementCall.messages.find((message: any) => message.role === "system").content;
   const schemaPrefix = "Return valid JSON that matches this schema: ";
   const schemaOffset = systemPrompt.indexOf(schemaPrefix);
   assert.notEqual(schemaOffset, -1);
   const responseSchema = JSON.parse(systemPrompt.slice(schemaOffset + schemaPrefix.length));
-  assert.equal(responseSchema.properties.examples.minItems, 3);
-  assert.equal(responseSchema.properties.examples.maxItems, 3);
+  assert.equal(responseSchema.properties.examples.minItems, 1);
+  assert.equal(responseSchema.properties.examples.maxItems, 1);
 });
 
 test("Reasoning batch jobs reject responses that omit the required think block", async () => {
@@ -339,12 +359,12 @@ test("Reasoning batch jobs reject responses that omit the required think block",
   assert.equal(job.body.status, "error");
   assert.equal(job.body.result, undefined);
   assert.equal(Object.hasOwn(job.body, "failureCategory"), false);
-  assert.equal(f.calls.length, 6);
+  assert.equal(f.calls.length, 11);
 });
 
-test("Reasoning timeout failure categories remain internal to job status", async () => {
+test("Reasoning fills every requested slot or errors without exposing partial results", async () => {
   for (const [mode, expectedStatus] of [
-    ["timeoutRecovery", "partial"],
+    ["timeoutRecovery", "complete"],
     ["timeoutRecoveryAll", "error"]
   ] as const) {
     const f = fixture(mode);
@@ -353,14 +373,21 @@ test("Reasoning timeout failure categories remain internal to job status", async
 
     assert.equal(job.body.status, expectedStatus);
     assert.equal(Object.hasOwn(job.body, "failureCategory"), false);
-    if (expectedStatus === "partial") {
-      assert.ok(job.body.result.examples.length > 0);
-      assert.ok(job.body.result.examples.length < 5);
+    if (expectedStatus === "complete") {
+      assert.equal(job.body.result.examples.length, 5);
+      assert.equal(job.body.result.partial, undefined);
     } else {
       assert.equal(job.body.result, undefined);
     }
-    assert.equal(f.calls.length, 6);
+    assert.equal(f.calls.length, expectedStatus === "complete" ? 6 : 11);
   }
+
+  const directFailure = fixture("timeoutRecoveryAll");
+  const response = await directFailure.generate(5, false, "Reasoning");
+  assert.equal(response.statusCode, 500);
+  assert.equal(response.body.success, false);
+  assert.equal(Object.hasOwn(response.body, "examples"), false);
+  assert.equal(Object.hasOwn(response.body, "partial"), false);
 });
 
 test("a stalled model is skipped in later stacks and GLM fills all missing examples in one request", async () => {

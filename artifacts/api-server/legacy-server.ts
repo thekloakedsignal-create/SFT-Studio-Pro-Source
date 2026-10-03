@@ -1974,9 +1974,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               job.status = "partial";
               job.progress.completed = partialExamples.length;
               job.result = partialResponse;
-              if (turnMode === "Reasoning") {
-                job.failureCategory = getReasoningFailureCategory(error);
-              }
               job.updatedAt = Date.now();
             }
             return;
@@ -1988,8 +1985,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           return res.json(partialResponse);
         }
         throw Object.assign(
-          new Error(`Generation stopped after ${completedExampleCount} of ${countNum} examples completed. ${detail}`),
-          { failureCategory: turnMode === "Reasoning" ? getReasoningFailureCategory(error) : undefined }
+          new Error(`Generation stopped after ${completedExampleCount} of ${countNum} examples completed. ${detail}`)
         );
       }
     }
@@ -2131,9 +2127,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             job.status = "partial";
             job.progress.completed = formattedPartialExamples.length;
             job.result = partialResponse;
-            if (turnMode === "Reasoning") {
-              job.failureCategory = recoveryFailureCategory ?? "provider_timeout";
-            }
             job.updatedAt = Date.now();
           }
           return;
