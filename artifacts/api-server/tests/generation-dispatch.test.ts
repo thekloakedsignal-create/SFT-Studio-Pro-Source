@@ -19,6 +19,7 @@ assert.ok(dispatchSource.includes('app.post("/api/generate"'));
 const compiled = await transform(dispatchSource, { loader: "ts", format: "cjs", target: "node24" });
 
 const firstModel = "glm-5.3";
+const reasoningModels = ["glm-5.3", "glm-5.2"];
 const models = [
   firstModel, "qwen3.5-397b-a17b", "gemma-4-31B-it", "deepseek-v4-pro", "nemotron-3-ultra-550b",
   "llama-4-maverick", "mimo-v2.5-pro", "qwen3.8-max", "deepseek-4-flash", "nemotron-3-nano-omni"
@@ -31,7 +32,7 @@ function hasRenderableMessages(example: any): boolean {
     ));
 }
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutReasoning53" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const delays: number[] = [];
@@ -82,7 +83,8 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       if (mode === "fastFailure" && request.model !== firstModel) {
         return await new Promise(() => {});
       }
-      if (mode === "timeoutQwen" && request.model === "qwen3.5-397b-a17b") {
+      if ((mode === "timeoutQwen" && request.model === "qwen3.5-397b-a17b")
+        || (mode === "timeoutReasoning53" && request.model === "glm-5.3")) {
         concurrent--;
         const timeoutError = new Error("fixture request timeout");
         timeoutError.name = "TimeoutError";
@@ -134,6 +136,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
         : 200;
       const userPrompt = request.messages.find((message: any) => message.role === "user")?.content || "";
       const requestedCount = Number(userPrompt.match(/Generate exactly (\d+) examples\./)?.[1]) || 1;
+      const reasoningExample = userPrompt.includes("REASONING TEMPLATE — EXACT FETCH RESPONSE FORMAT");
       const requestedExamples = Array.from({ length: requestedCount }, (_, index) => ({
         messages: userPrompt.includes('selected TEMPLATE TYPE: "Multi Turn"')
           ? [
@@ -145,7 +148,12 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
             ]
           : [
               { role: "user", content: `Question ${index + 1} for ${request.model}` },
-              { role: "assistant", content: `Answer ${index + 1} from ${request.model}.` }
+              {
+                role: "assistant",
+                content: reasoningExample
+                  ? `<think>Reasoning from ${request.model}.</think>\nAnswer ${index + 1} from ${request.model}.`
+                  : `Answer ${index + 1} from ${request.model}.`
+              }
             ]
       }));
       const content = mode === "invalid" && isPrimary
@@ -210,6 +218,46 @@ test("Multi Turn prompt requests the JSON-object envelope required by the provid
   assert.match(prompt, /Return them as one JSON object with an "examples" array/);
   assert.match(prompt, /Do not return a top-level JSON array/);
   assert.ok(f.calls.every(call => call.response_format.type === "json_object"));
+});
+
+test("Reasoning batches use only glm-5.3 and glm-5.2 concurrently and preserve the reasoning field", async () => {
+  const f = fixture();
+  const response = await f.generate(5, false, "Reasoning");
+  assert.equal(response.body.success, true);
+  assert.equal(response.body.examples.length, 5);
+  assert.ok(response.body.examples.every((example: any) => example.messages[1].reasoning));
+  assert.deepEqual(
+    f.calls.map(call => call.model),
+    ["glm-5.3", "glm-5.2", "glm-5.3", "glm-5.2", "glm-5.3"]
+  );
+  assert.ok(f.calls.every(call => reasoningModels.includes(call.model)));
+  assert.equal(f.peak(), 2);
+  assert.deepEqual(f.delays, [2000, 2000]);
+  const prompt = f.calls[0].messages.find((message: any) => message.role === "user").content;
+  assert.match(prompt, /one top-level property, "examples"/);
+  assert.match(prompt, /<think>/);
+});
+
+test("Reasoning HTTP 529 backup stays within glm-5.3 and glm-5.2", async () => {
+  const f = fixture("primary529");
+  const response = await f.generate(5, false, "Reasoning");
+  assert.equal(response.body.success, true);
+  assert.equal(response.body.examples.length, 5);
+  assert.ok(f.calls.every(call => reasoningModels.includes(call.model)));
+  assert.ok(f.calls.some(call => call.model === "glm-5.2"));
+});
+
+test("Reasoning timeout recovery uses the other selected GLM and no third model", async () => {
+  const f = fixture("timeoutReasoning53");
+  const response = await f.generate(5, false, "Reasoning");
+  assert.equal(response.body.success, true);
+  assert.equal(response.body.examples.length, 5);
+  assert.ok(f.calls.every(call => reasoningModels.includes(call.model)));
+  assert.equal(f.calls.at(-1).model, "glm-5.2");
+  assert.match(
+    f.calls.at(-1).messages.find((message: any) => message.role === "user").content,
+    /Generate exactly 3 examples\./
+  );
 });
 
 test("a stalled model is skipped in later stacks and GLM fills all missing examples in one request", async () => {

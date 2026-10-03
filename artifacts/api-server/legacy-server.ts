@@ -992,6 +992,23 @@ function createModelGenerationStacks(
   const repeat = (stackCount: number, modelList: string[], count = 1) =>
     Array.from({ length: stackCount }, () => assign(modelList, count));
 
+  if (models.length < 5) {
+    const stacks: Array<Array<{ model: string; count: number }>> = [];
+    let remaining = totalExamples;
+    let modelOffset = 0;
+    while (remaining > 0) {
+      const callsThisStack = Math.min(models.length, remaining);
+      const stackModels = Array.from(
+        { length: callsThisStack },
+        (_, index) => models[(modelOffset + index) % models.length],
+      );
+      stacks.push(assign(stackModels));
+      modelOffset = (modelOffset + callsThisStack) % models.length;
+      remaining -= callsThisStack;
+    }
+    return stacks;
+  }
+
   if (totalExamples === 5) return [assign(groupOne)];
   if (totalExamples === 10) return [assign(allModels)];
   if (totalExamples === 25) {
@@ -1514,7 +1531,9 @@ REASONING TEMPLATE — EXACT FETCH RESPONSE FORMAT (Reasoning batches only):
       };
     }
 
-    const generationModels = getGenerationModels();
+    const generationModels = turnMode === "Reasoning"
+      ? ["glm-5.3", "glm-5.2"].map(model => normalizeModel(model))
+      : getGenerationModels();
     const modelAbortControllers = new Map(
       generationModels.map(model => [model, new AbortController()])
     );
@@ -2053,7 +2072,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
 
     let recoveryExamples: any[] = [];
     let recoveryFailureReason: string | null = null;
-    let recoveryModel = "glm-5.3";
+    let recoveryModel = turnMode === "Reasoning"
+      ? generationModels.find(model => !stalledModels.has(model)) || ""
+      : "glm-5.3";
     if (timedOutExampleCount > 0) {
       const remainingBatchMs = generationDeadline - Date.now();
       const recoveryTimeoutMs = Math.min(
@@ -2062,6 +2083,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       );
       if (recoveryTimeoutMs <= 0 || !requestExamplesForMissingBatch) {
         recoveryFailureReason = `The ${generationTimeoutMs / 1000}-second total batch time limit expired before the GLM fill request could start.`;
+      } else if (!recoveryModel) {
+        recoveryFailureReason = "No selected Reasoning model remains available for timeout recovery.";
       } else {
         logger.warn(
           { model: recoveryModel, missingCount: timedOutExampleCount, batchId: generationBatchId },
@@ -2108,15 +2131,17 @@ No internal deliberation, planning, or reasoning fields are permitted.`
         if (recoveryExamples.length < timedOutExampleCount && !recoveryFailureReason) {
           recoveryFailureReason = `${recoveryModel} returned ${recoveryExamples.length} of ${timedOutExampleCount} missing examples.`;
         }
-        completedExampleCount += recoveryExamples.length;
-        sendProgressEvent({
-          type: "progress",
-          taskId: `recovery:${recoveryModel}`,
-          model: recoveryModel,
-          generatedCount: recoveryExamples.length,
-          completedCount: completedExampleCount,
-          total: countNum
-        });
+        if (recoveryModel) {
+          completedExampleCount += recoveryExamples.length;
+          sendProgressEvent({
+            type: "progress",
+            taskId: `recovery:${recoveryModel}`,
+            model: recoveryModel,
+            generatedCount: recoveryExamples.length,
+            completedCount: completedExampleCount,
+            total: countNum
+          });
+        }
       }
     }
 
