@@ -14,3 +14,5 @@ The user specifies “Purple for font and highlighted selections.”
 **Why:** The user explicitly clarified the purple's role.
 
 **How to apply:** Use readable deep purple text on light surfaces and lighter purple on charcoal, with purple selection highlights.
+
+Avoid low-opacity white panels over grey and muted grey-purple lettering: the user describes that treatment as “greyed out.” Keep working panels opaque and the purple text visibly saturated.

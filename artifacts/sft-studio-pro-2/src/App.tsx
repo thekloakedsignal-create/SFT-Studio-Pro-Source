@@ -4460,7 +4460,7 @@ export default function App() {
         </div>
 
         {/* Tab Contents Frame */}
-        <div className="lg:col-span-9 xl:col-span-10 flex flex-col gap-6 min-w-0">
+        <div className="sft-content lg:col-span-9 xl:col-span-10 flex flex-col gap-6 min-w-0">
           <AnimatePresence mode="wait">
             
             {/* TAB 1: DEFINITIONS & BATCH GENERATION */}
