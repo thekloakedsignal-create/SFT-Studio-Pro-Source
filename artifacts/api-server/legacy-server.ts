@@ -1769,7 +1769,8 @@ REASONING TEMPLATE FORMAT:
           `
         ) : turnMode === "Reasoning" ? `
         EXACT MANDATORY STRUCTURE FOR REASONING TEMPLATE:
-        Every single example in the JSON array MUST follow this exact structure:
+        Every example in the "examples" array MUST follow this exact structure.
+        Return the complete batch as one JSON object: {"examples":[...]}.
         {
           "messages": [
             {
@@ -1815,7 +1816,9 @@ REASONING TEMPLATE FORMAT:
 
         ${turnMode === "Reasoning" ? reasoningFormatInstruction : ""}
         Generate exactly ${currentChunkSize} examples. ${
-          turnMode === "Multi Turn"
+          turnMode === "Reasoning"
+            ? `Return them as one JSON object with an "examples" array, for example {"examples":[...]}. Do not return a top-level JSON array.`
+            : turnMode === "Multi Turn"
             ? `Return them as one JSON object with an "examples" array, for example {"examples":[...]}. Do not return a top-level JSON array.`
             : `Return them as a JSON array of examples.`
         }
@@ -1828,7 +1831,15 @@ REASONING TEMPLATE FORMAT:
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
             ...(turnMode === "Reasoning"
-              ? { responseSchema: { type: Type.ARRAY, items: schemaProperty } }
+              ? {
+                  responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                      examples: { type: Type.ARRAY, items: schemaProperty }
+                    },
+                    required: ["examples"]
+                  }
+                }
               : {}),
             ...(turnMode !== "Reasoning" && turnMode !== "Mixed" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
             systemInstruction: turnMode === "Reasoning"

@@ -235,7 +235,17 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   }
   const prompt = f.calls[0].messages.find((message: any) => message.role === "user").content;
   assert.match(prompt, /selected TEMPLATE TYPE: "Reasoning"/);
+  assert.match(prompt, /Return them as one JSON object with an "examples" array/);
+  assert.doesNotMatch(prompt, /Return them as a JSON array of examples/);
   assert.ok(f.calls.every(call => call.response_format.type === "json_object"));
+
+  const systemPrompt = f.calls[0].messages.find((message: any) => message.role === "system").content;
+  const schemaPrefix = "Return valid JSON that matches this schema: ";
+  const schemaOffset = systemPrompt.indexOf(schemaPrefix);
+  assert.notEqual(schemaOffset, -1);
+  const responseSchema = JSON.parse(systemPrompt.slice(schemaOffset + schemaPrefix.length));
+  assert.equal(String(responseSchema.type).toLowerCase(), "object");
+  assert.equal(String(responseSchema.properties.examples.type).toLowerCase(), "array");
 });
 
 test("Reasoning batch jobs reject responses that omit the required think block", async () => {
