@@ -11,7 +11,7 @@ Keep visibly distinct charcoal and light-grey areas, not an almost entirely blac
 
 The user specifies “Purple for font and highlighted selections.”
 
-Keep the writing visibly fuchsia and saturated, not pale lavender or grey-purple. The user repeatedly rejects the washed-out, “paste or a film over it” appearance. Locked editing fields must remain legible rather than fading their text.
+Keep writing bright metallic purple, not fuchsia or pink. “Bright like fuchsia” describes intensity, not hue. The user repeatedly rejects the washed-out, “paste or a film over it” appearance. Locked editing fields must remain legible rather than fading their text.
 
 All palette work is aesthetic only: do not change function or access rules. Nothing should look greyed out, whether accessible or not; unavailable controls retain full-color styling.
 
@@ -23,8 +23,8 @@ All palette work is aesthetic only: do not change function or access rules. Noth
 
 Avoid low-opacity white panels over grey and muted grey-purple lettering: the user describes that treatment as “greyed out.” Keep working panels opaque and the purple text visibly saturated.
 
-Input boxes should have black backgrounds and bright, almost-fuchsia purple writing. Use dark-grey borders around the whole app.
+Use bright metallic-purple writing and dark-grey borders around the whole app.
 
 **Why:** The user explicitly requested this contrast treatment.
 
-**How to apply:** Preserve the mixed light/charcoal workspace and vivid purple-fuchsia text with clear dark-grey framing. The user's later correction takes precedence for the top panel and workspace: top panel inner box is medium grey; main workspace content box is medium-dark grey, explicitly not black.
+**How to apply:** Preserve the mixed light/charcoal workspace and vivid metallic-purple text with clear dark-grey framing. The top panel inner box is medium grey; the main workspace content box is medium-dark grey, explicitly not black. Shade individual boxes directly rather than adding blanket background overrides.

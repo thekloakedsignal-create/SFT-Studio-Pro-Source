@@ -9,11 +9,11 @@
   --color-purple-50: #f8f1ff;
   --color-purple-100: #eee0ff;
   --color-purple-200: #dec2ff;
-  --color-purple-300: #ff8cf5;
-  --color-purple-400: #ff66ed;
-  --color-purple-500: #ed40d7;
-  --color-purple-600: #bc169f;
-  --color-purple-700: #8d0876;
+  --color-purple-300: #d09aff;
+  --color-purple-400: #c278ff;
+  --color-purple-500: #ad4af5;
+  --color-purple-600: #8930ca;
+  --color-purple-700: #69209e;
   --color-purple-800: #512077;
   --color-purple-900: #301444;
   --color-purple-950: #170b22;
@@ -131,13 +131,13 @@
 
   /* Legacy utility names now express dark ink on light paper.
      Charcoal regions below restore the dark surface scale locally. */
-  --color-slate-50: #39002f;
-  --color-slate-100: #510042;
-  --color-slate-200: #660053;
-  --color-slate-300: #72005d;
-  --color-slate-400: #780062;
-  --color-slate-500: #780062;
-  --color-slate-600: #780062;
+  --color-slate-50: #2e064a;
+  --color-slate-100: #410965;
+  --color-slate-200: #521078;
+  --color-slate-300: #601787;
+  --color-slate-400: #681b94;
+  --color-slate-500: #681b94;
+  --color-slate-600: #681b94;
   --color-slate-700: #91919a;
   --color-slate-750: #a4a4ad;
   --color-slate-800: #b8b8bf;
@@ -206,8 +206,8 @@
 @layer base {
   :root {
     color-scheme: light;
-    --heading-ink: #800067;
-    --accent-ink: #950079;
+    --heading-ink: #661698;
+    --accent-ink: #7823b1;
     --background: 240 6% 79%;
     --foreground: 279 70% 22%;
     --card: 0 0% 100%;
@@ -282,13 +282,13 @@ body {
   background: #c77dff;
 }
 
-/* Bright purple-fuchsia writing on black editing surfaces. */
+/* Bright metallic-purple writing; grey panels set their own editing surface. */
 textarea,
 select,
 input:not([type]),
 input:is([type="text"], [type="email"], [type="password"], [type="number"], [type="search"], [type="url"], [type="tel"]) {
-  background-color: #070709 !important;
-  color: #ff66ed !important;
+  background-color: var(--field-surface, #070709) !important;
+  color: var(--field-ink, #c278ff) !important;
   caret-color: #f6a5ff;
   border: 2px solid #505056;
   color-scheme: dark;
@@ -302,13 +302,13 @@ input:is([type="text"], [type="email"], [type="password"], [type="number"], [typ
 
 textarea::placeholder,
 input::placeholder {
-  color: #ff80ef !important;
+  color: #c78aff !important;
   opacity: 1;
 }
 
 select option {
   background-color: #070709;
-  color: #ff66ed;
+  color: #c278ff;
 }
 
 textarea:focus,
@@ -322,23 +322,24 @@ input:focus {
 textarea:disabled,
 select:disabled,
 input:disabled {
-  background-color: #202024 !important;
-  color: #ff8cf5 !important;
+  background-color: var(--field-surface, #070709) !important;
+  color: var(--field-ink, #c278ff) !important;
   opacity: 1 !important;
 }
 
 /* Explicit dark zones against the light workspace, matching the reference's
    charcoal navigation and black code/composer blocks. */
 .sft-charcoal,
+.sft-panel,
 pre {
-  --heading-ink: #ff66ed;
-  --accent-ink: #ff66ed;
-  --color-slate-50: #ff8cf5;
-  --color-slate-100: #ff8cf5;
-  --color-slate-200: #ff8cf5;
-  --color-slate-300: #ff8cf5;
-  --color-slate-400: #ff8cf5;
-  --color-slate-500: #ff8cf5;
+  --heading-ink: #c278ff;
+  --accent-ink: #c278ff;
+  --color-slate-50: #d09aff;
+  --color-slate-100: #d09aff;
+  --color-slate-200: #d09aff;
+  --color-slate-300: #d09aff;
+  --color-slate-400: #d09aff;
+  --color-slate-500: #d09aff;
   --color-slate-600: #797985;
   --color-slate-700: #5e5e66;
   --color-slate-750: #505057;
@@ -347,23 +348,23 @@ pre {
   --color-slate-900: #2b2b31;
   --color-slate-950: #111114;
   background-color: #222226;
-  color: #ff8cf5;
+  color: #d09aff;
   color-scheme: dark;
 }
 
 pre {
   background-color: #111114 !important;
-  color: #ff66ed;
+  color: #c278ff;
 }
 
 .sft-composer,
 .sft-composer input {
   background-color: #09090c !important;
-  color: #ff66ed !important;
+  color: #c278ff !important;
 }
 
 .sft-composer input::placeholder {
-  color: #ff80ef !important;
+  color: #c78aff !important;
 }
 
 .text-white,
@@ -409,44 +410,33 @@ pre {
   box-shadow: inset 0 -3px 0 #8c24d1;
 }
 
-/* Remove the translucent grey wash from working panels. Keep intentional
-   charcoal regions and the black composer distinct. */
-.sft-content [class*="bg-slate-950/"]:not(.sft-charcoal):not(.sft-composer) {
+/* Each workspace card owns its solid fill and border. The layout wrapper
+   does not paint over its children or infer colors from utility substrings. */
+.sft-panel {
   background-color: #48484e;
-  border-color: #9696a0;
+  border: 2px solid #35353b;
+  --field-surface: #414147;
+  --field-ink: #d09aff;
+  --heading-ink: #c78aff;
+  --accent-ink: #c78aff;
 }
 
 .sft-top-panel-inner {
   background-color: #77777e;
-  --color-slate-200: #480037;
-  --color-slate-500: #480037;
+  --color-slate-200: #2e064a;
+  --color-slate-500: #2e064a;
 }
 
-.sft-top-panel-inner [class*="bg-slate-950"] {
-  --color-slate-200: #ff8cf5;
-  --color-slate-500: #ff8cf5;
-}
-
-.sft-content.sft-charcoal {
-  background-color: transparent;
-  --heading-ink: #ff80ef;
-  --accent-ink: #ff80ef;
-  --color-slate-400: #ff8cf5;
-  --color-slate-500: #ff8cf5;
-}
-
-.sft-content textarea {
-  background-color: #48484e !important;
-  color: #ff8cf5 !important;
-}
-
-.sft-content > div > div {
-  border-color: #888892;
+.sft-top-control {
+  background-color: #333339;
+  border: 1px solid #45454b;
+  --color-slate-200: #d09aff;
+  --color-slate-500: #d09aff;
 }
 
 .sft-charcoal button[id^="tab-"].shadow-sm {
   --accent-ink: #350b50;
-  background-color: #ff66ed;
+  background-color: #c278ff;
   color: #350b50;
   border-color: #e3bdff;
   box-shadow: inset 3px 0 0 #f1ddff;
@@ -461,9 +451,7 @@ pre {
   border: 4px solid #45454b;
 }
 
-:is(.border, .border-2, .border-t, .border-b, .border-l, .border-r, .border-t-2),
-.sft-content [class*="bg-slate-950/"]:not(.sft-charcoal):not(.sft-composer),
-.sft-content > div > div {
+:is(.border, .border-2, .border-t, .border-b, .border-l, .border-r, .border-t-2) {
   border-color: #505056;
 }
 
