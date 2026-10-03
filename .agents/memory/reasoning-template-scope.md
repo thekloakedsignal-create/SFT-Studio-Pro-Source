@@ -1,13 +1,13 @@
 ---
-name: Reasoning worker reliability
-description: User-defined reliability requirements for SFT Reasoning batch generation.
+name: Reasoning template scope
+description: User-defined boundary for changes to SFT Reasoning batch generation.
 ---
 
-Keep the Reasoning template unchanged. For its existing model slots, use `nemotron-3-ultra-550b` in every slot and run the slots concurrently. Preserve the existing batch lineup, batch sizing, request schedule, fallback logic, and recovery logic. Do not change Single Turn or Multi Turn prompts, schemas, or behavior.
+For Reasoning-generation work, change only the Reasoning template and its tests. Do not alter Single Turn or Multi Turn prompts, schemas, or behavior. Keep the shared concurrent model schedule.
 
-**Why:** The user explicitly clarified that this is a literal model-slot substitution only, with no other changes to generation behavior.
+**Why:** The user explicitly set and reinforced this scope while correcting Reasoning generation.
 
-**How to apply:** Change only the model IDs assigned to existing Reasoning slots. Do not modify the batch schedule, concurrency mechanism, fallback, recovery, or other templates.
+**How to apply:** Confine prompt, schema, and validation changes to Reasoning-specific branches; do not change the shared model pool or scheduler.
 
 The DigitalOcean adapter's verified request format is `json_object`, with response-schema text added to the prompt. Do not infer or add a native JSON-schema request payload unless its exact shape is established by existing app integration material.
 

@@ -31,10 +31,9 @@ function hasRenderableMessages(example: any): boolean {
     ));
 }
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" | "reasoningSiblingDelay" | "reasoningOneWorkerSuccess" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
-  const requestEvents: Array<{ type: "start" | "settled"; model: string }> = [];
   const delays: number[] = [];
   const timeoutValues: number[] = [];
   let fixtureNow = 1_700_000_000_000;
@@ -68,7 +67,6 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
     AbortController,
     Date: FixtureDate,
     randomUUID: () => `fixture-uuid-${++uuidCount}`,
-    setImmediate,
     setTimeout(callback: Function, delay: number) {
       delays.push(delay);
       fixtureNow += delay;
@@ -79,12 +77,6 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       const request = JSON.parse(options.body);
       const requestNumber = calls.length + 1;
       calls.push(request);
-      if (mode === "reasoningSiblingDelay") {
-        requestEvents.push({ type: "start", model: request.model });
-      }
-      if (mode === "reasoningSiblingDelay" && request.model !== firstModel) {
-        await new Promise<void>(resolve => setImmediate(resolve));
-      }
       concurrent++;
       peakConcurrent = Math.max(peakConcurrent, concurrent);
       if (mode === "fastFailure" && request.model !== firstModel) {
@@ -145,7 +137,6 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       const isPrimary = request.model === firstModel;
       const isBackup = !models.slice(0, 5).includes(request.model);
       const status = (mode === "fastFailure" && isPrimary) ? 503
-        : mode === "reasoningSiblingDelay" && isPrimary && requestNumber === 1 ? 503
         : ((mode === "primary529" || mode === "both529") && isPrimary)
         || (mode === "both529" && isBackup) ? 529
         : mode === "503" && isPrimary ? 503
@@ -175,8 +166,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
               }
             ]
       }));
-      const content = (mode === "invalid" && isPrimary)
-        || (mode === "reasoningOneWorkerSuccess" && request.model !== "nemotron-3-ultra-550b")
+      const content = mode === "invalid" && isPrimary
         ? "This is prose, not a JSON training example."
         : JSON.stringify({
             examples: isReasoning
@@ -188,15 +178,12 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
           { type: "text", text: content.slice(0, 30) }, { type: "text", text: content.slice(30) }
         ] } }] }
         : { error: { message: "fixture provider unavailable" } };
-      if (mode === "reasoningSiblingDelay") {
-        requestEvents.push({ type: "settled", model: request.model });
-      }
       return { ok: status === 200, status, statusText: "Fixture", async text() { return JSON.stringify(response); } };
     }
   };
   vm.runInNewContext(compiled.code, context);
   return {
-    calls, delays, timeoutValues, requestEvents,
+    calls, delays, timeoutValues,
     peak: () => peakConcurrent,
     async generate(count = 5, jobMode = false, templateType = "Single Turn") {
       const response: any = {
@@ -305,69 +292,24 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
   ]) assert.equal(contentPattern.test(content), false);
 });
 
-test("Reasoning immediately replaces a failed worker while sibling workers are still running", async () => {
-  const f = fixture("reasoningSiblingDelay");
-  const started = await f.generate(5, true, "Reasoning");
-  const job = await f.job(started.body.jobId);
-
-  assert.equal(job.body.status, "complete");
-  assert.equal(job.body.result.partial, undefined);
-  assert.equal(job.body.result.examples.length, 5);
-  assert.equal(f.calls.length, 6);
-  assert.equal(f.calls.at(-1).model, "llama-4-maverick");
-  assert.match(f.calls.at(-1).messages.find((message: any) => message.role === "user").content, /Generate exactly 1 examples\./);
-  const replacementStart = f.requestEvents.findIndex(event =>
-    event.type === "start" && event.model === "llama-4-maverick"
-  );
-  const firstSiblingSettlement = f.requestEvents.findIndex(event =>
-    event.type === "settled" && event.model !== firstModel
-  );
-  assert.ok(replacementStart >= 0);
-  assert.ok(firstSiblingSettlement >= 0);
-  assert.ok(replacementStart < firstSiblingSettlement);
-  assert.ok(job.body.result.examples.every(hasRenderableMessages));
-});
-
-test("Reasoning timeout recovery replaces the failed slot with a correctly sized worker request", async () => {
+test("Reasoning timeout recovery updates the schema to the requested fill count", async () => {
   const f = fixture("timeoutQwen");
   const started = await f.generate(25, true, "Reasoning");
   const job = await f.job(started.body.jobId);
 
   assert.equal(job.body.status, "complete");
   assert.equal(job.body.result.examples.length, 25);
-  const replacementCall = f.calls.find(call =>
-    call.model === "glm-5.3"
-    && call.messages.find((message: any) => message.role === "user").content.includes("selected TEMPLATE TYPE: \"Reasoning\"")
-  );
-  assert.ok(replacementCall);
-  const replacementPrompt = replacementCall.messages.find((message: any) => message.role === "user").content;
-  assert.match(replacementPrompt, /Generate exactly 1 examples\./);
+  const recoveryCall = f.calls.at(-1);
+  const recoveryPrompt = recoveryCall.messages.find((message: any) => message.role === "user").content;
+  assert.match(recoveryPrompt, /Generate exactly 3 examples\./);
 
-  const systemPrompt = replacementCall.messages.find((message: any) => message.role === "system").content;
+  const systemPrompt = recoveryCall.messages.find((message: any) => message.role === "system").content;
   const schemaPrefix = "Return valid JSON that matches this schema: ";
   const schemaOffset = systemPrompt.indexOf(schemaPrefix);
   assert.notEqual(schemaOffset, -1);
   const responseSchema = JSON.parse(systemPrompt.slice(schemaOffset + schemaPrefix.length));
-  assert.equal(responseSchema.properties.examples.minItems, 1);
-  assert.equal(responseSchema.properties.examples.maxItems, 1);
-});
-
-test("Reasoning recovery fills missing slots concurrently using a worker proven to return valid examples", async () => {
-  const f = fixture("reasoningOneWorkerSuccess");
-  const started = await f.generate(5, true, "Reasoning");
-  const job = await f.job(started.body.jobId);
-
-  assert.equal(job.body.status, "complete");
-  assert.equal(job.body.result.examples.length, 5);
-  assert.equal(job.body.result.partial, undefined);
-  const recoveryCalls = f.calls.filter(call =>
-    call.model === "nemotron-3-ultra-550b"
-  );
-  assert.equal(recoveryCalls.length, 5); // One initial success plus four concurrent recovery requests.
-  assert.ok(recoveryCalls.every(call =>
-    call.messages.find((message: any) => message.role === "user").content.includes("Generate exactly 1 examples.")
-  ));
-  assert.ok(job.body.result.examples.every(hasRenderableMessages));
+  assert.equal(responseSchema.properties.examples.minItems, 3);
+  assert.equal(responseSchema.properties.examples.maxItems, 3);
 });
 
 test("Reasoning batch jobs reject responses that omit the required think block", async () => {
@@ -378,12 +320,12 @@ test("Reasoning batch jobs reject responses that omit the required think block",
   assert.equal(job.body.status, "error");
   assert.equal(job.body.result, undefined);
   assert.equal(Object.hasOwn(job.body, "failureCategory"), false);
-  assert.equal(f.calls.length, 60);
+  assert.equal(f.calls.length, 5);
 });
 
-test("Reasoning fills every requested slot or errors without exposing partial results", async () => {
+test("Reasoning timeout failure categories remain internal to job status", async () => {
   for (const [mode, expectedStatus] of [
-    ["timeoutRecovery", "complete"],
+    ["timeoutRecovery", "partial"],
     ["timeoutRecoveryAll", "error"]
   ] as const) {
     const f = fixture(mode);
@@ -392,21 +334,14 @@ test("Reasoning fills every requested slot or errors without exposing partial re
 
     assert.equal(job.body.status, expectedStatus);
     assert.equal(Object.hasOwn(job.body, "failureCategory"), false);
-    if (expectedStatus === "complete") {
-      assert.equal(job.body.result.examples.length, 5);
-      assert.equal(job.body.result.partial, undefined);
+    if (expectedStatus === "partial") {
+      assert.ok(job.body.result.examples.length > 0);
+      assert.ok(job.body.result.examples.length < 5);
     } else {
       assert.equal(job.body.result, undefined);
     }
-    assert.equal(f.calls.length, expectedStatus === "complete" ? 6 : 10);
+    assert.equal(f.calls.length, 6);
   }
-
-  const directFailure = fixture("timeoutRecoveryAll");
-  const response = await directFailure.generate(5, false, "Reasoning");
-  assert.equal(response.statusCode, 500);
-  assert.equal(response.body.success, false);
-  assert.equal(Object.hasOwn(response.body, "examples"), false);
-  assert.equal(Object.hasOwn(response.body, "partial"), false);
 });
 
 test("a stalled model is skipped in later stacks and GLM fills all missing examples in one request", async () => {
@@ -546,23 +481,5 @@ test("preserved schedules and two-second spacing cover every supported batch siz
       assert.deepEqual(f.calls.slice(offset, offset + stackSize).map(call => call.model), scheduled);
       offset += stackSize;
     }
-  }
-});
-
-test("Reasoning launches every supported batch size using the preserved concurrent worker waves", async () => {
-  const expected: Record<number, number[]> = {
-    5: [5], 10: [10], 25: [10, 10, 5], 50: Array(5).fill(10),
-    100: Array(10).fill(10), 200: Array(10).fill(20), 250: [...Array(12).fill(20), 10]
-  };
-  for (const [countText, stackSizes] of Object.entries(expected)) {
-    const count = Number(countText);
-    const f = fixture();
-    const response = await f.generate(count, false, "Reasoning");
-    assert.equal(response.body.success, true, `Reasoning batch size ${count}`);
-    assert.equal(response.body.examples.length, count, `Reasoning batch size ${count}`);
-    assert.ok(response.body.examples.every(hasRenderableMessages));
-    assert.equal(f.calls.length, count);
-    assert.equal(f.peak(), Math.max(...stackSizes), `Reasoning concurrency for batch size ${count}`);
-    assert.deepEqual(f.delays, Array(stackSizes.length - 1).fill(2000));
   }
 });

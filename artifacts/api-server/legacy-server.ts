@@ -1117,7 +1117,6 @@ app.post("/api/generate", async (req, res) => {
   const generationDeadline = Date.now() + generationTimeoutMs;
   const stalledModels = new Set<string>();
   let timedOutExampleCount = 0;
-  let reasoningWorkerFailureCategory: GenerationFailureCategory | undefined;
   let requestExamplesForMissingBatch: ((model: string, count: number, timeoutMs: number) => Promise<any[]>) | undefined;
   let isReasoningGeneration = false;
   const useJobPolling = req.body?.jobMode === true;
@@ -1349,20 +1348,14 @@ REASONING TEMPLATE FORMAT:
     const modelAbortControllers = new Map(
       generationModels.map(model => [model, new AbortController()])
     );
-    const scheduledGenerationModels = turnMode === "Reasoning"
-      ? generationModels.map(() => "nemotron-3-ultra-550b")
-      : generationModels;
-    const generationStacks = createModelGenerationStacks(countNum, scheduledGenerationModels);
+    const generationStacks = createModelGenerationStacks(countNum, generationModels);
     const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);
     const taskOutputs: Array<Array<any[] | undefined>> = generationStacks.map(stack => new Array(stack.length));
-    const successfulReasoningModels: string[] = [];
     let completedExampleCount = 0;
 
     for (let c = 0; c < generationStacks.length; c++) {
       const scheduledStackModels = new Set(generationStacks[c].map(({ model }) => model));
       const backupModelsUsed = new Set<string>();
-      let reasoningFallbackCursor = generationModels.findIndex(model => !scheduledStackModels.has(model));
-      if (reasoningFallbackCursor < 0) reasoningFallbackCursor = 0;
       for (let modelIndex = 0; modelIndex < generationStacks[c].length; modelIndex++) {
         const { model: targetModel, count: currentChunkSize } = generationStacks[c][modelIndex];
 
@@ -1779,76 +1772,20 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               );
           }
 
-          const requestNextReasoningWorker = async (failedModel: string) => {
-            let nextModel: string | undefined;
-            for (let offset = 0; offset < generationModels.length; offset++) {
-              const candidateIndex = (reasoningFallbackCursor + offset) % generationModels.length;
-              const candidate = generationModels[candidateIndex];
-              if (
-                candidate === failedModel
-                || backupModelsUsed.has(candidate)
-                || stalledModels.has(candidate)
-              ) continue;
-              nextModel = candidate;
-              reasoningFallbackCursor = (candidateIndex + 1) % generationModels.length;
-              break;
-            }
-            if (!nextModel) {
-              throw new Error(`No available Reasoning worker remains after ${failedModel} failed.`);
-            }
-
-            backupModelsUsed.add(nextModel);
-            logger.warn(
-              { failedModel, nextModel, stack: c + 1, batchId: generationBatchId },
-              "Reasoning worker failed; immediately trying the next worker"
-            );
-            try {
-              return {
-                model: nextModel,
-                examples: await requestExamplesFromModel(
-                  nextModel,
-                  currentChunkSize,
-                  promptForExampleCount(currentChunkSize)
-                )
-              };
-            } catch (error: any) {
-              if (isDigitalOceanRequestTimeout(error)) {
-                stalledModels.add(nextModel);
-                modelAbortControllers.get(nextModel)?.abort();
-              }
-              throw error;
-            }
-          };
-
           let responseModel = targetModel;
           let generated: any[] = [];
           try {
             if (stalledModels.has(targetModel)) {
-              if (turnMode === "Reasoning") {
-                const replacement = await requestNextReasoningWorker(targetModel);
-                responseModel = replacement.model;
-                generated = replacement.examples;
-              } else {
-                timedOutExampleCount += currentChunkSize;
-                logger.warn(
-                  { model: targetModel, stack: c + 1, batchId: generationBatchId },
-                  "Skipping a model after its earlier request timed out"
-                );
-                return [];
-              }
-            } else {
-              generated = await requestExamplesFromModel(targetModel);
+              timedOutExampleCount += currentChunkSize;
+              logger.warn(
+                { model: targetModel, stack: c + 1, batchId: generationBatchId },
+                "Skipping a model after its earlier request timed out"
+              );
+              return [];
             }
+            generated = await requestExamplesFromModel(targetModel);
           } catch (primaryError: any) {
-            if (turnMode === "Reasoning") {
-              if (isDigitalOceanRequestTimeout(primaryError)) {
-                stalledModels.add(targetModel);
-                modelAbortControllers.get(targetModel)?.abort();
-              }
-              const replacement = await requestNextReasoningWorker(targetModel);
-              responseModel = replacement.model;
-              generated = replacement.examples;
-            } else if (isDigitalOceanRequestTimeout(primaryError)) {
+            if (isDigitalOceanRequestTimeout(primaryError)) {
               stalledModels.add(targetModel);
               modelAbortControllers.get(targetModel)?.abort();
               timedOutExampleCount += currentChunkSize;
@@ -1857,64 +1794,61 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 "Model request timed out; skipping it for the rest of this batch"
               );
               return [];
-            } else if (!isProviderOverload(primaryError)) {
-              throw primaryError;
-            } else {
-
-              const unusedBackupModels = generationModels.filter(
-                model =>
-                  model !== targetModel &&
-                  !scheduledStackModels.has(model) &&
-                  !backupModelsUsed.has(model) &&
-                  !stalledModels.has(model)
-              );
-              const availableBackupModels = unusedBackupModels.length > 0
-                ? unusedBackupModels
-                : generationModels.filter(
-                    model => model !== targetModel &&
-                      !backupModelsUsed.has(model) &&
-                      !stalledModels.has(model)
-                  );
-              const backupModel = availableBackupModels[0];
-              if (!backupModel) throw primaryError;
-
-              backupModelsUsed.add(backupModel);
-              logger.warn(
-                { model: targetModel, backupModel, stack: c + 1, batchId: generationBatchId },
-                "Model returned HTTP 529; trying its one permitted backup"
-              );
-
-              try {
-                generated = await requestExamplesFromModel(backupModel);
-              } catch (backupError: any) {
-                if (isDigitalOceanRequestTimeout(backupError)) {
-                  stalledModels.add(backupModel);
-                  modelAbortControllers.get(backupModel)?.abort();
-                  timedOutExampleCount += currentChunkSize;
-                  logger.warn(
-                    { model: backupModel, stack: c + 1, batchId: generationBatchId },
-                    "Backup model timed out; its example will be included in the GLM fill batch"
-                  );
-                  return [];
-                }
-                const backupMessage = String(backupError?.message || backupError || "Unknown backup model error");
-                throw new Error(
-                  `Model ${targetModel} returned HTTP 529; backup model ${backupModel} failed: ${backupMessage}`
-                );
-              }
-              if (generated.length === 0) {
-                throw new Error(
-                  `Backup model ${backupModel} returned no examples after ${targetModel} returned HTTP 529.`
-                );
-              }
-              responseModel = backupModel;
             }
+            if (!isProviderOverload(primaryError)) {
+              throw primaryError;
+            }
+
+            const unusedBackupModels = generationModels.filter(
+              model =>
+                model !== targetModel &&
+                !scheduledStackModels.has(model) &&
+                !backupModelsUsed.has(model) &&
+                !stalledModels.has(model)
+            );
+            const availableBackupModels = unusedBackupModels.length > 0
+              ? unusedBackupModels
+              : generationModels.filter(
+                  model => model !== targetModel &&
+                    !backupModelsUsed.has(model) &&
+                    !stalledModels.has(model)
+                );
+            const backupModel = availableBackupModels[0];
+            if (!backupModel) throw primaryError;
+
+            backupModelsUsed.add(backupModel);
+            logger.warn(
+              { model: targetModel, backupModel, stack: c + 1, batchId: generationBatchId },
+              "Model returned HTTP 529; trying its one permitted backup"
+            );
+
+            try {
+              generated = await requestExamplesFromModel(backupModel);
+            } catch (backupError: any) {
+              if (isDigitalOceanRequestTimeout(backupError)) {
+                stalledModels.add(backupModel);
+                modelAbortControllers.get(backupModel)?.abort();
+                timedOutExampleCount += currentChunkSize;
+                logger.warn(
+                  { model: backupModel, stack: c + 1, batchId: generationBatchId },
+                  "Backup model timed out; its example will be included in the GLM fill batch"
+                );
+                return [];
+              }
+              const backupMessage = String(backupError?.message || backupError || "Unknown backup model error");
+              throw new Error(
+                `Model ${targetModel} returned HTTP 529; backup model ${backupModel} failed: ${backupMessage}`
+              );
+            }
+            if (generated.length === 0) {
+              throw new Error(
+                `Backup model ${backupModel} returned no examples after ${targetModel} returned HTTP 529.`
+              );
+            }
+            responseModel = backupModel;
           }
 
           completedExampleCount += generated.length;
-          if (turnMode === "Reasoning" && !successfulReasoningModels.includes(responseModel)) {
-            successfulReasoningModels.push(responseModel);
-          }
           taskOutputs[c][modelIndex] = generated;
           sendProgressEvent({
             type: "progress",
@@ -1942,21 +1876,10 @@ No internal deliberation, planning, or reasoning fields are permitted.`
         if (spacingMs > 0) await new Promise((resolve) => setTimeout(resolve, spacingMs));
       }
       try {
-        // Reasoning must retain valid results from sibling workers already in flight.
-        const stackTasks = chunkTasks[stackIndex].map(task => task());
-        if (turnMode === "Reasoning") {
-          const settledTasks = await Promise.allSettled(stackTasks);
-          const failedTask = settledTasks.find(result => result.status === "rejected");
-          if (failedTask?.status === "rejected") throw failedTask.reason;
-        } else {
-          // Preserve fail-fast behavior and the existing schedule for other templates.
-          await Promise.all(stackTasks);
-        }
+        // Each task already applies the sole allowed 529 fallback. Fail the job as
+        // soon as one task is unrecoverable instead of waiting for every sibling.
+        await Promise.all(chunkTasks[stackIndex].map(task => task()));
       } catch (error: any) {
-        if (turnMode === "Reasoning") {
-          reasoningWorkerFailureCategory ??= getReasoningFailureCategory(error);
-          continue;
-        }
         const detail = formatAIErrorMessage(error);
         const partialExamples = taskOutputs
           .flatMap(stack => stack.flatMap(examples => examples || []))
@@ -1981,6 +1904,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               job.status = "partial";
               job.progress.completed = partialExamples.length;
               job.result = partialResponse;
+              if (turnMode === "Reasoning") {
+                job.failureCategory = getReasoningFailureCategory(error);
+              }
               job.updatedAt = Date.now();
             }
             return;
@@ -1992,7 +1918,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           return res.json(partialResponse);
         }
         throw Object.assign(
-          new Error(`Generation stopped after ${completedExampleCount} of ${countNum} examples completed. ${detail}`)
+          new Error(`Generation stopped after ${completedExampleCount} of ${countNum} examples completed. ${detail}`),
+          { failureCategory: turnMode === "Reasoning" ? getReasoningFailureCategory(error) : undefined }
         );
       }
     }
@@ -2001,95 +1928,24 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     let recoveryFailureReason: string | null = null;
     let recoveryFailureCategory: GenerationFailureCategory | undefined;
     let recoveryModel = "glm-5.3";
-    const recoveryCount = turnMode === "Reasoning"
-      ? Math.max(0, countNum - completedExampleCount)
-      : timedOutExampleCount;
-    if (turnMode === "Reasoning" && recoveryCount > 0) {
-      const remainingBatchMs = generationDeadline - Date.now();
-      const recoveryCandidates = [...successfulReasoningModels, ...generationModels]
-        .filter((model, index, models) =>
-          models.indexOf(model) === index && !stalledModels.has(model)
-        );
-      if (remainingBatchMs <= 0 || !requestExamplesForMissingBatch || recoveryCandidates.length === 0) {
-        recoveryFailureReason = `The ${generationTimeoutMs / 1000}-second total batch time limit expired before Reasoning recovery could start.`;
-        recoveryFailureCategory = "provider_timeout";
-      } else {
-        logger.warn(
-          {
-            models: recoveryCandidates,
-            missingCount: recoveryCount,
-            batchId: generationBatchId
-          },
-          "Starting concurrent one-example Reasoning recovery workers"
-        );
-        const recoveryConcurrency = Math.max(1, ...generationStacks.map(stack => stack.length));
-        const recoveredSlots: PromiseSettledResult<any[]>[] = [];
-        for (let offset = 0; offset < recoveryCount; offset += recoveryConcurrency) {
-          if (offset > 0) {
-            const remainingBatchMs = generationDeadline - Date.now();
-            const spacingMs = Math.min(2000, Math.max(0, remainingBatchMs));
-            if (spacingMs > 0) await new Promise(resolve => setTimeout(resolve, spacingMs));
-          }
-          const waveCount = Math.min(recoveryConcurrency, recoveryCount - offset);
-          const wave = await Promise.allSettled(
-            Array.from({ length: waveCount }, async () => {
-              let lastError: any;
-              for (const model of recoveryCandidates) {
-                const timeoutMs = Math.min(SFT_SINGLE_EXAMPLE_TIMEOUT_MS, generationDeadline - Date.now());
-                if (timeoutMs <= 0) {
-                  throw createDigitalOceanRequestTimeoutError(model, 0);
-                }
-                try {
-                  return await requestExamplesForMissingBatch!(model, 1, timeoutMs);
-                } catch (error: any) {
-                  lastError = error;
-                  if (isDigitalOceanRequestTimeout(error)) stalledModels.add(model);
-                }
-              }
-              throw lastError || new Error("No Reasoning recovery worker returned a valid example.");
-            })
-          );
-          recoveredSlots.push(...wave);
-          if (Date.now() >= generationDeadline) break;
-        }
-        recoveryExamples = recoveredSlots.flatMap(result =>
-          result.status === "fulfilled" ? result.value : []
-        );
-        const failedRecovery = recoveredSlots.find(result => result.status === "rejected");
-        if (failedRecovery?.status === "rejected") {
-          recoveryFailureCategory = getReasoningFailureCategory(failedRecovery.reason);
-        }
-        if (recoveryExamples.length < recoveryCount) {
-          recoveryFailureReason = `Reasoning recovery returned ${recoveryExamples.length} of ${recoveryCount} missing examples.`;
-        }
-        completedExampleCount += recoveryExamples.length;
-        sendProgressEvent({
-          type: "progress",
-          taskId: "reasoning-recovery",
-          model: recoveryCandidates[0],
-          generatedCount: recoveryExamples.length,
-          completedCount: completedExampleCount,
-          total: countNum
-        });
-      }
-    } else if (timedOutExampleCount > 0) {
+    if (timedOutExampleCount > 0) {
       const remainingBatchMs = generationDeadline - Date.now();
       const recoveryTimeoutMs = Math.min(
         remainingBatchMs,
-        Math.max(SFT_SINGLE_EXAMPLE_TIMEOUT_MS, recoveryCount * SFT_SINGLE_EXAMPLE_TIMEOUT_MS)
+        Math.max(SFT_SINGLE_EXAMPLE_TIMEOUT_MS, timedOutExampleCount * SFT_SINGLE_EXAMPLE_TIMEOUT_MS)
       );
       if (recoveryTimeoutMs <= 0 || !requestExamplesForMissingBatch) {
         recoveryFailureReason = `The ${generationTimeoutMs / 1000}-second total batch time limit expired before the GLM fill request could start.`;
         if (turnMode === "Reasoning") recoveryFailureCategory = "provider_timeout";
       } else {
         logger.warn(
-          { model: recoveryModel, missingCount: recoveryCount, batchId: generationBatchId },
+          { model: recoveryModel, missingCount: timedOutExampleCount, batchId: generationBatchId },
           "Requesting one GLM batch to replace examples from timed-out model requests"
         );
         try {
           recoveryExamples = await requestExamplesForMissingBatch(
             recoveryModel,
-            recoveryCount,
+            timedOutExampleCount,
             recoveryTimeoutMs
           );
         } catch (recoveryError: any) {
@@ -2130,8 +1986,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             recoveryFailureReason = `GLM recovery failed: ${formatAIErrorMessage(recoveryError)}`;
           }
         }
-        if (recoveryExamples.length < recoveryCount && !recoveryFailureReason) {
-          recoveryFailureReason = `${recoveryModel} returned ${recoveryExamples.length} of ${recoveryCount} missing examples.`;
+        if (recoveryExamples.length < timedOutExampleCount && !recoveryFailureReason) {
+          recoveryFailureReason = `${recoveryModel} returned ${recoveryExamples.length} of ${timedOutExampleCount} missing examples.`;
         }
         completedExampleCount += recoveryExamples.length;
         sendProgressEvent({
@@ -2176,12 +2032,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     }
 
     if (allExamples.length < countNum) {
-      if (turnMode === "Reasoning") {
-        throw Object.assign(
-          new Error(`Reasoning generation could not complete all ${countNum} requested examples.`),
-          { failureCategory: recoveryFailureCategory ?? reasoningWorkerFailureCategory ?? "provider_error" }
-        );
-      }
       if (timedOutExampleCount > 0) {
         const formattedPartialExamples = allExamples
           .slice(0, countNum)
@@ -2202,6 +2052,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             job.status = "partial";
             job.progress.completed = formattedPartialExamples.length;
             job.result = partialResponse;
+            if (turnMode === "Reasoning") {
+              job.failureCategory = recoveryFailureCategory ?? "provider_timeout";
+            }
             job.updatedAt = Date.now();
           }
           return;
