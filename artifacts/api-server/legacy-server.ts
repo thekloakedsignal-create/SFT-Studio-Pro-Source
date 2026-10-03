@@ -1352,6 +1352,7 @@ REASONING TEMPLATE FORMAT:
     const generationStacks = createModelGenerationStacks(countNum, generationModels);
     const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);
     const taskOutputs: Array<Array<any[] | undefined>> = generationStacks.map(stack => new Array(stack.length));
+    const successfulReasoningModels: string[] = [];
     let completedExampleCount = 0;
 
     for (let c = 0; c < generationStacks.length; c++) {
@@ -1908,6 +1909,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           }
 
           completedExampleCount += generated.length;
+          if (turnMode === "Reasoning" && !successfulReasoningModels.includes(responseModel)) {
+            successfulReasoningModels.push(responseModel);
+          }
           taskOutputs[c][modelIndex] = generated;
           sendProgressEvent({
             type: "progress",
@@ -1997,7 +2001,75 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     const recoveryCount = turnMode === "Reasoning"
       ? Math.max(0, countNum - completedExampleCount)
       : timedOutExampleCount;
-    if (timedOutExampleCount > 0 || (turnMode === "Reasoning" && recoveryCount > 0)) {
+    if (turnMode === "Reasoning" && recoveryCount > 0) {
+      const remainingBatchMs = generationDeadline - Date.now();
+      const recoveryCandidates = [...successfulReasoningModels, ...generationModels]
+        .filter((model, index, models) =>
+          models.indexOf(model) === index && !stalledModels.has(model)
+        );
+      if (remainingBatchMs <= 0 || !requestExamplesForMissingBatch || recoveryCandidates.length === 0) {
+        recoveryFailureReason = `The ${generationTimeoutMs / 1000}-second total batch time limit expired before Reasoning recovery could start.`;
+        recoveryFailureCategory = "provider_timeout";
+      } else {
+        logger.warn(
+          {
+            models: recoveryCandidates,
+            missingCount: recoveryCount,
+            batchId: generationBatchId
+          },
+          "Starting concurrent one-example Reasoning recovery workers"
+        );
+        const recoveryConcurrency = Math.max(1, ...generationStacks.map(stack => stack.length));
+        const recoveredSlots: PromiseSettledResult<any[]>[] = [];
+        for (let offset = 0; offset < recoveryCount; offset += recoveryConcurrency) {
+          if (offset > 0) {
+            const remainingBatchMs = generationDeadline - Date.now();
+            const spacingMs = Math.min(2000, Math.max(0, remainingBatchMs));
+            if (spacingMs > 0) await new Promise(resolve => setTimeout(resolve, spacingMs));
+          }
+          const waveCount = Math.min(recoveryConcurrency, recoveryCount - offset);
+          const wave = await Promise.allSettled(
+            Array.from({ length: waveCount }, async () => {
+              let lastError: any;
+              for (const model of recoveryCandidates) {
+                const timeoutMs = Math.min(SFT_SINGLE_EXAMPLE_TIMEOUT_MS, generationDeadline - Date.now());
+                if (timeoutMs <= 0) {
+                  throw createDigitalOceanRequestTimeoutError(model, 0);
+                }
+                try {
+                  return await requestExamplesForMissingBatch!(model, 1, timeoutMs);
+                } catch (error: any) {
+                  lastError = error;
+                  if (isDigitalOceanRequestTimeout(error)) stalledModels.add(model);
+                }
+              }
+              throw lastError || new Error("No Reasoning recovery worker returned a valid example.");
+            })
+          );
+          recoveredSlots.push(...wave);
+          if (Date.now() >= generationDeadline) break;
+        }
+        recoveryExamples = recoveredSlots.flatMap(result =>
+          result.status === "fulfilled" ? result.value : []
+        );
+        const failedRecovery = recoveredSlots.find(result => result.status === "rejected");
+        if (failedRecovery?.status === "rejected") {
+          recoveryFailureCategory = getReasoningFailureCategory(failedRecovery.reason);
+        }
+        if (recoveryExamples.length < recoveryCount) {
+          recoveryFailureReason = `Reasoning recovery returned ${recoveryExamples.length} of ${recoveryCount} missing examples.`;
+        }
+        completedExampleCount += recoveryExamples.length;
+        sendProgressEvent({
+          type: "progress",
+          taskId: "reasoning-recovery",
+          model: recoveryCandidates[0],
+          generatedCount: recoveryExamples.length,
+          completedCount: completedExampleCount,
+          total: countNum
+        });
+      }
+    } else if (timedOutExampleCount > 0) {
       const remainingBatchMs = generationDeadline - Date.now();
       const recoveryTimeoutMs = Math.min(
         remainingBatchMs,

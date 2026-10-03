@@ -31,7 +31,7 @@ function hasRenderableMessages(example: any): boolean {
     ));
 }
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" | "reasoningSiblingDelay" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" | "reasoningSiblingDelay" | "reasoningOneWorkerSuccess" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const requestEvents: Array<{ type: "start" | "settled"; model: string }> = [];
@@ -175,7 +175,8 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
               }
             ]
       }));
-      const content = mode === "invalid" && isPrimary
+      const content = (mode === "invalid" && isPrimary)
+        || (mode === "reasoningOneWorkerSuccess" && request.model !== "nemotron-3-ultra-550b")
         ? "This is prose, not a JSON training example."
         : JSON.stringify({
             examples: isReasoning
@@ -349,6 +350,24 @@ test("Reasoning timeout recovery replaces the failed slot with a correctly sized
   const responseSchema = JSON.parse(systemPrompt.slice(schemaOffset + schemaPrefix.length));
   assert.equal(responseSchema.properties.examples.minItems, 1);
   assert.equal(responseSchema.properties.examples.maxItems, 1);
+});
+
+test("Reasoning recovery fills missing slots concurrently using a worker proven to return valid examples", async () => {
+  const f = fixture("reasoningOneWorkerSuccess");
+  const started = await f.generate(5, true, "Reasoning");
+  const job = await f.job(started.body.jobId);
+
+  assert.equal(job.body.status, "complete");
+  assert.equal(job.body.result.examples.length, 5);
+  assert.equal(job.body.result.partial, undefined);
+  const recoveryCalls = f.calls.filter(call =>
+    call.model === "nemotron-3-ultra-550b"
+  );
+  assert.equal(recoveryCalls.length, 5); // One initial success plus four concurrent recovery requests.
+  assert.ok(recoveryCalls.every(call =>
+    call.messages.find((message: any) => message.role === "user").content.includes("Generate exactly 1 examples.")
+  ));
+  assert.ok(job.body.result.examples.every(hasRenderableMessages));
 });
 
 test("Reasoning batch jobs reject responses that omit the required think block", async () => {
@@ -527,5 +546,23 @@ test("preserved schedules and two-second spacing cover every supported batch siz
       assert.deepEqual(f.calls.slice(offset, offset + stackSize).map(call => call.model), scheduled);
       offset += stackSize;
     }
+  }
+});
+
+test("Reasoning launches every supported batch size using the preserved concurrent worker waves", async () => {
+  const expected: Record<number, number[]> = {
+    5: [5], 10: [10], 25: [10, 10, 5], 50: Array(5).fill(10),
+    100: Array(10).fill(10), 200: Array(10).fill(20), 250: [...Array(12).fill(20), 10]
+  };
+  for (const [countText, stackSizes] of Object.entries(expected)) {
+    const count = Number(countText);
+    const f = fixture();
+    const response = await f.generate(count, false, "Reasoning");
+    assert.equal(response.body.success, true, `Reasoning batch size ${count}`);
+    assert.equal(response.body.examples.length, count, `Reasoning batch size ${count}`);
+    assert.ok(response.body.examples.every(hasRenderableMessages));
+    assert.equal(f.calls.length, count);
+    assert.equal(f.peak(), Math.max(...stackSizes), `Reasoning concurrency for batch size ${count}`);
+    assert.deepEqual(f.delays, Array(stackSizes.length - 1).fill(2000));
   }
 });
