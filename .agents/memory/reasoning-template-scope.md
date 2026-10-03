@@ -3,9 +3,9 @@ name: Reasoning worker reliability
 description: User-defined reliability requirements for SFT Reasoning batch generation.
 ---
 
-Keep the Reasoning template unchanged. Make reliability changes only to Reasoning dispatch, result collection, and tests; do not alter Single Turn or Multi Turn prompts, schemas, or behavior. When a Reasoning worker fails, start its replacement immediately while sibling workers continue. Retain successful sibling results, and return exactly the requested number of examples or an error—never a successful partial batch.
+Keep the Reasoning template unchanged. Make reliability changes only to Reasoning dispatch, result collection, and tests; do not alter Single Turn or Multi Turn prompts, schemas, or behavior. Workers must run concurrently for every supported batch size: 5, 10, 25, 50, 100, 200, and 250. When a Reasoning worker fails, start its replacement immediately while sibling workers continue. Retain successful sibling results, and return exactly the requested number of examples or an error—never a successful partial batch.
 
-**Why:** The user explicitly said the template is already correct, workers must run concurrently, failed slots should move quickly to another worker, and incomplete batches must not be returned.
+**Why:** The user explicitly said the template is already correct, repeatedly emphasized concurrency across all batch sizes, required failed slots to move quickly to another worker, and prohibited incomplete batches.
 
 **How to apply:** Keep prompts and schemas untouched. Confine worker replacement and collection changes to Reasoning-specific branches; preserve the shared model pool and schedule. Wait for all launched sibling tasks in the active stack, and report an error if recovery cannot fill every requested slot.
 
