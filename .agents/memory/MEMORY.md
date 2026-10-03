@@ -2,3 +2,4 @@
 - [Batch snapshot compatibility](batch-snapshot-compatibility.md) — Preserve newer incremental saves and deletions when older clients submit whole-project snapshots.
 - [Reasoning and Mixed scope](reasoning-template-scope.md) — Keep Reasoning isolated; Mixed contains only Single Turn and Multi Turn, never reasoning.
 - [TRiAD import source](triad-import-source.md) — Keep TRiAD imports URL-based; do not restore embedded helpful/harmful seed examples or fallback records.
+- [Document conversion intent](document-conversion-intent.md) — All three document types require content analysis and synthesis, not extraction of existing examples.

@@ -32,7 +32,7 @@ function hasRenderableMessages(example: any): boolean {
     ));
 }
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" | "reasoningEarlyFailure" | "reasoningSlotTimeout" | "singleEarlyFailures" | "rejectArrayInstruction" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" | "reasoningEarlyFailure" | "reasoningSlotTimeout" | "singleEarlyFailures" | "rejectArrayInstruction" | "singleRecovery12" = "success", recoveryOutcome: "success" | "timeout" | "529" | "deadline" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const delays: number[] = [];
@@ -83,6 +83,17 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       calls.push(request);
       concurrent++;
       peakConcurrent = Math.max(peakConcurrent, concurrent);
+      if (mode === "singleRecovery12") {
+        const modelCallCount = calls.filter(call => call.model === request.model).length;
+        if ((request.model === "qwen3.5-397b-a17b" && modelCallCount === 1)
+          || (request.model === firstModel && modelCallCount === 2)
+          || (request.model === "deepseek-4-flash" && modelCallCount === 3)
+          || (requestNumber === 42 && recoveryOutcome === "timeout")) {
+          concurrent--;
+          throw Object.assign(new Error("fixture timeout"), { name: "TimeoutError" });
+        }
+        if (requestNumber === 42 && recoveryOutcome === "deadline") fixtureNow += 120000;
+      }
       if (mode === "reasoningSlotTimeout" && requestNumber === 2) {
         concurrent--;
         throw Object.assign(new Error("fixture slot timeout"), { name: "TimeoutError" });
@@ -149,6 +160,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       const isPrimary = request.model === firstModel;
       const isBackup = !models.slice(0, 5).includes(request.model);
       const status = (mode === "reasoningEarlyFailure" && requestNumber === 2) ? 503
+        : (mode === "singleRecovery12" && requestNumber === 42 && recoveryOutcome === "529") ? 529
         : (mode === "singleEarlyFailures" && requestNumber >= 7 && requestNumber <= 10) ? 503
         : (mode === "rejectArrayInstruction" && userPrompt.includes("Return them as a JSON array of examples.")) ? 400
         : (mode === "fastFailure" && isPrimary) ? 503
@@ -400,10 +412,10 @@ test("Reasoning timeout failure categories remain internal to job status", async
   }
 });
 
-test("a stalled model is skipped in later stacks and GLM fills all missing examples in one request", async () => {
+test("Multi Turn retains its single GLM fill request after model timeouts", async () => {
   for (const mode of ["timeoutQwen", "504Qwen"] as const) {
     const f = fixture(mode);
-    const response = await f.generate(25);
+    const response = await f.generate(25, false, "Multi Turn");
     assert.equal(response.body.success, true);
     assert.equal(response.body.examples.length, 25);
     assert.ok(response.body.examples.every(hasRenderableMessages));
@@ -419,7 +431,7 @@ test("a stalled model is skipped in later stacks and GLM fills all missing examp
 
 test("batches over 50 examples receive a proportionally longer total timeout", async () => {
   const f = fixture("timeoutAllInitial");
-  const response = await f.generate(250);
+  const response = await f.generate(250, false, "Multi Turn");
   assert.equal(response.body.success, true);
   assert.equal(response.body.examples.length, 250);
   assert.equal(f.calls.length, 21);
@@ -431,13 +443,57 @@ test("batches over 50 examples receive a proportionally longer total timeout", a
 
 test("stopping a stalled model aborts its duplicate in-flight request", async () => {
   const f = fixture("abortDuplicateQwen");
-  const response = await f.generate(200);
+  const response = await f.generate(200, false, "Multi Turn");
   assert.equal(response.body.success, true);
   assert.equal(response.body.examples.length, 200);
   assert.equal(f.calls.filter(call => call.model === "qwen3.5-397b-a17b").length, 2);
   assert.equal(f.calls.at(-1).model, firstModel);
   const recoveryPrompt = f.calls.at(-1).messages.find((message: any) => message.role === "user").content;
   assert.match(recoveryPrompt, /Generate exactly 20 examples\./);
+});
+
+test("Single Turn recovers 12 missing examples individually, preserving the original 38", async () => {
+  const f = fixture("singleRecovery12");
+  const response = await f.generate(50);
+  assert.equal(response.body.examples.length, 50);
+  assert.equal(response.body.partial, undefined);
+  assert.equal(f.calls.length, 53);
+  const replacements = f.calls.slice(41);
+  assert.equal(replacements.length, 12);
+  assert.ok(replacements.every(call => call.model === firstModel
+    && call.messages.find((message: any) => message.role === "user").content.includes("Generate exactly 1 examples.")));
+  assert.equal(f.peak(), 10);
+  assert.ok(f.timeoutValues.every(timeout => timeout <= 20000));
+  assert.equal(response.body.examples.filter((example: any) => example.id.startsWith("gen-recovery-")).length, 12);
+});
+
+test("one Single Turn replacement timeout does not discard successful siblings or cause a retry loop", async () => {
+  const f = fixture("singleRecovery12", "timeout");
+  const response = await f.generate(50);
+  assert.equal(response.body.examples.length, 49);
+  assert.equal(response.body.partial, true);
+  assert.equal(response.body.requestedCount, 50);
+  assert.equal(f.calls.length, 53);
+});
+
+test("Single Turn recovery honors one distinct-model backup only for HTTP 529", async () => {
+  const f = fixture("singleRecovery12", "529");
+  const response = await f.generate(50);
+  assert.equal(response.body.examples.length, 50);
+  assert.equal(response.body.partial, undefined);
+  assert.equal(f.calls.length, 54);
+  const backups = f.calls.slice(41).filter(call => call.model !== firstModel);
+  assert.equal(backups.length, 1);
+  assert.equal(backups[0].model, "gemma-4-31B-it");
+});
+
+test("Single Turn stops starting replacement requests when the existing batch deadline expires", async () => {
+  const f = fixture("singleRecovery12", "deadline");
+  const response = await f.generate(50);
+  assert.equal(f.calls.length, 42);
+  assert.equal(response.body.examples.length, 39);
+  assert.equal(response.body.partial, true);
+  assert.match(response.body.partialReason, /deadline expired/);
 });
 
 test("HTTP 529 triggers exactly one distinct configured backup request", async () => {
