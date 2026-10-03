@@ -378,7 +378,7 @@ test("Reasoning batch jobs reject responses that omit the required think block",
   assert.equal(job.body.status, "error");
   assert.equal(job.body.result, undefined);
   assert.equal(Object.hasOwn(job.body, "failureCategory"), false);
-  assert.equal(f.calls.length, 11);
+  assert.equal(f.calls.length, 60);
 });
 
 test("Reasoning fills every requested slot or errors without exposing partial results", async () => {
@@ -398,7 +398,7 @@ test("Reasoning fills every requested slot or errors without exposing partial re
     } else {
       assert.equal(job.body.result, undefined);
     }
-    assert.equal(f.calls.length, expectedStatus === "complete" ? 6 : 11);
+    assert.equal(f.calls.length, expectedStatus === "complete" ? 6 : 10);
   }
 
   const directFailure = fixture("timeoutRecoveryAll");
