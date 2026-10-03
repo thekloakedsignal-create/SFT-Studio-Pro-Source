@@ -883,7 +883,7 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         messages: baseMessages,
         temperature: params.config?.temperature ?? 0.7,
         max_tokens: maxTokensToUse,
-        reasoning_effort: params.config?.reasoningEffort ?? "none",
+        reasoning_effort: "none",
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
       signal: abortSignal
@@ -991,23 +991,6 @@ function createModelGenerationStacks(
     modelList.map((model) => ({ model, count }));
   const repeat = (stackCount: number, modelList: string[], count = 1) =>
     Array.from({ length: stackCount }, () => assign(modelList, count));
-
-  if (models.length < 5) {
-    const stacks: Array<Array<{ model: string; count: number }>> = [];
-    let remaining = totalExamples;
-    let modelOffset = 0;
-    while (remaining > 0) {
-      const callsThisStack = Math.min(models.length, remaining);
-      const stackModels = Array.from(
-        { length: callsThisStack },
-        (_, index) => models[(modelOffset + index) % models.length],
-      );
-      stacks.push(assign(stackModels));
-      modelOffset = (modelOffset + callsThisStack) % models.length;
-      remaining -= callsThisStack;
-    }
-    return stacks;
-  }
 
   if (totalExamples === 5) return [assign(groupOne)];
   if (totalExamples === 10) return [assign(allModels)];
@@ -1397,15 +1380,15 @@ app.post("/api/generate", async (req, res) => {
       (tTypeLower.includes("mixed") || tTypeLower.includes("mix")) ? "Mixed" :
       "Single Turn";
     const reasoningFormatInstruction = `
-REASONING TEMPLATE — EXACT FETCH RESPONSE FORMAT (Reasoning batches only):
-- The fetch handler reads generated text from the first Chat Completions choice's message.content. That content must be one valid JSON object with the required response shape below.
-- Return one valid JSON object with exactly one top-level property, "examples". Its value must be an array of example objects. Do not return a bare array, a single example object, or a differently named wrapper.
-- Each item in "examples" must be an object with a "messages" array. Each Reasoning example must contain a user message followed by an assistant message; do not add a system message or extra turns. Keep any instruction markers required by the selected format in the appropriate message content.
-- The assistant message's "content" must be one string containing, in this order: <think>, a non-empty concise explanation of the key reasoning steps, </think>, and the final answer. Put the reasoning inside these tags in assistant content; the response parser extracts it into the separate reasoning field shown by the UI.
-- In the JSON string, encode line breaks as \\n. Do not put reasoning in a top-level field or a separate "reasoning" or "reasoning_content" message property. Do not put the final answer inside the tags.
-- Use this only for the Reasoning template. Create new content for the requested task and persona.
-- Response-format example:
-{"examples":[{"messages":[{"role":"user","content":"What is 2 + 3?"},{"role":"assistant","content":"<think>\\nI add 2 and 3 to get 5.\\n</think>\\nThe answer is 5."}]}]}
+REASONING TEMPLATE FORMAT:
+- In every example in this Reasoning batch, the assistant "content" must start with <think>, contain a non-empty, concise explanation of the key reasoning steps, close with </think>, and then give the final answer.
+- Required shape: "<think>\n[Concise explanation of the key reasoning steps]\n</think>\n[Final answer]".
+- Formatting example:
+{"messages":[{"role":"user","content":"What is 2 + 3?"},{"role":"assistant","content":"<think>\nI add 2 and 3 to get 5.\n</think>\nThe answer is 5."}]}
+- Use this only as a formatting example; create new content for the requested task and persona.
+- Never omit either tag, put the final answer inside the tags, or use the format for any template other than Reasoning.
+- Do not emit a separate "reasoning" or "reasoning_content" property.
+- Keep the selected template's message roles and any required instruction markers.
 `;
 
     // Define response schema to guarantee format
@@ -1531,9 +1514,7 @@ REASONING TEMPLATE — EXACT FETCH RESPONSE FORMAT (Reasoning batches only):
       };
     }
 
-    const generationModels = turnMode === "Reasoning"
-      ? ["glm-5.3", "glm-5.2"].map(model => normalizeModel(model))
-      : getGenerationModels();
+    const generationModels = getGenerationModels();
     const modelAbortControllers = new Map(
       generationModels.map(model => [model, new AbortController()])
     );
@@ -1832,7 +1813,7 @@ REASONING TEMPLATE — EXACT FETCH RESPONSE FORMAT (Reasoning batches only):
 
         ${turnMode === "Reasoning" ? reasoningFormatInstruction : ""}
         Generate exactly ${currentChunkSize} examples. ${
-          turnMode === "Multi Turn" || turnMode === "Reasoning"
+          turnMode === "Multi Turn"
             ? `Return them as one JSON object with an "examples" array, for example {"examples":[...]}. Do not return a top-level JSON array.`
             : `Return them as a JSON array of examples.`
         }
@@ -1845,13 +1826,7 @@ REASONING TEMPLATE — EXACT FETCH RESPONSE FORMAT (Reasoning batches only):
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
             ...(turnMode === "Reasoning"
-              ? {
-                  responseSchema: {
-                    type: Type.OBJECT,
-                    properties: { examples: { type: Type.ARRAY, items: schemaProperty } },
-                    required: ["examples"]
-                  }
-                }
+              ? { responseSchema: { type: Type.ARRAY, items: schemaProperty } }
               : {}),
             ...(turnMode !== "Reasoning" && turnMode !== "Mixed" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
             systemInstruction: turnMode === "Reasoning"
@@ -1901,9 +1876,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             const response = await callDigitalOceanChatCompletions({
               model,
               contents: prompt,
-              config: turnMode === "Reasoning" && model === "glm-5.2"
-                ? { ...configObj, reasoningEffort: "medium" }
-                : configObj,
+              config: configObj,
               timeoutMs,
               ...(ignoreModelAbort ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
             });
@@ -2074,9 +2047,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
 
     let recoveryExamples: any[] = [];
     let recoveryFailureReason: string | null = null;
-    let recoveryModel = turnMode === "Reasoning"
-      ? generationModels.find(model => !stalledModels.has(model)) || ""
-      : "glm-5.3";
+    let recoveryModel = "glm-5.3";
     if (timedOutExampleCount > 0) {
       const remainingBatchMs = generationDeadline - Date.now();
       const recoveryTimeoutMs = Math.min(
@@ -2085,8 +2056,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       );
       if (recoveryTimeoutMs <= 0 || !requestExamplesForMissingBatch) {
         recoveryFailureReason = `The ${generationTimeoutMs / 1000}-second total batch time limit expired before the GLM fill request could start.`;
-      } else if (!recoveryModel) {
-        recoveryFailureReason = "No selected Reasoning model remains available for timeout recovery.";
       } else {
         logger.warn(
           { model: recoveryModel, missingCount: timedOutExampleCount, batchId: generationBatchId },
@@ -2133,17 +2102,15 @@ No internal deliberation, planning, or reasoning fields are permitted.`
         if (recoveryExamples.length < timedOutExampleCount && !recoveryFailureReason) {
           recoveryFailureReason = `${recoveryModel} returned ${recoveryExamples.length} of ${timedOutExampleCount} missing examples.`;
         }
-        if (recoveryModel) {
-          completedExampleCount += recoveryExamples.length;
-          sendProgressEvent({
-            type: "progress",
-            taskId: `recovery:${recoveryModel}`,
-            model: recoveryModel,
-            generatedCount: recoveryExamples.length,
-            completedCount: completedExampleCount,
-            total: countNum
-          });
-        }
+        completedExampleCount += recoveryExamples.length;
+        sendProgressEvent({
+          type: "progress",
+          taskId: `recovery:${recoveryModel}`,
+          model: recoveryModel,
+          generatedCount: recoveryExamples.length,
+          completedCount: completedExampleCount,
+          total: countNum
+        });
       }
     }
 
