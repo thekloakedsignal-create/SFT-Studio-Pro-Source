@@ -14,30 +14,29 @@
   --color-brand-900: #14532d;
 
 
-  /* Kreative palette: ivory surfaces (inverted slate), charcoal ink, plum/mauve accents */
-  --color-white: #1f1c22;
-  --color-black: #f4f1ea;
-  --color-slate-50: #1a181d; --color-slate-100: #24212a; --color-slate-200: #2e2a33;
-  --color-slate-300: #3d3842; --color-slate-400: #57505c; --color-slate-500: #6c6470;
-  --color-slate-600: #8a828c; --color-slate-700: #c9c3c6; --color-slate-750: #d6d1d2;
-  --color-slate-800: #dcd7d6; --color-slate-850: #e3dfdc; --color-slate-900: #ebe8e3;
-  --color-slate-950: #f6f3ec;
-  --color-gray-50: #f6f3ec;
-  /* Semantic statuses keep their hues, deepened for ivory contrast */
+  /* Kreative Kode Labs reference: neutral gray canvas, white reading surfaces, charcoal ink, lavender selection */
+  --color-white: #1c1c1c;
+  --color-black: #f5f5f4;
+  --color-slate-50: #111111; --color-slate-100: #1a1a1a; --color-slate-200: #232323;
+  --color-slate-300: #2e2e2e; --color-slate-400: #474747; --color-slate-500: #5c5c5c;
+  --color-slate-600: #737373; --color-slate-700: #b5b5b3; --color-slate-750: #c4c4c2;
+  --color-slate-800: #d2d2d0; --color-slate-850: #dfdfdd; --color-slate-900: #fbfbfa;
+  --color-slate-950: #ececea;
+  --color-gray-50: #f2f2f1;
   --color-green-300: #2f7a45; --color-green-400: #276b3b; --color-green-500: #3f9a5a;
   --color-yellow-300: #8a6410; --color-yellow-400: #7a560a;
   --color-amber-300: #8f5a0c; --color-amber-400: #7d4d08;
   --color-red-300: #a3302c; --color-red-400: #962824;
   --color-rose-300: #9e2f4b; --color-rose-400: #8f2641;
   --color-orange-300: #9a4a12; --color-orange-400: #8a400c;
-  --color-emerald-50: #f7eff6; --color-emerald-100: #efe1ed; --color-emerald-200: #e2cde0; --color-emerald-300: #6e4a72; --color-emerald-400: #5d3b62; --color-emerald-500: #dcc6dc; --color-emerald-600: #cfb2cf; --color-emerald-700: #a682a6; --color-emerald-800: #c9a9c8; --color-emerald-900: #4a2f4e; --color-emerald-950: #f3e9f1;
-  --color-blue-50: #f7eff6; --color-blue-100: #efe1ed; --color-blue-200: #e2cde0; --color-blue-300: #6e4a72; --color-blue-400: #5d3b62; --color-blue-500: #dcc6dc; --color-blue-600: #cfb2cf; --color-blue-700: #a682a6; --color-blue-800: #c9a9c8; --color-blue-900: #4a2f4e; --color-blue-950: #f3e9f1;
-  --color-purple-50: #f7eff6; --color-purple-100: #efe1ed; --color-purple-200: #e2cde0; --color-purple-300: #6e4a72; --color-purple-400: #5d3b62; --color-purple-500: #dcc6dc; --color-purple-600: #cfb2cf; --color-purple-700: #a682a6; --color-purple-800: #c9a9c8; --color-purple-900: #4a2f4e; --color-purple-950: #f3e9f1;
-  --color-indigo-50: #f7eff6; --color-indigo-100: #efe1ed; --color-indigo-200: #e2cde0; --color-indigo-300: #6e4a72; --color-indigo-400: #5d3b62; --color-indigo-500: #dcc6dc; --color-indigo-600: #cfb2cf; --color-indigo-700: #a682a6; --color-indigo-800: #c9a9c8; --color-indigo-900: #4a2f4e; --color-indigo-950: #f3e9f1;
-  --color-violet-50: #f7eff6; --color-violet-100: #efe1ed; --color-violet-200: #e2cde0; --color-violet-300: #6e4a72; --color-violet-400: #5d3b62; --color-violet-500: #dcc6dc; --color-violet-600: #cfb2cf; --color-violet-700: #a682a6; --color-violet-800: #c9a9c8; --color-violet-900: #4a2f4e; --color-violet-950: #f3e9f1;
-  --color-teal-50: #f7eff6; --color-teal-100: #efe1ed; --color-teal-200: #e2cde0; --color-teal-300: #6e4a72; --color-teal-400: #5d3b62; --color-teal-500: #dcc6dc; --color-teal-600: #cfb2cf; --color-teal-700: #a682a6; --color-teal-800: #c9a9c8; --color-teal-900: #4a2f4e; --color-teal-950: #f3e9f1;
-  --color-cyan-50: #f7eff6; --color-cyan-100: #efe1ed; --color-cyan-200: #e2cde0; --color-cyan-300: #6e4a72; --color-cyan-400: #5d3b62; --color-cyan-500: #dcc6dc; --color-cyan-600: #cfb2cf; --color-cyan-700: #a682a6; --color-cyan-800: #c9a9c8; --color-cyan-900: #4a2f4e; --color-cyan-950: #f3e9f1;
-  --color-sky-50: #f7eff6; --color-sky-100: #efe1ed; --color-sky-200: #e2cde0; --color-sky-300: #6e4a72; --color-sky-400: #5d3b62; --color-sky-500: #dcc6dc; --color-sky-600: #cfb2cf; --color-sky-700: #a682a6; --color-sky-800: #c9a9c8; --color-sky-900: #4a2f4e; --color-sky-950: #f3e9f1;
+  --color-emerald-50: #f6f1f8; --color-emerald-100: #eee4f2; --color-emerald-200: #e2d2ea; --color-emerald-300: #6a3f7c; --color-emerald-400: #5b3270; --color-emerald-500: #b48ac4; --color-emerald-600: #9f74b2; --color-emerald-700: #8a5e9e; --color-emerald-800: #d8c3e1; --color-emerald-900: #4a2a5c; --color-emerald-950: #f1e8f5;
+  --color-blue-50: #f6f1f8; --color-blue-100: #eee4f2; --color-blue-200: #e2d2ea; --color-blue-300: #6a3f7c; --color-blue-400: #5b3270; --color-blue-500: #b48ac4; --color-blue-600: #9f74b2; --color-blue-700: #8a5e9e; --color-blue-800: #d8c3e1; --color-blue-900: #4a2a5c; --color-blue-950: #f1e8f5;
+  --color-purple-50: #f6f1f8; --color-purple-100: #eee4f2; --color-purple-200: #e2d2ea; --color-purple-300: #6a3f7c; --color-purple-400: #5b3270; --color-purple-500: #b48ac4; --color-purple-600: #9f74b2; --color-purple-700: #8a5e9e; --color-purple-800: #d8c3e1; --color-purple-900: #4a2a5c; --color-purple-950: #f1e8f5;
+  --color-indigo-50: #f6f1f8; --color-indigo-100: #eee4f2; --color-indigo-200: #e2d2ea; --color-indigo-300: #6a3f7c; --color-indigo-400: #5b3270; --color-indigo-500: #b48ac4; --color-indigo-600: #9f74b2; --color-indigo-700: #8a5e9e; --color-indigo-800: #d8c3e1; --color-indigo-900: #4a2a5c; --color-indigo-950: #f1e8f5;
+  --color-violet-50: #f6f1f8; --color-violet-100: #eee4f2; --color-violet-200: #e2d2ea; --color-violet-300: #6a3f7c; --color-violet-400: #5b3270; --color-violet-500: #b48ac4; --color-violet-600: #9f74b2; --color-violet-700: #8a5e9e; --color-violet-800: #d8c3e1; --color-violet-900: #4a2a5c; --color-violet-950: #f1e8f5;
+  --color-teal-50: #f6f1f8; --color-teal-100: #eee4f2; --color-teal-200: #e2d2ea; --color-teal-300: #6a3f7c; --color-teal-400: #5b3270; --color-teal-500: #b48ac4; --color-teal-600: #9f74b2; --color-teal-700: #8a5e9e; --color-teal-800: #d8c3e1; --color-teal-900: #4a2a5c; --color-teal-950: #f1e8f5;
+  --color-cyan-50: #f6f1f8; --color-cyan-100: #eee4f2; --color-cyan-200: #e2d2ea; --color-cyan-300: #6a3f7c; --color-cyan-400: #5b3270; --color-cyan-500: #b48ac4; --color-cyan-600: #9f74b2; --color-cyan-700: #8a5e9e; --color-cyan-800: #d8c3e1; --color-cyan-900: #4a2a5c; --color-cyan-950: #f1e8f5;
+  --color-sky-50: #f6f1f8; --color-sky-100: #eee4f2; --color-sky-200: #e2d2ea; --color-sky-300: #6a3f7c; --color-sky-400: #5b3270; --color-sky-500: #b48ac4; --color-sky-600: #9f74b2; --color-sky-700: #8a5e9e; --color-sky-800: #d8c3e1; --color-sky-900: #4a2a5c; --color-sky-950: #f1e8f5;
 
   --radius-xs: 0px;
   --radius-sm: 0px;
@@ -65,8 +64,8 @@ html {
 body {
   font-family: var(--font-sans);
   letter-spacing: 0.035em;
-  background-color: #f4f1ea;
-  color: #1f1c22;
+  background-color: #ececea;
+  color: #1c1c1c;
 }
 
 /* Universal wide font tracking and full-width border coverage */
@@ -99,26 +98,28 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cfb2cf;
+  background: #b5b5b3;
   border-radius: 0px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #a682a6;
+  background: #8a8a88;
 }
 
 /* Make editable text inside inputs and textareas a highly distinctive, elegant mint green */
 textarea, 
 input[type="text"], 
 input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]) {
-  color: #4a2f4e !important; /* Deep plum */
+  color: #f2f0ea !important;
+  background-color: #0e0e0e !important;
+  border-color: #3a3a3a !important;
   font-family: var(--font-mono) !important; /* Highly technical and readable JetBrains Mono */
 }
 
 /* Also style placeholder text to fit beautifully with the mint color scheme */
 textarea::placeholder,
 input::placeholder {
-  color: #8a828c !important; /* Elegant readable slate grey */
+  color: #8f8f8d !important; /* Elegant readable slate grey */
 }
 
 /* Universal text and font containment: prevent any text, token, or filename from breaking out of its container */
@@ -138,128 +139,25 @@ pre, code, kbd, samp, .font-mono {
 
 
 
-/* Charcoal ink on mauve accent fills */
-[class*="bg-emerald-4"],[class*="bg-emerald-5"],[class*="bg-emerald-6"],
-[class*="bg-blue-4"],[class*="bg-blue-5"],[class*="bg-blue-6"],
-[class*="bg-purple-5"],[class*="bg-purple-6"] { color: #1f1c22; }
-[class*="bg-emerald-"].text-slate-950,[class*="bg-blue-"].text-slate-950,[class*="bg-purple-"].text-slate-950,
-[class*="from-emerald"].text-slate-950 { color: #1f1c22 !important; }
+/* Primary action fills: pale lavender with purple ink */
+.text-slate-950:is(.bg-emerald-400,.bg-emerald-500,.bg-emerald-600,.bg-blue-500,.bg-blue-600,.bg-purple-500,.bg-purple-600,.from-emerald-500) { color: #3d2050; }
+.kk-primary { background-color: #e6d6ee; color: #4a2a5c; border: 1px solid #b48ac4; }
+.kk-primary:hover:not(:disabled) { background-color: #dcc7e7; }
+.kk-tab-active { background-color: #ece0f2; color: #5b3270; border: 1px solid #b48ac4; }
 
-/* Scoped charcoal panels (header, code previews, chat) — re-declare tokens locally */
-.kk-dark {
-  --color-white: #f4f1ea; --color-black: #141216;
-  --color-slate-50: #f6f3ec; --color-slate-100: #ece7e2; --color-slate-200: #e2dcd8;
-  --color-slate-300: #d3ccd0; --color-slate-400: #b2a9b4; --color-slate-500: #968d99;
-  --color-slate-600: #7a727d; --color-slate-700: #4a454d; --color-slate-750: #3f3a42;
-  --color-slate-800: #38343b; --color-slate-850: #2e2a31; --color-slate-900: #29262c;
-  --color-slate-950: #1f1c22;
-  --color-emerald-300: #e2cde0; --color-emerald-400: #d4b6d2; --color-emerald-500: #b994b8;
-  --color-blue-300: #e2cde0; --color-blue-400: #d4b6d2; --color-blue-500: #b994b8;
-  --color-purple-300: #e2cde0; --color-purple-400: #d4b6d2;
-  --color-emerald-950: #3a2a3c; --color-blue-950: #3a2a3c; --color-purple-950: #3a2a3c;
-  --color-green-400: #8fd3a3; --color-green-500: #5fbf7c;
-  --color-red-400: #f0a19c; --color-amber-400: #e9c27a; --color-yellow-400: #e9cf7a;
-  background-color: #1f1c22;
-  color: #ece7e2;
-}
-.kk-dark textarea, .kk-dark input:not([type="checkbox"]):not([type="radio"]) { color: #e2cde0 !important; }
-.kk-dark .custom-scrollbar::-webkit-scrollbar-thumb, .kk-dark.custom-scrollbar::-webkit-scrollbar-thumb { background: #4a454d; }
+/* Medium-gray control strips */
+.kk-strip { background-color: #8e8e8c !important; color: #111111; border-color: #6f6f6d !important; }
+.kk-strip :is(.text-slate-400,.text-slate-500,.text-slate-600) { color: #1e1e1e; }
 
-/* Keep the workspace light, with sharply separated charcoal work panels. */
-.sft-workspace {
-  background-color: #e9e5e0;
-  color: #211e24;
+/* Light neutral header bar */
+.kk-header { background-color: #e3e3e1 !important; border-color: #c4c4c2 !important; }
+
+/* Charcoal code panels */
+.kk-code {
+  background-color: #2b2b2d !important; color: #e8e6e1 !important; border-color: #3d3d40 !important;
+  --color-slate-300: #e2e0db; --color-emerald-300: #d9c3e6;
 }
 
-.sft-workspace :is([class^="bg-slate-950"], [class*=" bg-slate-950"]),
-.sft-workspace :is([class^="bg-slate-900"], [class*=" bg-slate-900"]),
-.sft-workspace :is([class^="bg-slate-850"], [class*=" bg-slate-850"]),
-.sft-workspace :is([class^="bg-slate-800"], [class*=" bg-slate-800"]) {
-  --color-white: #f5f0eb;
-  --color-slate-50: #f7f2ee;
-  --color-slate-100: #ece6e9;
-  --color-slate-200: #ded6dc;
-  --color-slate-300: #e4dce5;
-  --color-slate-400: #cfc5d2;
-  --color-slate-500: #b8adbc;
-  --color-slate-600: #a397a7;
-  --color-slate-700: #716875;
-  --color-slate-750: #514b56;
-  --color-slate-800: #433e47;
-  --color-slate-850: #302c34;
-  --color-slate-900: #242128;
-  --color-slate-950: #141216;
-  --color-emerald-300: #e2cde0;
-  --color-emerald-400: #d4b6d2;
-  --color-emerald-500: #c29fc0;
-  --color-blue-300: #e2cde0;
-  --color-blue-400: #d4b6d2;
-  --color-blue-500: #c29fc0;
-  --color-purple-300: #e2cde0;
-  --color-purple-400: #d4b6d2;
-  --color-green-300: #a5e2b5;
-  --color-green-400: #8fd3a3;
-  --color-green-500: #5fbf7c;
-  --color-red-400: #f0a19c;
-  --color-amber-400: #e9c27a;
-  --color-yellow-400: #e9cf7a;
-  color: #f0eaf0;
-  border-color: #514b56;
-}
-
-.sft-workspace :is([class^="bg-slate-950"], [class*=" bg-slate-950"]) {
-  background-color: #141216 !important;
-}
-
-.sft-workspace :is([class^="bg-slate-900"], [class*=" bg-slate-900"]) {
-  background-color: #242128 !important;
-}
-
-.sft-workspace :is([class^="bg-slate-850"], [class*=" bg-slate-850"]) {
-  background-color: #302c34 !important;
-}
-
-.sft-workspace :is([class^="bg-slate-800"], [class*=" bg-slate-800"]) {
-  background-color: #3b3640 !important;
-}
-
-.sft-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
-.sft-workspace textarea,
-.sft-workspace select {
-  color: #f1eaf1 !important;
-  background-color: #111013;
-  border-color: #71677a;
-}
-
-.sft-workspace [class*="text-slate-700"] {
-  color: #706775 !important;
-}
-
-.sft-workspace :is([class^="bg-slate-950"], [class*=" bg-slate-950"]) [class*="text-slate-700"],
-.sft-workspace :is([class^="bg-slate-900"], [class*=" bg-slate-900"]) [class*="text-slate-700"],
-.sft-workspace :is([class^="bg-slate-850"], [class*=" bg-slate-850"]) [class*="text-slate-700"],
-.sft-workspace :is([class^="bg-slate-800"], [class*=" bg-slate-800"]) [class*="text-slate-700"] {
-  color: #d1c8d5 !important;
-}
-
-.sft-workspace input::placeholder,
-.sft-workspace textarea::placeholder {
-  color: #b8adbc !important;
-  opacity: 1;
-}
-
-.sft-workspace input:focus,
-.sft-workspace textarea:focus,
-.sft-workspace select:focus {
-  border-color: #d4b6d2;
-  outline: 2px solid rgb(194 159 192 / 38%);
-  outline-offset: 1px;
-}
-
-.sft-workspace .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #71677a;
-}
-
-.sft-workspace .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #b18cad;
-}
+/* True black composer surface */
+.kk-composer { background-color: #0a0a0a !important; border-color: #2a2a2a !important; }
+.kk-composer input, .kk-composer textarea { background-color: #0a0a0a !important; border-color: #3a3a3a !important; }

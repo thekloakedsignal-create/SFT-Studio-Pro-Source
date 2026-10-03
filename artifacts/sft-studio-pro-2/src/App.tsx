@@ -3885,7 +3885,7 @@ export default function App() {
                 <button
                   type="submit"
                   disabled={isSigningIn !== null}
-                  className="w-full py-3 bg-green-500 hover:bg-green-400 text-slate-950 rounded-xl font-bold text-sm transition cursor-pointer disabled:opacity-50 select-none shadow-lg shadow-green-500/10 flex items-center justify-center gap-1.5"
+                  className="w-full py-3 kk-primary rounded-xl font-bold text-sm transition cursor-pointer disabled:opacity-50 select-none shadow-lg shadow-green-500/10 flex items-center justify-center gap-1.5"
                 >
                   {isSigningIn && (isSigningIn === "Registering" || isSigningIn === "Signing In") ? (
                     <>
@@ -4012,7 +4012,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
       {/* Top Banner Navigation */}
-      <header className="kk-dark border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+      <header className="kk-header border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
           
           <div className="flex items-center justify-between md:justify-start gap-3">
@@ -4175,7 +4175,7 @@ export default function App() {
                 ) : (
                   <button
                     onClick={() => setIsGuestMode(false)}
-                    className="flex items-center justify-center gap-1 px-2.5 h-7.5 bg-green-500 hover:bg-green-400 text-slate-950 font-bold text-xs rounded-lg border border-green-400 transition cursor-pointer w-full"
+                    className="flex items-center justify-center gap-1 px-2.5 h-7.5 kk-primary font-bold text-xs rounded-lg border border-green-400 transition cursor-pointer w-full"
                   >
                     <span className="truncate">Sign In</span>
                   </button>
@@ -4205,7 +4205,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="sft-workspace flex-1 max-w-[1720px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-5 grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <main className="flex-1 max-w-[1720px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-5 grid grid-cols-1 lg:grid-cols-12 gap-5">
         
         {/* Tab Sidebar Navigation (Desktop) & Tabs bar (Mobile) */}
         <div className="lg:col-span-3 xl:col-span-2 flex flex-col gap-3">
@@ -4216,7 +4216,7 @@ export default function App() {
               onClick={() => setActiveTab("define")}
               className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 ${
                 activeTab === "define"
-                  ? "bg-green-500/15 text-green-400 border border-green-500/25 shadow-sm"
+                  ? "kk-tab-active shadow-sm"
                   : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
               }`}
             >
@@ -5207,7 +5207,7 @@ export default function App() {
                             <>
                               <button
                                 onClick={() => handleUpdateBatchStatus(latestGeneratorBatch.id, "Approved")}
-                                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-slate-950 font-bold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
+                                className="px-4 py-2 kk-primary font-bold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
                               >
                                 <Check className="h-3.5 w-3.5 text-slate-950" />
                                 Approve & Unlock Scale
@@ -5908,7 +5908,7 @@ export default function App() {
                             <>
                               <button
                                 onClick={() => handleUpdateBatchStatus(latestDocBatch.id, "Approved")}
-                                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-slate-950 font-bold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
+                                className="px-4 py-2 kk-primary font-bold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
                               >
                                 <Check className="h-3.5 w-3.5 text-slate-950" />
                                 Approve Batch
@@ -6960,7 +6960,7 @@ export default function App() {
                               type="button"
                               onClick={() => handleFormatDataset()}
                               disabled={(compiledDataset.trainingSet.length + compiledDataset.validationSet.length) === 0}
-                              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 transition cursor-pointer disabled:opacity-50"
+                              className="flex-1 py-2.5 px-4 rounded-xl kk-primary text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 transition cursor-pointer disabled:opacity-50"
                             >
                               <CheckCircle className="h-4 w-4" />
                               <span>Format Dataset to {exportTemplateFormat === "chatml_token" || exportTemplateFormat === "chatml_instruction" ? "ChatML Instruction (<|im_start|>)" : exportTemplateFormat === "chatml" || exportTemplateFormat === "openai" ? "ChatML Conversation" : exportTemplateFormat === "alpaca" ? "Alpaca" : exportTemplateFormat === "maestro" ? "Maestro" : exportTemplateFormat === "openai_o1_o3" ? "OpenAI o1/o3" : exportTemplateFormat === "deepseek" ? "DeepSeek R1" : exportTemplateFormat === "sharegpt" ? "ShareGPT" : "Prompt/Response"}</span>
@@ -7096,7 +7096,7 @@ export default function App() {
                           </button>
                         </div>
                       </div>
-                      <pre className="kk-dark text-[10px] text-slate-300 font-mono bg-slate-900/60 p-3.5 rounded-xl overflow-x-auto max-h-60 custom-scrollbar whitespace-pre border border-slate-800">
+                      <pre className="kk-code text-[10px] text-slate-300 font-mono bg-slate-900/60 p-3.5 rounded-xl overflow-x-auto max-h-60 custom-scrollbar whitespace-pre border border-slate-800">
                         {exportedPreview}
                       </pre>
                     </div>
@@ -7116,7 +7116,7 @@ export default function App() {
               >
                 <div className="bg-slate-950/30 border border-slate-800/50 rounded-xl flex flex-col h-[720px] overflow-hidden shadow-lg">
                   {/* Chat Header */}
-                  <div className="flex items-center justify-between border-b border-slate-800/70 px-6 py-4 bg-slate-900/30">
+                  <div className="flex items-center justify-between border-b border-slate-800/70 px-6 py-4 bg-slate-900/30 kk-strip">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20 shrink-0">
                         <MessageSquare className="h-5 w-5" />
@@ -7145,7 +7145,7 @@ export default function App() {
                   </div>
 
                   {/* Messages Scroll Area */}
-                  <div className="kk-dark flex-1 overflow-y-auto px-6 py-4 space-y-4 custom-scrollbar">
+                  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 custom-scrollbar">
                     {expertMessages.length === 0 && (
                       <div className="h-full min-h-[320px] flex flex-col items-center justify-center text-center p-8 space-y-3">
                         <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl text-emerald-400 shadow-sm">
@@ -7192,7 +7192,7 @@ export default function App() {
                                         </span>
                                         <CopyCodeButton text={part.content} />
                                       </div>
-                                      <pre className="kk-dark bg-slate-950/90 text-emerald-300 text-[11px] p-3 overflow-x-auto font-mono whitespace-pre custom-scrollbar">
+                                      <pre className="kk-code bg-slate-950/90 text-emerald-300 text-[11px] p-3 overflow-x-auto font-mono whitespace-pre custom-scrollbar">
                                         {part.content}
                                       </pre>
                                     </div>
@@ -7253,7 +7253,7 @@ export default function App() {
                   </div>
 
                   {/* Prominent, Obvious Prompt Box */}
-                  <div className="p-4 sm:p-5 border-t-2 border-slate-700/80 bg-slate-900/80 shadow-2xl">
+                  <div className="p-4 sm:p-5 border-t-2 border-slate-700/80 bg-slate-900/80 shadow-2xl kk-composer">
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
@@ -7352,7 +7352,7 @@ export default function App() {
               </button>
               <button
                 onClick={handleSaveEditedExample}
-                className="px-4 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-slate-950 text-xs font-bold"
+                className="px-4 py-2 rounded-xl kk-primary text-xs font-bold"
               >
                 Save Changes
               </button>
@@ -7400,7 +7400,7 @@ export default function App() {
                     setShowBillingModal(false);
                     setIsGuestMode(false);
                   }}
-                  className="px-4 py-2 bg-green-500 hover:bg-green-400 text-slate-950 rounded-xl font-bold text-xs transition cursor-pointer select-none"
+                  className="px-4 py-2 kk-primary rounded-xl font-bold text-xs transition cursor-pointer select-none"
                 >
                   Sign In / Register
                 </button>
@@ -7500,7 +7500,7 @@ export default function App() {
                         <button
                           onClick={handleRedeemStudentCode}
                           disabled={isRedeemingCode || !studentCodeInput.trim()}
-                          className="px-4 py-2 bg-green-500 hover:bg-green-400 text-slate-950 rounded-xl font-bold text-xs transition cursor-pointer select-none disabled:opacity-40"
+                          className="px-4 py-2 kk-primary rounded-xl font-bold text-xs transition cursor-pointer select-none disabled:opacity-40"
                         >
                           {isRedeemingCode ? "Verifying..." : "Redeem"}
                         </button>
@@ -7562,7 +7562,7 @@ export default function App() {
                                 setNotification({ text: "Incorrect instructor key. Please try again.", type: "error" });
                               }
                             }}
-                            className="px-4 py-2 bg-green-500 hover:bg-green-400 text-slate-950 rounded-xl font-bold text-xs transition cursor-pointer select-none"
+                            className="px-4 py-2 kk-primary rounded-xl font-bold text-xs transition cursor-pointer select-none"
                           >
                             Verify Key
                           </button>
