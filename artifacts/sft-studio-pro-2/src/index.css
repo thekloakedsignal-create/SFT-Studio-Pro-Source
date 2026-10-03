@@ -9,11 +9,11 @@
   --color-purple-50: #f8f1ff;
   --color-purple-100: #eee0ff;
   --color-purple-200: #dec2ff;
-  --color-purple-300: #d09aff;
-  --color-purple-400: #c77dff;
-  --color-purple-500: #b75cff;
-  --color-purple-600: #963de5;
-  --color-purple-700: #762bb7;
+  --color-purple-300: #ff8cf5;
+  --color-purple-400: #ff66ed;
+  --color-purple-500: #ed40d7;
+  --color-purple-600: #bc169f;
+  --color-purple-700: #8d0876;
   --color-purple-800: #512077;
   --color-purple-900: #301444;
   --color-purple-950: #170b22;
@@ -131,13 +131,13 @@
 
   /* Legacy utility names now express dark ink on light paper.
      Charcoal regions below restore the dark surface scale locally. */
-  --color-slate-50: #270737;
-  --color-slate-100: #360a50;
-  --color-slate-200: #46115f;
-  --color-slate-300: #50196a;
-  --color-slate-400: #592772;
-  --color-slate-500: #654175;
-  --color-slate-600: #71567d;
+  --color-slate-50: #39002f;
+  --color-slate-100: #510042;
+  --color-slate-200: #660053;
+  --color-slate-300: #72005d;
+  --color-slate-400: #780062;
+  --color-slate-500: #780062;
+  --color-slate-600: #780062;
   --color-slate-700: #91919a;
   --color-slate-750: #a4a4ad;
   --color-slate-800: #b8b8bf;
@@ -206,8 +206,8 @@
 @layer base {
   :root {
     color-scheme: light;
-    --heading-ink: #530c86;
-    --accent-ink: #7513b1;
+    --heading-ink: #800067;
+    --accent-ink: #950079;
     --background: 240 6% 79%;
     --foreground: 279 70% 22%;
     --card: 0 0% 100%;
@@ -288,7 +288,7 @@ select,
 input:not([type]),
 input:is([type="text"], [type="email"], [type="password"], [type="number"], [type="search"], [type="url"], [type="tel"]) {
   background-color: #070709 !important;
-  color: #ef70ff !important;
+  color: #ff66ed !important;
   caret-color: #f6a5ff;
   border: 2px solid #505056;
   color-scheme: dark;
@@ -302,13 +302,13 @@ input:is([type="text"], [type="email"], [type="password"], [type="number"], [typ
 
 textarea::placeholder,
 input::placeholder {
-  color: #d98be6 !important;
+  color: #ff80ef !important;
   opacity: 1;
 }
 
 select option {
   background-color: #070709;
-  color: #ef70ff;
+  color: #ff66ed;
 }
 
 textarea:focus,
@@ -323,21 +323,22 @@ textarea:disabled,
 select:disabled,
 input:disabled {
   background-color: #202024 !important;
-  color: #c49bcc !important;
+  color: #ff8cf5 !important;
+  opacity: 1 !important;
 }
 
 /* Explicit dark zones against the light workspace, matching the reference's
    charcoal navigation and black code/composer blocks. */
 .sft-charcoal,
 pre {
-  --heading-ink: #edccff;
-  --accent-ink: #dfadff;
-  --color-slate-50: #f5eaff;
-  --color-slate-100: #ead6f7;
-  --color-slate-200: #dfc4f0;
-  --color-slate-300: #d3b4e6;
-  --color-slate-400: #c5a6d8;
-  --color-slate-500: #b79bc8;
+  --heading-ink: #ff66ed;
+  --accent-ink: #ff66ed;
+  --color-slate-50: #ff8cf5;
+  --color-slate-100: #ff8cf5;
+  --color-slate-200: #ff8cf5;
+  --color-slate-300: #ff8cf5;
+  --color-slate-400: #ff8cf5;
+  --color-slate-500: #ff8cf5;
   --color-slate-600: #797985;
   --color-slate-700: #5e5e66;
   --color-slate-750: #505057;
@@ -346,23 +347,23 @@ pre {
   --color-slate-900: #2b2b31;
   --color-slate-950: #111114;
   background-color: #222226;
-  color: #dfc4f0;
+  color: #ff8cf5;
   color-scheme: dark;
 }
 
 pre {
   background-color: #111114 !important;
-  color: #dfc4f0;
+  color: #ff66ed;
 }
 
 .sft-composer,
 .sft-composer input {
   background-color: #09090c !important;
-  color: #ef70ff !important;
+  color: #ff66ed !important;
 }
 
 .sft-composer input::placeholder {
-  color: #d98be6 !important;
+  color: #ff80ef !important;
 }
 
 .text-white,
@@ -411,27 +412,32 @@ pre {
 /* Remove the translucent grey wash from working panels. Keep intentional
    charcoal regions and the black composer distinct. */
 .sft-content [class*="bg-slate-950/"]:not(.sft-charcoal):not(.sft-composer) {
-  background-color: #505056;
+  background-color: #48484e;
   border-color: #9696a0;
 }
 
 .sft-top-panel-inner {
   background-color: #77777e;
-  --color-slate-200: #fff0ff;
-  --color-slate-500: #fff0ff;
+  --color-slate-200: #480037;
+  --color-slate-500: #480037;
+}
+
+.sft-top-panel-inner [class*="bg-slate-950"] {
+  --color-slate-200: #ff8cf5;
+  --color-slate-500: #ff8cf5;
 }
 
 .sft-content.sft-charcoal {
   background-color: transparent;
-  --heading-ink: #ffadff;
-  --accent-ink: #ffadff;
-  --color-slate-400: #efd4f7;
-  --color-slate-500: #e6c8ef;
+  --heading-ink: #ff80ef;
+  --accent-ink: #ff80ef;
+  --color-slate-400: #ff8cf5;
+  --color-slate-500: #ff8cf5;
 }
 
 .sft-content textarea {
   background-color: #48484e !important;
-  color: #ffadff !important;
+  color: #ff8cf5 !important;
 }
 
 .sft-content > div > div {
@@ -440,7 +446,7 @@ pre {
 
 .sft-charcoal button[id^="tab-"].shadow-sm {
   --accent-ink: #350b50;
-  background-color: #c782ff;
+  background-color: #ff66ed;
   color: #350b50;
   border-color: #e3bdff;
   box-shadow: inset 3px 0 0 #f1ddff;
@@ -468,6 +474,30 @@ pre {
 .sft-charcoal button[id^="tab-"].shadow-sm,
 [role="tab"][data-state="active"] {
   border-color: #bc61ff;
+}
+
+/* Availability changes behavior, never visual opacity or color intensity. */
+:disabled,
+[aria-disabled="true"],
+[data-disabled],
+.cursor-not-allowed {
+  opacity: 1 !important;
+}
+
+button {
+  text-shadow: none;
+}
+
+button[class*="shadow-green-"],
+button[class*="shadow-purple-"],
+button[class*="shadow-emerald-"] {
+  box-shadow: none;
+}
+
+/* Dialogs retain their dark scrim and focus containment, but no frosted blur. */
+[class*="backdrop-blur"] {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* Universal text and font containment: prevent any text, token, or filename from breaking out of its container */

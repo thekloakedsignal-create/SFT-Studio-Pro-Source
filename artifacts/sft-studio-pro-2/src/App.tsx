@@ -3796,8 +3796,6 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between font-sans selection:bg-green-500/20 selection:text-green-300">
         {/* Decorative ambient blobs */}
-        <div className="fixed top-0 left-1/4 w-96 h-96 bg-green-500/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 z-10">
           <div className="w-full max-w-md bg-slate-950 border border-slate-800/80 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
@@ -4012,7 +4010,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
       {/* Top Banner Navigation */}
-      <header className="sft-charcoal border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+      <header className="sft-charcoal border-b border-slate-800">
         <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
           
           <div className="flex items-center justify-between md:justify-start gap-3">

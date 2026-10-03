@@ -11,6 +11,12 @@ Keep visibly distinct charcoal and light-grey areas, not an almost entirely blac
 
 The user specifies “Purple for font and highlighted selections.”
 
+Keep the writing visibly fuchsia and saturated, not pale lavender or grey-purple. The user repeatedly rejects the washed-out, “paste or a film over it” appearance. Locked editing fields must remain legible rather than fading their text.
+
+All palette work is aesthetic only: do not change function or access rules. Nothing should look greyed out, whether accessible or not; unavailable controls retain full-color styling.
+
+**Why:** The user explicitly clarified this standing scope and appearance rule.
+
 **Why:** The user explicitly clarified the purple's role.
 
 **How to apply:** Use readable deep purple text on light surfaces and lighter purple on charcoal, with purple selection highlights.
