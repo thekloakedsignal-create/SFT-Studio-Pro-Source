@@ -31,7 +31,7 @@ function hasRenderableMessages(example: any): boolean {
     ));
 }
 
-function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" = "success") {
+function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" | "malformedReasoning" | "fastFailure" | "partialFailure" | "timeoutQwen" | "timeoutAllInitial" | "504Qwen" | "abortDuplicateQwen" | "timeoutRecovery" | "timeoutRecoveryAll" | "reasoningSiblingDelay" = "success") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   const delays: number[] = [];
@@ -67,6 +67,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
     AbortController,
     Date: FixtureDate,
     randomUUID: () => `fixture-uuid-${++uuidCount}`,
+    setImmediate,
     setTimeout(callback: Function, delay: number) {
       delays.push(delay);
       fixtureNow += delay;
@@ -77,6 +78,9 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       const request = JSON.parse(options.body);
       const requestNumber = calls.length + 1;
       calls.push(request);
+      if (mode === "reasoningSiblingDelay" && request.model !== firstModel) {
+        await new Promise<void>(resolve => setImmediate(resolve));
+      }
       concurrent++;
       peakConcurrent = Math.max(peakConcurrent, concurrent);
       if (mode === "fastFailure" && request.model !== firstModel) {
@@ -137,6 +141,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       const isPrimary = request.model === firstModel;
       const isBackup = !models.slice(0, 5).includes(request.model);
       const status = (mode === "fastFailure" && isPrimary) ? 503
+        : mode === "reasoningSiblingDelay" && isPrimary ? 503
         : ((mode === "primary529" || mode === "both529") && isPrimary)
         || (mode === "both529" && isBackup) ? 529
         : mode === "503" && isPrimary ? 503
@@ -290,6 +295,18 @@ test("Reasoning batch jobs extract tagged thinking into the UI reasoning field",
     "<think>Trace.</think>\nAnswer.<think>Second.</think>",
     "<think>Trace.</think>\n<|im_end|>"
   ]) assert.equal(contentPattern.test(content), false);
+});
+
+test("Reasoning jobs wait for in-flight sibling workers before saving a partial result", async () => {
+  const f = fixture("reasoningSiblingDelay");
+  const started = await f.generate(5, true, "Reasoning");
+  const job = await f.job(started.body.jobId);
+
+  assert.equal(job.body.status, "partial");
+  assert.equal(job.body.result.partial, true);
+  assert.equal(job.body.result.examples.length, 4);
+  assert.equal(f.calls.length, 5);
+  assert.ok(job.body.result.examples.every(hasRenderableMessages));
 });
 
 test("Reasoning timeout recovery updates the schema to the requested fill count", async () => {

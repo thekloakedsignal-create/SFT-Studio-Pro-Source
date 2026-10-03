@@ -1876,9 +1876,16 @@ No internal deliberation, planning, or reasoning fields are permitted.`
         if (spacingMs > 0) await new Promise((resolve) => setTimeout(resolve, spacingMs));
       }
       try {
-        // Each task already applies the sole allowed 529 fallback. Fail the job as
-        // soon as one task is unrecoverable instead of waiting for every sibling.
-        await Promise.all(chunkTasks[stackIndex].map(task => task()));
+        // Reasoning must retain valid results from sibling workers already in flight.
+        const stackTasks = chunkTasks[stackIndex].map(task => task());
+        if (turnMode === "Reasoning") {
+          const settledTasks = await Promise.allSettled(stackTasks);
+          const failedTask = settledTasks.find(result => result.status === "rejected");
+          if (failedTask?.status === "rejected") throw failedTask.reason;
+        } else {
+          // Preserve fail-fast behavior and the existing schedule for other templates.
+          await Promise.all(stackTasks);
+        }
       } catch (error: any) {
         const detail = formatAIErrorMessage(error);
         const partialExamples = taskOutputs
