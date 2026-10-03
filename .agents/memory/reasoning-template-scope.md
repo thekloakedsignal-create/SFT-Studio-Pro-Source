@@ -3,11 +3,11 @@ name: Reasoning worker reliability
 description: User-defined reliability requirements for SFT Reasoning batch generation.
 ---
 
-Keep the Reasoning template unchanged. Make reliability changes only to Reasoning dispatch, result collection, and tests; do not alter Single Turn or Multi Turn prompts, schemas, or behavior. Workers must run concurrently for every supported batch size: 5, 10, 25, 50, 100, 200, and 250. When a Reasoning worker fails, start its replacement immediately while sibling workers continue. Retain successful sibling results, and return exactly the requested number of examples or an error—never a successful partial batch.
+Keep the Reasoning template unchanged. For its existing model slots, use `nemotron-3-ultra-550b` in every slot and run the slots concurrently. Preserve the existing batch lineup, batch sizing, request schedule, fallback logic, and recovery logic. Do not change Single Turn or Multi Turn prompts, schemas, or behavior.
 
-**Why:** The user explicitly said the template is already correct, repeatedly emphasized concurrency across all batch sizes, required failed slots to move quickly to another worker, and prohibited incomplete batches.
+**Why:** The user explicitly clarified that this is a literal model-slot substitution only, with no other changes to generation behavior.
 
-**How to apply:** Keep prompts and schemas untouched. Confine worker replacement and collection changes to Reasoning-specific branches; preserve the shared model pool and schedule. Wait for all launched sibling tasks in the active stack, and report an error if recovery cannot fill every requested slot.
+**How to apply:** Change only the model IDs assigned to existing Reasoning slots. Do not modify the batch schedule, concurrency mechanism, fallback, recovery, or other templates.
 
 The DigitalOcean adapter's verified request format is `json_object`, with response-schema text added to the prompt. Do not infer or add a native JSON-schema request payload unless its exact shape is established by existing app integration material.
 

@@ -1349,7 +1349,10 @@ REASONING TEMPLATE FORMAT:
     const modelAbortControllers = new Map(
       generationModels.map(model => [model, new AbortController()])
     );
-    const generationStacks = createModelGenerationStacks(countNum, generationModels);
+    const scheduledGenerationModels = turnMode === "Reasoning"
+      ? generationModels.map(() => "nemotron-3-ultra-550b")
+      : generationModels;
+    const generationStacks = createModelGenerationStacks(countNum, scheduledGenerationModels);
     const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);
     const taskOutputs: Array<Array<any[] | undefined>> = generationStacks.map(stack => new Array(stack.length));
     const successfulReasoningModels: string[] = [];
