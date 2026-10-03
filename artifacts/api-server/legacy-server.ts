@@ -1344,7 +1344,9 @@ REASONING TEMPLATE FORMAT:
       };
     }
 
-    const generationModels = getGenerationModels();
+    const generationModels = isReasoningGeneration
+      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(() => "nemotron-3-ultra-550b")
+      : getGenerationModels();
     const modelAbortControllers = new Map(
       generationModels.map(model => [model, new AbortController()])
     );
