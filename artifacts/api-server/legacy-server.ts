@@ -1383,8 +1383,8 @@ app.post("/api/generate", async (req, res) => {
 REASONING TEMPLATE FORMAT:
 - In every example in this Reasoning batch, the assistant "content" must start with <think>, contain a non-empty, concise explanation of the key reasoning steps, close with </think>, and then give the final answer.
 - Required shape: "<think>\n[Concise explanation of the key reasoning steps]\n</think>\n[Final answer]".
-- Formatting example:
-{"messages":[{"role":"user","content":"What is 2 + 3?"},{"role":"assistant","content":"<think>\\nI add 2 and 3 to get 5.\\n</think>\\nThe answer is 5."}]}
+- Formatting example (one example shown):
+{"examples":[{"messages":[{"role":"user","content":"What is 2 + 3?"},{"role":"assistant","content":"<think>\\nI add 2 and 3 to get 5.\\n</think>\\nThe answer is 5."}]}]}
 - Use this only as a formatting example; create new content for the requested task and persona.
 - Never omit either tag, put the final answer inside the tags, or use the format for any template other than Reasoning.
 - Do not emit a separate "reasoning" or "reasoning_content" property.
