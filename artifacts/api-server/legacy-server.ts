@@ -10,6 +10,7 @@ import { projects, batches, users, studentCodes } from "./src/db/schema.ts";
 import { eq, and, inArray } from "drizzle-orm";
 import { optionalAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { logger } from "./src/lib/logger.ts";
+import { auditTemplateFormat } from "./src/lib/quality-format.ts";
 import {
   ChatCompletionsHttpError, isProviderOverload, normalizeText,
   parseGeneratedExamples, parseReasoningExamples, sanitizeExample, sanitizeMessage,
@@ -3396,6 +3397,7 @@ function runDeterministicQualityAudit(
     targetTask?: string;
     constraints?: string;
     templateType?: string;
+    instructTemplate?: string;
   }
 ): DeterministicAuditResult {
   const issues: Array<{
@@ -3403,7 +3405,7 @@ function runDeterministicQualityAudit(
     severity: "High" | "Medium" | "Low";
     type: string;
     message: string;
-  }> = [];
+  }> = auditTemplateFormat(examples, context);
 
   const promptMap = new Map<string, number>();
   const assistantMap = new Map<string, number>();
@@ -3510,8 +3512,8 @@ function runDeterministicQualityAudit(
 
     for (let t = 0; t < ex.messages.length; t++) {
       const msg = ex.messages[t];
-      if (!msg) continue;
-      const role = (msg.role || "").trim().toLowerCase();
+      if (!msg || typeof msg !== "object") continue;
+      const role = typeof msg.role === "string" ? msg.role.trim().toLowerCase() : "";
       const content = typeof msg.content === "string" ? msg.content : "";
       const trimmed = content.trim();
 
@@ -3525,7 +3527,8 @@ function runDeterministicQualityAudit(
       }
 
       if (t > 0) {
-        const prevRole = (ex.messages[t - 1].role || "").trim().toLowerCase();
+        const previous = ex.messages[t - 1]?.role;
+        const prevRole = typeof previous === "string" ? previous.trim().toLowerCase() : "";
         if (role === prevRole && role !== "system") {
           issues.push({
             exampleIndex: i,
@@ -3664,7 +3667,8 @@ app.post("/api/analyze-quality", async (req, res) => {
     systemPrompt,
     targetTask,
     constraints,
-    templateType
+    templateType,
+    instructTemplate
   } = req.body;
 
   if (!examples || !Array.isArray(examples) || examples.length === 0) {
@@ -3676,7 +3680,8 @@ app.post("/api/analyze-quality", async (req, res) => {
     systemPrompt,
     targetTask,
     constraints,
-    templateType
+    templateType,
+    instructTemplate
   });
 
   const client = getDigitalOceanClient();

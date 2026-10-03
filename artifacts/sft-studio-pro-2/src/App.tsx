@@ -2815,7 +2815,8 @@ export default function App() {
           systemPrompt: project.systemPrompt,
           targetTask: project.targetTask,
           constraints: project.constraints,
-          templateType: targetBatch.templateType || project.templateType
+          templateType: targetBatch.templateType || project.templateType,
+          instructTemplate: project.projectFormat === ProjectFormat.INSTRUCTION ? project.instructTemplate : undefined
         })
       });
 
