@@ -17,11 +17,11 @@ Do not show or replace backend failure messages in the SFT UI. Keep the existing
 
 **How to apply:** Do not render backend/provider error text or partial reasons in the SFT UI, and do not add generic failure copy in their place. Preserve existing progress-bar wording unless explicitly requested.
 
-Single Turn must collect in-flight responses and continue the remaining originally scheduled stacks after an individual request fails, within the existing batch deadline.
+Single Turn, Multi Turn, and Mixed must collect in-flight responses and continue the remaining originally scheduled stacks after an individual request fails, within the existing batch deadline.
 
-**Why:** The user reported receiving six examples when requesting fifty and asked for a strictly scoped fix. Abandoning later scheduled stacks on one failed request needlessly reduces completed output.
+**Why:** The user reported receiving six examples when requesting fifty in Single Turn, then the same six-or-seven-result issue in Multi Turn and Mixed. Abandoning later scheduled stacks on one failed request needlessly reduces completed output.
 
-**How to apply:** Keep this exception Single Turn-only. Continuing already scheduled requests is not permission to add retries or top-ups for non-timeout failures. Preserve honest partial status if the provider still returns fewer valid examples.
+**How to apply:** Apply to non-Reasoning generation only. Continuing already scheduled requests is not permission to add retries or top-ups for non-timeout failures. Preserve honest partial status if the provider still returns fewer valid examples.
 
 Single Turn timeout recovery uses individual requests for missing examples rather than one large fill request.
 

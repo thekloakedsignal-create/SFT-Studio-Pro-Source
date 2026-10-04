@@ -1881,17 +1881,15 @@ No internal deliberation, planning, or reasoning fields are permitted.`
         if (spacingMs > 0) await new Promise((resolve) => setTimeout(resolve, spacingMs));
       }
       try {
-        // Collect independent responses before finalizing. Single Turn also
-        // finishes later scheduled stacks; a failed slot must not cancel them.
-        if (isReasoningGeneration || turnMode === "Single Turn") {
+        // Collect all in-flight responses; non-Reasoning modes also continue
+        // later scheduled stacks rather than stopping after one failed slot.
+        {
           const results = await Promise.allSettled(chunkTasks[stackIndex].map(task => task()));
           const failure = results.find(result => result.status === "rejected");
           if (failure?.status === "rejected") {
-            if (turnMode === "Single Turn") singleTurnFailure ??= failure.reason;
+            if (!isReasoningGeneration) singleTurnFailure ??= failure.reason;
             else throw failure.reason;
           }
-        } else {
-          await Promise.all(chunkTasks[stackIndex].map(task => task()));
         }
       } catch (error: any) {
         const detail = formatAIErrorMessage(error);
@@ -2089,7 +2087,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     }
 
     if (allExamples.length < countNum) {
-      if (timedOutExampleCount > 0 || (turnMode === "Single Turn" && singleTurnFailure !== undefined)) {
+      if (timedOutExampleCount > 0 || (!isReasoningGeneration && singleTurnFailure !== undefined)) {
         const formattedPartialExamples = allExamples
           .slice(0, countNum)
           .map(example => sanitizeExample(example, turnMode));

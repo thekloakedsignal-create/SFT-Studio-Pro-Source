@@ -562,16 +562,18 @@ test("other HTTP failures and invalid content do not retry or top up", async () 
   }
 });
 
-test("Multi Turn retains fail-fast behavior for an unrecoverable request", async () => {
-  const f = fixture("fastFailure");
-  const outcome = await Promise.race([
-    f.generate(5, false, "Multi Turn"),
-    new Promise(resolve => setTimeout(() => resolve("still waiting"), 500))
-  ]);
-  assert.notEqual(outcome, "still waiting");
-  assert.equal((outcome as any).statusCode, 500);
-  assert.match((outcome as any).body.error, /stopped after 0 of 5 examples/);
-  assert.equal(f.calls.length, 5);
+test("Multi Turn and Mixed retain responses and continue large batches after first-stack failures", async () => {
+  for (const mode of ["Multi Turn", "Mixed"]) {
+    for (const size of [50, 250]) {
+      const f = fixture("singleEarlyFailures");
+      const response = await f.generate(size, false, mode);
+      assert.equal(f.calls.length, size, "Run the original schedule without retries");
+      assert.equal(response.body.examples.length, size - 4);
+      assert.equal(response.body.partial, true);
+      assert.equal(response.body.requestedCount, size);
+      assert.ok(response.body.examples.every(hasRenderableMessages));
+    }
+  }
 });
 
 test("Single Turn 50-example batch uses the provider-required JSON object envelope", async () => {
