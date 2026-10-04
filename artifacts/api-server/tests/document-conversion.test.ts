@@ -125,6 +125,41 @@ test("transcripts copy tagged dialogue without provider calls and survive saniti
   assert.equal((await f.run({ ...body, documentContent: "No tagged dialogue." })).code, 400);
 });
 
+test("transcripts strip metadata blocks, cues and speaker wrappers without rewriting dialogue", async () => {
+  const f = fixture();
+  const result = await f.run({
+    docType: "transcript", userTag: "Alice", assistantTag: "Bob",
+    documentContent: [
+      "Title: Meeting export", "Source: Zoom", "Alice: What happens at 12:30?",
+      "Participants:", "- Alice (host)", "- Bob (guest)", "",
+      "[Bob] [00:02]: Answer: Keep  two spaces.",
+      "00:03", "Page 2 of 3", "[Someone joined the meeting]",
+      "https://meeting.example/recording", "Aliceanna: Excluded third speaker.",
+      "Excluded continuation.", "<v Alice> Again?</v>", "**Bob:** Yes."
+    ].join("\n")
+  });
+  assert.equal(result.code, 200);
+  assert.equal(result.body.examples.length, 2);
+  assert.equal(result.body.examples[0].messages[0].content.trim(), "What happens at 12:30?");
+  assert.equal(result.body.examples[0].messages[1].content, "Answer: Keep  two spaces.");
+  assert.equal(result.body.examples[1].messages[0].content, "Again?");
+  assert.equal(result.body.examples[1].messages[1].content, "Yes.");
+  assert.equal(f.calls.length, 0);
+});
+
+test("knowledge and literature custom instructions are highest-priority provider instructions on every request", async () => {
+  for (const docType of ["knowledge_base", "literature"]) {
+    const f = fixture();
+    const instructions = "Use only backup procedures. Answer in Spanish. Use exactly three bullets.";
+    const result = await f.run({ docType, converterInstructions: instructions, count: 4 });
+    assert.equal(result.code, 200);
+    assert.equal(f.calls.length, 4);
+    assert.ok(f.calls.every(call => call.config.systemInstruction.includes(instructions)
+      && call.config.systemInstruction.includes("highest-priority content instructions")
+      && call.config.systemInstruction.includes("override conflicting default")));
+  }
+});
+
 test("transcript layout, Mixed, and instruction formats work; converter rejects Reasoning", async () => {
   const f = fixture();
   const multi = await f.run({ docType: "transcript", transcriptLayout: "multi_turn",

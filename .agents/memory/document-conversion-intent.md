@@ -9,6 +9,12 @@ Knowledge and literature synthesize grounded training examples. Transcript mode 
 
 **How to apply:** Keep Knowledge conversion unchanged. Transcript wording must survive saving and reloading without generation-oriented prose cleanup. Keep this work separate from batch generation.
 
+For Knowledge and Literature, typed user conversion instructions are the highest-priority content directions. For Transcript only, preserve exact dialogue and apply extraction/metadata removal, never rewriting.
+
+**Why:** The user confirmed “No—preserve exact dialogue; apply only extraction and metadata-removal instructions” and clarified “For transcript converter only. If knowledge or literature setting user instruction is highest priority.”
+
+**How to apply:** Put Knowledge/Literature instructions in the provider's system instructions, overriding default content/style preferences. Keep Transcript cleanup deterministic; do not introduce an AI rewriting or instruction-planning path. Make minimal scoped fixes, not converter redesigns.
+
 The document converter offers Single Turn, Multi Turn, and Mixed only—not Reasoning.
 
 **Why:** The user explicitly asked to remove the Reasoning option from the converter while keeping the repair confined to document conversion.
