@@ -995,7 +995,7 @@ const DEFAULT_GENERATION_MODEL_GROUPS = [
 ];
 const SUPPORTED_GENERATION_BATCH_SIZES = [5, 10, 25, 50, 100, 200, 250] as const;
 const SFT_SINGLE_EXAMPLE_TIMEOUT_MS = 20_000;
-const SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS = 120_000;
+const SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS = 180_000;
 
 function getGenerationModels(): string[] {
   return DEFAULT_GENERATION_MODEL_GROUPS.flat().map((model) => normalizeModel(model));
@@ -1890,8 +1890,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           const results = await Promise.allSettled(chunkTasks[stackIndex].map(task => task()));
           const failure = results.find(result => result.status === "rejected");
           if (failure?.status === "rejected") {
-            if (!isReasoningGeneration) singleTurnFailure ??= failure.reason;
-            else throw failure.reason;
+            singleTurnFailure ??= failure.reason;
           }
         }
       } catch (error: any) {
@@ -1943,17 +1942,16 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     let recoveryFailureReason: string | null = null;
     let recoveryFailureCategory: GenerationFailureCategory | undefined;
     let recoveryModel = isReasoningGeneration ? "nemotron-3-ultra-550b" : "glm-5.3";
-    const completeMissing = turnMode === "Multi Turn" || turnMode === "Mixed";
-    let replacementCount = completeMissing ? Math.max(0, countNum - completedExampleCount) : timedOutExampleCount;
-    if ((turnMode === "Single Turn" || completeMissing) && replacementCount > 0 && requestExamplesForMissingBatch) {
-      // Multi Turn/Mixed requeue failed replacements until complete or deadline.
-      // Single Turn retains its existing one-attempt-per-missing-timeout policy.
+    let replacementCount = Math.max(0, countNum - completedExampleCount);
+    if (replacementCount > 0 && requestExamplesForMissingBatch) {
+      // Refill each missing example with an individual request, bounded by concurrency and deadline.
       const requestReplacement = requestExamplesForMissingBatch;
       let nextReplacement = 0;
       await Promise.all(Array.from({ length: Math.min(10, replacementCount) }, async () => {
         while (nextReplacement < replacementCount) {
           if (Date.now() >= generationDeadline) {
             recoveryFailureReason ??= "The batch deadline expired before all missing examples could be recovered.";
+            if (isReasoningGeneration) recoveryFailureCategory ??= "provider_timeout";
             return;
           }
           const slot = nextReplacement++;
@@ -1981,90 +1979,20 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             });
           } catch (error: any) {
             recoveryFailureReason ??= formatAIErrorMessage(error);
+            if (isReasoningGeneration) {
+              recoveryFailureCategory ??= getReasoningFailureCategory(error);
+            }
             logger.warn(
               { model: replacementModel, slot, batchId: generationBatchId, error: formatAIErrorMessage(error) },
               "Replacement failed; preserving other completed examples"
             );
-            if (completeMissing) {
-              replacementCount++;
-              // Pace persistent provider failures instead of creating a tight request loop.
-              const pauseMs = Math.min(2000, Math.max(0, generationDeadline - Date.now()));
-              if (pauseMs > 0) await new Promise(resolve => setTimeout(resolve, pauseMs));
-            }
+            replacementCount++;
+            // Pace persistent provider failures instead of creating a tight request loop.
+            const pauseMs = Math.min(2000, Math.max(0, generationDeadline - Date.now()));
+            if (pauseMs > 0) await new Promise(resolve => setTimeout(resolve, pauseMs));
           }
         }
       }));
-    } else if (timedOutExampleCount > 0) {
-      const remainingBatchMs = generationDeadline - Date.now();
-      const recoveryTimeoutMs = Math.min(
-        remainingBatchMs,
-        Math.max(SFT_SINGLE_EXAMPLE_TIMEOUT_MS, timedOutExampleCount * SFT_SINGLE_EXAMPLE_TIMEOUT_MS)
-      );
-      if (recoveryTimeoutMs <= 0 || !requestExamplesForMissingBatch) {
-        recoveryFailureReason = `The ${generationTimeoutMs / 1000}-second total batch time limit expired before the GLM fill request could start.`;
-        if (turnMode === "Reasoning") recoveryFailureCategory = "provider_timeout";
-      } else {
-        logger.warn(
-          { model: recoveryModel, missingCount: timedOutExampleCount, batchId: generationBatchId },
-          "Requesting one recovery batch to replace examples from timed-out model requests"
-        );
-        try {
-          recoveryExamples = await requestExamplesForMissingBatch(
-            recoveryModel,
-            timedOutExampleCount,
-            recoveryTimeoutMs
-          );
-        } catch (recoveryError: any) {
-          if (turnMode === "Reasoning") {
-            recoveryFailureCategory = getReasoningFailureCategory(recoveryError);
-          }
-          if (isProviderOverload(recoveryError)) {
-            const backupModel = generationModels.find(
-              model => model !== recoveryModel && !stalledModels.has(model)
-            );
-            if (!backupModel) {
-              recoveryFailureReason = "GLM returned HTTP 529 and no distinct, available backup model remains.";
-            } else {
-              recoveryModel = backupModel;
-              logger.warn(
-                { model: "glm-5.3", backupModel, missingCount: timedOutExampleCount, batchId: generationBatchId },
-                "GLM recovery returned HTTP 529; trying one distinct backup model"
-              );
-              try {
-                recoveryExamples = await requestExamplesForMissingBatch(
-                  recoveryModel,
-                  timedOutExampleCount,
-                  recoveryTimeoutMs
-                );
-              } catch (backupError: any) {
-                if (isDigitalOceanRequestTimeout(backupError)) stalledModels.add(backupModel);
-                if (turnMode === "Reasoning") {
-                  recoveryFailureCategory = getReasoningFailureCategory(backupError);
-                }
-                recoveryFailureReason = `The recovery backup model ${backupModel} failed: ${formatAIErrorMessage(backupError)}`;
-              }
-            }
-          } else {
-            if (isDigitalOceanRequestTimeout(recoveryError)) {
-              stalledModels.add(recoveryModel);
-              modelAbortControllers.get(recoveryModel)?.abort();
-            }
-            recoveryFailureReason = `${recoveryModel} recovery failed: ${formatAIErrorMessage(recoveryError)}`;
-          }
-        }
-        if (recoveryExamples.length < timedOutExampleCount && !recoveryFailureReason) {
-          recoveryFailureReason = `${recoveryModel} returned ${recoveryExamples.length} of ${timedOutExampleCount} missing examples.`;
-        }
-        completedExampleCount += recoveryExamples.length;
-        sendProgressEvent({
-          type: "progress",
-          taskId: `recovery:${recoveryModel}`,
-          model: recoveryModel,
-          generatedCount: recoveryExamples.length,
-          completedCount: completedExampleCount,
-          total: countNum
-        });
-      }
     }
 
     let allExamples: any[] = [];
@@ -2098,42 +2026,38 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     }
 
     if (allExamples.length < countNum) {
-      if (timedOutExampleCount > 0 || (!isReasoningGeneration && singleTurnFailure !== undefined)) {
-        const formattedPartialExamples = allExamples
-          .slice(0, countNum)
-          .map(example => sanitizeExample(example, turnMode));
-        const modelList = [...stalledModels].join(", ") || "one or more models";
-        const partialResponse = {
-          success: true as const,
-          batchId: generationBatchId,
-          examples: formattedPartialExamples,
-          source: `DigitalOcean Inference (${generationModels.join(", ")})`,
-          partial: true as const,
-          requestedCount: countNum,
-          partialReason: singleTurnFailure !== undefined
-            ? formatAIErrorMessage(singleTurnFailure)
-            : `Timed out model(s): ${modelList}. ${recoveryFailureReason || "GLM could not fill all missing examples."}`
-        };
-        if (generationJobId) {
-          const job = generationJobs.get(generationJobId);
-          if (job) {
-            job.status = "partial";
-            job.progress.completed = formattedPartialExamples.length;
-            job.result = partialResponse;
-            if (turnMode === "Reasoning") {
-              job.failureCategory = recoveryFailureCategory ?? "provider_timeout";
-            }
-            job.updatedAt = Date.now();
+      const formattedPartialExamples = allExamples
+        .slice(0, countNum)
+        .map(example => sanitizeExample(example, turnMode));
+      const partialResponse = {
+        success: true as const,
+        batchId: generationBatchId,
+        examples: formattedPartialExamples,
+        source: `DigitalOcean Inference (${generationModels.join(", ")})`,
+        partial: true as const,
+        requestedCount: countNum,
+        partialReason: singleTurnFailure !== undefined
+          ? formatAIErrorMessage(singleTurnFailure)
+          : recoveryFailureReason || `Generation completed ${formattedPartialExamples.length} of ${countNum} examples.`
+      };
+      if (generationJobId) {
+        const job = generationJobs.get(generationJobId);
+        if (job) {
+          job.status = "partial";
+          job.progress.completed = formattedPartialExamples.length;
+          job.result = partialResponse;
+          if (turnMode === "Reasoning") {
+            job.failureCategory = recoveryFailureCategory ?? (timedOutExampleCount > 0 ? "provider_timeout" : "provider_error");
           }
-          return;
+          job.updatedAt = Date.now();
         }
-        if (progressStreamStarted) {
-          sendProgressEvent({ type: "partial", ...partialResponse });
-          return res.end();
-        }
-        return res.json(partialResponse);
+        return;
       }
-      throw new Error(`Generation returned ${allExamples.length} of ${countNum} requested examples.`);
+      if (progressStreamStarted) {
+        sendProgressEvent({ type: "partial", ...partialResponse });
+        return res.end();
+      }
+      return res.json(partialResponse);
     }
 
     // Ensure we don't exceed requested count
