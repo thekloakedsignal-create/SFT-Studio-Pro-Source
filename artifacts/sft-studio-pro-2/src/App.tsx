@@ -5039,7 +5039,6 @@ export default function App() {
                               { type: TemplateType.SINGLE_TURN, label: "Single Turn", sub: "Instruction Pair" },
                               { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Multi-turn Dialogue" },
                               { type: TemplateType.REASONING, label: "Reasoning", sub: "<think> CoT" },
-                              { type: TemplateType.MIXED, label: "Mixed", sub: "Dynamic Mix" },
                             ].map(({ type, label, sub }) => {
                               const isSelected = batchTemplate === type;
                               return (
@@ -5074,7 +5073,6 @@ export default function App() {
                               { type: TemplateType.SINGLE_TURN, label: "Single Turn", sub: "Q&A Pair" },
                               { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Dialogue" },
                               { type: TemplateType.REASONING, label: "Reasoning", sub: "CoT Thoughts" },
-                              { type: TemplateType.MIXED, label: "Mixed", sub: "Dynamic Mix" },
                             ].map(({ type, label, sub }) => {
                               const isSelected = batchTemplate === type;
                               return (
@@ -5635,7 +5633,6 @@ export default function App() {
                           {[
                             { type: TemplateType.SINGLE_TURN, label: "Single Turn", sub: "Q&A Pair" },
                             { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Dialogue" },
-                            { type: TemplateType.MIXED, label: "Mixed", sub: "Dynamic Mix" },
                           ].map(({ type, label, sub }) => {
                             const isSelected = docTemplate === type;
                             return (
@@ -6138,24 +6135,7 @@ export default function App() {
                             LOCKED ({project.instructTemplate || "ChatML"})
                           </span>
                         </div>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-2">
-                          {[TemplateType.SINGLE_TURN, TemplateType.MULTI_TURN, TemplateType.REASONING].map((t) => (
-                            <button
-                              key={t}
-                              type="button"
-                              onClick={() => setTriadTemplate(t)}
-                              className={`py-2 px-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                                triadTemplate === t
-                                  ? "bg-amber-500/10 border-amber-500/40 text-amber-400 shadow-md"
-                                  : "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-300"
-                              }`}
-                            >
-                              {t}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      ) : null}
                       <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
                         Records the selected batch type; imported source messages are preserved.
                       </p>
