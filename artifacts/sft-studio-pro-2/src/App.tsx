@@ -518,8 +518,10 @@ export default function App() {
   const [docTemplate, setDocTemplate] = useState<TemplateType>(TemplateType.SINGLE_TURN);
   const [docCount, setDocCount] = useState<number>(8); // AI estimated example count
   const [literatureTheme, setLiteratureTheme] = useState<string>("");
-  const [extractionModel, setExtractionModel] = useState("glm-5.3");
+  const [extractionModel, setExtractionModel] = useState("llama-4-maverick");
   const [isConverting, setIsConverting] = useState(false);
+  const [documentSource, setDocumentSource] = useState<{ data: string; mimeType: string } | null>(null);
+  const [docProgress, setDocProgress] = useState<{ phase: string; completed: number; total: number } | null>(null);
   const [isAnalyzingDoc, setIsAnalyzingDoc] = useState(false);
   const [docSuggestionExplanation, setDocSuggestionExplanation] = useState("");
   const [userTag, setUserTag] = useState<string>("");
@@ -1994,6 +1996,8 @@ export default function App() {
   const handleClearDocument = () => {
     setDocName("");
     setDocContent("");
+    setDocumentSource(null);
+    setDocProgress(null);
     setLiteratureTheme("");
     setDocSuggestionExplanation("");
     setDocCount(8);
@@ -2320,6 +2324,8 @@ export default function App() {
 
   // Process uploaded document file (PDF, DOCX, Image, Text)
   const processUploadedDoc = async (file: File) => {
+    setDocumentSource(null);
+    setDocProgress(null);
     const fileNameLower = file.name.toLowerCase();
     const isDocx = file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileNameLower.endsWith(".docx");
     const isPdf = file.type === "application/pdf" || fileNameLower.endsWith(".pdf");
@@ -2341,6 +2347,9 @@ export default function App() {
       const reader = new FileReader();
       reader.onload = async (event) => {
         const base64 = event.target?.result as string;
+        setDocumentSource({ data: base64, mimeType: "application/pdf" });
+        setDocContent("");
+        setDocName(file.name);
         try {
           const res = await fetch("/api/parse-pdf", {
             method: "POST",
@@ -2406,30 +2415,25 @@ export default function App() {
       };
       reader.readAsDataURL(file);
     } else if (isImage) {
-      setNotification({ text: `Running OCR text extraction on image "${truncateFileName(file.name, 30)}"...`, type: "info" });
+      setNotification({ text: "Loading original document image for Maverick...", type: "info" });
       setIsConverting(true);
       
       const reader = new FileReader();
       reader.onload = async (event) => {
         const base64 = event.target?.result as string;
         try {
-          const res = await fetch("/api/ocr", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              imageBase64: base64,
-              mimeType: resolvedMime || "image/png"
-            })
+          setDocumentSource({ data: base64, mimeType: resolvedMime || "image/png" });
+          setDocContent("");
+          setDocName(file.name);
+          const response = await fetch("/api/ocr", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageBase64: base64, mimeType: resolvedMime || "image/png" })
           });
-          const data = await res.json();
-          if (data.success) {
-            setDocContent(data.text);
-            setDocName(file.name);
-            setNotification({ text: `OCR text extraction complete for "${truncateFileName(file.name, 28)}"!`, type: "success" });
-            handleSuggestDocCount(data.text, file.name);
-          } else {
-            throw new Error(data.error || "OCR failed");
-          }
+          const data = await response.json();
+          if (!response.ok || !data.success) throw new Error(data.error || "OCR failed");
+          setDocContent(data.text);
+          setNotification({ text: "Text extracted. Original image retained for Maverick conversion.", type: "success" });
+          handleSuggestDocCount(data.text, file.name);
         } catch (err: any) {
           const errMsg = err.message === "Load failed" || err.message === "Failed to fetch"
             ? "Network interrupted during file transfer."
@@ -2657,7 +2661,7 @@ export default function App() {
       setNotification({ text: "Project definition must be saved and locked before converting documents.", type: "error" });
       return;
     }
-    if (!docContent.trim()) {
+    if (!docContent.trim() && !documentSource) {
       setNotification({ text: "Please provide document content or upload a text-based file first.", type: "error" });
       return;
     }
@@ -2665,6 +2669,7 @@ export default function App() {
 
     setIsConverting(true);
     setNotification({ text: "Processing document and converting to structured SFT examples...", type: "info" });
+    setDocProgress({ phase: "reading", completed: 0, total: docCount });
 
     try {
       const effectiveTemplate = docTemplate;
@@ -2677,6 +2682,7 @@ export default function App() {
           documentName: docName || "Inline Document",
           async: true,
           documentContent: docContent,
+          documentSource: docType === "transcript" ? undefined : documentSource,
           templateType: effectiveTemplate,
           instructTemplate: project.projectFormat === ProjectFormat.INSTRUCTION ? (project.instructTemplate || InstructTemplate.CHATML) : undefined,
           isInstruction: project.projectFormat === ProjectFormat.INSTRUCTION,
@@ -2713,6 +2719,7 @@ export default function App() {
           const statusResponse = await projectApiFetch(`/api/convert-document/jobs/${encodeURIComponent(jobId)}`);
           const status = await statusResponse.json();
           if (!statusResponse.ok) throw new Error(status.error || "Unable to retrieve conversion results.");
+          setDocProgress({ phase: status.phase || "generating", completed: status.completed, total: status.total });
           if (status.status === "running") continue;
           if (!status.result) throw new Error("Conversion returned no result.");
           data = status.result;
@@ -2721,6 +2728,7 @@ export default function App() {
       }
 
       if (data.success && Array.isArray(data.examples) && data.examples.length > 0) {
+        setDocProgress({ phase: "saving", completed: data.examples.length, total: data.requestedCount || docCount });
         const truncatedDocName = truncateFileName(docName, 32);
         const generatedBatchId = data.batchId || data.id || `batch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         const newBatch: SFTBatch = {
@@ -2762,6 +2770,7 @@ export default function App() {
       setNotification({ text: `Conversion failed: ${err.message}`, type: "error" });
     } finally {
       setIsConverting(false);
+      setDocProgress(null);
     }
   };
 
@@ -5541,7 +5550,7 @@ export default function App() {
                         </div>
                         <textarea
                           value={docContent}
-                          onChange={(e) => setDocContent(e.target.value)}
+                          onChange={(e) => { setDocContent(e.target.value); setDocumentSource(null); }}
                           rows={6}
                           placeholder="# SFT Technical Spec... Paste knowledge content or transcripts here to digest."
                           className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono focus:border-blue-500/45 outline-none transition custom-scrollbar"
@@ -5870,9 +5879,21 @@ export default function App() {
                     </div>
                   </div>
 
+                  {docProgress && (
+                    <div className="mt-5 space-y-2" role="status" aria-live="polite">
+                      <div className="flex justify-between text-xs text-slate-300">
+                        <span>{docProgress.phase === "reading" ? "Reading document…" : docProgress.phase === "saving" ? "Saving examples…" : "Generating sequential groups…"}</span>
+                        <span>{docProgress.completed} / {docProgress.total} examples</span>
+                      </div>
+                      <progress className="w-full h-2 accent-blue-500" max={Math.max(1, docProgress.total)}
+                        value={docProgress.phase === "reading" ? undefined : docProgress.completed}
+                        aria-label="Document conversion progress" />
+                      <p className="text-[11px] text-slate-400">Maverick → DeepSeek-4-flash → GLM-5.3 on failure. Allow up to 10 minutes per request.</p>
+                    </div>
+                  )}
                   <div className="border-t border-slate-800/60 pt-5 mt-6 flex justify-end">
                     <button
-                      disabled={isConverting || !docContent.trim() || isFieldsUnlocked || !selectedProjectId}
+                      disabled={isConverting || (!docContent.trim() && !documentSource) || isFieldsUnlocked || !selectedProjectId}
                       onClick={handleConvertDocument}
                       className={`px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
                         isFieldsUnlocked || !selectedProjectId

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import { transform } from "esbuild";
+import { PDFDocument } from "pdf-lib";
+import { PDFParse } from "pdf-parse";
 import { parseGeneratedExamples, sanitizeExample } from "../src/lib/generation-response.ts";
 
 const source = await readFile(new URL("../legacy-server.ts", import.meta.url), "utf8");
@@ -16,6 +18,7 @@ function fixture(output: "valid" | "invalid" | "error" | "partial" | "persistent
   let active = 0;
   let peak = 0;
   vm.runInNewContext(compiled.code, {
+    PDFParse, Buffer,
     app: { post: (path: string, ...handlers: Function[]) => routes.set(path, handlers.at(-1)!),
       get: (path: string, ...handlers: Function[]) => routes.set(path, handlers.at(-1)!) },
     optionalAuth: () => {},
@@ -35,8 +38,9 @@ function fixture(output: "valid" | "invalid" | "error" | "partial" | "persistent
       await Promise.resolve();
       active--;
       if (output === "error") throw new Error("fixture provider failure");
-      if (output === "partial" && callIndex === 2) throw new Error("fixture truncated response");
-      if (output === "persistentPartial" && params.contents.includes("Coverage assignment: examples 2-2 ")) {
+      if (Array.isArray(params.contents)) return { text: '{"coverage":["Backup procedures","Verification requirements"]}' };
+      if (output === "partial" && callIndex === 3) throw new Error("fixture truncated response");
+      if (output === "persistentPartial" && params.contents.includes("Coverage assignment: examples 3-4 ")) {
         throw new Error("fixture persistent failure");
       }
       if (output === "invalid") return { text: '{"examples":[{"messages":[]}]}' };
@@ -104,7 +108,7 @@ test("knowledge and literature synthesize new examples from ordinary prose", asy
     assert.equal(result.code, 200);
     assert.equal(result.body.examples.length, 2);
     assert.equal(f.calls.length, 2);
-    const prompt = f.calls[0].contents;
+    const prompt = f.calls[1].contents;
     assert.ok(prompt.includes(directive));
     assert.match(prompt, /create NEW training examples from its meaning/);
     assert.match(prompt, /Keep a backup and verify it/);
@@ -151,11 +155,47 @@ test("large requested counts use bounded small groups with custom instructions r
   const f = fixture();
   const result = await f.run({ docType: "knowledge_base", count: 50, converterInstructions: "Focus on backup procedures." });
   assert.equal(result.body.examples.length, 50);
-  assert.equal(f.calls.length, 50);
-  assert.equal(f.peak(), 10);
-  assert.ok(f.calls.every(call => /Synthesize exactly 1 examples/.test(call.contents)
+  assert.equal(f.calls.length, 26);
+  assert.equal(f.peak(), 1);
+  assert.ok(f.calls.every(call => call.model === "llama-4-maverick" && call.timeoutMs === 600_000));
+  assert.ok(f.calls.slice(1).every(call => /Synthesize exactly 2 examples/.test(call.contents)
     && /Focus on backup procedures/.test(call.contents)));
-  assert.match(f.calls.at(-1).contents, /examples 50-50 of 50/);
+  assert.match(f.calls.at(-1).contents, /examples 49-50 of 50/);
+  assert.equal(f.calls.filter(call => Array.isArray(call.contents)).length, 1);
+  assert.match(f.calls[2].contents, /What is the source's point/);
+});
+
+test("Maverick reads original images once before sequential synthesis", async () => {
+  const f = fixture();
+  const { response, done } = await f.start({
+    documentContent: "", count: 5,
+    documentSource: { data: "data:image/png;base64,aW1hZ2U=", mimeType: "image/png" }
+  });
+  assert.equal(response.code, 202);
+  assert.equal(f.poll().body.phase, "reading");
+  await done;
+  assert.equal(f.poll().body.completed, 5);
+  assert.equal(f.calls.length, 4);
+  assert.equal(f.calls.at(-1).model, "deepseek-4-flash");
+  assert.equal(f.calls.at(-1).config.systemInstruction, f.calls[2].config.systemInstruction);
+  assert.equal(f.calls[0].contents[0].inlineData.data, "aW1hZ2U=");
+  assert.equal(f.calls[0].contents[0].inlineData.mimeType, "image/png");
+  assert.equal(f.calls[0].config.systemInstruction, f.calls[1].config.systemInstruction);
+  assert.ok(f.calls.slice(1).every(call => call.contents.includes("[DOCUMENT COVERAGE INDEX]")));
+});
+
+test("PDF originals send every rendered page to the single Maverick reading", async () => {
+  const pdf = await PDFDocument.create();
+  pdf.addPage([200, 200]).drawText("First page");
+  pdf.addPage([200, 200]).drawText("Second page");
+  const f = fixture();
+  const result = await f.run({
+    documentSource: { data: Buffer.from(await pdf.save()).toString("base64"), mimeType: "application/pdf" }
+  });
+  assert.equal(result.code, 200);
+  const pages = f.calls[0].contents.filter((part: any) => part.inlineData);
+  assert.equal(pages.length, 2);
+  assert.ok(pages.every((part: any) => part.inlineData.data.startsWith("data:image/png;base64,")));
 });
 
 test("failed converter requests are retried individually without repeating successful requests", async () => {
@@ -164,19 +204,20 @@ test("failed converter requests are retried individually without repeating succe
   assert.equal(result.code, 200);
   assert.equal(result.body.examples.length, 4);
   assert.equal(result.body.partial, false);
-  assert.equal(f.calls.length, 5);
-  assert.equal(f.calls.filter(call => call.contents.includes("Coverage assignment: examples 2-2 ")).length, 2);
-  assert.ok(f.peak() <= 10);
+  assert.equal(f.calls.length, 4);
+  assert.equal(f.calls.filter(call => typeof call.contents === "string" && call.contents.includes("Coverage assignment: examples 3-4 ")).length, 2);
+  assert.equal(f.peak(), 1);
 });
 
 test("persistent failures stop after three attempts and preserve completed examples", async () => {
   const f = fixture("persistentPartial");
   const result = await f.run({ count: 4 });
   assert.equal(result.code, 200);
-  assert.equal(result.body.examples.length, 3);
+  assert.equal(result.body.examples.length, 2);
   assert.equal(result.body.partial, true);
   assert.equal(result.body.requestedCount, 4);
-  assert.equal(f.calls.length, 6);
+  assert.equal(f.calls.length, 5);
+  assert.deepEqual(f.calls.slice(-3).map(call => call.model), ["llama-4-maverick", "deepseek-4-flash", "glm-5.3"]);
 });
 
 test("unfinished conversations are not returned as completed examples", async () => {
@@ -206,8 +247,8 @@ test("background errors and partial results are retrievable", async () => {
     const status = f.poll().body;
     assert.equal(status.status, output === "error" ? "error" : "complete");
     assert.equal(status.result.success, output !== "error");
-    if (output === "persistentPartial") assert.equal(status.result.examples.length, 3);
-    assert.equal(status.completed, output === "error" ? 0 : 3);
+    if (output === "persistentPartial") assert.equal(status.result.examples.length, 2);
+    assert.equal(status.completed, output === "error" ? 0 : 2);
   }
 });
 
@@ -215,7 +256,7 @@ test("converter UI excludes Reasoning and retains partial results for review", a
   const app = await readFile(new URL("../../sft-studio-pro-2/src/App.tsx", import.meta.url), "utf8");
   const options = app.slice(app.indexOf("Dataset Turn Mode & Layout:"), app.indexOf("AI Document Analysis & Example Count Estimation Readout"));
   assert.doesNotMatch(options, /TemplateType\.REASONING/);
-  for (const mode of ["SINGLE_TURN", "MULTI_TURN", "MIXED"]) assert.ok(options.includes(`TemplateType.${mode}`));
+  for (const mode of ["SINGLE_TURN", "MULTI_TURN"]) assert.ok(options.includes(`TemplateType.${mode}`));
   assert.ok(app.includes("setLatestConvertedDocBatchId(newBatch.id)"));
   assert.ok(app.includes("partial: Boolean(data.partial)"));
   assert.ok(app.includes("latestDocBatch.partial"));
@@ -229,10 +270,10 @@ test("long documents analyze every section, including sections formerly skipped"
   });
   assert.equal(result.code, 200);
   for (let index = 0; index < 6; index++) {
-    assert.ok(f.calls.some(call => call.contents.includes(`SECTION_${index} `)));
+    assert.ok(f.calls.some(call => typeof call.contents === "string" && call.contents.includes(`SECTION_${index} `)));
   }
   assert.equal(result.body.examples.length, 8);
-  assert.ok(f.peak() <= 10);
+  assert.equal(f.peak(), 1);
 });
 
 test("invalid input and provider output fail explicitly without transcript extraction fallback", async () => {
