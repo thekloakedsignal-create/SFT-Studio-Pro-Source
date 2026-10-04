@@ -14,3 +14,9 @@ The document converter offers Single Turn, Multi Turn, and Mixed only—not Reas
 **Why:** The user explicitly asked to remove the Reasoning option from the converter while keeping the repair confined to document conversion.
 
 **How to apply:** Leave Reasoning generation elsewhere unchanged; do not reintroduce converter reasoning controls based on the project's selected template.
+
+Keep document analysis brief on the UI.
+
+**Why:** The user explicitly requested brief visible analysis when discussing reuse of the pre-generation document analysis.
+
+**How to apply:** Keep any detailed coverage plan internal; do not expand the displayed analysis into that plan.
