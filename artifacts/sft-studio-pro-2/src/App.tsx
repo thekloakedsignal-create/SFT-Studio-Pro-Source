@@ -4930,7 +4930,7 @@ export default function App() {
                 </div>
 
                 {/* Batch Generator Settings Card */}
-                <div className="bg-slate-950/40 border border-slate-800/80 p-6 rounded-2xl relative overflow-hidden">
+                <div className="kk-synthetic-generator-card bg-slate-950/40 border border-slate-800/80 p-6 rounded-2xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 h-32 w-32 bg-green-500/5 rounded-full blur-3xl pointer-events-none" />
                   
                   <div className="border-b border-slate-800 pb-4 mb-6">

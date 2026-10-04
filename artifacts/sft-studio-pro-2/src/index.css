@@ -305,6 +305,7 @@ main [class~="opacity-45"] { opacity: .72; }
 .kk-workspace-panel button[class~="bg-slate-900"] { background-color: #392846 !important; color: #f7f2fa !important; }
 .kk-workspace-panel [class~="bg-slate-800"] { background-color: #493854 !important; }
 .kk-workspace-panel [class~="bg-slate-700"] { background-color: #60496f !important; }
+.kk-workspace-panel .kk-synthetic-generator-card { background-color: #faf9fb !important; }
 .kk-workspace-panel button:is([class~="bg-slate-800"], [class~="bg-slate-700"]) {
   color: #f7f2fa !important;
 }
