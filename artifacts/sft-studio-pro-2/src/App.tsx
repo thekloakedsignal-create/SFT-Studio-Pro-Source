@@ -4471,7 +4471,7 @@ export default function App() {
                 initial={{ opacity: 0, x: 10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
-                className="space-y-6"
+                className="space-y-6 kk-qa-panel"
               >
                 {/* Preset Selection & Project Definition Card */}
                 <div className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl">
@@ -6654,27 +6654,19 @@ export default function App() {
                           const hasMedium = exampleIssues.some(iss => iss.severity === "Medium" || iss.severity === "Moderate");
 
                           let borderClass = "border-slate-800/60";
-                          let bgClass = "bg-slate-900/40";
-                          let ringClass = "";
 
                           if (hasHigh) {
                             borderClass = "border-red-500/50";
-                            bgClass = "bg-red-500/5";
-                            ringClass = "ring-1 ring-red-500/20 shadow-[inset_0_0_12px_rgba(239,68,68,0.06)]";
                           } else if (hasMedium) {
                             borderClass = "border-yellow-500/50";
-                            bgClass = "bg-yellow-500/5";
-                            ringClass = "ring-1 ring-yellow-500/20 shadow-[inset_0_0_12px_rgba(234,179,8,0.06)]";
                           } else if (isFlagged) {
                             borderClass = "border-amber-500/50";
-                            bgClass = "bg-amber-500/5";
-                            ringClass = "ring-1 ring-amber-500/20";
                           }
 
                           return (
                             <div
                               key={`batch-${currentBatch.id}-ex-${originalIndex}`}
-                              className={`rounded-xl p-4 relative overflow-hidden group border transition-all duration-300 kk-example-card ${borderClass} ${bgClass} ${ringClass}`}
+                              className={`rounded-xl p-4 relative overflow-hidden group border transition-all duration-300 kk-example-card ${borderClass}`}
                             >
                               {/* Header with Example # and actions */}
                               <div className="flex items-center justify-between mb-3 border-b border-slate-800/60 pb-2">

@@ -426,6 +426,22 @@ main [class~="opacity-45"] { opacity: .72; }
   font-weight: 900 !important;
 }
 
+.kk-workspace-panel .kk-qa-panel button {
+  background: #392846 !important;
+  border-color: #765687 !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+}
+
+.kk-workspace-panel .kk-qa-panel button:hover:not(:disabled) {
+  background: #573a68 !important;
+}
+
+.kk-workspace-panel .kk-qa-panel button:disabled {
+  background: #57495d !important;
+  color: #f3edf7 !important;
+}
+
 #root > div:has(> .kk-header) > main :is(
   textarea,
   input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"])
