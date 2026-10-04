@@ -515,6 +515,7 @@ export default function App() {
   const [docType, setDocType] = useState<"transcript" | "knowledge_base" | "literature">("knowledge_base");
   const [hasUserManuallySetDocType, setHasUserManuallySetDocType] = useState(false);
   const [docTemplate, setDocTemplate] = useState<TemplateType>(TemplateType.SINGLE_TURN);
+  const [transcriptLayout, setTranscriptLayout] = useState<"single_turn" | "multi_turn">("single_turn");
   const [docCount, setDocCount] = useState<number>(8); // AI estimated example count
   const [literatureTheme, setLiteratureTheme] = useState<string>("");
   const [extractionModel, setExtractionModel] = useState("glm-5.3");
@@ -535,7 +536,7 @@ export default function App() {
 
   // Tab 2: TRiAD Alignment Import State
   const [triadSize, setTriadSize] = useState<number>(150);
-  const triadTemplate = TemplateType.SINGLE_TURN;
+  const [triadTemplate, setTriadTemplate] = useState<TemplateType>(TemplateType.SINGLE_TURN);
   const [isTriadImporting, setIsTriadImporting] = useState(false);
   const [triadUrls, setTriadUrls] = useState<Record<number, string>>({
     150: "https://drive.google.com/file/d/1YPplVDO45R-endyIEbc3vEgh92KBCYNz/view?usp=drivesdk",
@@ -2684,7 +2685,7 @@ export default function App() {
           constraints: project.constraints,
           docType,
           isTranscript: docType === "transcript",
-          transcriptLayout: "single_turn",
+          transcriptLayout,
           userTag: userTag.trim(),
           assistantTag: assistantTag.trim(),
           fixedUserPrompt,
@@ -5633,7 +5634,6 @@ export default function App() {
                           {[
                             { type: TemplateType.SINGLE_TURN, label: "Single Turn", sub: "Q&A Pair" },
                             { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Dialogue" },
-                            { type: TemplateType.MIXED, label: "Mixed", sub: "Dynamic Mix" },
                           ].map(({ type, label, sub }) => {
                             const isSelected = docTemplate === type;
                             return (
@@ -5761,6 +5761,37 @@ export default function App() {
                             </div>
                           </div>
 
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                              Transcript Dialogue Layout:
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setTranscriptLayout("single_turn")}
+                                className={`p-2 rounded-lg border text-left text-xs transition cursor-pointer ${
+                                  transcriptLayout === "single_turn"
+                                    ? "bg-blue-600/20 border-blue-500 text-blue-200 font-semibold"
+                                    : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                                }`}
+                              >
+                                <div>Single-Turn Pairs (Q&A)</div>
+                                <div className="text-[10px] text-slate-500 mt-0.5">Extract each question & answer as a distinct example</div>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setTranscriptLayout("multi_turn")}
+                                className={`p-2 rounded-lg border text-left text-xs transition cursor-pointer ${
+                                  transcriptLayout === "multi_turn"
+                                    ? "bg-blue-600/20 border-blue-500 text-blue-200 font-semibold"
+                                    : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                                }`}
+                              >
+                                <div>Multi-Turn Dialogue</div>
+                                <div className="text-[10px] text-slate-500 mt-0.5">Group consecutive turns into episodic conversations</div>
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       )}
 
