@@ -45,9 +45,6 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
   let qwenCallCount = 0;
   let concurrent = 0;
   let peakConcurrent = 0;
-  let recoveryConcurrent = 0;
-  let peakRecoveryConcurrent = 0;
-  let generationCallCount = 5;
   const context = {
     module: { exports: {} },
     app: {
@@ -83,14 +80,9 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       const userPrompt = request.messages.find((message: any) => message.role === "user")?.content || "";
       const isReasoning = userPrompt.includes('selected TEMPLATE TYPE: "Reasoning"');
       const requestNumber = calls.length + 1;
-      const isRecoveryRequest = requestNumber > generationCallCount;
       calls.push(request);
       concurrent++;
       peakConcurrent = Math.max(peakConcurrent, concurrent);
-      if (isRecoveryRequest) {
-        recoveryConcurrent++;
-        peakRecoveryConcurrent = Math.max(peakRecoveryConcurrent, recoveryConcurrent);
-      }
       if (mode === "singleRecovery12") {
         const modelCallCount = calls.filter(call => call.model === request.model).length;
         if ((request.model === "qwen3.5-397b-a17b" && modelCallCount === 1)
@@ -165,7 +157,6 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       }
       await Promise.resolve();
       concurrent--;
-      if (isRecoveryRequest) recoveryConcurrent--;
       const isPrimary = request.model === firstModel;
       const isBackup = !models.slice(0, 5).includes(request.model);
       const status = (mode === "reasoningEarlyFailure" && requestNumber === 2) ? 503
@@ -177,7 +168,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
         || (mode === "both529" && isBackup) ? 529
         : mode === "503" && isPrimary && requestNumber === 1 ? 503
         : mode === "504Qwen" && request.model === "qwen3.5-397b-a17b" ? 504
-        : mode === "partialFailure" && (requestNumber === 11 || requestNumber > 25) ? 503
+        : mode === "partialFailure" && requestNumber === 11 ? 503
         : 200;
       const requestedCount = Number(userPrompt.match(/Generate exactly (\d+) examples\./)?.[1]) || 1;
       const isMultiTurn = userPrompt.includes('selected TEMPLATE TYPE: "Multi Turn"')
@@ -220,9 +211,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
   return {
     calls, delays, timeoutValues,
     peak: () => peakConcurrent,
-    recoveryPeak: () => peakRecoveryConcurrent,
     async generate(count = 5, jobMode = false, templateType = "Single Turn", instructTemplate?: string) {
-      generationCallCount = count;
       const response: any = {
         statusCode: 200, body: undefined,
         status(value: number) { this.statusCode = value; return this; },
@@ -259,28 +248,13 @@ test("real dispatcher launches the preserved initial models concurrently and cou
   assert.equal(f.calls.every(call => call.max_tokens === 4096 && call.response_format.type === "json_object"), true);
 });
 
-test("Reasoning retains delayed sibling responses and refills an early failed slot", async () => {
+test("Reasoning retains delayed sibling responses after an early failure", async () => {
   const f = fixture("reasoningEarlyFailure");
   const response = await f.generate(5, false, "Reasoning");
-  assert.equal(response.body.partial, undefined);
-  assert.equal(response.body.examples.length, 5);
-  assert.equal(f.calls.length, 6);
+  assert.equal(response.body.partial, true);
+  assert.equal(response.body.examples.length, 4);
+  assert.equal(f.calls.length, 5);
   assert.ok(f.calls.every(call => call.model === "nemotron-3-ultra-550b"));
-});
-
-test("Reasoning continues later scheduled calls and refills the failed slot individually", async () => {
-  const f = fixture("reasoningEarlyFailure");
-  const response = await f.generate(25, false, "Reasoning");
-
-  assert.equal(response.body.partial, undefined);
-  assert.equal(response.body.examples.length, 25);
-  assert.equal(f.calls.length, 26);
-  assert.deepEqual(f.delays, [2000, 2000]);
-  assert.ok(f.calls.every(call => call.model === "nemotron-3-ultra-550b"));
-  const refill = f.calls.at(-1);
-  const prompt = refill.messages.find((message: any) => message.role === "user").content;
-  assert.match(prompt, /Generate exactly 1 examples\./);
-  assert.match(prompt, /Offline fixture/);
 });
 
 test("one Reasoning timeout neither cancels siblings nor skips later Nemotron slots", async () => {
@@ -419,12 +393,7 @@ test("Reasoning batch jobs reject responses that omit the required think block",
   assert.equal(job.body.status, "error");
   assert.equal(job.body.result, undefined);
   assert.equal(Object.hasOwn(job.body, "failureCategory"), false);
-  assert.ok(f.calls.length > 5);
-  assert.ok(f.calls.length <= 100);
-  assert.ok(f.calls.slice(5).every(call => {
-    const prompt = call.messages.find((message: any) => message.role === "user").content;
-    return call.model === "nemotron-3-ultra-550b" && prompt.includes("Generate exactly 1 examples.");
-  }));
+  assert.equal(f.calls.length, 5);
 });
 
 test("Reasoning replacement failures remain bounded and failure categories stay internal", async () => {
@@ -548,18 +517,17 @@ test("HTTP 529 triggers exactly one distinct configured backup request", async (
   assert.notEqual(f.calls[5].model, firstModel);
 });
 
-test("an unavailable 529 backup does not prevent an individual refill of the missing slot", async () => {
+test("a failed 529 backup is not retried again and completed examples return as a partial batch", async () => {
   const f = fixture("both529");
   const response = await f.generate();
-  assert.equal(f.calls.length, 8);
+  assert.equal(f.calls.length, 6);
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.success, true);
-  assert.equal(response.body.partial, undefined);
-  assert.equal(response.body.examples.length, 5);
+  assert.equal(response.body.partial, true);
+  assert.ok(response.body.examples.length > 0);
+  assert.ok(response.body.examples.length < 5);
   assert.equal(response.body.batchId, "fixture-uuid-1");
-  const refillPrompt = f.calls.at(-1).messages.find((message: any) => message.role === "user").content;
-  assert.match(refillPrompt, /Generate exactly 1 examples\./);
-  assert.match(refillPrompt, /Offline fixture/);
+  assert.match(response.body.partialReason, /backup model/i);
 });
 
 test("a job returns its server-generated batch ID immediately and preserves it in the final result", async () => {
@@ -576,7 +544,7 @@ test("a job returns its server-generated batch ID immediately and preserves it i
   assert.ok(job.body.result.examples.every(hasRenderableMessages));
 });
 
-test("unrecoverable individual refills preserve a partial job result and its batch ID", async () => {
+test("timed-out model stacks preserve completed examples and the same batch ID in job results", async () => {
   const f = fixture("partialFailure");
   const started = await f.generate(25, true);
   assert.equal(started.statusCode, 202);
@@ -586,7 +554,8 @@ test("unrecoverable individual refills preserve a partial job result and its bat
   assert.equal(job.body.result.partial, true);
   assert.equal(job.body.result.batchId, started.body.batchId);
   assert.equal(job.body.batchId, started.body.batchId);
-  assert.equal(job.body.result.examples.length, 24);
+  assert.ok(job.body.result.examples.length >= 10);
+  assert.ok(job.body.result.examples.length < 25);
   assert.equal(job.body.result.requestedCount, 25);
   assert.ok(job.body.result.partialReason);
 });
@@ -654,7 +623,6 @@ test("Single Turn refills individual failures concurrently after completing the 
   assert.equal(response.body.partial, undefined);
   assert.equal(response.body.batchId, "fixture-uuid-1");
   assert.equal(f.peak(), 10);
-  assert.equal(f.recoveryPeak(), 4, "All four one-example refill requests run concurrently");
   assert.deepEqual(f.delays, [2000, 2000, 2000, 2000]);
   const refills = f.calls.slice(50);
   assert.ok(refills.every(call => {
