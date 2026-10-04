@@ -1,4 +1,5 @@
 import express from "express";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { createServer as createViteServer } from "vite";
 
@@ -7,7 +8,19 @@ const port = Number(process.env.PORT || 3000);
 
 async function startServer() {
   if (process.env.NODE_ENV === "production") {
-    const distPath = path.join(process.cwd(), "dist");
+    const distPathCandidates = [
+      path.join(process.cwd(), "artifacts", "sft-studio-pro-2", "dist"),
+      path.join(process.cwd(), "dist"),
+    ];
+    const distPath = distPathCandidates.find((candidate) =>
+      existsSync(path.join(candidate, "index.html")),
+    );
+    if (!distPath) {
+      throw new Error(
+        `Production build index.html not found. Checked: ${distPathCandidates.join(", ")}`,
+      );
+    }
+
     app.use(express.static(distPath));
     app.use((req, res, next) => {
       if (req.method === "GET" && req.accepts("html")) {
