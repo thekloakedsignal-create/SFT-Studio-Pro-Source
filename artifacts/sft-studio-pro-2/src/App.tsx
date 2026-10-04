@@ -4471,7 +4471,7 @@ export default function App() {
                 initial={{ opacity: 0, x: 10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
-                className="space-y-6 kk-qa-panel"
+                className="space-y-6"
               >
                 {/* Preset Selection & Project Definition Card */}
                 <div className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl">
@@ -6335,7 +6335,7 @@ export default function App() {
                 initial={{ opacity: 0, x: 10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
-                className="space-y-6"
+                className="space-y-6 kk-qa-panel"
               >
                 {/* Batch Selector & AI grading Header */}
                 <div className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl">
