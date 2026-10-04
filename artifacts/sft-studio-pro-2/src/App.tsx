@@ -526,7 +526,7 @@ export default function App() {
   const [assistantTag, setAssistantTag] = useState<string>("");
   const [fixedUserPrompt, setFixedUserPrompt] = useState<string>("Please analyze and explain the following document chunk.");
   const [latestConvertedDocBatchId, setLatestConvertedDocBatchId] = useState<string | null>(null);
-  const [dismissedDocBatchId, setDismissedDocBatchId] = useState<string | null>(null);
+  const [isDocPreviewCleared, setIsDocPreviewCleared] = useState(false);
   const [converterInstructions, setConverterInstructions] = useState<string>("");
 
   // Memoized document word count for fast rendering without regex re-runs
@@ -1971,6 +1971,7 @@ export default function App() {
 
   // Find the latest batch from Document Conversion for inline review
   const latestDocBatch = useMemo(() => {
+    if (isDocPreviewCleared) return undefined;
     let latest: SFTBatch | undefined;
     if (latestConvertedDocBatchId) {
       latest = batches.find(b => b.id === latestConvertedDocBatchId);
@@ -1982,8 +1983,8 @@ export default function App() {
       b.name?.toLowerCase().includes("doc") || 
       b.name?.toLowerCase().includes("transcript")
     );
-    return latest?.id === dismissedDocBatchId ? undefined : latest;
-  }, [batches, latestConvertedDocBatchId, dismissedDocBatchId]);
+    return latest;
+  }, [batches, latestConvertedDocBatchId, isDocPreviewCleared]);
 
   // Find the latest batch from TRiAD Alignment for inline review
   const latestTriadBatch = useMemo(() => {
@@ -1991,17 +1992,25 @@ export default function App() {
   }, [batches]);
 
   // Handler to clear uploaded document and input states
-  const handleClearDocument = () => {
+  const handleClearDocument = async () => {
+    const rejectedDocBatchId = latestDocBatch?.status === "Rejected" ? latestDocBatch.id : null;
     setDocName("");
     setDocContent("");
     setLiteratureTheme("");
     setDocSuggestionExplanation("");
     setDocCount(8);
     setConverterInstructions("");
-    if (latestDocBatch) setDismissedDocBatchId(latestDocBatch.id);
+    setLatestConvertedDocBatchId(null);
+    setIsDocPreviewCleared(true);
     const fileInput = document.getElementById("doc-file-input") as HTMLInputElement;
     if (fileInput) fileInput.value = "";
-    setNotification({ text: "Document and displayed examples cleared.", type: "info" });
+    if (rejectedDocBatchId) await handleDeleteBatch(rejectedDocBatchId);
+    setNotification({
+      text: rejectedDocBatchId
+        ? "Document and examples cleared. The rejected conversion batch was deleted."
+        : "Document and displayed examples cleared.",
+      type: "info"
+    });
   };
 
   // Total examples counts
@@ -2741,7 +2750,7 @@ export default function App() {
         setBatches(prev => [newBatch, ...prev]);
         setSelectedBatchId(newBatch.id);
         setLatestConvertedDocBatchId(newBatch.id);
-        setDismissedDocBatchId(null);
+        setIsDocPreviewCleared(false);
         if (conversionProjectId) {
           const saved = await saveBatch(conversionProjectId, newBatch);
           if (!saved) {
