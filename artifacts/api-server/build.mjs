@@ -3,10 +3,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm } from "node:fs/promises";
+import { copyFile, rm } from "node:fs/promises";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
-globalThis.require = createRequire(import.meta.url);
+const require = createRequire(import.meta.url);
+globalThis.require = require;
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -118,6 +119,11 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
+
+  // pdf-parse loads its PDF.js worker relative to the built server entrypoint.
+  const pdfParseEntry = require.resolve("pdf-parse");
+  const pdfWorkerPath = path.resolve(path.dirname(pdfParseEntry), "../../worker/pdf.worker.mjs");
+  await copyFile(pdfWorkerPath, path.join(distDir, "pdf.worker.mjs"));
 }
 
 buildAll().catch((err) => {
