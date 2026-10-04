@@ -3027,6 +3027,9 @@ app.post("/api/convert-document", async (req, res) => {
 
   // Standardize templateType format
   const tTypeLower = (templateType || "Single Turn").toLowerCase();
+  if (tTypeLower.includes("reasoning") || tTypeLower.includes("cot")) {
+    return res.status(400).json({ success: false, error: "Reasoning is not available in the document converter." });
+  }
   const isInstructionTemplate = Boolean(
     req.body.isInstruction || 
     templateType === "Instruction Template" || 
@@ -3089,12 +3092,11 @@ app.post("/api/convert-document", async (req, res) => {
     const sectionsToProcess = documentSections;
 
     const perSectionCount = Math.max(1, Math.ceil(requestedCount / sectionsToProcess.length));
-    // The shared provider adapter caps output at 4096 tokens. Small synthesis
-    // groups avoid asking it to fit a whole document's dataset in one response.
+    // Give each complete conversation its own 4096-token output budget.
     const sectionJobs = sectionsToProcess.flatMap((text, sectionIndex) =>
-      Array.from({ length: Math.ceil(perSectionCount / 2) }, (_, group) => ({
-        text, sectionIndex, offset: group * 2,
-        count: Math.min(2, perSectionCount - group * 2)
+      Array.from({ length: perSectionCount }, (_, offset) => ({
+        text, sectionIndex, offset,
+        count: 1
       })));
 
     // Process sections in controlled batches (concurrency: 2) to respect inference burst limits.
@@ -3235,7 +3237,7 @@ QUALITY & SANITIZATION MANDATES:
 3. NO NOISE OR METADATA: Zero page numbers, chapter headers, timestamps, attendee lists, dial-in info, meeting IDs, or scan artifacts in prompts or answers.
 4. FORMAT OBSERVED:
    - If format is "reasoning", include a "reasoning" field or format assistant content with <think>\n{reasoning}\n</think>\n{final_answer}. DO NOT include a system message. CRITICAL: Reasoning within the template should always demonstrate a chain of thought the trainee will use to get to the response. No meta reasoning from the generator should be included.
-   - If format is "multi_turn", construct 2-4 alternating user/assistant turns probing the subject.
+   - If format is "multi_turn", construct 2-4 complete user/assistant pairs probing the subject. Always end with the assistant's complete answer.
    - If format is "mixed", alternate between single-turn and multi-turn examples only. Never include reasoning examples, thinking traces, or reasoning fields.
    ${isInstructionTemplate && instructTemplate === "Alpaca" ? (format === "reasoning" ? '- Alpaca Reasoning: user prompt starts with "### Instruction:\n", assistant response starts with "### Response:\n<think>\n{reasoning}\n</think>\n{final_answer}". DO NOT include a system message.' : '- Alpaca Instruction: user prompt MUST start with "### Instruction:\n", and assistant response MUST start with "### Response:\n".') : ""}
    ${isInstructionTemplate && instructTemplate === "Mistral" ? (format === "reasoning" ? '- Mistral Reasoning: user prompt MUST be wrapped in [INST] ... [/INST], assistant response formatted with <think>\n{reasoning}\n</think>\n{final_answer}. DO NOT include a system message.' : '- Mistral Instruction: user prompt MUST be wrapped in [INST] ... [/INST].') : ""}
@@ -3257,13 +3259,14 @@ Return ONLY a valid JSON object matching this structure:
   ]
 }
 Return raw JSON without extra conversational text.
+The entire JSON response must fit within 4096 output tokens. Keep the conversation concise enough to finish every answer and close all JSON objects and arrays; never leave a trailing unanswered user message.
 `;
 
         const aiRes = await callDigitalOceanAI({
           model: normalizeModel(extractionModel),
           contents: synthesisPrompt,
           config: {
-            maxOutputTokens: 65536,
+            maxOutputTokens: 4096,
             responseMimeType: "application/json",
             ...(format !== "reasoning" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
             systemInstruction: format === "reasoning"
@@ -3283,7 +3286,14 @@ No internal deliberation, planning, or reasoning fields are permitted.`
         });
 
         const rawText = extractResponseText(aiRes);
-        const sectionExamples = parseGeneratedExamples(rawText, format).map(item => {
+        const sectionExamples = parseGeneratedExamples(rawText, format).filter(item => {
+          const conversation = item.messages.filter((message: any) => message.role !== "system");
+          return conversation.length >= (format === "multi_turn" ? 4 : 2)
+            && conversation.length % 2 === 0
+            && conversation.every((message: any, index: number) =>
+              message.role === (index % 2 === 0 ? "user" : "assistant")
+              && typeof message.content === "string" && message.content.trim().length > 0);
+        }).slice(0, sectionExampleCount).map(item => {
           const conversation = item.messages.filter((message: any) => message.role !== "system");
           return { messages: format === "reasoning" ? conversation : [
             { role: "system", content: sysPromptVerbatim }, ...conversation
@@ -3299,14 +3309,16 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       }
     };
 
+    const conversionErrors: string[] = [];
     const CONCURRENCY_LIMIT = 2;
     for (let i = 0; i < sectionJobs.length; i += CONCURRENCY_LIMIT) {
       const batch = sectionJobs.slice(i, i + CONCURRENCY_LIMIT);
-      const batchResults = await Promise.all(
+      const batchResults = await Promise.allSettled(
         batch.map(job => processSection(job.text, job.sectionIndex, job.count, job.offset))
       );
-      for (const sEx of batchResults) {
-        finalExamples.push(...sEx);
+      for (const result of batchResults) {
+        if (result.status === "fulfilled") finalExamples.push(...result.value);
+        else conversionErrors.push(result.reason?.message || "Document conversion request failed.");
       }
       if (i + CONCURRENCY_LIMIT < sectionJobs.length) {
         await new Promise((resolve) => setTimeout(resolve, 400));
@@ -3314,7 +3326,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     }
 
     if (!finalExamples || finalExamples.length === 0) {
-      return res.status(500).json({ success: false, error: "Document synthesis produced no valid SFT examples. Please verify document text and try again." });
+      return res.status(500).json({ success: false, error: conversionErrors[0] || "Document synthesis produced no valid SFT examples. Please verify document text and try again." });
     }
 
     // Keep representative results across the entire document when rounding
@@ -3368,7 +3380,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       success: true, 
       examples: formattedExamples,
       requestedCount,
-      partial: formattedExamples.length < requestedCount,
+      partial: conversionErrors.length > 0 || formattedExamples.length < requestedCount,
       source: `Document Conversion (${actualDocType} - ${extractionModel || "DigitalOcean"})`
     });
 

@@ -8,3 +8,9 @@ Analyze source documents and synthesize grounded training examples for all three
 **Why:** The user explicitly corrected the converter: “It should analyze a document and convert it not look for already formatted examples,” and asked that all three types be understood and fixed.
 
 **How to apply:** Interpret transcript discussions, knowledge facts and procedures, and literary narratives according to their different purposes. Preserve source meaning, avoid invented details, and do not silently skip sections of long documents. Keep this work separate from batch generation.
+
+The document converter offers Single Turn, Multi Turn, and Mixed only—not Reasoning.
+
+**Why:** The user explicitly asked to remove the Reasoning option from the converter while keeping the repair confined to document conversion.
+
+**How to apply:** Leave Reasoning generation elsewhere unchanged; do not reintroduce converter reasoning controls based on the project's selected template.

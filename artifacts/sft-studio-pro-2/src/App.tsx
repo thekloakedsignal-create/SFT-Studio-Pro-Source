@@ -525,7 +525,6 @@ export default function App() {
   const [userTag, setUserTag] = useState<string>("");
   const [assistantTag, setAssistantTag] = useState<string>("");
   const [fixedUserPrompt, setFixedUserPrompt] = useState<string>("Please analyze and explain the following document chunk.");
-  const [reasoningInstructions, setReasoningInstructions] = useState<string>("Explain the planning, key facts, and logic leading to the target output.");
   const [latestConvertedDocBatchId, setLatestConvertedDocBatchId] = useState<string | null>(null);
   const [converterInstructions, setConverterInstructions] = useState<string>("");
 
@@ -2687,7 +2686,6 @@ export default function App() {
           userTag: userTag.trim(),
           assistantTag: assistantTag.trim(),
           fixedUserPrompt,
-          reasoningInstructions,
           literatureTheme,
           converterInstructions: converterInstructions.trim()
         })
@@ -2711,6 +2709,8 @@ export default function App() {
           templateType: effectiveTemplate,
           examplesCount: data.examples.length,
           examples: data.examples,
+          partial: Boolean(data.partial),
+          requestedExamples: data.requestedCount || docCount,
           status: "Pending",
           timestamp: new Date().toISOString().slice(0, 16).replace("T", " "),
           description: `Extracted from "${truncatedDocName || "Raw Text"}" • Format: ${project.projectFormat === ProjectFormat.INSTRUCTION ? `Instruction (${project.instructTemplate || "ChatML"})` : "Conversation"}`
@@ -2722,7 +2722,9 @@ export default function App() {
         if (selectedProjectId) {
           saveBatch(selectedProjectId, newBatch);
         }
-        setNotification({ text: `Converted successfully! ${data.examples.length} examples extracted and displayed below for review & approval.`, type: "success" });
+        setNotification({ text: data.partial
+          ? `Partial conversion: ${data.examples.length} of ${data.requestedCount || docCount} examples completed and displayed below for review.`
+          : `Converted successfully! ${data.examples.length} examples extracted and displayed below for review & approval.`, type: data.partial ? "info" : "success" });
         setTimeout(() => {
           document.getElementById("doc-conversion-review-card")?.scrollIntoView({ behavior: "smooth" });
         }, 150);
@@ -5587,7 +5589,6 @@ export default function App() {
                           {[
                             { type: TemplateType.SINGLE_TURN, label: "Single Turn", sub: "Q&A Pair" },
                             { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Dialogue" },
-                            { type: TemplateType.REASONING, label: "Reasoning", sub: "<think> CoT" },
                             { type: TemplateType.MIXED, label: "Mixed", sub: "Dynamic Mix" },
                           ].map(({ type, label, sub }) => {
                             const isSelected = docTemplate === type;
@@ -5766,20 +5767,6 @@ export default function App() {
                         </div>
                       )}
 
-                      {/* Reasoning Instructions */}
-                      {(docTemplate === TemplateType.REASONING || project.templateType === TemplateType.REASONING) && (
-                        <div className="pt-2 border-t border-slate-800/60">
-                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Reasoning Trace Instructions</label>
-                          <textarea
-                            value={reasoningInstructions}
-                            onChange={(e) => setReasoningInstructions(e.target.value)}
-                            rows={2}
-                            placeholder="Show the natural language chain of thought process."
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:border-blue-500/50 outline-none font-sans custom-scrollbar"
-                          />
-                        </div>
-                      )}
-
                       {/* Custom Conversion & Style Instructions Box */}
                       <div className="pt-3 border-t border-slate-800/60 space-y-2">
                         <div className="flex items-center justify-between">
@@ -5899,7 +5886,7 @@ export default function App() {
                             </span>
                           </div>
                           <div className="text-[10px] text-slate-500 font-mono truncate max-w-full" title={`Timestamp: ${latestDocBatch.timestamp} • ${latestDocBatch.examplesCount} Examples • ${latestDocBatch.description}`}>
-                            Timestamp: {latestDocBatch.timestamp} • {latestDocBatch.examplesCount} Examples • {latestDocBatch.description}
+                            Timestamp: {latestDocBatch.timestamp} • {latestDocBatch.partial ? `Partial: ${latestDocBatch.examplesCount} of ${latestDocBatch.requestedExamples} Examples` : `${latestDocBatch.examplesCount} Examples`} • {latestDocBatch.description}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">

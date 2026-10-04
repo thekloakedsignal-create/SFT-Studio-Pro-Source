@@ -10,7 +10,7 @@ const routesSource = source.slice(source.indexOf("// 1.5 Document Analysis"), so
 assert.ok(routesSource.includes('app.post("/api/convert-document"'));
 const compiled = await transform(routesSource, { loader: "ts", format: "cjs", target: "node24" });
 
-function fixture(output: "valid" | "invalid" | "error" = "valid") {
+function fixture(output: "valid" | "invalid" | "error" | "partial" | "unfinished" = "valid") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   let active = 0;
@@ -27,11 +27,17 @@ function fixture(output: "valid" | "invalid" | "error" = "valid") {
     setTimeout: (callback: Function) => callback(),
     async callDigitalOceanAI(params: any) {
       calls.push(params);
+      const callIndex = calls.length;
       peak = Math.max(peak, ++active);
       await Promise.resolve();
       active--;
       if (output === "error") throw new Error("fixture provider failure");
+      if (output === "partial" && callIndex === 2) throw new Error("fixture truncated response");
       if (output === "invalid") return { text: '{"examples":[{"messages":[]}]}' };
+      if (output === "unfinished") return { text: JSON.stringify({ examples: [{ messages: [
+        { role: "user", content: "Question" }, { role: "assistant", content: "Answer" },
+        { role: "user", content: "Unanswered follow-up" }
+      ] }] }) };
       if (params.contents.includes("architectural analysis")) return { text: JSON.stringify({
         estimatedCount: 4, recommendedDocType: "transcript", titleOrTheme: "Storage migration",
         explanation: "Four substantive topics in the discussion."
@@ -78,7 +84,7 @@ test("all three source types synthesize new examples from ordinary prose", async
     const result = await f.run({ docType, systemPrompt: 'A "helpful" assistant', literatureTheme: "River Journey" });
     assert.equal(result.code, 200);
     assert.equal(result.body.examples.length, 2);
-    assert.equal(f.calls.length, 1);
+    assert.equal(f.calls.length, 2);
     const prompt = f.calls[0].contents;
     assert.ok(prompt.includes(directive));
     assert.match(prompt, /create NEW training examples from its meaning/);
@@ -95,17 +101,17 @@ test("labeled transcripts also use synthesis, and analysis no longer counts extr
   assert.equal(analysis.body.estimatedCount, 4);
   const converted = await f.run(body);
   assert.equal(converted.body.examples.length, 2);
-  assert.equal(f.calls.length, 2);
+  assert.equal(f.calls.length, 3);
   assert.doesNotMatch(converted.body.examples[0].messages[1].content, /What next/);
 });
 
-test("transcript layout, reasoning, Mixed, and instruction formats remain available", async () => {
+test("transcript layout, Mixed, and instruction formats work; converter rejects Reasoning", async () => {
   const f = fixture();
   const multi = await f.run({ docType: "transcript", transcriptLayout: "multi_turn" });
   assert.equal(multi.body.examples[0].messages.length, 5);
   const reasoning = await f.run({ docType: "transcript", templateType: "Reasoning" });
-  assert.equal(reasoning.body.examples[0].messages.length, 2);
-  assert.ok(reasoning.body.examples[0].messages[1].reasoning);
+  assert.equal(reasoning.code, 400);
+  assert.match(reasoning.body.error, /Reasoning is not available/);
   const mixed = await f.run({ docType: "knowledge_base", templateType: "Mixed" });
   assert.ok(mixed.body.examples.every((e: any) => e.messages.every((m: any) => !m.reasoning)));
   assert.match(f.calls.at(-1).contents, /single-turn and multi-turn examples only/);
@@ -121,11 +127,37 @@ test("large requested counts use bounded small groups with custom instructions r
   const f = fixture();
   const result = await f.run({ docType: "knowledge_base", count: 8, converterInstructions: "Focus on backup procedures." });
   assert.equal(result.body.examples.length, 8);
-  assert.equal(f.calls.length, 4);
+  assert.equal(f.calls.length, 8);
   assert.equal(f.peak(), 2);
-  assert.ok(f.calls.every(call => /Synthesize exactly 2 examples/.test(call.contents)
+  assert.ok(f.calls.every(call => /Synthesize exactly 1 examples/.test(call.contents)
     && /Focus on backup procedures/.test(call.contents)));
-  assert.match(f.calls.at(-1).contents, /examples 7-8 of 8/);
+  assert.match(f.calls.at(-1).contents, /examples 8-8 of 8/);
+});
+
+test("failed requests do not discard completed examples or stop later requests", async () => {
+  const f = fixture("partial");
+  const result = await f.run({ count: 4 });
+  assert.equal(result.code, 200);
+  assert.equal(result.body.examples.length, 3);
+  assert.equal(result.body.partial, true);
+  assert.equal(result.body.requestedCount, 4);
+  assert.equal(f.calls.length, 4);
+});
+
+test("unfinished conversations are not returned as completed examples", async () => {
+  const result = await fixture("unfinished").run({ templateType: "Multi Turn" });
+  assert.equal(result.code, 500);
+  assert.equal(result.body.success, false);
+});
+
+test("converter UI excludes Reasoning and retains partial results for review", async () => {
+  const app = await readFile(new URL("../../sft-studio-pro-2/src/App.tsx", import.meta.url), "utf8");
+  const options = app.slice(app.indexOf("Dataset Turn Mode & Layout:"), app.indexOf("AI Document Analysis & Example Count Estimation Readout"));
+  assert.doesNotMatch(options, /TemplateType\.REASONING/);
+  for (const mode of ["SINGLE_TURN", "MULTI_TURN", "MIXED"]) assert.ok(options.includes(`TemplateType.${mode}`));
+  assert.ok(app.includes("setLatestConvertedDocBatchId(newBatch.id)"));
+  assert.ok(app.includes("partial: Boolean(data.partial)"));
+  assert.ok(app.includes("latestDocBatch.partial"));
 });
 
 test("long documents analyze every section, including sections formerly skipped", async () => {
