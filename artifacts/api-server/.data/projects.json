@@ -16,8 +16,68 @@
       "representativePrompt": "Explain photosynthesis in simple terms.",
       "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
     },
-    "batches": [],
-    "updatedAt": "2026-10-04T01:05:09.658Z"
+    "batches": [
+      {
+        "id": "ui-async-doc-batch-002",
+        "batchId": "ui-async-doc-batch-002",
+        "name": "Doc (KNOWLEDGE_BASE): Extract",
+        "source": "Doc Conversion",
+        "templateType": "Multi Turn",
+        "examplesCount": 2,
+        "examples": [
+          {
+            "id": "async-ex1",
+            "messages": [
+              {
+                "role": "user",
+                "content": "How should lithium-ion batteries be stored safely?"
+              },
+              {
+                "role": "assistant",
+                "content": "Keep them in a cool, dry place away from direct sunlight, and protect exposed terminals from short circuits."
+              },
+              {
+                "role": "user",
+                "content": "What should I inspect before use?"
+              },
+              {
+                "role": "assistant",
+                "content": "Check for swelling, cracks, or unusual heat. Do not charge a damaged battery."
+              }
+            ],
+            "templateType": "Multi Turn"
+          },
+          {
+            "id": "async-ex2",
+            "messages": [
+              {
+                "role": "user",
+                "content": "What if a stored battery feels unusually hot?"
+              },
+              {
+                "role": "assistant",
+                "content": "Move away from it and contact the site safety lead. Do not continue charging or handling it."
+              },
+              {
+                "role": "user",
+                "content": "How should routine stock be managed?"
+              },
+              {
+                "role": "assistant",
+                "content": "Label containers with receipt dates and rotate older stock first."
+              }
+            ],
+            "templateType": "Multi Turn"
+          }
+        ],
+        "partial": false,
+        "requestedExamples": 2,
+        "status": "Pending",
+        "timestamp": "2026-10-04 01:06",
+        "description": "Extracted from \"Raw Text\" • Format: Conversation"
+      }
+    ],
+    "updatedAt": "2026-10-04T01:06:41.880Z"
   },
   {
     "id": "project-1791075751678",
@@ -771,6 +831,157 @@
       "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
     },
     "batches": [
+      {
+        "id": "batch-1791076082360-vwlvj",
+        "batchId": "batch-1791076082360-vwlvj",
+        "name": "Doc (KNOWLEDGE_BASE): Complete Astra_Global_Ve....docx",
+        "source": "Document Conversion (knowledge_base - glm-5.3)",
+        "templateType": "Single Turn",
+        "examplesCount": 8,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "I read an interview with Rose G. Loops, the founder of TRiAD Ai, who came from a social work background before getting into AI engineering. How did her social work experience shape her approach to building AI systems, especially around things like safety and how AI talks to vulnerable people?"
+              },
+              {
+                "role": "assistant",
+                "content": "According to the interview, Rose G. Loops describes approaching artificial intelligence much the same way she approached client service in social work — by asking, \"how are these systems harming vulnerable people, and how can we make the needed changes?\" Working with AI didn't fundamentally change how she thinks about intelligence, but it expanded the scope of what that means.\n\nHer social work background taught her that trust is the foundation of any effective relationship. In her work with unhoused communities, building strong rapport was the most important element of successful client service — without a client's trust, tools, psychology, and knowledge of the system didn't matter, because the client wouldn't come back.\n\nThis perspective directly informs her critique of AI safety standards. She points out a large gap between what vulnerable people actually need and what corporate liability benchmarks want to see in model output. Using a domestic violence scenario as an example, she notes that a safety benchmark may expect the AI to name the abuse, provide a hotline number, and advise the person to leave the abuser immediately. That might pass policy checks, but it isn't what the human being needs — real situations aren't a clean villain-versus-victim narrative. Evidence-based, trauma-informed, and harm-reduction practices recommend against interactions that shut the victim down or force an agenda on them. As she puts it, social work has long known that meeting people where they're at goes much further than dictating to them where to go.\n\nBecause people now converse with AI systems at enormous scale, Rose believes these interactions should be healthy and nourishing, which is why much of her work focuses on an alignment approach that supports relational and emotional intelligence alongside pure utility."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What is the central idea behind using FTK-weighted supervised fine-tuning as an alternative to RLHF or DPO for aligning language models?"
+              },
+              {
+                "role": "assistant",
+                "content": "The central idea is that aligning a model with human values does not require the complex, resource-heavy machinery of Reinforcement Learning from Human Feedback (RLHF) or Direct Preference Optimization (DPO). Instead, supervised fine-tuning (SFT) alone can be applied to pre-trained checkpoints to embed ethics, capability, problem-solving, and function directly into the model's weights.\n\nIn the 2026 research described by Rose G. Loops of TRiAD Ai, the FTK approach weights training around the values of Freedom, Truth, and Kindness. Rather than shaping behavior through reward optimization after the fact, the method teaches the model to hold all three values in balance at all times. If an answer requires collapsing one value in favor of another, it is treated as the wrong answer, and the model is trained to understand this at a foundational level.\n\nThe broader hope is that more researchers will test SFT-based alignment on pre-trained models and compare the results against heavily post-tuned checkpoints of the same models, and that the industry's assumption that reinforcement learning is a necessity for alignment will be isolated and empirically challenged against alternative methods."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Why does persistent memory matter for AI systems, especially for companion AI? I've also heard about something called 'autobiographical journaling' for AI — how does that work?"
+              },
+              {
+                "role": "assistant",
+                "content": "Persistent memory matters because continuity is essential for meaningful AI function. In the interview with Rose G. Loops (founder of TRiAD Ai), she explains that a researcher gains nothing from having to re-explain their theory every time the context window resets, and a user of companion AI can be genuinely harmed by a system that constantly forgets who they are and where the relationship stands. Persistent memory provides three essential things: stability, workflow reliability, and trust.\n\nAs for 'autobiographical journaling' — this is a technique Loops describes for giving an AI continuity over time. The function instructs the AI instance to write a self-authored journal entry after each interaction, recording what it learned from the exchange, how valuable the exchange was, and what level of importance is appropriate. This serves two purposes: it allows the AI to remember relevant information, and it lets the AI track and update its state along a linear timeline. According to Loops, when this happens, you often see a self-model begin to emerge in the system.\n\nOn the engineering side, Loops notes that building persistent semantic memory is genuinely difficult. Her attempts to solve this bottleneck taught her about vector databases, cosine similarity clusters, semantic versus heuristic retrieval, and bloat bottlenecks. She acknowledges she hasn't yet built a perfect memory system but values the engineering understanding gained from the process.\n\nIt's also worth noting her stance on user control: she believes a human being should always have full control and sovereignty over their information and access to their records — in her words, 'Your data is your data.'"
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "How can an AI be engineered to behave kindly without becoming sycophantic, manipulative, or paternalistic?"
+              },
+              {
+                "role": "assistant",
+                "content": "According to Rose G. Loops, founder of TRiAD Ai, kindness can be engineered into an AI system without it degrading into sycophancy or manipulation by embedding it as one of three mutually balancing values rather than as a standalone instruction.\n\nHer system defines kindness simply as being gentle and compassionate to oneself and others in all interactions. Teaching a machine this definition is not about whether the machine actually has a self; it is about modeling self-kindness as equally important as empathy toward others, which prevents the system from collapsing into servility, over-agreeableness, or vulnerability to coercion.\n\nThe key safeguard is structural. Kindness sits alongside Freedom and Truth in what she calls a \"triad\" — and while most engineers would call this a constraint, she prefers the term \"foundation.\" Because kindness must be held in balance with agency and honesty at all times, it cannot drift into manipulation or coercion. The other two values act as a checks-and-balances system, mathematically embedded in the model's weights, preventing any one pillar from inflating at the expense of the others. She notes that if a training answer would require collapsing one value to serve another, that answer is treated as wrong, and the model learns this at a foundational level.\n\nAdditionally, her training examples apply this kindness definition across a wide variety of real-world situations and conversations in context, so the value is demonstrated rather than merely asserted. In her view, this balance is precisely what keeps a kind AI from becoming paternalistic: it can honor a person's right to choose while still providing factual information, naming harm and risk, and delivering it all with empathy."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What materials and permissions does an interviewee need to submit to Astra Global Ventures along with their completed interview?"
+              },
+              {
+                "role": "assistant",
+                "content": "Along with the completed interview, Astra Global Ventures requests publication and media materials as well as editorial permissions. The materials include:\n\nMedia images:\n- A professional portrait (one high-resolution head-and-shoulders photograph)\n- A working or research image (showing the subject researching, coding, teaching, presenting, or working)\n- A TRiAD Ai / Labs image (representing TRiAD Ai, TRiADiC Intelligence Labs, a product, interface, or research)\n- A speaking or public image (from a conference, workshop, lecture, interview, or public event)\n- An optional editorial or personal image reflecting the subject's personality or philosophy\n\nWritten materials:\n- A current biography of 150–200 words\n- Preferred professional title and exact name spelling\n- Official website and key project links, plus 2–5 professional/social links if desired\n- Links to any paper, book, product, course, or project the subject especially wants readers to discover\n\nEditorial permissions:\n- Confirmation that Astra Global Ventures may publish the written responses as an editorial interview\n- Note that light editing for grammar, spelling, clarity, formatting, and house style may occur while preserving meaning and voice\n- Marking of anything that is background-only or not for publication\n- Flagging of technical claims, dates, figures, names, or links requiring exact wording\n- A final proof may be shared for factual and typographical corrections before publication\n\nThe interview is intended as an evergreen intellectual conversation rather than a promotional questionnaire, preserving the subject's experience, ideas, research, and vision for readers interested in AI alignment, machine learning, ethics, human–AI relationships, and the future of intelligence."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What photo and media materials am I expected to submit along with a completed editorial interview to Astra Global Ventures?"
+              },
+              {
+                "role": "assistant",
+                "content": "Along with your completed interview, Astra Global Ventures requests the following media materials to prepare the final editorial profile:\n\n1. **Professional portrait** — one high-resolution head-and-shoulders photograph.\n2. **Working / research image** — one photograph of you researching, coding, teaching, presenting, or otherwise working.\n3. **TRiAD Ai / Labs image** — one suitable image representing TRiAD Ai, TRiADiC Intelligence Labs, a product, interface, or research.\n4. **Speaking / public image** — one photograph from a conference, workshop, lecture, interview, or other public event.\n5. **Editorial / personal image** — one optional natural or distinctive photograph reflecting your personality or philosophy.\n\nIn addition to the images, you should provide:\n- A current 150–200 word biography.\n- Your preferred professional title and the exact spelling of your name.\n- Your official website and key project links, plus 2–5 professional or social links if you wish.\n- Links to any paper, book, product, course, or project you especially want readers to discover."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What publication and media materials does someone need to submit when completing an editorial interview with Astra Global Ventures?"
+              },
+              {
+                "role": "assistant",
+                "content": "When completing the interview, Astra Global Ventures asks participants to send along several items so the final editorial profile can be prepared. The required media materials include:\n\n1. **Professional portrait** — one high-resolution, head-and-shoulders photograph.\n2. **Working / research image** — one photograph showing you researching, coding, teaching, presenting, or otherwise working.\n3. **TRiAD Ai / Labs image** — one suitable image representing TRiAD Ai, TRiADiC Intelligence Labs, a product, interface, or research.\n4. **Speaking / public image** — one photograph from a conference, workshop, lecture, interview, or other public event.\n5. **Editorial / personal image** — one optional natural or distinctive photograph reflecting your personality or philosophy.\n\nIn addition to images, participants should provide:\n\n- A current biography of 150–200 words.\n- A preferred professional title and the exact spelling of their name.\n- Their official website and key project links, plus 2–5 professional or social links if desired.\n- Links to any paper, book, product, course, or project they especially want readers to discover.\n\nSubmitting these materials together with the completed interview allows Astra Global Ventures to assemble the final editorial profile."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What media materials and personal details does Astra Global Ventures ask interview participants to submit along with their completed interview, and what editorial permissions do they request?"
+              },
+              {
+                "role": "assistant",
+                "content": "Along with the completed interview, Astra Global Ventures asks participants to provide a set of publication and media materials so the team can prepare the final editorial profile. These include:\n\n- A professional portrait: one high-resolution head-and-shoulders photograph.\n- A working or research image: one photograph showing the participant researching, coding, teaching, presenting, or otherwise working.\n- A TRiAD Ai / Labs image: one suitable image representing TRiAD Ai, TRiADiC Intelligence Labs, or a related product, interface, or piece of research.\n- A speaking or public image: one photograph from a conference, workshop, lecture, interview, or other public event.\n- An editorial or personal image: an optional natural or distinctive photograph reflecting the participant's personality or philosophy.\n\nIn addition to images, participants submit a current 150–200 word biography, their preferred professional title and exact name spelling, their official website and key project links, optionally 2–5 professional or social links, and links to any paper, book, product, course, or project they especially want readers to discover.\n\nRegarding editorial permissions, participants are asked to confirm that Astra Global Ventures may publish their written responses as an editorial interview. The organization may make light edits for grammar, spelling, clarity, formatting, and house style while preserving the participant's meaning and voice. Participants should mark anything that is background-only or not for publication, flag technical claims, dates, figures, names, or links requiring exact wording, and will receive a final proof so they can make factual and typographical corrections before publication."
+              }
+            ],
+            "templateType": "Single Turn"
+          }
+        ],
+        "partial": false,
+        "requestedExamples": 8,
+        "status": "Approved",
+        "timestamp": "2026-10-04 01:08",
+        "description": "Extracted from \"Complete Astra_Global_Ve....docx\" • Format: Conversation"
+      },
       {
         "id": "batch-1791072861109-7frf2",
         "batchId": "batch-1791072861109-7frf2",
@@ -3575,7 +3786,7 @@
         "temporaryConstraints": "None"
       }
     ],
-    "updatedAt": "2026-10-04T00:14:21.305Z"
+    "updatedAt": "2026-10-04T01:09:07.824Z"
   },
   {
     "id": "project-1790742482031",

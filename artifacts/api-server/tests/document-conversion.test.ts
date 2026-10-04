@@ -6,7 +6,7 @@ import { transform } from "esbuild";
 import { parseGeneratedExamples, sanitizeExample } from "../src/lib/generation-response.ts";
 
 const source = await readFile(new URL("../legacy-server.ts", import.meta.url), "utf8");
-const routesSource = source.slice(source.indexOf("// 1.5 Document Analysis"), source.indexOf("// 3. AI Quality Assessment"));
+const routesSource = source.slice(source.indexOf("// Universal Transcript Cleaning"), source.indexOf("// 3. AI Quality Assessment"));
 assert.ok(routesSource.includes('app.post("/api/convert-document"'));
 const compiled = await transform(routesSource, { loader: "ts", format: "cjs", target: "node24" });
 
@@ -25,7 +25,6 @@ function fixture(output: "valid" | "invalid" | "error" | "partial" | "unfinished
     getDigitalOceanClient: () => ({}),
     normalizeModel: (model: string) => model || "fixture-model",
     formatAIErrorMessage: (error: Error) => error.message,
-    parseUniversalTranscript: () => { throw new Error("Verbatim extraction must never run"); },
     parseGeneratedExamples, sanitizeExample,
     extractResponseText: (response: any) => response.text,
     setTimeout: (callback: Function) => callback(),
@@ -92,9 +91,8 @@ function fixture(output: "valid" | "invalid" | "error" | "partial" | "unfinished
   };
 }
 
-test("all three source types synthesize new examples from ordinary prose", async () => {
+test("knowledge and literature synthesize new examples from ordinary prose", async () => {
   for (const [docType, directive] of [
-    ["transcript", "ANALYZE THE DISCUSSION"],
     ["knowledge_base", "KNOWLEDGE DOCUMENT CONVERSION"],
     ["literature", "LITERATURE DOCUMENT CONVERSION"]
   ]) {
@@ -112,21 +110,26 @@ test("all three source types synthesize new examples from ordinary prose", async
   }
 });
 
-test("labeled transcripts also use synthesis, and analysis no longer counts extracted pairs", async () => {
+test("transcripts copy tagged dialogue without provider calls and survive sanitization", async () => {
   const f = fixture();
-  const body = { docType: "transcript", documentContent: "User: What next?\nAssistant: Verify the backup." };
-  const analysis = await f.run(body, "/api/analyze-document");
-  assert.equal(analysis.body.estimatedCount, 4);
+  const body = { docType: "transcript", userTag: "Alice", assistantTag: "Bob", count: 1,
+    documentContent: "Meeting date: Monday\n[00:01] Alice: What next at 12:30?\n[00:02] Bob: Answer: Keep  two spaces.\nAlice: Again?\nBob: Yes." };
   const converted = await f.run(body);
   assert.equal(converted.body.examples.length, 2);
-  assert.equal(f.calls.length, 3);
-  assert.doesNotMatch(converted.body.examples[0].messages[1].content, /What next/);
+  assert.equal(f.calls.length, 0);
+  assert.equal(converted.body.examples[0].messages[0].content, "What next at 12:30?");
+  assert.equal(sanitizeExample(converted.body.examples[0]).messages[1].content, "Answer: Keep  two spaces.");
+  const multi = await f.run({ ...body, async: true, transcriptLayout: "multi_turn" });
+  assert.equal(multi.code, 200);
+  assert.equal(multi.body.examples[0].messages.length, 4);
+  assert.equal((await f.run({ ...body, documentContent: "No tagged dialogue." })).code, 400);
 });
 
 test("transcript layout, Mixed, and instruction formats work; converter rejects Reasoning", async () => {
   const f = fixture();
-  const multi = await f.run({ docType: "transcript", transcriptLayout: "multi_turn" });
-  assert.equal(multi.body.examples[0].messages.length, 5);
+  const multi = await f.run({ docType: "transcript", transcriptLayout: "multi_turn",
+    documentContent: "User: Q?\nAssistant: A.\nUser: More?\nAssistant: Yes." });
+  assert.equal(multi.body.examples[0].messages.length, 4);
   const reasoning = await f.run({ docType: "transcript", templateType: "Reasoning" });
   assert.equal(reasoning.code, 400);
   assert.match(reasoning.body.error, /Reasoning is not available/);
@@ -225,7 +228,7 @@ test("invalid input and provider output fail explicitly without transcript extra
   }
   for (const output of ["invalid", "error"] as const) {
     const f = fixture(output);
-    const result = await f.run({ docType: "transcript", documentContent: "User: Question\nAssistant: Answer" });
+    const result = await f.run({ docType: "knowledge_base", documentContent: "User: Question\nAssistant: Answer" });
     assert.equal(result.code, 500);
     assert.equal(result.body.success, false);
     assert.match(result.body.error, /section 1 could not be converted/);

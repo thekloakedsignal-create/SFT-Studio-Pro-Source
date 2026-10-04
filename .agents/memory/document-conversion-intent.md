@@ -3,11 +3,11 @@ name: Document conversion intent
 description: User's intended behavior for transcript, knowledge, and literature conversion.
 ---
 
-Analyze source documents and synthesize grounded training examples for all three types: transcript, knowledge, and literature. Do not require existing formatted examples or speaker-labeled Q&A, and do not silently substitute verbatim extraction when synthesis fails.
+Knowledge and literature synthesize grounded training examples. Transcript mode instead copies dialogue exactly, stripping metadata according to user-provided speaker tags; it must not call AI to rewrite dialogue.
 
-**Why:** The user explicitly corrected the converter: “It should analyze a document and convert it not look for already formatted examples,” and asked that all three types be understood and fixed.
+**Why:** The user clarified Transcript behavior: “Copies transcript exactly as is stripping meta data according to user tags.” This supersedes the earlier synthesis requirement for transcripts only.
 
-**How to apply:** Interpret transcript discussions, knowledge facts and procedures, and literary narratives according to their different purposes. Preserve source meaning, avoid invented details, and do not silently skip sections of long documents. Keep this work separate from batch generation.
+**How to apply:** Keep Knowledge conversion unchanged. Transcript wording must survive saving and reloading without generation-oriented prose cleanup. Keep this work separate from batch generation.
 
 The document converter offers Single Turn, Multi Turn, and Mixed only—not Reasoning.
 

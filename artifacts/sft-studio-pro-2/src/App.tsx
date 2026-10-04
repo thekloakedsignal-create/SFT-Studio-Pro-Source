@@ -2724,7 +2724,7 @@ export default function App() {
           batchId: generatedBatchId,
           name: `Doc (${docType === "transcript" ? "Transcript" : docType.toUpperCase()}): ${truncatedDocName || "Extract"}`,
           source: data.source || (docType === "transcript" ? "Verbatim Transcript Conversion" : "Doc Conversion"),
-          templateType: effectiveTemplate,
+          templateType: data.templateType || effectiveTemplate,
           examplesCount: data.examples.length,
           examples: data.examples,
           partial: Boolean(data.partial),
@@ -5708,7 +5708,7 @@ export default function App() {
                           <div className="p-3 bg-blue-950/25 border border-blue-500/25 rounded-xl flex items-start gap-2.5">
                             <Sparkles className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
                             <div className="text-[11px] text-blue-200 leading-relaxed">
-                              <span className="font-semibold text-white">Intelligent Transcript Engine:</span> Filters out meeting headers, attendee rosters, timestamps, and administrative logistics. Dialogue is synthesized into rich, high-value training pairs adhering to your custom instructions and desired response length.
+                              <span className="font-semibold text-white">Verbatim Transcript Conversion:</span> Copies dialogue using your speaker tags and removes transcript metadata. No AI rewriting or generated text. All matched dialogue is retained regardless of the example count.
                             </div>
                           </div>
 

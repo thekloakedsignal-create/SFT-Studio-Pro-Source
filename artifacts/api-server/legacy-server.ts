@@ -2734,11 +2734,7 @@ function parseUniversalTranscript(
 
   // Helper to clean inline timestamps and artifacts from dialogue content word-for-word
   const cleanTurnContent = (rawText: string) => {
-    return rawText
-      .replace(/\[?\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?\]?/g, "")
-      .replace(/\(?\d{1,2}:\d{2}(?::\d{2})?\)?/g, "")
-      .replace(/\s{2,}/g, " ")
-      .trim();
+    return rawText.trim();
   };
 
   const excludedSpeakers = new Set([
@@ -2828,7 +2824,10 @@ function parseUniversalTranscript(
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
     const trimmed = rawLine.trim();
-    if (!trimmed) continue;
+    if (!trimmed) {
+      if (turns.length) turns[turns.length - 1].content += "\n";
+      continue;
+    }
 
     // Filter out metadata separators or status alerts
     if (isMetadataLine(trimmed)) {
@@ -2845,11 +2844,11 @@ function parseUniversalTranscript(
         role = "user";
       } else if (isAssistantSpeaker(spk) || spk === mappedAssistant || matchesTag(spk, mappedAssistant)) {
         role = "assistant";
-      } else if (asstKeywords.some(k => spk.includes(k))) {
+      } else if (!customAsstLower && asstKeywords.some(k => spk.includes(k))) {
         role = "assistant";
-      } else if (userKeywords.some(k => spk.includes(k))) {
+      } else if (!customUserLower && userKeywords.some(k => spk.includes(k))) {
         role = "user";
-      } else if (speakerCounts.has(spk)) {
+      } else if (!customUserLower && !customAsstLower && speakerCounts.has(spk)) {
         role = spk === mappedUser ? "user" : "assistant";
       }
 
@@ -2875,7 +2874,7 @@ function parseUniversalTranscript(
       const cleanedLine = cleanTurnContent(trimmed);
       if (cleanedLine && !isMetadataLine(cleanedLine)) {
         if (turns.length > 0 && turns[turns.length - 1].role === currentRole) {
-          turns[turns.length - 1].content += "\n\n" + cleanedLine;
+          turns[turns.length - 1].content += "\n" + cleanedLine;
         } else {
           turns.push({ role: currentRole, content: cleanedLine });
         }
@@ -3065,6 +3064,33 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
   const fUserPrompt = (fixedUserPrompt && fixedUserPrompt.trim() !== "Please explain the following segment.") ? fixedUserPrompt.trim() : "";
   const rInstructions = reasoningInstructions || "Show the reasoning process using a natural language chain of thought.";
   const requestedCount = count === undefined ? 8 : Number(count);
+  // Transcript mode is extraction, never synthesis. Do not truncate to an AI example count.
+  if (actualDocType === "transcript") {
+    const { turns } = parseUniversalTranscript(documentContent, userTag, assistantTag);
+    if (!turns.length || !turns.some(turn => turn.role === "user") || !turns.some(turn => turn.role === "assistant")) {
+      return res.status(400).json({ success: false, error: "No dialogue matched both speaker tags. Check the User and Assistant tags against your transcript." });
+    }
+    const multiTurn = req.body.transcriptLayout === "multi_turn";
+    const groups: DialogueTurn[][] = [];
+    if (multiTurn) groups.push(turns);
+    else {
+      for (let index = 0; index < turns.length; index += 2) {
+        if (turns[index]?.role !== "user" || turns[index + 1]?.role !== "assistant") {
+          return res.status(400).json({ success: false, error: "Single Turn requires complete User/Assistant pairs. Use Multi Turn to preserve all transcript turns." });
+        }
+        groups.push(turns.slice(index, index + 2));
+      }
+    }
+    const transcriptTemplate = multiTurn ? "Multi Turn" : "Single Turn";
+    return res.json({
+      success: true, source: "Verbatim Transcript Conversion", templateType: transcriptTemplate,
+      requestedCount: groups.length, partial: false,
+      examples: groups.map(messages => ({
+        id: randomUUID(), templateType: transcriptTemplate, verbatimTranscript: true,
+        messages: systemPrompt ? [{ role: "system", content: systemPrompt }, ...messages] : messages
+      }))
+    });
+  }
   if (!Number.isInteger(requestedCount) || requestedCount < 1 || requestedCount > 250) {
     return res.status(400).json({ success: false, error: "Example count must be an integer between 1 and 250." });
   }

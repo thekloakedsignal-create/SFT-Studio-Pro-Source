@@ -228,6 +228,12 @@ export function sanitizeMessage(msg: any, templateType?: string): { role: string
 
 export function sanitizeExample(example: any, templateType?: string): any {
   if (!isRecord(example)) return example;
+  // Extracted transcript text must also survive save/reload without prose cleanup.
+  if (example.verbatimTranscript === true && Array.isArray(example.messages)) {
+    return { ...example, messages: example.messages.map((message: any) => ({
+      role: message.role, content: typeof message.content === "string" ? message.content : ""
+    })) };
+  }
   const effectiveTemplate = templateType || example.templateType || "Single Turn";
   let rawMessages = example.messages;
   if (!Array.isArray(rawMessages)) {
