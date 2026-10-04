@@ -514,8 +514,8 @@ export default function App() {
   const [docContent, setDocContent] = useState("");
   const [docType, setDocType] = useState<"transcript" | "knowledge_base" | "literature">("knowledge_base");
   const [hasUserManuallySetDocType, setHasUserManuallySetDocType] = useState(false);
-  const [docTemplate, setDocTemplate] = useState<TemplateType>(TemplateType.SINGLE_TURN);
   const [transcriptLayout, setTranscriptLayout] = useState<"single_turn" | "multi_turn">("single_turn");
+  const [docTemplate, setDocTemplate] = useState<TemplateType>(TemplateType.SINGLE_TURN);
   const [docCount, setDocCount] = useState<number>(8); // AI estimated example count
   const [literatureTheme, setLiteratureTheme] = useState<string>("");
   const [extractionModel, setExtractionModel] = useState("glm-5.3");
@@ -5072,6 +5072,7 @@ export default function App() {
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             {[
                               { type: TemplateType.SINGLE_TURN, label: "Single Turn", sub: "Q&A Pair" },
+                              { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Dialogue" },
                               { type: TemplateType.REASONING, label: "Reasoning", sub: "CoT Thoughts" },
                               { type: TemplateType.MIXED, label: "Mixed", sub: "Dynamic Mix" },
                             ].map(({ type, label, sub }) => {
@@ -5634,6 +5635,7 @@ export default function App() {
                           {[
                             { type: TemplateType.SINGLE_TURN, label: "Single Turn", sub: "Q&A Pair" },
                             { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Dialogue" },
+                            { type: TemplateType.MIXED, label: "Mixed", sub: "Dynamic Mix" },
                           ].map(({ type, label, sub }) => {
                             const isSelected = docTemplate === type;
                             return (
@@ -6114,6 +6116,49 @@ export default function App() {
                           </code>
                         </div>
                       </div>
+                    </div>
+
+                    {/* TRiAD Template Selection */}
+                    <div className="mb-5">
+                        <label className="block text-xs font-semibold text-slate-300 mb-2">Batch Template Type</label>
+                      {project.projectFormat === ProjectFormat.INSTRUCTION ? (
+                        <div className="p-3 bg-purple-950/20 border border-purple-800/40 rounded-xl flex flex-wrap items-center justify-between gap-2 overflow-hidden min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Code className="h-4 w-4 text-purple-400 shrink-0" />
+                            <span className="font-bold text-slate-200 text-xs truncate">Instruction Template ({project.instructTemplate || "ChatML"})</span>
+                            <span className="text-[10px] text-slate-400 font-mono truncate">
+                              {(project.instructTemplate || InstructTemplate.CHATML) === InstructTemplate.CHATML
+                                ? "<|im_start|> tags"
+                                : project.instructTemplate === InstructTemplate.MISTRAL
+                                ? "[INST] tags"
+                                : "### Instruction / ### Response"}
+                            </span>
+                          </div>
+                          <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded font-mono font-bold shrink-0">
+                            LOCKED ({project.instructTemplate || "ChatML"})
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-2">
+                          {[TemplateType.SINGLE_TURN, TemplateType.MULTI_TURN, TemplateType.REASONING].map((t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => setTriadTemplate(t)}
+                              className={`py-2 px-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                                triadTemplate === t
+                                  ? "bg-amber-500/10 border-amber-500/40 text-amber-400 shadow-md"
+                                  : "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-300"
+                              }`}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
+                        Records the selected batch type; imported source messages are preserved.
+                      </p>
                     </div>
 
                     {/* Sizes Selection */}
