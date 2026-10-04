@@ -10,7 +10,7 @@ const routesSource = source.slice(source.indexOf("// Universal Transcript Cleani
 assert.ok(routesSource.includes('app.post("/api/convert-document"'));
 const compiled = await transform(routesSource, { loader: "ts", format: "cjs", target: "node24" });
 
-function fixture(output: "valid" | "invalid" | "error" | "partial" | "unfinished" = "valid") {
+function fixture(output: "valid" | "invalid" | "error" | "partial" | "persistentPartial" | "unfinished" = "valid") {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   let active = 0;
@@ -36,6 +36,9 @@ function fixture(output: "valid" | "invalid" | "error" | "partial" | "unfinished
       active--;
       if (output === "error") throw new Error("fixture provider failure");
       if (output === "partial" && callIndex === 2) throw new Error("fixture truncated response");
+      if (output === "persistentPartial" && params.contents.includes("Coverage assignment: examples 2-2 ")) {
+        throw new Error("fixture persistent failure");
+      }
       if (output === "invalid") return { text: '{"examples":[{"messages":[]}]}' };
       if (output === "unfinished") return { text: JSON.stringify({ examples: [{ messages: [
         { role: "user", content: "Question" }, { role: "assistant", content: "Answer" },
@@ -155,14 +158,25 @@ test("large requested counts use bounded small groups with custom instructions r
   assert.match(f.calls.at(-1).contents, /examples 8-8 of 8/);
 });
 
-test("failed requests do not discard completed examples or stop later requests", async () => {
+test("failed converter requests are retried individually without repeating successful requests", async () => {
   const f = fixture("partial");
+  const result = await f.run({ count: 4 });
+  assert.equal(result.code, 200);
+  assert.equal(result.body.examples.length, 4);
+  assert.equal(result.body.partial, false);
+  assert.equal(f.calls.length, 5);
+  assert.equal(f.calls.filter(call => call.contents.includes("Coverage assignment: examples 2-2 ")).length, 2);
+  assert.ok(f.peak() <= 2);
+});
+
+test("persistent failures stop after three attempts and preserve completed examples", async () => {
+  const f = fixture("persistentPartial");
   const result = await f.run({ count: 4 });
   assert.equal(result.code, 200);
   assert.equal(result.body.examples.length, 3);
   assert.equal(result.body.partial, true);
   assert.equal(result.body.requestedCount, 4);
-  assert.equal(f.calls.length, 4);
+  assert.equal(f.calls.length, 6);
 });
 
 test("unfinished conversations are not returned as completed examples", async () => {
@@ -185,14 +199,15 @@ test("background conversion acknowledges before completion and exposes owner-sco
 });
 
 test("background errors and partial results are retrievable", async () => {
-  for (const output of ["error", "partial"] as const) {
+  for (const output of ["error", "persistentPartial"] as const) {
     const f = fixture(output);
     const { done } = await f.start({});
     await done;
     const status = f.poll().body;
     assert.equal(status.status, output === "error" ? "error" : "complete");
     assert.equal(status.result.success, output !== "error");
-    if (output === "partial") assert.equal(status.result.examples.length, 3);
+    if (output === "persistentPartial") assert.equal(status.result.examples.length, 3);
+    assert.equal(status.completed, output === "error" ? 0 : 3);
   }
 });
 
