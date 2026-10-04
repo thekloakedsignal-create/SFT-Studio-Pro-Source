@@ -156,7 +156,7 @@ test("large requested counts use bounded small groups with custom instructions r
   const result = await f.run({ docType: "knowledge_base", count: 50, converterInstructions: "Focus on backup procedures." });
   assert.equal(result.body.examples.length, 50);
   assert.equal(f.calls.length, 26);
-  assert.equal(f.peak(), 1);
+  assert.equal(f.peak(), 5);
   assert.ok(f.calls.every(call => call.model === "llama-4-maverick" && call.timeoutMs === 600_000));
   assert.ok(f.calls.slice(1).every(call => /Synthesize exactly 2 examples/.test(call.contents)
     && /Focus on backup procedures/.test(call.contents)));
@@ -206,7 +206,7 @@ test("failed converter requests are retried individually without repeating succe
   assert.equal(result.body.partial, false);
   assert.equal(f.calls.length, 4);
   assert.equal(f.calls.filter(call => typeof call.contents === "string" && call.contents.includes("Coverage assignment: examples 3-4 ")).length, 2);
-  assert.equal(f.peak(), 1);
+  assert.equal(f.peak(), 4);
 });
 
 test("persistent failures stop after three attempts and preserve completed examples", async () => {
@@ -273,7 +273,7 @@ test("long documents analyze every section, including sections formerly skipped"
     assert.ok(f.calls.some(call => typeof call.contents === "string" && call.contents.includes(`SECTION_${index} `)));
   }
   assert.equal(result.body.examples.length, 8);
-  assert.equal(f.peak(), 1);
+  assert.equal(f.peak(), 5);
 });
 
 test("invalid input and provider output fail explicitly without transcript extraction fallback", async () => {

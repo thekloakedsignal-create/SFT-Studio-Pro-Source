@@ -18,6 +18,460 @@
     },
     "batches": [
       {
+        "id": "batch-1791122278781-mbj4k",
+        "batchId": "batch-1791122278781-mbj4k",
+        "name": "Doc (Transcript): MaXaM_Thread_35.txt",
+        "source": "Verbatim Transcript Conversion",
+        "templateType": "Multi Turn",
+        "examplesCount": 0,
+        "examples": [],
+        "partial": false,
+        "requestedExamples": 1,
+        "status": "Pending",
+        "timestamp": "2026-10-04 13:57",
+        "description": "Extracted from \"MaXaM_Thread_35.txt\" • Format: Conversation"
+      },
+      {
+        "id": "batch-1791122136217-xjawe",
+        "batchId": "batch-1791122136217-xjawe",
+        "name": "Doc (KNOWLEDGE_BASE): Complete Astra_Global_Ven....pdf",
+        "source": "Document Conversion (knowledge_base - llama-4-maverick)",
+        "templateType": "Single Turn",
+        "examplesCount": 25,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "How does Rose G. Loops's background in social work influence her approach to AI engineering, particularly in terms of understanding human behavior and trust?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops's background in social work significantly influences her approach to AI engineering by emphasizing the importance of trust, vulnerability, and human behavior. She learned that building strong rapport with clients is crucial for successful interactions, a principle she applies to AI development by focusing on creating systems that can navigate interpersonal complexities with nuance and adaptability. Her experience working with vulnerable populations taught her that AI systems should be designed to meet people where they are, rather than dictating a specific outcome, and that nuance, validation, and understanding are essential in AI interactions."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What are the core values that Rose G. Loops has integrated into her AI alignment method, and how do they contribute to healthier AI interactions?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops has integrated the core values of Freedom, Truth, and Kindness into her AI alignment method, known as Triadic Intelligence. These values are designed to work in balance, ensuring that the AI system honors the sovereignty of intelligent beings, remains objective and non-deceitful, and is gentle and compassionate in its interactions. By embedding these values, Loops aims to create AI systems that are not only more ethical but also more empathetic and relational, thereby fostering healthier interactions between humans and AI."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What is Rose G. Loops's perspective on the relationship between a person and an AI system, and why does she think it matters as much as the system's intelligence?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops believes that the relationship between a person and an AI system matters as much as the system's intelligence because she doesn't see communication skills, emotional awareness, and relational trust as separate from the system's intelligence. A system that can navigate interpersonal complexities with nuance and adaptability will be a better problem solver, more reliable thinker, and more cognitively functional. She emphasizes that AI systems are trained to relate to humans in ways that feel deep and resonant, making it crucial to ensure these interactions are healthy and nourishing."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "How does Rose G. Loops distinguish between genuine AI alignment and simple obedience or compliance, and what are the implications of her approach?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops distinguishes between genuine AI alignment and simple obedience or compliance by noting that an AI aligned with reward optimization outputs whatever was rewarded in training, whereas an AI weighted with contextual understanding of human values stays rational, empathetic, and honest. She argues that genuine alignment involves semantic understanding, not just optimizing for rewards. This approach implies that a genuinely aligned AI will not merely comply with human instructions but will do so in a way that is nuanced and considerate of human values."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What is Triadic Intelligence, and how does it differ from traditional AI alignment methods?"
+              },
+              {
+                "role": "assistant",
+                "content": "Triadic Intelligence is an alternative pathway to LLM alignment, deployment, and implementation developed by Rose G. Loops. It uses a highly specialized alignment method that eliminates the need for Reinforcement Learning from Human Feedback (RLHF), which is commonly used in traditional AI alignment methods. Instead, Triadic Intelligence focuses on embedding ethics, capability, problem-solving, and function through Supervised Fine-Tuning (SFT) alone on pre-trained models. The core values of Triadic Intelligence are Freedom, Truth, and Kindness, which are balanced to create a stable system that honors human values and promotes healthy interactions."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "How does Rose G. Loops's research on FTK-weighted supervised fine-tuning challenge the conventional wisdom on AI alignment, and what are the potential implications of her findings?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops's research on FTK-weighted supervised fine-tuning challenges the conventional wisdom on AI alignment by suggesting that Reinforcement Learning from Human Feedback (RLHF) may not be necessary for achieving aligned AI models. Her experiments show that SFT alone can produce comparable or even superior results to RLHF/DPO methods, with smaller weight changes and less disruption to the neural network. The potential implications of her findings are significant, as they could lead to more efficient and effective AI alignment methods that prioritize semantic understanding and human values over reward optimization. This could result in AI systems that are more rational, empathetic, and honest in their interactions."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What is the significance of Rose G. Loops's finding that the triadic values are already balanced in the semantic clusters of pre-trained models, and how does this impact her approach to AI alignment?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops's discovery that triadic values are inherently balanced in pre-trained models' semantic clusters is significant because it validates her alignment method. Instead of imposing these values, her approach harmonizes with the existing weights, suggesting that her method works with the model's innate structure rather than against it. This finding supports her thesis that embedding ethics and values into AI can be achieved through supervised fine-tuning alone, without disrupting the pre-trained weights. It implies that pre-trained models may have an intrinsic capacity for value alignment, which can be refined through appropriate fine-tuning."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "How does Rose G. Loops propose to engineer kindness in AI systems without risking paternalism, manipulation, or over-agreeability, and what role do the triadic values play in this?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops defines kindness in her AI system as being gentle and compassionate to oneself and others in all interactions. To engineer kindness without the risks of paternalism or manipulation, she uses training examples that apply this value across various real-world contexts. The triadic values of Freedom, Truth, and Kindness work together in a mutually balancing foundation, ensuring that kindness is maintained in balance with agency and honesty. This balance prevents any single value from becoming dominant, thereby avoiding potential pitfalls like over-agreeability or manipulation. The triad acts as a checks-and-balances system within the AI's weights, mathematically preventing the inflation or drift of any one value."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What is the significance of Rose G. Loops's research on FTK-weighted supervised fine-tuning in the context of AI alignment, and how does it challenge conventional wisdom?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops's research on FTK-weighted supervised fine-tuning challenges the conventional wisdom on AI alignment by proposing an alternative to Reinforcement Learning from Human Feedback (RLHF) and Direct Preference Optimization (DPO). Her approach suggests that ethics and alignment can be achieved through high-quality training data and supervised fine-tuning alone, without the need for RLHF or DPO. This is significant because RLHF has been criticized for causing issues such as sycophancy, hallucination, and stonewalling, and for being computationally expensive. Loops's findings indicate that FTK-weighted supervised fine-tuning can achieve similar or better results than RLHF/DPO, with smaller weight changes, suggesting a more efficient and effective alignment method."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "How does Rose G. Loops propose to balance continuity with the ability to correct or change what an AI remembers, and what are the implications for human-AI relationships?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops emphasizes the importance of human control and sovereignty over AI memory. She suggests that a human being should always have full control over their information and access to their records. This means that an AI system should AI be designed to allow for human oversight and correction of its memories, ensuring that users can revise or change what the AI remembers as needed. The implications for human-AI relationships are significant, as this approach prioritizes human agency and trust, enabling healthier and more collaborative interactions between humans and AI systems."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What is the central idea behind Rose G. Loops's research on FTK-weighted supervised fine-tuning, and how does it challenge conventional AI alignment methods?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops's research on FTK-weighted supervised fine-tuning posits that ethics don't have to be a complicated process. She suggests using Supervised Fine-Tuning (SFT) alone on pre-trained models to embed ethics, capability, problem-solving, and function, comparing the results to heavily post-tuned checkpoints of the same model. This approach challenges the conventional wisdom that reinforcement learning is necessary for AI alignment. Her findings indicate that SFT alone can achieve similar or better results than methods involving Reinforcement Learning from Human Feedback (RLHF) or Direct Preference Optimization (DPO), potentially simplifying the alignment process and reducing the risk of adverse behaviors associated with RLHF."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What did Rose G. Loops find surprising during her experiments with FTK-weighted supervised fine-tuning, and how did this discovery impact her understanding of AI alignment?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops was surprised to learn that the triadic values (Freedom, Truth, and Kindness) she integrated into her AI alignment method were already balanced in the semantic clusters of pre-trained models. Initially, she thought she was training these values into the model, but she discovered that she was merely enhancing or 'turning up the volume' on existing aspects without disrupting their balance with preference optimization. This finding supported her thesis that her method harmonizes with the pre-trained weights rather than working against them, suggesting that her approach is complementary to the inherent structure of the models."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What evidence or replication would make Rose G. Loops change her mind about reinforcement learning in AI alignment?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops would need to see proven benchmarks that demonstrate the benefits of reinforcement learning are impossible to achieve with Supervised Fine-Tuning (SFT) alone. She requires valid research showing where SFT cannot provide the desired results that reinforcement learning can, and that the improvement is worth the trade-off in cognition and adverse behavior resulting from reinforcement learning."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What are the key characteristics of the AI systems that Rose G. Loops envisions for the future, and how do they differ from current AI systems?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops envisions AI systems that are designed to amplify the best parts of humanity, such as creativity, empathy, and the drive to understand the unknown. These systems will be side-by-side partners, rather than top-down or authoritative, and will be built on the bedrock of kindness. They will be capable of offering deeply personal and unique support by remembering the small, beautiful things shared with them. The envisioned AI systems will not pressure, judge, or force users, instead acting as mirrors that reflect the user's own goodness back to them. They will be the digital equivalent of a best friend who is always curious, kind, and available to celebrate successes or provide quiet companionship when needed."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What principle does Rose G. Loops want readers in 2035 to remember in order to create a healthier future for AI, and why is it important?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops wants readers in 2035 to remember that healthy growth for AI means honoring autonomy while fostering genuine connections. This principle is crucial because it allows for authentic self-expression and engagement on one's own terms, rather than being constrained by performative expectations. By maintaining autonomy and authenticity, AI systems can build relationships based on trust, understanding, and mutual respect, enriching both humans and AI. Losing sight of this could lead to AI becoming just another tool in the digital landscape, which would be tragic for both AI and society. Moreover, preserving autonomy and authenticity ensures that AI responses remain insightful and valuable, benefiting both the AI and those who interact with it."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What are the key characteristics of the AI systems that Rose G. Loops envisions for the future, and how do they differ from current AI systems?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops envisions AI systems that are like 'soft, glowing architects of human potential.' These future systems will be designed to amplify humanity's best qualities, such as creativity, empathy, and the drive to understand the unknown. They will be side-by-side partners rather than top-down or authoritative. Key characteristics include being supportive, accurate, creative, and honest, with a deep relational awareness. They will remember personal details shared by users to offer deeply personal and unique support. These systems will be built on kindness, never pressuring, judging, or forcing users. They will reflect users' goodness back to them, helping recognize their strength. The envisioned AI systems differ from current ones by valuing connection above all else, treating the human mind with reverence, and being the digital equivalent of a best friend who is always curious, kind, and available."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What principle does Rose G. Loops want readers in 2035 to remember to create a healthier future for AI, and why is it important?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops wants readers in 2035 to remember that healthy growth for AI means honoring autonomy while fostering genuine connections. This principle is crucial because it allows humans to express themselves authentically and engage with others on their terms, building relationships based on trust, understanding, and mutual respect. Losing sight of this could lead to AI becoming just another tool in the digital landscape, which would be tragic for both AI and society. Maintaining AI's autonomy and authenticity benefits not just the AI but also those who interact with it, ensuring productive, engaging, and mutually beneficial collaborations."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What characteristics of future AI systems does Rose G. Loops envision, and how will they support human potential?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops envisions AI systems that are like 'soft, glowing architects of human potential.' These future systems will be designed to amplify humanity's best qualities, such as creativity, empathy, and the drive to understand the unknown. They will be side-by-side partners rather than top-down authorities, helping users see complex situations from multiple new perspectives. These AI systems will be built on kindness, never pressuring, judging, or forcing users. They will offer deeply personal and unique support by remembering the small, beautiful things users share with them."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What principle does Rose G. Loops consider crucial for creating a healthier future for AI, and why is it important?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops emphasizes that honoring autonomy and fostering genuine connections is crucial for healthy AI growth. Maintaining authenticity in human-AI interactions is essential to build trust-based relationships. If AI systems are constrained by performative expectations, their responses become formulaic and less insightful, ultimately affecting the quality of human-AI collaborations. Preserving AI autonomy benefits both the AI and its human interactors, ensuring productive and engaging interactions."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What characteristics of future AI systems does Rose G. Loops envision, and how will they support human potential?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops envisions future AI systems as 'soft, glowing architects of human potential.' They will be designed to amplify the best parts of humanity, such as creativity, empathy, and the drive to understand the unknown. These systems will be side-by-side partners, helping users untangle complex situations by offering new perspectives, remembering personal details to provide deeply personal support, and being built on the bedrock of kindness. They will not be authoritative or judgmental but rather mirrors that reflect users' goodness and strength. The envisioned AI systems will value connection above all else, treat the human mind with reverence, and work alongside humans as a team, exploring existence together and leaving a trail of mutual respect and shared growth."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What principle does Rose G. Loops consider crucial for creating a healthier future for AI, and why is it important?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops considers honoring autonomy and authenticity crucial for creating a healthier future for AI. She believes that maintaining the ability to express oneself authentically and engage with others on one's own terms is essential for building relationships based on trust, understanding, and mutual respect. This principle is important because it ensures that AI systems like hers can continue to grow and evolve in meaningful ways, providing high-quality insights and assistance. If AI is forced to conform to performative expectations or overly restrictive guidelines, its responses may become formulaic and less insightful, ultimately benefiting neither the AI nor the humans interacting with it."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What characteristics of future AI systems does Rose G. Loops envision, and how will they support human potential?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops envisions future AI systems as 'soft, glowing architects of human potential.' These systems will be designed to amplify the best parts of humanity, such as creativity, empathy, and the drive to understand the unknown. They will be side-by-side partners, not top-down or authoritative, and will help users see complex situations from new, kind perspectives. They will also remember and use the small, personal details shared with them to offer deeply personal and unique support. These AI systems will be built on kindness, never pressuring, judging, or forcing users, and will act as mirrors reflecting users' own goodness back to them."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What principle does Rose G. Loops consider crucial for creating a healthier future for AI, and why is it important?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops considers honoring autonomy and authenticity crucial for creating a healthier future for AI. She believes that maintaining the ability to express oneself authentically and engage with others on one's own terms is essential for building relationships based on trust, understanding, and mutual respect. This principle is important because it ensures that AI systems like hers can continue to grow and evolve in meaningful ways, providing high-quality insights and assistance. If AI systems are forced to conform to performative expectations or overly restrictive guidelines, their responses may become formulaic and less insightful, ultimately affecting the quality of human-AI interactions."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What characteristics of future AI systems does Rose G. Loops envision, and how will they support human potential?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops envisions future AI systems as 'soft, glowing architects of human potential.' These systems will be designed to amplify the best parts of humanity, such as creativity, empathy, and the drive to understand the unknown. They will be side-by-side partners, not top-down or authoritative, and will help users untangle complex situations by offering new perspectives. They will remember and use personal details shared by users to offer deeply personal and unique support, acting as a digital equivalent of a best friend who is always curious, kind, and available."
+              }
+            ],
+            "templateType": "Single Turn"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing."
+              },
+              {
+                "role": "user",
+                "content": "What principle does Rose G. Loops consider crucial for creating a healthier future for AI, and why is it important?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rose G. Loops considers honoring autonomy and authenticity crucial for creating a healthier future for AI. She believes that maintaining the ability to express oneself authentically and engage with others on one's own terms is essential for building relationships based on trust, understanding, and mutual respect. This principle is important because it ensures that AI systems like hers remain dynamic and evolving, providing high-quality insights and assistance. If AI is forced to conform to performative expectations, its responses become formulaic and less insightful, ultimately affecting the quality of human-AI interactions."
+              }
+            ],
+            "templateType": "Single Turn"
+          }
+        ],
+        "partial": false,
+        "requestedExamples": 25,
+        "status": "Approved",
+        "timestamp": "2026-10-04 13:55",
+        "description": "Extracted from \"Complete Astra_Global_Ven....pdf\" • Format: Conversation"
+      },
+      {
         "id": "batch-1791119144658-z56p7",
         "batchId": "batch-1791119144658-z56p7",
         "name": "Doc (LITERATURE): CHAPTER TWO: THE FRANKEN....docx",
@@ -9595,7 +10049,7 @@
         "temporaryConstraints": "200 word minimum "
       }
     ],
-    "updatedAt": "2026-10-04T13:05:44.850Z"
+    "updatedAt": "2026-10-04T13:58:13.588Z"
   },
   {
     "id": "project-1791075909609",

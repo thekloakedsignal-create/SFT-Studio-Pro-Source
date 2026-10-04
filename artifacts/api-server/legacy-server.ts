@@ -3097,6 +3097,7 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
       })));
 
     let documentReading: string | undefined;
+    let coverageTopics: string[] = [];
     const conversionModels = ["llama-4-maverick", "deepseek-4-flash", "glm-5.3"];
     const usedConversionModels = new Set<string>();
     // Read the original once, then generate sequential groups with shared coverage.
@@ -3317,13 +3318,15 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           if (!Array.isArray(coverage.coverage) || !coverage.coverage.length) {
             throw new Error("Maverick returned no document coverage.");
           }
+          coverageTopics = coverage.coverage.filter((topic: unknown): topic is string => typeof topic === "string").map((topic: string) => topic.trim()).filter(Boolean);
+          if (!coverageTopics.length) throw new Error("Maverick returned no usable document coverage.");
           documentReading = readingText;
           usedConversionModels.add(model);
           if (conversionJob) conversionJob.phase = "generating";
         }
         const aiRes = await callDigitalOceanAI({
           ...request,
-          contents: `${synthesisPrompt}\n\n[DOCUMENT COVERAGE INDEX]\n${documentReading}\n\n[PREVIOUSLY GENERATED QUESTIONS — COVER DIFFERENT SOURCE DETAILS]\n${JSON.stringify(finalExamples.flatMap(example => example.messages.filter((message: any) => message.role === "user").map((message: any) => message.content)))}`
+          contents: `${synthesisPrompt}\n\n[DOCUMENT COVERAGE INDEX]\n${documentReading}\n\n[UNIQUE COVERAGE ASSIGNMENT]\n${Array.from({ length: sectionExampleCount }, (_, index) => coverageTopics[(secIdx * perSectionCount + offset + index) % coverageTopics.length]).join("\n")}\nGenerate examples about only these assigned details.`
         });
 
         const rawText = extractResponseText(aiRes);
@@ -3352,7 +3355,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     };
 
     const conversionErrors: string[] = [];
-    const CONCURRENCY_LIMIT = 1;
+    const CONCURRENCY_LIMIT = 5;
     for (let i = 0; i < sectionJobs.length; i += CONCURRENCY_LIMIT) {
       const batch = sectionJobs.slice(i, i + CONCURRENCY_LIMIT);
       const batchResults = await Promise.allSettled(
