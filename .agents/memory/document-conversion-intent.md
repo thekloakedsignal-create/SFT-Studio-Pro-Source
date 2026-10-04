@@ -20,3 +20,9 @@ Clearing a document resets the converter and its displayed result so another doc
 **Why:** The user clarified that Clear Document is meant to prepare the converter for another document, not merely dismiss the review card.
 
 **How to apply:** Clear the document inputs and active converter result. Do not remove approved or pending batches from shared project data. Delete a rejected converter batch through the existing batch-delete path.
+
+User-typed conversion instructions apply to every generated conversation and override document-analysis guidance. Literature defaults to storytelling. Knowledge and Literature use the project definition and target the example count displayed in analysis.
+
+**Why:** The user explicitly clarified the instruction precedence and Literature's storytelling default.
+
+**How to apply:** Pass current instructions, project context, and analysis to each synthesis and refill request. Keep source grounding and the selected template; never fabricate examples to fill a count.

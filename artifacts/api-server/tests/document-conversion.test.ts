@@ -10,11 +10,13 @@ const routesSource = source.slice(source.indexOf("// Universal Transcript Cleani
 assert.ok(routesSource.includes('app.post("/api/convert-document"'));
 const compiled = await transform(routesSource, { loader: "ts", format: "cjs", target: "node24" });
 
-function fixture(output: "valid" | "invalid" | "error" | "partial" | "unfinished" = "valid") {
+function fixture(output: "valid" | "invalid" | "error" | "partial" | "recover" | "pause" | "unfinished" = "valid", analysisCount = 4) {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   let active = 0;
   let peak = 0;
+  let resume!: () => void;
+  const pause = new Promise<void>(resolve => { resume = resolve; });
   vm.runInNewContext(compiled.code, {
     app: { post: (path: string, ...handlers: Function[]) => routes.set(path, handlers.at(-1)!),
       get: (path: string, ...handlers: Function[]) => routes.set(path, handlers.at(-1)!) },
@@ -31,18 +33,20 @@ function fixture(output: "valid" | "invalid" | "error" | "partial" | "unfinished
     async callDigitalOceanAI(params: any) {
       calls.push(params);
       const callIndex = calls.length;
+      if (output === "pause" && callIndex > 2) await pause;
       peak = Math.max(peak, ++active);
       await Promise.resolve();
       active--;
       if (output === "error") throw new Error("fixture provider failure");
-      if (output === "partial" && callIndex === 2) throw new Error("fixture truncated response");
+      if ((output === "partial" && (callIndex === 2 || callIndex > 4))
+        || (output === "recover" && callIndex === 2)) throw new Error("fixture truncated response");
       if (output === "invalid") return { text: '{"examples":[{"messages":[]}]}' };
       if (output === "unfinished") return { text: JSON.stringify({ examples: [{ messages: [
         { role: "user", content: "Question" }, { role: "assistant", content: "Answer" },
         { role: "user", content: "Unanswered follow-up" }
       ] }] }) };
       if (params.contents.includes("architectural analysis")) return { text: JSON.stringify({
-        estimatedCount: 4, recommendedDocType: "transcript", titleOrTheme: "Storage migration",
+        estimatedCount: analysisCount, recommendedDocType: "transcript", titleOrTheme: "Storage migration",
         explanation: "Four substantive topics in the discussion."
       }) };
       const count = Number(params.contents.match(/Synthesize exactly (\d+) examples/)?.[1]);
@@ -61,7 +65,7 @@ function fixture(output: "valid" | "invalid" | "error" | "partial" | "unfinished
     }
   });
   return {
-    calls, peak: () => peak,
+    calls, peak: () => peak, resume,
     async start(body: any) {
       const response: any = { code: 200, status(code: number) { this.code = code; return this; },
         json(body: any) { this.body = body; return this; } };
@@ -71,7 +75,7 @@ function fixture(output: "valid" | "invalid" | "error" | "partial" | "unfinished
       return { response, done };
     },
     poll(owner = "test-owner") {
-      const response: any = { code: 200, status(code: number) { this.code = code; return this; },
+      const response: any = { code: 200, setHeader() {}, status(code: number) { this.code = code; return this; },
         json(body: any) { this.body = body; return this; } };
       routes.get("/api/convert-document/jobs/:jobId")!({ deviceId: owner, params: { jobId: "conversion-test-job" } }, response);
       return response;
@@ -162,7 +166,46 @@ test("failed requests do not discard completed examples or stop later requests",
   assert.equal(result.body.examples.length, 3);
   assert.equal(result.body.partial, true);
   assert.equal(result.body.requestedCount, 4);
-  assert.equal(f.calls.length, 4);
+  assert.equal(f.calls.length, 6);
+});
+
+test("each knowledge and literature conversation and refill retains user instructions, project and analysis", async () => {
+  for (const docType of ["knowledge_base", "literature"]) {
+    const f = fixture("recover");
+    const result = await f.run({
+      docType, count: 4, templateType: "Multi Turn",
+      converterInstructions: "Use short dialogue and focus only on river safety.",
+      projectName: "River Tutor", targetTask: "Teach safe navigation",
+      constraints: "Never invent water conditions", systemPrompt: "You are a river guide.",
+      documentAnalysis: "Cover equipment, navigation, weather, and routes."
+    });
+    assert.equal(result.code, 200);
+    assert.equal(result.body.examples.length, 4);
+    assert.equal(result.body.partial, false);
+    assert.equal(f.calls.length, 5);
+    assert.equal(f.peak(), 2);
+    for (const call of f.calls) {
+      for (const text of ["Use short dialogue and focus only on river safety.",
+        "River Tutor", "Teach safe navigation", "Never invent water conditions",
+        "Cover equipment, navigation, weather, and routes.",
+        "EVERY generated conversation", "the user's instructions take precedence"]) {
+        assert.ok(call.contents.includes(text), text);
+      }
+      assert.match(call.contents, /Synthesize exactly 1 examples/);
+    }
+  }
+});
+
+test("analysis receives current user instructions and project definition", async () => {
+  const f = fixture();
+  const analysis = await f.run({
+    docType: "literature", projectName: "Story Tutor",
+    targetTask: "Teach storytelling", systemPrompt: "You are a narrator.",
+    constraints: "Stay grounded", converterInstructions: "Focus on the protagonist."
+  }, "/api/analyze-document");
+  assert.equal(analysis.body.estimatedCount, 4);
+  for (const text of ["Story Tutor", "Teach storytelling", "You are a narrator.",
+    "Stay grounded", "Focus on the protagonist."]) assert.ok(f.calls[0].contents.includes(text));
 });
 
 test("unfinished conversations are not returned as completed examples", async () => {
@@ -200,10 +243,40 @@ test("converter UI excludes Reasoning and retains partial results for review", a
   const app = await readFile(new URL("../../sft-studio-pro-2/src/App.tsx", import.meta.url), "utf8");
   const options = app.slice(app.indexOf("Dataset Turn Mode & Layout:"), app.indexOf("AI Document Analysis & Example Count Estimation Readout"));
   assert.doesNotMatch(options, /TemplateType\.REASONING/);
-  for (const mode of ["SINGLE_TURN", "MULTI_TURN", "MIXED"]) assert.ok(options.includes(`TemplateType.${mode}`));
-  assert.ok(app.includes("setLatestConvertedDocBatchId(newBatch.id)"));
-  assert.ok(app.includes("partial: Boolean(data.partial)"));
+  for (const mode of ["SINGLE_TURN", "MULTI_TURN"]) assert.ok(options.includes(`TemplateType.${mode}`));
+  assert.ok(app.includes("documentAnalysis: docSuggestionExplanation"));
+  assert.ok(app.includes("count: docCount"));
+  assert.ok(app.includes("!hasUserManuallySetDocType && data.recommendedDocType"));
+  assert.ok(app.includes("setLatestConvertedDocBatchId(id)"));
+  assert.ok(app.includes("partial: Boolean(result.partial)"));
+  assert.ok(app.includes("displayConversion({ ...status, partial: true"));
+  assert.ok(app.includes("prev.filter(existing => existing.id !== id)"));
   assert.ok(app.includes("latestDocBatch.partial"));
+});
+
+test("completed examples are available while conversion is still running, with a stable batch ID", async () => {
+  const f = fixture("pause");
+  const { done } = await f.start({});
+  for (let step = 0; step < 30; step++) await Promise.resolve();
+  const running = f.poll().body;
+  assert.equal(running.status, "running");
+  assert.equal(running.examples.length, 2);
+  assert.equal(running.completed, 2);
+  f.resume();
+  await done;
+  const finished = f.poll().body;
+  assert.equal(finished.result.examples.length, 4);
+  assert.equal(finished.result.batchId, running.batchId);
+  assert.ok(f.calls.every(call => call.timeoutMs > 0 && call.timeoutMs <= 20_000));
+});
+
+test("analysis preserves recommendations above 35 and conversion fulfills that count", async () => {
+  const f = fixture("valid", 45);
+  const analysis = await f.run({}, "/api/analyze-document");
+  assert.equal(analysis.body.estimatedCount, 45);
+  const result = await f.run({ count: analysis.body.estimatedCount, documentAnalysis: analysis.body.explanation });
+  assert.equal(result.body.examples.length, 45);
+  assert.equal(result.body.partial, false);
 });
 
 test("long documents analyze every section, including sections formerly skipped", async () => {

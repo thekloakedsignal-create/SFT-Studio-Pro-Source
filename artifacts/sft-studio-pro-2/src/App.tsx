@@ -2290,7 +2290,12 @@ export default function App() {
           documentContent: content,
           documentName: name || docName || "Inline Document",
           docType,
-          extractionModel
+          extractionModel,
+          projectName: project.name,
+          systemPrompt: project.systemPrompt,
+          targetTask: project.targetTask,
+          constraints: project.constraints,
+          converterInstructions: converterInstructions.trim()
         })
       });
       const data = await res.json();
@@ -2301,7 +2306,7 @@ export default function App() {
         if (data.explanation) {
           setDocSuggestionExplanation(data.explanation);
         }
-        if (data.recommendedDocType && ["knowledge_base", "transcript", "literature"].includes(data.recommendedDocType)) {
+        if (!hasUserManuallySetDocType && data.recommendedDocType && ["knowledge_base", "transcript", "literature"].includes(data.recommendedDocType)) {
           setDocType(data.recommendedDocType as "knowledge_base" | "transcript" | "literature");
         }
         if (data.titleOrTheme) {
@@ -2679,6 +2684,27 @@ export default function App() {
       const effectiveTemplate = docTemplate;
 
       const conversionProjectId = selectedProjectId;
+      const displayConversion = (result: any): SFTBatch => {
+        const name = truncateFileName(docName, 32) || "Extract";
+        const id = result.batchId || result.id || `batch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const batch: SFTBatch = {
+          id, batchId: id,
+          name: `Doc (${docType === "transcript" ? "Transcript" : docType.toUpperCase()}): ${name}`,
+          source: result.source || (docType === "transcript" ? "Verbatim Transcript Conversion" : "Doc Conversion"),
+          templateType: result.templateType || effectiveTemplate,
+          examplesCount: result.examples.length, examples: result.examples,
+          partial: Boolean(result.partial), requestedExamples: result.requestedCount || docCount,
+          status: "Pending", timestamp: new Date().toISOString().slice(0, 16).replace("T", " "),
+          description: `Extracted from "${name}" • Format: ${project.projectFormat === ProjectFormat.INSTRUCTION ? `Instruction (${project.instructTemplate || "ChatML"})` : "Conversation"}`
+        };
+        if (activeProjectId.current === conversionProjectId) {
+          setBatches(prev => [batch, ...prev.filter(existing => existing.id !== id)]);
+          setSelectedBatchId(id);
+          setLatestConvertedDocBatchId(id);
+          setIsDocPreviewCleared(false);
+        }
+        return batch;
+      };
       const res = await projectApiFetch("/api/convert-document", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2702,6 +2728,7 @@ export default function App() {
           assistantTag: assistantTag.trim(),
           fixedUserPrompt,
           literatureTheme,
+          documentAnalysis: docSuggestionExplanation,
           converterInstructions: converterInstructions.trim()
         })
       });
@@ -2717,12 +2744,20 @@ export default function App() {
       if (res.status === 202) {
         if (typeof data.jobId !== "string") throw new Error("Conversion job ID is missing.");
         const jobId = data.jobId;
+        let displayedCount = 0;
         while (true) {
           await new Promise(resolve => setTimeout(resolve, 1500));
           const statusResponse = await projectApiFetch(`/api/convert-document/jobs/${encodeURIComponent(jobId)}`);
           const status = await statusResponse.json();
           if (!statusResponse.ok) throw new Error(status.error || "Unable to retrieve conversion results.");
-          if (status.status === "running") continue;
+          if (status.status === "running") {
+            if (Array.isArray(status.examples) && status.examples.length > displayedCount) {
+              displayedCount = status.examples.length;
+              displayConversion({ ...status, partial: true, requestedCount: docCount });
+              setNotification({ text: `Converting: ${displayedCount} of ${docCount} examples ready below.`, type: "info" });
+            }
+            continue;
+          }
           if (!status.result) throw new Error("Conversion returned no result.");
           data = status.result;
           break;
@@ -2730,27 +2765,7 @@ export default function App() {
       }
 
       if (data.success && Array.isArray(data.examples) && data.examples.length > 0) {
-        const truncatedDocName = truncateFileName(docName, 32);
-        const generatedBatchId = data.batchId || data.id || `batch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-        const newBatch: SFTBatch = {
-          id: generatedBatchId,
-          batchId: generatedBatchId,
-          name: `Doc (${docType === "transcript" ? "Transcript" : docType.toUpperCase()}): ${truncatedDocName || "Extract"}`,
-          source: data.source || (docType === "transcript" ? "Verbatim Transcript Conversion" : "Doc Conversion"),
-          templateType: data.templateType || effectiveTemplate,
-          examplesCount: data.examples.length,
-          examples: data.examples,
-          partial: Boolean(data.partial),
-          requestedExamples: data.requestedCount || docCount,
-          status: "Pending",
-          timestamp: new Date().toISOString().slice(0, 16).replace("T", " "),
-          description: `Extracted from "${truncatedDocName || "Raw Text"}" • Format: ${project.projectFormat === ProjectFormat.INSTRUCTION ? `Instruction (${project.instructTemplate || "ChatML"})` : "Conversation"}`
-        };
-
-        setBatches(prev => [newBatch, ...prev]);
-        setSelectedBatchId(newBatch.id);
-        setLatestConvertedDocBatchId(newBatch.id);
-        setIsDocPreviewCleared(false);
+        const newBatch = displayConversion(data);
         if (conversionProjectId) {
           const saved = await saveBatch(conversionProjectId, newBatch);
           if (!saved) {
@@ -5881,7 +5896,7 @@ export default function App() {
 
                   <div className="border-t border-slate-800/60 pt-5 mt-6 flex justify-end">
                     <button
-                      disabled={isConverting || !docContent.trim() || isFieldsUnlocked || !selectedProjectId}
+                      disabled={isConverting || isAnalyzingDoc || !docContent.trim() || isFieldsUnlocked || !selectedProjectId}
                       onClick={handleConvertDocument}
                       className={`px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
                         isFieldsUnlocked || !selectedProjectId
