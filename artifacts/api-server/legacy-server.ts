@@ -3094,7 +3094,7 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
         count: 1
       })));
 
-    // Process sections in controlled batches (concurrency: 2) to respect inference burst limits.
+    // Process sections in controlled batches (concurrency: 10).
     const processSection = async (currentSectionText: string, secIdx: number, sectionExampleCount: number, offset: number) => {
       try {
         let specificInstructions = "";
@@ -3305,7 +3305,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     };
 
     const conversionErrors: string[] = [];
-    const CONCURRENCY_LIMIT = 2;
+    const CONCURRENCY_LIMIT = 10;
     for (let i = 0; i < sectionJobs.length; i += CONCURRENCY_LIMIT) {
       const batch = sectionJobs.slice(i, i + CONCURRENCY_LIMIT);
       const batchResults = await Promise.allSettled(

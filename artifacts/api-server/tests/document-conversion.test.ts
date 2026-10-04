@@ -149,13 +149,13 @@ test("transcript layout, Mixed, and instruction formats work; converter rejects 
 
 test("large requested counts use bounded small groups with custom instructions retained", async () => {
   const f = fixture();
-  const result = await f.run({ docType: "knowledge_base", count: 8, converterInstructions: "Focus on backup procedures." });
-  assert.equal(result.body.examples.length, 8);
-  assert.equal(f.calls.length, 8);
-  assert.equal(f.peak(), 2);
+  const result = await f.run({ docType: "knowledge_base", count: 50, converterInstructions: "Focus on backup procedures." });
+  assert.equal(result.body.examples.length, 50);
+  assert.equal(f.calls.length, 50);
+  assert.equal(f.peak(), 10);
   assert.ok(f.calls.every(call => /Synthesize exactly 1 examples/.test(call.contents)
     && /Focus on backup procedures/.test(call.contents)));
-  assert.match(f.calls.at(-1).contents, /examples 8-8 of 8/);
+  assert.match(f.calls.at(-1).contents, /examples 50-50 of 50/);
 });
 
 test("failed converter requests are retried individually without repeating successful requests", async () => {
@@ -166,7 +166,7 @@ test("failed converter requests are retried individually without repeating succe
   assert.equal(result.body.partial, false);
   assert.equal(f.calls.length, 5);
   assert.equal(f.calls.filter(call => call.contents.includes("Coverage assignment: examples 2-2 ")).length, 2);
-  assert.ok(f.peak() <= 2);
+  assert.ok(f.peak() <= 10);
 });
 
 test("persistent failures stop after three attempts and preserve completed examples", async () => {
@@ -232,7 +232,7 @@ test("long documents analyze every section, including sections formerly skipped"
     assert.ok(f.calls.some(call => call.contents.includes(`SECTION_${index} `)));
   }
   assert.equal(result.body.examples.length, 8);
-  assert.ok(f.peak() <= 2);
+  assert.ok(f.peak() <= 10);
 });
 
 test("invalid input and provider output fail explicitly without transcript extraction fallback", async () => {
