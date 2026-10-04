@@ -15,11 +15,11 @@ The DigitalOcean adapter's verified request format is `json_object`, with respon
 
 **How to apply:** Preserve JSON-object mode and keep strict schema constraints Reasoning-only until the integration itself establishes native structured-output support.
 
-Treat repeated Reasoning model slots as independent requests, not one shared failure domain. Collect in-flight sibling results before finalizing a partial batch.
+Treat repeated Reasoning model slots as independent requests, not one shared failure domain. Collect in-flight sibling results before finalizing a partial batch. Refill any missing examples with separate concurrent Nemotron requests, never one bulk fill request.
 
-**Why:** Assigning the same Nemotron model to every slot made model-wide cancellation affect all slots; fail-fast finalization could also omit responses that completed later. The user requested a minimal fix for only one response completing.
+**Why:** Assigning the same Nemotron model to every slot made model-wide cancellation affect all slots; fail-fast finalization could also omit responses that completed later. The user requested a minimal fix for only one response completing and later explicitly required individual concurrent refills instead of one all-missing request.
 
-**How to apply:** Keep Reasoning timeout isolation and result collection separate from the existing Single Turn/Multi Turn failure policy. Preserve model selection, batch sizes, timing, and recovery limits unless explicitly asked to change them.
+**How to apply:** Keep Reasoning timeout isolation and result collection separate from prompt/template changes. Preserve Nemotron model selection, batch sizes, initial schedule, and spacing; apply the user-authorized per-example concurrent refill and longer shared batch deadline without changing provider transport or parsing.
 
 Use only `nemotron-3-ultra-550b` for Reasoning, including timeout recovery; the general GLM recovery rule applies only to other templates.
 

@@ -1,4 +1,4 @@
-- [SFT generation constraints](sft-generation-constraints.md) — Keep direct DigitalOcean calls and 529-only backup; save completed output as a marked partial batch after failures.
+- [SFT generation constraints](sft-generation-constraints.md) — Generate every refill via an individual concurrent provider request; never use bulk or fabricated fallback examples.
 - [Batch snapshot compatibility](batch-snapshot-compatibility.md) — Preserve newer incremental saves and deletions when older clients submit whole-project snapshots.
 - [Reasoning and Mixed scope](reasoning-template-scope.md) — Mixed excludes Reasoning; preserve it in Batch Synthesis and remove it only from Document Converter when asked.
 - [TRiAD import source](triad-import-source.md) — Keep TRiAD imports URL-based; do not restore embedded helpful/harmful seed examples or fallback records.

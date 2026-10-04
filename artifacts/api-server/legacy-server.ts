@@ -1950,7 +1950,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       await Promise.all(Array.from({ length: Math.min(10, replacementCount) }, async () => {
         while (nextReplacement < replacementCount) {
           if (Date.now() >= generationDeadline) {
-            recoveryFailureReason ??= "The batch deadline expired before all missing examples could be recovered.";
+            recoveryFailureReason = "The batch deadline expired before all missing examples could be recovered.";
             if (isReasoningGeneration) recoveryFailureCategory ??= "provider_timeout";
             return;
           }
