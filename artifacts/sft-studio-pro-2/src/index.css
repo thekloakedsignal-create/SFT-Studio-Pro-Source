@@ -342,11 +342,11 @@ main [class~="opacity-45"] { opacity: .72; }
   color: #4a1d5d !important;
 }
 
-.kk-workspace-panel :is(p, span, label, a):not(button *):not(a *):not(.kk-code *):not(.kk-composer *):not(.kk-example-label):not(.kk-neon-example-count) {
+.kk-workspace-panel :is(p, span, label, a):not(button *):not(a *):not(.kk-code *):not(.kk-composer *):not(.kk-example-label):not(.kk-neon-example-count):not(.kk-reasoning-example *) {
   color: #2e2334 !important;
 }
 
-.kk-workspace-panel [class*="text-slate-"]:not(button *):not(.kk-code *):not(.kk-composer *) {
+.kk-workspace-panel [class*="text-slate-"]:not(button *):not(.kk-code *):not(.kk-composer *):not(.kk-reasoning-example):not(.kk-reasoning-example *) {
   color: #3d2c45 !important;
 }
 
@@ -402,6 +402,18 @@ main [class~="opacity-45"] { opacity: .72; }
 .kk-workspace-panel span.kk-neon-example-count {
   color: #7e22ce !important;
   text-shadow: 0 0 4px rgb(126 34 206 / 24%);
+}
+
+.kk-workspace-panel .kk-reasoning-example,
+.kk-workspace-panel .kk-reasoning-example * {
+  color: #f000ff !important;
+  text-shadow: 0 0 5px rgb(240 0 255 / 62%), 0 0 12px rgb(240 0 255 / 38%);
+}
+
+.kk-workspace-panel .kk-example-card .pl-2.border-l-2 {
+  color: #1b0e20 !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
 }
 
 #root > div:has(> .kk-header) > main :is(

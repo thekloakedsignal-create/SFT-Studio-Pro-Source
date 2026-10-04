@@ -4931,8 +4931,6 @@ export default function App() {
 
                 {/* Batch Generator Settings Card */}
                 <div className="kk-synthetic-generator-card bg-slate-950/40 border border-slate-800/80 p-6 rounded-2xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 h-32 w-32 bg-green-500/5 rounded-full blur-3xl pointer-events-none" />
-                  
                   <div className="border-b border-slate-800 pb-4 mb-6">
                     <h2 className="text-lg font-bold text-white flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-green-400" />
@@ -5310,7 +5308,7 @@ export default function App() {
 
                                   {/* Reasoning trace details (rendered BEFORE content for thinking models) */}
                                   {m.role === "assistant" && (m.reasoning || (typeof m.content === "string" && m.content.includes("<think>"))) && (
-                                    <div className="mb-2 ml-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-850 text-slate-400 font-mono text-[10px] leading-normal">
+                                    <div className="mb-2 ml-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-850 text-slate-400 font-mono text-[10px] leading-normal kk-reasoning-example">
                                       <span className="text-amber-400/90 block font-semibold uppercase tracking-wider mb-1 flex items-center gap-1">
                                         🧠 Train of Thought / Reasoning Trace:
                                       </span>
@@ -6000,7 +5998,7 @@ export default function App() {
 
                                   {/* Reasoning trace details (rendered BEFORE content for thinking models) */}
                                   {m.role === "assistant" && (m.reasoning || (typeof m.content === "string" && m.content.includes("<think>"))) && (
-                                    <div className="mb-2 ml-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-850 text-slate-400 font-mono text-[10px] leading-normal">
+                                    <div className="mb-2 ml-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-850 text-slate-400 font-mono text-[10px] leading-normal kk-reasoning-example">
                                       <span className="text-amber-400/90 block font-semibold uppercase tracking-wider mb-1 flex items-center gap-1">
                                         🧠 Train of Thought / Reasoning Trace:
                                       </span>
@@ -6291,7 +6289,7 @@ export default function App() {
 
                                   {/* Reasoning trace details (rendered BEFORE content for thinking models) */}
                                   {m.role === "assistant" && (m.reasoning || (typeof m.content === "string" && m.content.includes("<think>"))) && (
-                                    <div className="mb-2 ml-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-850 text-slate-400 font-mono text-[10px] leading-normal">
+                                    <div className="mb-2 ml-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-850 text-slate-400 font-mono text-[10px] leading-normal kk-reasoning-example">
                                       <span className="text-amber-400/90 block font-semibold uppercase tracking-wider mb-1 flex items-center gap-1">
                                         🧠 Train of Thought / Reasoning Trace:
                                       </span>
@@ -6761,7 +6759,7 @@ export default function App() {
 
                                     {/* Reasoning trace details (rendered BEFORE content for thinking models) */}
                                     {m.role === "assistant" && (m.reasoning || (typeof m.content === "string" && m.content.includes("<think>"))) && (
-                                      <div className="mb-2 ml-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-slate-400 font-mono text-[10px] leading-normal">
+                                      <div className="mb-2 ml-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-slate-400 font-mono text-[10px] leading-normal kk-reasoning-example">
                                         <span className="text-amber-400/90 block font-semibold uppercase tracking-wider mb-1 flex items-center gap-1">
                                           🧠 Train of Thought / Reasoning Trace:
                                         </span>
