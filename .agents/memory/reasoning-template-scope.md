@@ -38,3 +38,9 @@ Mixed must contain only a mix of Single Turn and Multi Turn, never Reasoning.
 **Why:** The user explicitly requested that the MIXED template exclude reasoning.
 
 **How to apply:** Apply this boundary to both generation and document conversion, including instruction-formatted output. Mixed must not preserve reasoning fields or thinking traces; leave the dedicated Reasoning template unchanged.
+
+When removing the Mixed option from the UI, remove it only from the Document Converter; preserve the Mixed option in Batch Synthesis.
+
+**Why:** The user corrected an earlier change that removed the Batch Synthesis option instead of limiting the change to the Document Converter.
+
+**How to apply:** Keep the Batch Synthesis Mixed control available for conversation and instruction projects. Do not expose Mixed in the Document Converter when the user requests its removal there.

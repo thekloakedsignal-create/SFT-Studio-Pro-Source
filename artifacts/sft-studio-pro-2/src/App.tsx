@@ -5039,6 +5039,7 @@ export default function App() {
                               { type: TemplateType.SINGLE_TURN, label: "Single Turn", sub: "Instruction Pair" },
                               { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Multi-turn Dialogue" },
                               { type: TemplateType.REASONING, label: "Reasoning", sub: "<think> CoT" },
+                              { type: TemplateType.MIXED, label: "Mixed", sub: "Single + Multi" },
                             ].map(({ type, label, sub }) => {
                               const isSelected = batchTemplate === type;
                               return (
@@ -5073,6 +5074,7 @@ export default function App() {
                               { type: TemplateType.SINGLE_TURN, label: "Single Turn", sub: "Q&A Pair" },
                               { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Dialogue" },
                               { type: TemplateType.REASONING, label: "Reasoning", sub: "CoT Thoughts" },
+                              { type: TemplateType.MIXED, label: "Mixed", sub: "Single + Multi" },
                             ].map(({ type, label, sub }) => {
                               const isSelected = batchTemplate === type;
                               return (
