@@ -5213,7 +5213,7 @@ export default function App() {
                               </button>
                               <button
                                 onClick={() => handleUpdateBatchStatus(latestGeneratorBatch.id, "Rejected")}
-                                className="px-3 py-2 bg-slate-800 hover:bg-red-950 text-slate-400 hover:text-red-400 font-semibold text-xs rounded-xl border border-slate-750 transition flex items-center gap-1 cursor-pointer"
+                                className="kk-reject-batch-button px-3 py-2 bg-slate-800 hover:bg-red-950 text-slate-400 hover:text-red-400 font-semibold text-xs rounded-xl border border-slate-750 transition flex items-center gap-1 cursor-pointer"
                               >
                                 <XCircle className="h-3.5 w-3.5" />
                                 Reject Batch
@@ -5914,7 +5914,7 @@ export default function App() {
                               </button>
                               <button
                                 onClick={() => handleUpdateBatchStatus(latestDocBatch.id, "Rejected")}
-                                className="px-3 py-2 bg-slate-800 hover:bg-red-950 text-slate-400 hover:text-red-400 font-semibold text-xs rounded-xl border border-slate-750 transition flex items-center gap-1 cursor-pointer"
+                                className="kk-reject-batch-button px-3 py-2 bg-slate-800 hover:bg-red-950 text-slate-400 hover:text-red-400 font-semibold text-xs rounded-xl border border-slate-750 transition flex items-center gap-1 cursor-pointer"
                               >
                                 <XCircle className="h-3.5 w-3.5" />
                                 Reject Batch

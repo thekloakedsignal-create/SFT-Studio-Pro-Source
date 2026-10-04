@@ -406,14 +406,24 @@ main [class~="opacity-45"] { opacity: .72; }
 
 .kk-workspace-panel .kk-reasoning-example,
 .kk-workspace-panel .kk-reasoning-example * {
-  color: #f000ff !important;
-  text-shadow: 0 0 5px rgb(240 0 255 / 62%), 0 0 12px rgb(240 0 255 / 38%);
+  color: #c77dff !important;
+  text-shadow: none !important;
 }
 
 .kk-workspace-panel .kk-example-card .pl-2.border-l-2 {
-  color: #1b0e20 !important;
-  font-size: 1rem !important;
-  font-weight: 800 !important;
+  color: #09040d !important;
+  font-size: 1.05rem !important;
+  font-weight: 900 !important;
+}
+
+.kk-workspace-panel .kk-example-card [class*="uppercase"][class*="px-1.5"] {
+  color: #09040d !important;
+  font-weight: 900 !important;
+}
+
+.kk-workspace-panel button.kk-reject-batch-button {
+  color: #ffffff !important;
+  font-weight: 900 !important;
 }
 
 #root > div:has(> .kk-header) > main :is(
