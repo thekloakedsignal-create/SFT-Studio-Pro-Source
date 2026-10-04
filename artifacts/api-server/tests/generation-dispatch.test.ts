@@ -412,7 +412,7 @@ test("Reasoning timeout failure categories remain internal to job status", async
   }
 });
 
-test("Multi Turn retains its single GLM fill request after model timeouts", async () => {
+test("Multi Turn fills timed-out slots individually", async () => {
   for (const mode of ["timeoutQwen", "504Qwen"] as const) {
     const f = fixture(mode);
     const response = await f.generate(25, false, "Multi Turn");
@@ -423,9 +423,8 @@ test("Multi Turn retains its single GLM fill request after model timeouts", asyn
     assert.equal(f.calls.filter(call => call.model === "qwen3.5-397b-a17b").length, 1);
     assert.equal(f.calls.at(-1).model, firstModel);
     const recoveryPrompt = f.calls.at(-1).messages.find((message: any) => message.role === "user").content;
-    assert.match(recoveryPrompt, /Generate exactly 3 examples\./);
-    assert.equal(f.timeoutValues.at(-1), 60000);
-    assert.ok(f.timeoutValues.slice(0, -1).every(timeoutMs => timeoutMs === 20000));
+    assert.match(recoveryPrompt, /Generate exactly 1 examples\./);
+    assert.ok(f.timeoutValues.every(timeoutMs => timeoutMs <= 20000));
   }
 });
 
@@ -434,11 +433,10 @@ test("batches over 50 examples receive a proportionally longer total timeout", a
   const response = await f.generate(250, false, "Multi Turn");
   assert.equal(response.body.success, true);
   assert.equal(response.body.examples.length, 250);
-  assert.equal(f.calls.length, 21);
+  assert.equal(f.calls.length, 270);
   assert.equal(f.calls.at(-1).model, firstModel);
   const fallbackTimeout = f.timeoutValues.at(-1) ?? 0;
-  assert.equal(fallbackTimeout, 576000);
-  assert.ok(fallbackTimeout > 120000);
+  assert.equal(fallbackTimeout, 20000);
 });
 
 test("stopping a stalled model aborts its duplicate in-flight request", async () => {
@@ -449,7 +447,7 @@ test("stopping a stalled model aborts its duplicate in-flight request", async ()
   assert.equal(f.calls.filter(call => call.model === "qwen3.5-397b-a17b").length, 2);
   assert.equal(f.calls.at(-1).model, firstModel);
   const recoveryPrompt = f.calls.at(-1).messages.find((message: any) => message.role === "user").content;
-  assert.match(recoveryPrompt, /Generate exactly 20 examples\./);
+  assert.match(recoveryPrompt, /Generate exactly 1 examples\./);
 });
 
 test("Single Turn recovers 12 missing examples individually, preserving the original 38", async () => {
@@ -567,12 +565,26 @@ test("Multi Turn and Mixed retain responses and continue large batches after fir
     for (const size of [50, 250]) {
       const f = fixture("singleEarlyFailures");
       const response = await f.generate(size, false, mode);
-      assert.equal(f.calls.length, size, "Run the original schedule without retries");
-      assert.equal(response.body.examples.length, size - 4);
-      assert.equal(response.body.partial, true);
-      assert.equal(response.body.requestedCount, size);
+      assert.equal(f.calls.length, size + 4, "Replace each missing example individually");
+      assert.equal(response.body.examples.length, size);
+      assert.equal(response.body.partial, undefined);
       assert.ok(response.body.examples.every(hasRenderableMessages));
     }
+  }
+});
+
+test("Multi Turn and Mixed retry failed replacements but stop at the batch deadline", async () => {
+  for (const mode of ["Multi Turn", "Mixed"]) {
+    const f = fixture("singleRecovery12", "timeout");
+    const response = await f.generate(50, false, mode);
+    assert.equal(response.body.examples.length, 50);
+    assert.equal(response.body.partial, undefined);
+    assert.equal(f.calls.length, 54);
+    const expired = fixture("singleRecovery12", "deadline");
+    const partial = await expired.generate(50, false, mode);
+    assert.equal(partial.body.partial, true);
+    assert.equal(partial.body.examples.length, 39);
+    assert.equal(expired.calls.length, 42);
   }
 });
 

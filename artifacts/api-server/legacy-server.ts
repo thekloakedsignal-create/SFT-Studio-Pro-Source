@@ -1119,7 +1119,7 @@ app.post("/api/generate", async (req, res) => {
   const generationDeadline = Date.now() + generationTimeoutMs;
   const stalledModels = new Set<string>();
   let timedOutExampleCount = 0;
-  let requestExamplesForMissingBatch: ((model: string, count: number, timeoutMs: number) => Promise<any[]>) | undefined;
+  let requestExamplesForMissingBatch: ((model: string, count: number, timeoutMs: number, slot?: number) => Promise<any[]>) | undefined;
   let isReasoningGeneration = false;
   const useJobPolling = req.body?.jobMode === true;
   let generationJobId: string | undefined;
@@ -1764,11 +1764,14 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             return parsed.slice(0, requestedCount);
           };
           if (!requestExamplesForMissingBatch) {
-            requestExamplesForMissingBatch = (model, requestedCount, timeoutMs) =>
+            requestExamplesForMissingBatch = (model, requestedCount, timeoutMs, slot = 0) =>
               requestExamplesFromModel(
                 model,
                 requestedCount,
-                promptForExampleCount(requestedCount),
+                turnMode === "Mixed" ? promptForExampleCount(requestedCount).replace(
+                  /For this request, generate [^\n]+/,
+                  `For this request, generate ${slot % 2 === 0 ? "Single Turn: one user/assistant exchange" : "Multi Turn: 2–4 user/assistant exchanges"}.`
+                ) : promptForExampleCount(requestedCount),
                 timeoutMs,
                 model === "glm-5.3"
               );
@@ -1940,13 +1943,15 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     let recoveryFailureReason: string | null = null;
     let recoveryFailureCategory: GenerationFailureCategory | undefined;
     let recoveryModel = isReasoningGeneration ? "nemotron-3-ultra-550b" : "glm-5.3";
-    if (turnMode === "Single Turn" && timedOutExampleCount > 0 && requestExamplesForMissingBatch) {
-      // One replacement per missing slot, with bounded concurrency and no retry
-      // loop. Keep successful replacements even if a sibling fails.
+    const completeMissing = turnMode === "Multi Turn" || turnMode === "Mixed";
+    let replacementCount = completeMissing ? Math.max(0, countNum - completedExampleCount) : timedOutExampleCount;
+    if ((turnMode === "Single Turn" || completeMissing) && replacementCount > 0 && requestExamplesForMissingBatch) {
+      // Multi Turn/Mixed requeue failed replacements until complete or deadline.
+      // Single Turn retains its existing one-attempt-per-missing-timeout policy.
       const requestReplacement = requestExamplesForMissingBatch;
       let nextReplacement = 0;
-      await Promise.all(Array.from({ length: Math.min(10, timedOutExampleCount) }, async () => {
-        while (nextReplacement < timedOutExampleCount) {
+      await Promise.all(Array.from({ length: Math.min(10, replacementCount) }, async () => {
+        while (nextReplacement < replacementCount) {
           if (Date.now() >= generationDeadline) {
             recoveryFailureReason ??= "The batch deadline expired before all missing examples could be recovered.";
             return;
@@ -1956,13 +1961,13 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           try {
             let examples: any[];
             try {
-              examples = await requestReplacement(replacementModel, 1, SFT_SINGLE_EXAMPLE_TIMEOUT_MS);
+              examples = await requestReplacement(replacementModel, 1, SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
             } catch (error: any) {
               if (!isProviderOverload(error)) throw error;
               const backup = generationModels.find(model => model !== replacementModel && !stalledModels.has(model));
               if (!backup) throw error;
               replacementModel = backup;
-              examples = await requestReplacement(replacementModel, 1, SFT_SINGLE_EXAMPLE_TIMEOUT_MS);
+              examples = await requestReplacement(replacementModel, 1, SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
             }
             recoveryExamples.push(...examples);
             completedExampleCount += examples.length;
@@ -1978,8 +1983,14 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             recoveryFailureReason ??= formatAIErrorMessage(error);
             logger.warn(
               { model: replacementModel, slot, batchId: generationBatchId, error: formatAIErrorMessage(error) },
-              "Single Turn replacement failed; preserving other completed examples"
+              "Replacement failed; preserving other completed examples"
             );
+            if (completeMissing) {
+              replacementCount++;
+              // Pace persistent provider failures instead of creating a tight request loop.
+              const pauseMs = Math.min(2000, Math.max(0, generationDeadline - Date.now()));
+              if (pauseMs > 0) await new Promise(resolve => setTimeout(resolve, pauseMs));
+            }
           }
         }
       }));
