@@ -3306,26 +3306,18 @@ No internal deliberation, planning, or reasoning fields are permitted.`
 
     const conversionErrors: string[] = [];
     const CONCURRENCY_LIMIT = 2;
+    if (conversionJob) conversionJob.total = sectionJobs.length;
     for (let i = 0; i < sectionJobs.length; i += CONCURRENCY_LIMIT) {
       const batch = sectionJobs.slice(i, i + CONCURRENCY_LIMIT);
       const batchResults = await Promise.allSettled(
-        batch.map(async job => {
-          for (let attempt = 0; ; attempt++) {
-            try {
-              return await processSection(job.text, job.sectionIndex, job.count, job.offset);
-            } catch (error) {
-              if (attempt >= 2) throw error;
-              await new Promise(resolve => setTimeout(resolve, 400));
-            }
-          }
-        })
+        batch.map(job => processSection(job.text, job.sectionIndex, job.count, job.offset))
       );
       for (const result of batchResults) {
         if (result.status === "fulfilled") finalExamples.push(...result.value);
         else conversionErrors.push(result.reason?.message || "Document conversion request failed.");
       }
       if (conversionJob) {
-        conversionJob.completed = Math.min(requestedCount, finalExamples.length);
+        conversionJob.completed += batchResults.length;
         conversionJob.updatedAt = Date.now();
       }
       if (i + CONCURRENCY_LIMIT < sectionJobs.length) {
@@ -3388,7 +3380,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       success: true, 
       examples: formattedExamples,
       requestedCount,
-      partial: formattedExamples.length < requestedCount,
+      partial: conversionErrors.length > 0 || formattedExamples.length < requestedCount,
       source: `Document Conversion (${actualDocType} - ${extractionModel || "DigitalOcean"})`
     });
 
