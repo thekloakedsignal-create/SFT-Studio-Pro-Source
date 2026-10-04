@@ -462,3 +462,43 @@ main [class~="opacity-45"] { opacity: .72; }
   border-color: #c77dff !important;
   box-shadow: 0 0 0 1px rgb(199 125 255 / 28%);
 }
+
+#root > div:has(> .kk-header) > main .kk-workspace-panel button:is(
+  [class~="bg-slate-950"],
+  [class~="bg-slate-900"],
+  [class~="bg-slate-800"],
+  [class~="bg-slate-700"],
+  [class~="bg-green-500"],
+  [class~="bg-green-600"],
+  [class~="bg-green-400"],
+  [class~="bg-green-500/15"],
+  [class~="bg-green-500/10"],
+  [class~="bg-blue-600/20"],
+  [class~="bg-amber-400/15"],
+  .kk-primary,
+  .kk-tab-active
+),
+#root > div:has(> .kk-header) > main .kk-workspace-panel button:is(
+  [class~="bg-slate-950"],
+  [class~="bg-slate-900"],
+  [class~="bg-slate-800"],
+  [class~="bg-slate-700"],
+  [class~="bg-green-500"],
+  [class~="bg-green-600"],
+  [class~="bg-green-400"],
+  [class~="bg-green-500/15"],
+  [class~="bg-green-500/10"],
+  [class~="bg-blue-600/20"],
+  [class~="bg-amber-400/15"],
+  .kk-primary,
+  .kk-tab-active
+) :is(span, strong, b, small, em, p, label, div) {
+  color: #ffffff !important;
+  font-weight: 900 !important;
+}
+
+#root > div:has(> .kk-header) > main .kk-qa-panel button,
+#root > div:has(> .kk-header) > main .kk-qa-panel button :is(span, strong, b, small, em, p, label, div) {
+  color: #ffffff !important;
+  font-weight: 900 !important;
+}
