@@ -3098,6 +3098,7 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
 
     let documentReading: string | undefined;
     let coverageTopics: string[] = [];
+    let documentReadPromise: Promise<{ reading: string; topics: string[] }> | undefined;
     const conversionModels = ["llama-4-maverick", "deepseek-4-flash", "glm-5.3"];
     const usedConversionModels = new Set<string>();
     // Read the original once, then generate sequential groups with shared coverage.
@@ -3287,7 +3288,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           }
         };
 
-        if (documentReading === undefined) {
+        if (!documentReadPromise) {
+          documentReadPromise = (async () => {
           const visualParts: any[] = [];
           const source = req.body.documentSource;
           if (source) {
@@ -3320,10 +3322,14 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           }
           coverageTopics = coverage.coverage.filter((topic: unknown): topic is string => typeof topic === "string").map((topic: string) => topic.trim()).filter(Boolean);
           if (!coverageTopics.length) throw new Error("Maverick returned no usable document coverage.");
-          documentReading = readingText;
           usedConversionModels.add(model);
           if (conversionJob) conversionJob.phase = "generating";
+          return { reading: readingText, topics: coverageTopics };
+          })();
         }
+        const readState = await documentReadPromise;
+        documentReading = readState.reading;
+        coverageTopics = readState.topics;
         const aiRes = await callDigitalOceanAI({
           ...request,
           contents: `${synthesisPrompt}\n\n[DOCUMENT COVERAGE INDEX]\n${documentReading}\n\n[UNIQUE COVERAGE ASSIGNMENT]\n${Array.from({ length: sectionExampleCount }, (_, index) => coverageTopics[(secIdx * perSectionCount + offset + index) % coverageTopics.length]).join("\n")}\nGenerate examples about only these assigned details.`
