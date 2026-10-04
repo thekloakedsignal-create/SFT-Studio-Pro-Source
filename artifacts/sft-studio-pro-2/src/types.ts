@@ -67,6 +67,8 @@ export interface SFTBatch {
   description?: string;
   specialInstructions?: string;
   temporaryConstraints?: string;
+  generationSettings?: ProjectSettings;
+  qualityReport?: QualityReport;
 }
 
 export interface QualityIssue {

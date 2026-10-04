@@ -2226,6 +2226,7 @@ export default function App() {
         batchId: generatedBatchId,
         name: batchDesc.trim() || `Synthetic Batch #${batches.length + 1}`,
         source: "Generator",
+        generationSettings: { ...project },
         templateType: batchTemplate,
         examplesCount: finalExamples.length,
         examples: finalExamples,
@@ -2866,7 +2867,7 @@ export default function App() {
   // Regenerate flagged examples based on quality assessment feedback
   const handleRegenerateFlagged = async (batchId: string) => {
     const targetBatch = batches.find(b => b.id === batchId);
-    const targetReport = reports[batchId];
+    const targetReport = reports[batchId] || targetBatch?.qualityReport;
     if (!targetBatch || !targetReport) {
       setNotification({ text: "Please run an AI Quality Audit first before regenerating flagged examples.", type: "info" });
       return;
@@ -2900,27 +2901,57 @@ export default function App() {
     });
 
     try {
-      const res = await fetch("/api/regenerate-flagged", {
+      const repairProjectId = selectedProjectId;
+      const originalSettings = targetBatch.generationSettings || project;
+      const res = await projectApiFetch("/api/regenerate-flagged", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           flaggedItems,
+          jobMode: true,
           suggestions: targetReport.suggestions || [],
-          systemPrompt: project.systemPrompt,
-          targetTask: project.targetTask,
-          constraints: project.constraints,
-          templateType: targetBatch.templateType
+          systemPrompt: originalSettings.systemPrompt,
+          targetTask: originalSettings.targetTask,
+          constraints: originalSettings.constraints,
+          templateType: targetBatch.templateType,
+          batchDescription: targetBatch.description,
+          specialInstructions: targetBatch.specialInstructions,
+          temporaryConstraints: targetBatch.temporaryConstraints,
+          instructTemplate: originalSettings.projectFormat === ProjectFormat.INSTRUCTION ? originalSettings.instructTemplate : undefined,
+          representativePrompt: originalSettings.representativePrompt,
+          representativeCompletion: originalSettings.representativeCompletion
         })
       });
 
-      const data = await res.json();
-      if (!data.success) {
+      let data = await res.json();
+      if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to regenerate flagged examples.");
+      }
+      if (res.status === 202) {
+        if (typeof data.jobId !== "string") throw new Error("QA repair job ID is missing.");
+        const jobId = data.jobId;
+        while (true) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          const statusRes = await projectApiFetch(`/api/regenerate-flagged/jobs/${encodeURIComponent(jobId)}`);
+          const status = await statusRes.json();
+          if (!statusRes.ok) throw new Error(status.error || "Unable to retrieve QA repairs.");
+          if (status.status === "running") {
+            setNotification({ text: `Repairing flagged responses: ${status.completed}/${status.total} processed...`, type: "info" });
+            continue;
+          }
+          data = status.result;
+          if (!data?.success) throw new Error(data?.error || "QA repair failed.");
+          break;
+        }
       }
 
       const regeneratedList: { exampleIndex: number; messages: SFTMessage[] }[] = data.regeneratedExamples || [];
       if (regeneratedList.length === 0) {
         throw new Error("No regenerated examples were returned by the AI engine.");
+      }
+      if (regeneratedList.some(item => !issuesByIndex.has(item.exampleIndex) || !item.messages?.length)
+        || new Set(regeneratedList.map(item => item.exampleIndex)).size !== regeneratedList.length) {
+        throw new Error("QA repair returned unexpected or duplicate example indices.");
       }
 
       // Map new examples into the batch
@@ -2930,55 +2961,48 @@ export default function App() {
         if (item.exampleIndex >= 0 && item.exampleIndex < newExamples.length) {
           newExamples[item.exampleIndex] = {
             ...newExamples[item.exampleIndex],
-            messages: Array.isArray(item.messages) ? item.messages.map(sanitizeClientMessage) : []
+            messages: item.messages
           };
         }
       });
 
+      const remainingIssues = targetReport.issues.filter(issue => !regeneratedIndices.has(issue.exampleIndex));
+      const remainingFlagged = new Set(remainingIssues.map(issue => issue.exampleIndex)).size;
+      const updatedReport: QualityReport = {
+        ...targetReport,
+        overallScore: Math.round((newExamples.length - remainingFlagged) / newExamples.length * 100),
+        issues: remainingIssues,
+        suggestions: remainingIssues.length ? targetReport.suggestions : [],
+        duplicateCheck: remainingIssues.length ? targetReport.duplicateCheck : {
+          duplicatesFound: 0, duplicatesList: [], deduplicatedLength: newExamples.length
+        },
+        stats: { totalExamples: newExamples.length, flaggedCount: remainingFlagged, passedCount: newExamples.length - remainingFlagged }
+      };
       const updatedBatch: SFTBatch = {
         ...targetBatch,
         examples: newExamples,
-        examplesCount: newExamples.length
+        examplesCount: newExamples.length,
+        qualityReport: updatedReport
       };
 
-      setBatches(prev => prev.map(b => (b.id === batchId ? updatedBatch : b)));
-
       // Persist to database / local storage if within a selected project
-      if (selectedProjectId) {
-        saveBatch(selectedProjectId, updatedBatch);
+      if (repairProjectId) {
+        const saved = await saveBatch(repairProjectId, updatedBatch);
+        if (!saved) {
+          setBatches(prev => prev.map(b => b.id === batchId ? { ...updatedBatch, qualityReport: targetReport } : b));
+          throw new Error("Responses repaired locally, but saving failed. The QA score has not been cleared.");
+        }
+      }
+      if (activeProjectId.current === repairProjectId) {
+        setBatches(prev => prev.map(b => (b.id === batchId ? updatedBatch : b)));
+        setReports(prev => ({ ...prev, [batchId]: updatedReport }));
       }
 
-      // Immediately clear the regenerated issues and update numbers of flagged / passed responses
-      setReports(prev => {
-        const currentRep = prev[batchId];
-        if (!currentRep) return prev;
-        const remainingIssues = (currentRep.issues || []).filter(
-          iss => !regeneratedIndices.has(iss.exampleIndex)
-        );
-        const total = newExamples.length;
-        const remainingFlaggedIndices = new Set(remainingIssues.map(iss => iss.exampleIndex));
-        const newFlaggedCount = remainingFlaggedIndices.size;
-        const newPassedCount = Math.max(0, total - newFlaggedCount);
-        const newOverallScore = total > 0 ? Math.round((newPassedCount / total) * 100) : 100;
-        return {
-          ...prev,
-          [batchId]: {
-            ...currentRep,
-            overallScore: newOverallScore,
-            issues: remainingIssues,
-            stats: {
-              ...currentRep.stats,
-              totalExamples: total,
-              flaggedCount: newFlaggedCount,
-              passedCount: newPassedCount
-            }
-          }
-        };
-      });
-
       setNotification({
-        text: `Successfully regenerated and fixed ${regeneratedList.length} flagged example(s)! All issues resolved.`,
-        type: "success"
+        text: remainingFlagged
+          ? `Repaired ${regeneratedList.length} flagged examples. ${remainingFlagged} remain flagged; successful repairs were saved.`
+          : `All ${regeneratedList.length} flagged examples repaired and saved. QA score: 100%.`,
+        type: remainingFlagged ? "info" : "success"
       });
     } catch (err: any) {
       setNotification({ text: `Regeneration failed: ${err.message}`, type: "error" });
@@ -3738,7 +3762,7 @@ export default function App() {
 
   // Handle active batch selection & memoized inspector pagination
   const currentBatch = batches.find(b => b.id === selectedBatchId) || batches[0];
-  const activeReport = currentBatch ? reports[currentBatch.id] : null;
+  const activeReport = currentBatch ? reports[currentBatch.id] || currentBatch.qualityReport : null;
 
   const displayedInspectorItems = useMemo<{
     example: SFTExample;

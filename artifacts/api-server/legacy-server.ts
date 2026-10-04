@@ -4004,7 +4004,16 @@ app.post("/api/analyze-quality", async (req, res) => {
 });
 
 // 3.1 Regenerate and Fix Flagged SFT Examples
-app.post("/api/regenerate-flagged", async (req, res) => {
+const qaRepairJobs: typeof documentConversionJobs = new Map();
+app.get("/api/regenerate-flagged/jobs/:jobId", optionalAuth, (req: AuthRequest, res) => {
+  const job = qaRepairJobs.get(String(req.params.jobId));
+  if (!job || job.owner !== projectOwnerId(req)) {
+    return res.status(404).json({ success: false, error: "QA repair job not found or expired." });
+  }
+  return res.json({ success: true, status: job.status, completed: job.completed, total: job.total, result: job.result });
+});
+
+app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) => {
   const {
     flaggedItems,
     suggestions,
@@ -4017,21 +4026,58 @@ app.post("/api/regenerate-flagged", async (req, res) => {
   if (!flaggedItems || !Array.isArray(flaggedItems) || flaggedItems.length === 0) {
     return res.json({ success: false, error: "No flagged examples provided to regenerate." });
   }
+  if (flaggedItems.some((item: any) => !Number.isInteger(item.exampleIndex) || item.exampleIndex < 0
+    || !Array.isArray(item.example?.messages))
+    || new Set(flaggedItems.map((item: any) => item.exampleIndex)).size !== flaggedItems.length) {
+    return res.status(400).json({ success: false, error: "Invalid or duplicate flagged example indices." });
+  }
 
   const client = getDigitalOceanClient();
+  let job: (typeof qaRepairJobs extends Map<string, infer T> ? T : never) | undefined;
+  const finish = (code: number, result: any) => {
+    if (job) {
+      job.status = result.success ? "complete" : "error";
+      job.updatedAt = Date.now();
+      job.result = result;
+    } else res.status(code).json(result);
+  };
+  if (req.body.jobMode === true) {
+    const owner = projectOwnerId(req);
+    if (!owner) return res.status(401).json({ success: false, error: "A signed-in account or guest device is required." });
+    for (const [id, old] of qaRepairJobs) {
+      if (old.status !== "running" && Date.now() - old.updatedAt > 3600000) qaRepairJobs.delete(id);
+    }
+    const jobId = randomUUID();
+    job = { owner, status: "running", completed: 0, total: flaggedItems.length, updatedAt: Date.now() };
+    qaRepairJobs.set(jobId, job);
+    res.status(202).json({ success: true, jobId });
+  }
 
   try {
     if (!client) {
       throw new Error("DigitalOcean inference client is not available.");
     }
 
+    const regeneratedExamples: any[] = [];
+    const failures: { exampleIndex: number; error: string }[] = [];
+    let nextItem = 0;
+    const repairStacks = createModelGenerationStacks(flaggedItems.length, getGenerationModels());
+    for (let stackIndex = 0; stackIndex < repairStacks.length; stackIndex++) {
+      if (stackIndex) await new Promise(resolve => setTimeout(resolve, 2000));
+      await Promise.all(repairStacks[stackIndex].map(async ({ model }) => {
+        const item = flaggedItems[nextItem++];
+        const originalTemplate = item.example.templateType || templateType;
+        const itemTemplate = /mixed/i.test(originalTemplate || "")
+          ? (item.example.messages.filter((message: any) => message.role === "user").length > 1 ? "Multi Turn" : "Single Turn")
+          : originalTemplate;
+        try {
     const fullPrompt = `
       You are an expert Supervised Fine-Tuning (SFT) Dataset Engineer and Quality Improvement Specialist.
-      Your task is to fix and regenerate the following ${flaggedItems.length} flagged SFT training examples based on quality assessment feedback.
+      Your task is to fix the following flagged SFT training example based on quality assessment feedback.
       You must eliminate every reported issue, conform strictly to the system prompt and persona constraints, and ensure high diversity, accuracy, and formatting compliance.
 
       TARGET SYSTEM PROMPT:
-      ${systemPrompt || "Standard helpful assistant"}
+      ${item.example.messages.find((message: any) => message.role === "system")?.content || systemPrompt || "Standard helpful assistant"}
 
       TARGET TASK & OBJECTIVE:
       ${targetTask || "Supervised fine-tuning high quality conversations"}
@@ -4039,14 +4085,24 @@ app.post("/api/regenerate-flagged", async (req, res) => {
       PROJECT CONSTRAINTS:
       ${constraints || "None specified"}
 
+      ORIGINAL BATCH INSTRUCTIONS:
+      ${JSON.stringify({
+        description: req.body.batchDescription,
+        specialInstructions: req.body.specialInstructions,
+        temporaryConstraints: req.body.temporaryConstraints,
+        instructTemplate: req.body.instructTemplate,
+        representativePrompt: req.body.representativePrompt,
+        representativeCompletion: req.body.representativeCompletion
+      })}
+
       DATASET TEMPLATE TYPE:
-      ${templateType || "Single Turn"}
+      ${itemTemplate || "Single Turn"}
 
       GLOBAL QA SUGGESTIONS:
       ${Array.isArray(suggestions) && suggestions.length > 0 ? suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n") : "Provide rich, accurate, and completely resolved responses."}
 
       FLAGGED EXAMPLES AND SPECIFIC AUDIT ISSUES:
-      ${JSON.stringify(flaggedItems, null, 2)}
+      ${JSON.stringify([item], null, 2)}
 
       RULES:
       1. For each item in the input, preserve its exact original "exampleIndex".
@@ -4054,27 +4110,54 @@ app.post("/api/regenerate-flagged", async (req, res) => {
       3. Regenerate the content to fix the specific flagged audit issues without altering the established template or conversation format.
       4. Ensure the regenerated response completely resolves all formatting anomalies (properly close all markdown code fences and reasoning tags like <think>, finish any truncated thoughts, remove unpopulated placeholder tokens, and ensure coherent turn ordering) and satisfies all system prompt guidelines and negative constraints.
       5. Return ONLY valid JSON matching the requested schema.
+      6. Preserve user, system, and other non-assistant messages exactly. Change only assistant responses.
+      7. Return exactly {"regeneratedExamples":[{"exampleIndex":${item.exampleIndex},"messages":[{"role":"user","content":"original user content"},{"role":"assistant","content":"corrected response"}]}]} with ALL original messages in their original order and roles. The illustrated two-message array is only an example, not a turn-count limit.
+      8. Resolve the specific issue messages and recommended fixes above. Keep the full JSON response within 4096 output tokens.
     `;
 
     const response = await callDigitalOceanAI({
-      model: normalizeModel(),
-      contents: fullPrompt,
+      model: itemTemplate === "Reasoning" ? "nemotron-3-ultra-550b" : model,
+      contents: itemTemplate === "Reasoning" ? encodeReasoningProviderText(fullPrompt) : fullPrompt,
+      timeoutMs: 45000,
       config: {
         temperature: 0.2,
+        maxOutputTokens: 4096,
         responseMimeType: "application/json"
       }
     });
 
-    const parsed = JSON.parse(extractResponseText(response) || "{}");
+    const text = extractResponseText(response) || "{}";
+    const parsed = JSON.parse(itemTemplate === "Reasoning" ? decodeReasoningProviderText(text) : text);
     const rawRegenerated = parsed.regeneratedExamples || [];
-    const regeneratedExamples = rawRegenerated.map((item: any) => ({
-      exampleIndex: item.exampleIndex,
-      messages: Array.isArray(item.messages) ? item.messages.map((m: any) => sanitizeMessage(m, templateType)) : []
-    }));
-    return res.json({ success: true, regeneratedExamples });
+    const candidate = rawRegenerated[0];
+    const original = item.example.messages;
+    if (rawRegenerated.length !== 1 || candidate?.exampleIndex !== item.exampleIndex
+      || !Array.isArray(candidate.messages) || candidate.messages.length !== original.length
+      || !original.some((message: any) => message.role === "assistant")
+      || candidate.messages.some((message: any, index: number) =>
+        message.role !== original[index].role || typeof message.content !== "string" || !message.content.trim())) {
+      throw new Error("Repair returned an incomplete example or changed its index/roles.");
+    }
+    const messages = candidate.messages.map((message: any, index: number) =>
+      message.role === "assistant" ? sanitizeMessage(message, itemTemplate) : original[index]);
+    if (auditTemplateFormat([{ messages }], { templateType: itemTemplate, instructTemplate: req.body.instructTemplate }).length) {
+      throw new Error("Repaired example still has template/format defects.");
+    }
+    regeneratedExamples.push({ exampleIndex: item.exampleIndex, messages });
+        } catch (error: any) {
+          failures.push({ exampleIndex: item.exampleIndex, error: formatAIErrorMessage(error) });
+        } finally {
+          if (job) { job.completed++; job.updatedAt = Date.now(); }
+        }
+      }));
+    }
+    finish(200, { success: regeneratedExamples.length > 0, regeneratedExamples, failures,
+      partial: failures.length > 0, error: regeneratedExamples.length ? undefined : "No flagged responses could be repaired." });
+    return;
   } catch (error: any) {
     console.error("Regenerate flagged error:", error);
-    return res.status(500).json({ success: false, error: formatAIErrorMessage(error) });
+    finish(500, { success: false, error: formatAIErrorMessage(error) });
+    return;
   }
 });
 
