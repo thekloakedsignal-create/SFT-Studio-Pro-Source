@@ -5,3 +5,4 @@
 - [Document conversion intent](document-conversion-intent.md) — Transcript copies tagged dialogue verbatim; Knowledge and Literature synthesize examples.
 - [QA scope](quality-audit-intent.md) — QA must combine formatting/template checks with semantic assessment, not replace either one.
 - [Visual reference](visual-reference.md) — Use the supplied screenshot for palette changes; preserve layout and prioritize sharp work-area contrast.
+- [Provider access](provider-access.md) — Use direct Chat Completions calls; do not install Gradient.
