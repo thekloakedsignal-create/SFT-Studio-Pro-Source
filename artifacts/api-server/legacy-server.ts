@@ -2993,7 +2993,21 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
 });
 
 // 2. Document to SFT Convertor
-app.post("/api/convert-document", async (req, res) => {
+const documentConversionJobs = new Map<string, {
+  owner: string; status: "running" | "complete" | "error";
+  updatedAt: number; completed: number; total: number; result?: any;
+}>();
+
+app.get("/api/convert-document/jobs/:jobId", optionalAuth, (req: AuthRequest, res) => {
+  const job = documentConversionJobs.get(String(req.params.jobId));
+  if (!job || job.owner !== projectOwnerId(req)) {
+    return res.status(404).json({ success: false, error: "Document conversion job not found or expired." });
+  }
+  return res.json({ success: true, status: job.status, completed: job.completed, total: job.total,
+    ...(job.result ? { result: job.result } : {}) });
+});
+
+app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) => {
   const {
     documentName,
     documentContent,
@@ -3053,6 +3067,28 @@ app.post("/api/convert-document", async (req, res) => {
   const requestedCount = count === undefined ? 8 : Number(count);
   if (!Number.isInteger(requestedCount) || requestedCount < 1 || requestedCount > 250) {
     return res.status(400).json({ success: false, error: "Example count must be an integer between 1 and 250." });
+  }
+
+  let conversionJob: (typeof documentConversionJobs extends Map<string, infer Job> ? Job : never) | undefined;
+  const finishConversion = (code: number, result: any) => {
+    if (!conversionJob) {
+      res.status(code).json(result);
+      return;
+    }
+    conversionJob.result = result;
+    conversionJob.status = result.success ? "complete" : "error";
+    conversionJob.updatedAt = Date.now();
+  };
+  if (req.body.async === true) {
+    const owner = projectOwnerId(req);
+    if (!owner) return res.status(401).json({ success: false, error: "Sign in or use a guest device to convert documents." });
+    for (const [id, job] of documentConversionJobs) {
+      if (job.status !== "running" && Date.now() - job.updatedAt > 3600000) documentConversionJobs.delete(id);
+    }
+    const jobId = randomUUID();
+    conversionJob = { owner, status: "running", updatedAt: Date.now(), completed: 0, total: requestedCount };
+    documentConversionJobs.set(jobId, conversionJob);
+    res.status(202).json({ success: true, status: "running", jobId });
   }
 
   try {
@@ -3311,6 +3347,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
 
     const conversionErrors: string[] = [];
     const CONCURRENCY_LIMIT = 2;
+    if (conversionJob) conversionJob.total = sectionJobs.length;
     for (let i = 0; i < sectionJobs.length; i += CONCURRENCY_LIMIT) {
       const batch = sectionJobs.slice(i, i + CONCURRENCY_LIMIT);
       const batchResults = await Promise.allSettled(
@@ -3320,13 +3357,17 @@ No internal deliberation, planning, or reasoning fields are permitted.`
         if (result.status === "fulfilled") finalExamples.push(...result.value);
         else conversionErrors.push(result.reason?.message || "Document conversion request failed.");
       }
+      if (conversionJob) {
+        conversionJob.completed += batchResults.length;
+        conversionJob.updatedAt = Date.now();
+      }
       if (i + CONCURRENCY_LIMIT < sectionJobs.length) {
         await new Promise((resolve) => setTimeout(resolve, 400));
       }
     }
 
     if (!finalExamples || finalExamples.length === 0) {
-      return res.status(500).json({ success: false, error: conversionErrors[0] || "Document synthesis produced no valid SFT examples. Please verify document text and try again." });
+      return finishConversion(500, { success: false, error: conversionErrors[0] || "Document synthesis produced no valid SFT examples. Please verify document text and try again." });
     }
 
     // Keep representative results across the entire document when rounding
@@ -3376,7 +3417,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       return sanitized;
     });
 
-    return res.json({ 
+    return finishConversion(200, {
       success: true, 
       examples: formattedExamples,
       requestedCount,
@@ -3386,7 +3427,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
 
   } catch (error: any) {
     console.error("Document conversion endpoint error:", error);
-    return res.status(500).json({ success: false, error: formatAIErrorMessage(error) });
+    return finishConversion(500, { success: false, error: formatAIErrorMessage(error) });
   }
 });
 

@@ -16,7 +16,11 @@ function fixture(output: "valid" | "invalid" | "error" | "partial" | "unfinished
   let active = 0;
   let peak = 0;
   vm.runInNewContext(compiled.code, {
-    app: { post: (path: string, handler: Function) => routes.set(path, handler) },
+    app: { post: (path: string, ...handlers: Function[]) => routes.set(path, handlers.at(-1)!),
+      get: (path: string, ...handlers: Function[]) => routes.set(path, handlers.at(-1)!) },
+    optionalAuth: () => {},
+    projectOwnerId: (req: any) => req.deviceId || null,
+    randomUUID: () => "conversion-test-job",
     console: { log() {}, error() {}, warn() {} },
     getDigitalOceanClient: () => ({}),
     normalizeModel: (model: string) => model || "fixture-model",
@@ -59,6 +63,20 @@ function fixture(output: "valid" | "invalid" | "error" | "partial" | "unfinished
   });
   return {
     calls, peak: () => peak,
+    async start(body: any) {
+      const response: any = { code: 200, status(code: number) { this.code = code; return this; },
+        json(body: any) { this.body = body; return this; } };
+      const done = routes.get("/api/convert-document")!({ deviceId: "test-owner", body: {
+        documentContent: "Keep a backup and verify it.", count: 4, async: true, ...body
+      } }, response);
+      return { response, done };
+    },
+    poll(owner = "test-owner") {
+      const response: any = { code: 200, status(code: number) { this.code = code; return this; },
+        json(body: any) { this.body = body; return this; } };
+      routes.get("/api/convert-document/jobs/:jobId")!({ deviceId: owner, params: { jobId: "conversion-test-job" } }, response);
+      return response;
+    },
     async run(body: any, path = "/api/convert-document") {
       const response: any = {
         code: 200,
@@ -148,6 +166,31 @@ test("unfinished conversations are not returned as completed examples", async ()
   const result = await fixture("unfinished").run({ templateType: "Multi Turn" });
   assert.equal(result.code, 500);
   assert.equal(result.body.success, false);
+});
+
+test("background conversion acknowledges before completion and exposes owner-scoped results", async () => {
+  const f = fixture();
+  const { response, done } = await f.start({});
+  assert.equal(response.code, 202);
+  assert.equal(response.body.status, "running");
+  assert.equal(f.poll("another-owner").code, 404);
+  await done;
+  const status = f.poll();
+  assert.equal(status.body.status, "complete");
+  assert.equal(status.body.result.examples.length, 4);
+  assert.equal(status.body.completed, 4);
+});
+
+test("background errors and partial results are retrievable", async () => {
+  for (const output of ["error", "partial"] as const) {
+    const f = fixture(output);
+    const { done } = await f.start({});
+    await done;
+    const status = f.poll().body;
+    assert.equal(status.status, output === "error" ? "error" : "complete");
+    assert.equal(status.result.success, output !== "error");
+    if (output === "partial") assert.equal(status.result.examples.length, 3);
+  }
 });
 
 test("converter UI excludes Reasoning and retains partial results for review", async () => {

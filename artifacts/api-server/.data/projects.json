@@ -1,5 +1,45 @@
 [
   {
+    "id": "project-1791075909609",
+    "userId": "device-6az4mn268la1791075897084",
+    "name": "General Instruction Tuner",
+    "settings": {
+      "name": "General Instruction Tuner",
+      "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+      "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+      "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+      "selectedPreset": "General Use AI",
+      "projectFormat": "Conversation",
+      "templateType": "Single Turn",
+      "instructTemplate": "ChatML",
+      "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      "representativePrompt": "Explain photosynthesis in simple terms.",
+      "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
+    },
+    "batches": [],
+    "updatedAt": "2026-10-04T01:05:09.658Z"
+  },
+  {
+    "id": "project-1791075751678",
+    "userId": "device-uzjsidcsv21791075737188",
+    "name": "General Instruction Tuner",
+    "settings": {
+      "name": "General Instruction Tuner",
+      "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+      "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+      "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+      "selectedPreset": "General Use AI",
+      "projectFormat": "Conversation",
+      "templateType": "Single Turn",
+      "instructTemplate": "ChatML",
+      "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      "representativePrompt": "Explain photosynthesis in simple terms.",
+      "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
+    },
+    "batches": [],
+    "updatedAt": "2026-10-04T01:02:31.733Z"
+  },
+  {
     "id": "project-1791064809419",
     "userId": "7i11Rpcqbdcz7O5nWB88k25rorG2",
     "name": "Savant (Academic Scholar)",

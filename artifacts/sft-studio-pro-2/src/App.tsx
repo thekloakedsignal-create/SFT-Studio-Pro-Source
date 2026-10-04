@@ -2665,11 +2665,13 @@ export default function App() {
     try {
       const effectiveTemplate = docTemplate;
 
-      const res = await fetch("/api/convert-document", {
+      const conversionProjectId = selectedProjectId;
+      const res = await projectApiFetch("/api/convert-document", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           documentName: docName || "Inline Document",
+          async: true,
           documentContent: docContent,
           templateType: effectiveTemplate,
           instructTemplate: project.projectFormat === ProjectFormat.INSTRUCTION ? (project.instructTemplate || InstructTemplate.CHATML) : undefined,
@@ -2698,6 +2700,22 @@ export default function App() {
         throw new Error(`Server returned status ${res.status}: unable to parse response.`);
       }
 
+      if (!res.ok) throw new Error(data.error || `Conversion request failed (${res.status}).`);
+      if (res.status === 202) {
+        if (typeof data.jobId !== "string") throw new Error("Conversion job ID is missing.");
+        const jobId = data.jobId;
+        while (true) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          const statusResponse = await projectApiFetch(`/api/convert-document/jobs/${encodeURIComponent(jobId)}`);
+          const status = await statusResponse.json();
+          if (!statusResponse.ok) throw new Error(status.error || "Unable to retrieve conversion results.");
+          if (status.status === "running") continue;
+          if (!status.result) throw new Error("Conversion returned no result.");
+          data = status.result;
+          break;
+        }
+      }
+
       if (data.success && Array.isArray(data.examples) && data.examples.length > 0) {
         const truncatedDocName = truncateFileName(docName, 32);
         const generatedBatchId = data.batchId || data.id || `batch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -2719,8 +2737,12 @@ export default function App() {
         setBatches(prev => [newBatch, ...prev]);
         setSelectedBatchId(newBatch.id);
         setLatestConvertedDocBatchId(newBatch.id);
-        if (selectedProjectId) {
-          saveBatch(selectedProjectId, newBatch);
+        if (conversionProjectId) {
+          const saved = await saveBatch(conversionProjectId, newBatch);
+          if (!saved) {
+            setNotification({ text: "Conversion completed. Examples are available below and cached locally, but the server save failed.", type: "error" });
+            return;
+          }
         }
         setNotification({ text: data.partial
           ? `Partial conversion: ${data.examples.length} of ${data.requestedCount || docCount} examples completed and displayed below for review.`
