@@ -526,6 +526,7 @@ export default function App() {
   const [assistantTag, setAssistantTag] = useState<string>("");
   const [fixedUserPrompt, setFixedUserPrompt] = useState<string>("Please analyze and explain the following document chunk.");
   const [latestConvertedDocBatchId, setLatestConvertedDocBatchId] = useState<string | null>(null);
+  const [dismissedDocBatchId, setDismissedDocBatchId] = useState<string | null>(null);
   const [converterInstructions, setConverterInstructions] = useState<string>("");
 
   // Memoized document word count for fast rendering without regex re-runs
@@ -1970,18 +1971,19 @@ export default function App() {
 
   // Find the latest batch from Document Conversion for inline review
   const latestDocBatch = useMemo(() => {
+    let latest: SFTBatch | undefined;
     if (latestConvertedDocBatchId) {
-      const found = batches.find(b => b.id === latestConvertedDocBatchId);
-      if (found) return found;
+      latest = batches.find(b => b.id === latestConvertedDocBatchId);
     }
-    return batches.find(b => 
+    latest ??= batches.find(b => 
       b.source === "Doc Conversion" || 
       b.source?.includes("Doc") || 
       b.source?.includes("Transcript") || 
       b.name?.toLowerCase().includes("doc") || 
       b.name?.toLowerCase().includes("transcript")
     );
-  }, [batches, latestConvertedDocBatchId]);
+    return latest?.id === dismissedDocBatchId ? undefined : latest;
+  }, [batches, latestConvertedDocBatchId, dismissedDocBatchId]);
 
   // Find the latest batch from TRiAD Alignment for inline review
   const latestTriadBatch = useMemo(() => {
@@ -1996,9 +1998,10 @@ export default function App() {
     setDocSuggestionExplanation("");
     setDocCount(8);
     setConverterInstructions("");
+    if (latestDocBatch) setDismissedDocBatchId(latestDocBatch.id);
     const fileInput = document.getElementById("doc-file-input") as HTMLInputElement;
     if (fileInput) fileInput.value = "";
-    setNotification({ text: "Document upload and content cleared.", type: "info" });
+    setNotification({ text: "Document and displayed examples cleared.", type: "info" });
   };
 
   // Total examples counts
@@ -2738,6 +2741,7 @@ export default function App() {
         setBatches(prev => [newBatch, ...prev]);
         setSelectedBatchId(newBatch.id);
         setLatestConvertedDocBatchId(newBatch.id);
+        setDismissedDocBatchId(null);
         if (conversionProjectId) {
           const saved = await saveBatch(conversionProjectId, newBatch);
           if (!saved) {
