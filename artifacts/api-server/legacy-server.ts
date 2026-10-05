@@ -994,7 +994,8 @@ const DEFAULT_GENERATION_MODEL_GROUPS = [
   ],
 ];
 const SUPPORTED_GENERATION_BATCH_SIZES = [5, 10, 25, 50, 100, 200, 250] as const;
-const SFT_SINGLE_EXAMPLE_TIMEOUT_MS = 120_000;
+const SFT_SINGLE_EXAMPLE_TIMEOUT_MS = 20_000;
+const SFT_REASONING_TIMEOUT_MS = 120_000;
 const SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS = 180_000;
 
 function getGenerationModels(): string[] {
@@ -1787,7 +1788,7 @@ This task generates direct ${turnMode} assistant responses. ${turnMode} response
 Every assistant response MUST begin immediately with the direct, substantive answer to the user.
 No internal deliberation, planning, or reasoning fields are permitted.`
           };
-          const promptForExampleCount = (requestedCount: number) => fullPrompt
+          const promptForExampleCount = (requestedCount: number) => (isReasoningGeneration ? reasoningUserPrompt : fullPrompt)
             .replace(
               `exactly ${currentChunkSize} high-quality, diverse SFT training examples`,
               `exactly ${requestedCount} high-quality, diverse SFT training examples`
@@ -1801,7 +1802,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             model: string,
             requestedCount = currentChunkSize,
             prompt = isReasoningGeneration ? reasoningUserPrompt : fullPrompt,
-            requestedTimeoutMs = SFT_SINGLE_EXAMPLE_TIMEOUT_MS,
+            requestedTimeoutMs = isReasoningGeneration ? SFT_REASONING_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS,
             ignoreModelAbort = false
           ) => {
             const requestConfig = turnMode === "Reasoning"
@@ -1892,7 +1893,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               if (!isReasoningGeneration) modelAbortControllers.get(targetModel)?.abort();
               timedOutExampleCount += currentChunkSize;
               logger.warn(
-                { model: targetModel, stack: c + 1, timeoutMs: SFT_SINGLE_EXAMPLE_TIMEOUT_MS, batchId: generationBatchId },
+                { model: targetModel, stack: c + 1, timeoutMs: isReasoningGeneration ? SFT_REASONING_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS, batchId: generationBatchId },
                 isReasoningGeneration
                   ? "Reasoning request timed out; leaving independent slots running"
                   : "Model request timed out; skipping it for the rest of this batch"
@@ -2056,13 +2057,13 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           try {
             let examples: any[];
             try {
-              examples = await requestReplacement(replacementModel, 1, SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
+              examples = await requestReplacement(replacementModel, 1, SFT_REASONING_TIMEOUT_MS, slot);
             } catch (error: any) {
               if (!isProviderOverload(error)) throw error;
               const backup = generationModels.find(model => model !== replacementModel && !stalledModels.has(model));
               if (!backup) throw error;
               replacementModel = backup;
-              examples = await requestReplacement(replacementModel, 1, SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
+              examples = await requestReplacement(replacementModel, 1, SFT_REASONING_TIMEOUT_MS, slot);
             }
             recoveryExamples.push(...examples);
             completedExampleCount += examples.length;
@@ -4146,7 +4147,7 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
     const response = await callDigitalOceanAI({
       model: itemTemplate === "Reasoning" ? "glm-5.3-flash" : model,
       contents: "Regenerate the single flagged example supplied in the system instructions, applying only its QA fixes.",
-      timeoutMs: itemTemplate === "Reasoning" ? SFT_SINGLE_EXAMPLE_TIMEOUT_MS : 45000,
+      timeoutMs: itemTemplate === "Reasoning" ? SFT_REASONING_TIMEOUT_MS : 45000,
       config: {
         systemInstruction: itemTemplate === "Reasoning" ? encodeReasoningProviderText(fullPrompt) : fullPrompt,
         temperature: 0.2,
