@@ -3729,7 +3729,7 @@ app.post("/api/analyze-quality", async (req, res) => {
       await Promise.allSettled(chunks.map(async (chunk) => {
         try {
           const chunkPrompt = `
-            You are a calibrated SFT dataset auditor. Identify invalid examples and direct violations of the supplied project and batch definitions. Do not maximize the number of findings.
+            You are a calibrated SFT dataset auditor. Identify concrete defects and direct violations of the supplied project and batch definitions. Neither seek faults in acceptable examples nor excuse clear failures. Judge each example independently; do not aim for a particular pass rate.
 
             AUTHORITATIVE PROJECT AND BATCH DEFINITIONS:
             These supplied values are the authority for this audit. Do not invent additional requirements.
@@ -3750,19 +3750,23 @@ app.post("/api/analyze-quality", async (req, res) => {
             AUDIT PRIORITIES:
             1. TEMPLATE, TEXT INTEGRITY, AND FORMATTING — CHECK THESE FIRST:
                - Inspect every example for a broken or mismatched conversation template, invalid message order or required turn count, missing required role, malformed/conflicting delimiters or tags, corrupted or garbled text, obvious truncation, or unfilled placeholders.
-               - Flag objective defects that make the example invalid or materially interfere with reading, training, or the selected format, even when its meaning is otherwise acceptable.
+               - Flag broken templates, corrupted text, and actual formatting errors even when the intended meaning remains understandable. A defect need not make the entire example unusable to warrant a flag.
+               - Distinguish actual formatting errors (unclosed fences/tags, inconsistent boundaries, malformed required structure) from cosmetic preferences (blank-line spacing, optional headings, or equivalent list styles).
                - Do not mistake clean structured role/content messages for missing export markers. Validate serialization markers when present; do not require export-only markers unless the supplied format explicitly requires them.
                - Ignore cosmetic whitespace or harmless stylistic differences that do not break the template or format.
 
             2. SEMANTIC REVIEW — STRICTLY LIMITED TO DIRECT DEFINITION VIOLATIONS:
                - Create a semantic issue ONLY when the assistant response directly conflicts with an explicit requirement in the supplied system prompt, task, constraints, or batch/template definition.
                - For each semantic issue, quote a short relevant excerpt from the response and identify the exact supplied requirement it violates.
+               - Direct violations include failure to fulfill a required task, not just statements that explicitly contradict a rule. Check for missing required output, unanswered required parts, irrelevant answers, internal contradictions that invalidate the requested result, and demonstrably incorrect results that defeat the supplied task.
+               - For a missing required element, identify the requirement and what is absent instead of demanding a quotation of absent text. Do not pass a non-answer merely because it contains no explicit contradiction.
+               - Report correctness failures only when the error and its conflict with the supplied task are demonstrable from the example or supplied definitions. Do not flag speculative factual concerns, disputed interpretations, or missing optional detail.
                - Do not flag general concerns about depth, polish, brevity, redundancy, awkward phrasing, preferred tone, or factual nuance unless they directly violate an explicit supplied requirement.
-               - Do not infer unstated expectations or flag an answer merely because it could be better. If there is no clear direct conflict, report no semantic issue.
+               - Do not infer unstated expectations or flag an answer merely because it could be better. If there is no demonstrable failure to satisfy a supplied requirement, report no semantic issue.
 
             SEVERITY CLASSIFICATION:
             - "High": A broken template, materially corrupted/unreadable text, or direct definition violation that makes the example unusable.
-            - "Medium": An objective, material format defect or a clear, direct definition violation that does not make the example wholly unusable.
+            - "Medium": A concrete formatting error or clear failure to satisfy a supplied requirement that needs correction but does not make the example wholly unusable. Do not suppress such findings merely because the rest of the example is useful.
             - Do not put minor style preferences or polish suggestions in "issues"; do not use "Low" to turn a nit into a finding.
 
             OUTPUT REQUIREMENTS:
