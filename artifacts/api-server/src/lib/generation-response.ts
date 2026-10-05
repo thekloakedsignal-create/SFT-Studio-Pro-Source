@@ -217,7 +217,11 @@ export function sanitizeMessage(msg: any, templateType?: string): { role: string
       if (!reasoning) reasoning = thinkMatch[1].trim();
       content = content.replace(/<(?:think|thinking)>[\s\S]*?<\/(?:think|thinking)>/gi, "").trim();
     }
-    if (templateType && !allowsReasoning(templateType)) content = stripCoTFromSingleTurn(content);
+    if (templateType && !allowsReasoning(templateType)) {
+      const mixedAlpacaResponse = templateType === "Mixed" && content.startsWith("### Response:\n");
+      content = stripCoTFromSingleTurn(content);
+      if (mixedAlpacaResponse) content = `### Response:\n${content}`;
+    }
   }
   // Never clean user/system instructions as though they were assistant deliberation.
   return {

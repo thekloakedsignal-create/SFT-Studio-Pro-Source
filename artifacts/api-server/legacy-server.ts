@@ -1,4 +1,5 @@
 import express from "express";
+import { mixedGenerationPrompt, validMixedExample, type MixedTurn } from "./src/lib/mixed-generation.ts";
 import path from "path";
 import { randomUUID } from "node:crypto";
 import fs from "fs";
@@ -1123,6 +1124,7 @@ app.post("/api/generate", async (req, res) => {
   const stalledModels = new Set<string>();
   let timedOutExampleCount = 0;
   let requestExamplesForMissingBatch: ((model: string, count: number, timeoutMs: number, slot?: number) => Promise<any[]>) | undefined;
+  const mixedRecoveryTurns: MixedTurn[] = [];
   let isReasoningGeneration = false;
   const useJobPolling = req.body?.jobMode === true;
   let generationJobId: string | undefined;
@@ -1369,6 +1371,8 @@ ${JSON.stringify({ examples: [{ messages: [
       const backupModelsUsed = new Set<string>();
       for (let modelIndex = 0; modelIndex < generationStacks[c].length; modelIndex++) {
         const { model: targetModel, count: currentChunkSize } = generationStacks[c][modelIndex];
+        const assignedMixedTurn: MixedTurn = (generationStacks.slice(0, c).reduce((sum, stack) => sum + stack.length, 0) + modelIndex) % 2 === 0
+          ? "Single Turn" : "Multi Turn";
 
       const reasoningUserPrompt = `Generate exactly 1 high-quality, diverse SFT training example for model stack ${c + 1} of ${generationStacks.length}.
 
@@ -1806,8 +1810,17 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             requestedCount = currentChunkSize,
             prompt = isReasoningGeneration ? reasoningUserPrompt : fullPrompt,
             requestedTimeoutMs = isReasoningGeneration ? SFT_REASONING_EXAMPLE_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS,
-            ignoreModelAbort = false
+            ignoreModelAbort = false,
+            mixedTurn: MixedTurn = assignedMixedTurn
           ) => {
+            if (turnMode === "Mixed") {
+              // Use one unambiguous subtype structure, including on replacement calls.
+              prompt = mixedGenerationPrompt(
+                prompt.split("CRITICAL MANDATE - STRICT TEMPLATE ENFORCEMENT:")[0],
+                mixedTurn, systemPrompt || "You are a helpful assistant.",
+                isInstruct ? instructTemplate || "ChatML" : undefined,
+              );
+            }
             const requestConfig = turnMode === "Reasoning"
               ? {
                   ...configObj,
@@ -1858,6 +1871,12 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               parsed = result.examples;
             } else {
               parsed = parseGeneratedExamples(extractResponseText(response), turnMode);
+              if (turnMode === "Mixed") {
+                parsed = parsed.filter(example => validMixedExample(
+                  example, mixedTurn, systemPrompt || "You are a helpful assistant.",
+                  isInstruct ? instructTemplate || "ChatML" : undefined,
+                ));
+              }
             }
             if (parsed.length === 0) {
               throw new Error(`Model ${model} returned no valid, non-empty SFT examples.`);
@@ -1869,12 +1888,10 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               requestExamplesFromModel(
                 model,
                 requestedCount,
-                turnMode === "Mixed" ? promptForExampleCount(requestedCount).replace(
-                  /For this request, generate [^\n]+/,
-                  `For this request, generate ${slot % 2 === 0 ? "Single Turn: one user/assistant exchange" : "Multi Turn: 2–4 user/assistant exchanges"}.`
-                ) : promptForExampleCount(requestedCount),
+                promptForExampleCount(requestedCount),
                 timeoutMs,
-                model === "glm-5.3"
+                model === "glm-5.3",
+                mixedRecoveryTurns[slot] ?? assignedMixedTurn
               );
           }
 
@@ -2044,6 +2061,15 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     let recoveryFailureCategory: GenerationFailureCategory | undefined;
     let recoveryModel = isReasoningGeneration ? "glm-5.3-flash" : "glm-5.3";
     let replacementCount = Math.max(0, countNum - completedExampleCount);
+    if (turnMode === "Mixed") {
+      let slot = 0;
+      generationStacks.forEach((stack, stackIndex) => stack.forEach((_, modelIndex) => {
+        if (!taskOutputs[stackIndex][modelIndex]?.length) {
+          mixedRecoveryTurns.push(slot % 2 === 0 ? "Single Turn" : "Multi Turn");
+        }
+        slot++;
+      }));
+    }
     if (replacementCount > 0 && requestExamplesForMissingBatch) {
       // Refill each missing example with an individual request, bounded by concurrency and deadline.
       const requestReplacement = requestExamplesForMissingBatch;
@@ -2088,6 +2114,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               "Replacement failed; preserving other completed examples"
             );
             replacementCount++;
+            if (turnMode === "Mixed") mixedRecoveryTurns.push(mixedRecoveryTurns[slot]);
             // Pace persistent provider failures instead of creating a tight request loop.
             const pauseMs = Math.min(2000, Math.max(0, generationDeadline - Date.now()));
             if (pauseMs > 0) await new Promise(resolve => setTimeout(resolve, pauseMs));
