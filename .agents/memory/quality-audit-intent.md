@@ -9,6 +9,12 @@ QA must catch formatting errors and template anomalies as well as assess semanti
 
 **How to apply:** Keep both sources of findings in the existing QA report and scoring. Inspect raw examples without silently sanitizing away defects. Keep audit changes confined to QA, not generation or conversion.
 
+QA must distinguish substantive defects from minor stylistic preferences. Do not make small wording or formatting nits imply that an otherwise useful example is bad, while continuing to flag meaningful factual, instruction-following, persona, and structural failures.
+
+**Why:** The user said QA currently makes almost all app-generated content look unusable, but should not become permissive either.
+
+**How to apply:** Treat low-impact observations as suggestions or small deductions rather than automatic failures; reserve flags and severe score reductions for consequential defects.
+
 Clean role/content messages are valid before export; do not require serialized Alpaca, Mistral, or ChatML delimiters just because that export format is selected.
 
 **Why:** Requiring export-only markers would falsely flag valid structured training examples. When markers are present, their structure and compatibility still need checking.
