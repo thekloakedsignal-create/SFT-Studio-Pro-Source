@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import { transform } from "esbuild";
-import { mixedGenerationPrompt, validMixedExample, repeatedMixedPrompt } from "../src/lib/mixed-generation.ts";
+import { mixedGenerationPrompt, validMixedExample, repeatedMixedPrompt, isMixedSingleTurn } from "../src/lib/mixed-generation.ts";
 import {
   ChatCompletionsHttpError, isProviderOverload, normalizeText,
   parseGeneratedExamples, parseReasoningExamples, sanitizeExample,
@@ -54,7 +54,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
     },
     Type: { OBJECT: "object", ARRAY: "array", STRING: "string", NUMBER: "number", BOOLEAN: "boolean" },
     ChatCompletionsHttpError, isProviderOverload, normalizeText, parseGeneratedExamples, parseReasoningExamples, sanitizeExample,
-    encodeReasoningProviderText, decodeReasoningProviderText, mixedGenerationPrompt, validMixedExample, repeatedMixedPrompt,
+    encodeReasoningProviderText, decodeReasoningProviderText, mixedGenerationPrompt, validMixedExample, repeatedMixedPrompt, isMixedSingleTurn,
     logger: { warn() {}, info() {}, error() {} },
     process: { env: { GRADIENT_MODEL_ACCESS_KEY: "offline-fixture-only-not-a-secret" } },
     console: { log() {}, warn() {}, error() {} },
@@ -195,17 +195,15 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
       }));
       if (userPrompt.includes("STRICT MIXED SLOT REQUIREMENT:")) {
         for (const example of requestedExamples) {
-          if (example.messages[0].role !== "system") {
-            example.messages.unshift({ role: "system", content: "You are a helpful assistant." });
-          } else {
-            example.messages[0].content = "You are a helpful assistant.";
-          }
-          for (const message of example.messages.slice(1)) {
+          const isMistral = userPrompt.includes("Use the Mistral instruction format");
+          if (!isMistral) example.messages.unshift({ role: "system", content: "You are a helpful assistant." });
+          let userIndex = 0;
+          for (const message of example.messages.slice(isMistral ? 0 : 1)) {
             if (message.role === "user") message.content = `Scenario ${requestNumber}: ${message.content}`;
             if (userPrompt.includes("Use the Alpaca instruction format")) {
               message.content = `${message.role === "user" ? "### Instruction:" : "### Response:"}\n${message.content}`;
             } else if (userPrompt.includes("Use the Mistral instruction format") && message.role === "user") {
-              message.content = `[INST] ${message.content} [/INST]`;
+              message.content = `[INST] ${userIndex++ === 0 ? "You are a helpful assistant.\n\n" : ""}${message.content} [/INST]`;
             }
           }
         }
@@ -305,10 +303,10 @@ test("Mixed requests only alternating Single Turn and Multi Turn across all inst
     const f = fixture();
     const response = await f.generate(10, false, "Mixed", format);
     assert.equal(response.body.examples.length, 10);
-    assert.equal(response.body.examples.filter((example: any) => example.messages.length === 5).length, 5);
-    assert.equal(response.body.examples.filter((example: any) => example.messages.length === 3).length, 5);
+    assert.equal(response.body.examples.filter((example: any) => !isMixedSingleTurn(example, format)).length, 5);
+    assert.equal(response.body.examples.filter((example: any) => isMixedSingleTurn(example, format)).length, 5);
     assert.ok(response.body.examples.every((example: any) => validMixedExample(
-      example, example.messages.length === 3 ? "Single Turn" : "Multi Turn",
+      example, isMixedSingleTurn(example, format) ? "Single Turn" : "Multi Turn",
       "You are a helpful assistant.", format,
     )));
     for (const [index, call] of f.calls.entries()) {
@@ -639,10 +637,10 @@ test("Mixed enforces half single-turn and half multi-turn at every supported bat
   for (const size of [5, 10, 25, 50, 100, 200, 250]) {
     const response = await fixture().generate(size, false, "Mixed");
     assert.equal(response.body.success, true);
-    assert.equal(response.body.examples.filter((example: any) => example.messages.length === 3).length, Math.ceil(size / 2));
-    assert.equal(response.body.examples.filter((example: any) => example.messages.length >= 5).length, Math.floor(size / 2));
+    assert.equal(response.body.examples.filter((example: any) => isMixedSingleTurn(example)).length, Math.ceil(size / 2));
+    assert.equal(response.body.examples.filter((example: any) => !isMixedSingleTurn(example)).length, Math.floor(size / 2));
     response.body.examples.forEach((example: any, index: number) =>
-      assert.equal(example.messages.length, index % 2 === 0 ? 3 : 5));
+      assert.equal(isMixedSingleTurn(example), index % 2 === 0));
   }
 });
 
