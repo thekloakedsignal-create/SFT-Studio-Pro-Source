@@ -2142,6 +2142,14 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       }, turnMode));
     });
 
+    if (turnMode === "Mixed") {
+      const singles = allExamples.filter(example => example.messages.length === 3).length;
+      const multis = allExamples.length - singles;
+      if (singles !== Math.ceil(countNum / 2) || multis !== Math.floor(countNum / 2)) {
+        throw new Error(`Mixed generation requires ${Math.ceil(countNum / 2)} single-turn and ${Math.floor(countNum / 2)} multi-turn examples; received ${singles} and ${multis}.`);
+      }
+    }
+
     if (allExamples.length === 0) {
       throw Object.assign(
         new Error("No examples were returned by the generation engine. Please retry with a smaller batch or check connection."),

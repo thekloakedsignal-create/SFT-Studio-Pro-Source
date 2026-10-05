@@ -620,9 +620,24 @@ test("Multi Turn and Mixed retry failed replacements but stop at the batch deadl
     assert.equal(f.calls.length, 54);
     const expired = fixture("singleRecovery12", "deadline");
     const partial = await expired.generate(50, false, mode);
-    assert.equal(partial.body.partial, true);
-    assert.equal(partial.body.examples.length, 39);
+    if (mode === "Mixed") {
+      assert.equal(partial.body.success, false);
+      assert.match(partial.body.error, /Mixed generation requires 25 single-turn and 25 multi-turn/);
+      assert.equal(partial.body.examples, undefined);
+    } else {
+      assert.equal(partial.body.partial, true);
+      assert.equal(partial.body.examples.length, 39);
+    }
     assert.equal(expired.calls.length, 42);
+  }
+});
+
+test("Mixed enforces half single-turn and half multi-turn at every supported batch size", async () => {
+  for (const size of [5, 10, 25, 50, 100, 200, 250]) {
+    const response = await fixture().generate(size, false, "Mixed");
+    assert.equal(response.body.success, true);
+    assert.equal(response.body.examples.filter((example: any) => example.messages.length === 3).length, Math.ceil(size / 2));
+    assert.equal(response.body.examples.filter((example: any) => example.messages.length >= 5).length, Math.floor(size / 2));
   }
 });
 
