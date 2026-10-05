@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { pendingBatches, rememberBatch, forgetBatch, orderBatchesForReview } from "./lib/batch-recovery";
+import { validateRegistryOutput } from "./lib/registry-validation";
 import { 
   Sparkles, 
   Settings, 
@@ -2865,6 +2866,10 @@ export default function App() {
           ...prev,
           [batchId]: data.report
         }));
+        const reviewedBatch = { ...targetBatch, qualityReport: data.report };
+        setBatches(prev => prev.map(b => b.id === batchId ? reviewedBatch : b));
+        setSelectedRegistryBatches(prev => ({ ...prev, [batchId]: true }));
+        if (selectedProjectId) await saveBatch(selectedProjectId, reviewedBatch);
         setNotification({ text: `AI Audit Complete. Quality Score: ${data.report.overallScore}/100.`, type: "success" });
       } else {
         throw new Error(data.error);
@@ -3222,17 +3227,26 @@ export default function App() {
   };
 
   // Registry Batch selections
+  const isRegistryEligible = (batch: SFTBatch) =>
+    batch.status !== "Rejected" && Boolean(reports[batch.id] || batch.qualityReport);
+
   const toggleSelectRegistryBatch = (batchId: string) => {
+    const batch = batches.find(b => b.id === batchId);
+    if (!batch || !isRegistryEligible(batch)) return;
     setSelectedRegistryBatches(prev => ({
       ...prev,
-      [batchId]: !prev[batchId]
+      [batchId]: prev[batchId] === false
     }));
   };
 
   // Compiled Approved Datasets & Validator Generator logic
   const selectedApprovedBatches = useMemo(() => {
-    return batches.filter(b => b.status === "Approved" && selectedRegistryBatches[b.id] !== false);
-  }, [batches, selectedRegistryBatches]);
+    return batches.filter(b => isRegistryEligible(b) && selectedRegistryBatches[b.id] !== false);
+  }, [batches, selectedRegistryBatches, reports]);
+
+  useEffect(() => {
+    setExportedPreview("");
+  }, [selectedApprovedBatches, exportTemplateFormat]);
 
   const compiledDataset = useMemo(() => {
     const allExamples: SFTExample[] = [];
@@ -3563,12 +3577,20 @@ export default function App() {
   };
 
   // Export utility for JSONL files
+  const checkRegistryOutput = (records: unknown[], format: string) => {
+    const error = validateRegistryOutput(records, format);
+    if (error) setNotification({ text: error, type: "error" });
+    return !error;
+  };
+
   const downloadJSONL = (dataset: SFTExample[], fileName: string) => {
     if (dataset.length === 0) {
       setNotification({ text: "No compiled examples to download.", type: "error" });
       return;
     }
-    const lines = dataset.map(ex => JSON.stringify(formatExampleForExport(ex, exportTemplateFormat))).join("\n");
+    const records = dataset.map(ex => formatExampleForExport(ex, exportTemplateFormat));
+    if (!checkRegistryOutput(records, exportTemplateFormat)) return;
+    const lines = records.map(record => JSON.stringify(record)).join("\n");
     triggerFileDownload(lines, fileName, "application/x-jsonlines");
     setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!`, type: "success" });
   };
@@ -3580,6 +3602,7 @@ export default function App() {
       return;
     }
     const sanitizedData = dataset.map(ex => formatExampleForExport(ex, exportTemplateFormat));
+    if (!checkRegistryOutput(sanitizedData, exportTemplateFormat)) return;
     const jsonString = JSON.stringify(sanitizedData, null, 2);
     triggerFileDownload(jsonString, fileName, "application/json");
     setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!`, type: "success" });
@@ -3633,16 +3656,7 @@ export default function App() {
   const handleFormatDataset = (formatToApply?: string) => {
     const fmt = formatToApply || exportTemplateFormat;
     
-    // Auto-select all batches if none are selected currently
-    let currentBatches = selectedApprovedBatches;
-    if (currentBatches.length === 0 && batches.length > 0) {
-      const newSelected: Record<string, boolean> = {};
-      batches.forEach(b => {
-        if (b.status !== "Rejected") newSelected[b.id] = true;
-      });
-      setSelectedRegistryBatches(newSelected);
-      currentBatches = batches.filter(b => b.status !== "Rejected");
-    }
+    const currentBatches = selectedApprovedBatches;
 
     const allExamples = currentBatches.flatMap(b => b.examples);
     
@@ -3660,6 +3674,10 @@ export default function App() {
       ? compiledDataset.validationSet.map(ex => formatExampleForExport(ex, fmt))
       : [];
 
+    if (!checkRegistryOutput([...formattedTraining, ...formattedValidation], fmt)) {
+      setExportedPreview("");
+      return;
+    }
     const sampleItems = formattedTraining.slice(0, 3);
     
     const previewPayload = {
@@ -3716,7 +3734,7 @@ export default function App() {
 
     let convertedCount = 0;
     const newBatches = batches.map(b => {
-      if (selectedRegistryBatches[b.id] === false) return b;
+      if (!isRegistryEligible(b) || selectedRegistryBatches[b.id] === false) return b;
       const updatedExamples = b.examples.map(ex => {
         convertedCount++;
         if (fmt === "deepseek") {
@@ -6890,25 +6908,26 @@ export default function App() {
                       Dataset Registry
                     </h2>
                     <p className="text-xs text-slate-400">
-                      Select approved batches and combine them into a final single dataset. Non-approved pending batches must be audited in Tab 3 first.
+                      Select QA-checked batches to include in the final dataset.
                     </p>
                   </div>
 
                   <div className="space-y-3">
-                    {batches.filter(b => b.status === "Approved").length === 0 ? (
+                    {batches.filter(b => b.status !== "Rejected").length === 0 ? (
                       <div className="text-center py-8 text-slate-500 text-xs border border-dashed border-slate-800 rounded-xl bg-slate-900/10">
                         <Database className="h-8 w-8 text-slate-600 mx-auto mb-2" />
                         <p className="font-semibold text-slate-400">Registry is empty</p>
                         <p className="text-[11px] text-slate-500 mt-1 max-w-xs mx-auto">
-                          Generate SFT batches in synthetic generation or document converter. Approve your batches in the Quality Assessor or Workbench to add them to this Registry.
+                          Generate or convert a batch, then run its check in QA to include it in final output.
                         </p>
                       </div>
                     ) : (
-                      batches.filter(b => b.status === "Approved").map((b) => (
+                      batches.filter(b => b.status !== "Rejected").map((b) => (
                         <div
                           key={b.id}
                           onClick={() => toggleSelectRegistryBatch(b.id)}
-                          className={`border rounded-xl p-4 transition-all flex items-center justify-between cursor-pointer ${
+                          className={`border rounded-xl p-4 transition-all flex items-center justify-between ${
+                            !isRegistryEligible(b) ? "opacity-50 cursor-not-allowed border-slate-800 bg-slate-900/40" :
                             selectedRegistryBatches[b.id] !== false
                               ? "border-green-500 bg-green-500/5 shadow-md shadow-green-500/5"
                               : "border-slate-800 bg-slate-900/40 hover:border-slate-700"
@@ -6918,12 +6937,17 @@ export default function App() {
                             <div className="flex items-center gap-2 min-w-0">
                               <input
                                 type="checkbox"
-                                checked={selectedRegistryBatches[b.id] !== false}
+                                checked={isRegistryEligible(b) && selectedRegistryBatches[b.id] !== false}
+                                disabled={!isRegistryEligible(b)}
+                                onClick={event => event.stopPropagation()}
                                 onChange={() => toggleSelectRegistryBatch(b.id)}
                                 className="rounded text-green-500 accent-green-500 cursor-pointer shrink-0"
                               />
                               <h3 className="text-xs font-bold text-slate-100 truncate" title={b.name}>{b.name}</h3>
                             </div>
+                            {!isRegistryEligible(b) && (
+                              <p className="text-[11px] text-slate-400">Please run a check in QA to add this batch to final output.</p>
+                            )}
 
                             <div className="flex flex-wrap gap-1.5 text-[10px] font-mono text-slate-400">
                               <span className="bg-slate-900/60 px-1.5 py-0.5 rounded text-emerald-400/90 font-mono">
@@ -6938,7 +6962,7 @@ export default function App() {
                           {/* Status Label */}
                           <div className="shrink-0">
                             <span className="px-2 py-1 rounded text-[10px] font-mono font-bold tracking-wide bg-green-500/10 text-green-400 border border-green-500/20">
-                              Approved
+                              {isRegistryEligible(b) ? "QA Checked" : "QA Required"}
                             </span>
                           </div>
                         </div>
@@ -7088,7 +7112,9 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => {
-                            const lines = compiledDataset.trainingSet.map(ex => JSON.stringify(formatExampleForExport(ex, exportTemplateFormat))).join("\n");
+                            const records = compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, exportTemplateFormat));
+                            if (!checkRegistryOutput(records, exportTemplateFormat)) return;
+                            const lines = records.map(record => JSON.stringify(record)).join("\n");
                             navigator.clipboard.writeText(lines);
                             setNotification({ text: `Copied Training JSONL dataset (${compiledDataset.trainingSet.length} items) to clipboard!`, type: "success" });
                           }}
@@ -7126,7 +7152,9 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => {
-                            const lines = compiledDataset.validationSet.map(ex => JSON.stringify(formatExampleForExport(ex, exportTemplateFormat))).join("\n");
+                            const records = compiledDataset.validationSet.map(ex => formatExampleForExport(ex, exportTemplateFormat));
+                            if (!checkRegistryOutput(records, exportTemplateFormat)) return;
+                            const lines = records.map(record => JSON.stringify(record)).join("\n");
                             navigator.clipboard.writeText(lines);
                             setNotification({ text: `Copied Validation JSONL dataset (${compiledDataset.validationSet.length} items) to clipboard!`, type: "success" });
                           }}
