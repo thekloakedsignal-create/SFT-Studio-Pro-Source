@@ -2925,6 +2925,8 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
 });
 
 // 2. Document to SFT Convertor
+const DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS = 180_000;
+const DOCUMENT_CONVERTER_MAX_ATTEMPTS = 3;
 const documentConversionJobs = new Map<string, {
   owner: string; status: "running" | "complete" | "error";
   updatedAt: number; completed: number; total: number; result?: any;
@@ -3086,10 +3088,14 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
     // Analyze every section; do not silently omit the middle of a document.
     const sectionsToProcess = documentSections;
 
-    const perSectionCount = Math.max(1, Math.ceil(requestedCount / sectionsToProcess.length));
+    const baseSectionCount = Math.floor(requestedCount / sectionsToProcess.length);
+    const extraSectionExamples = requestedCount % sectionsToProcess.length;
+    const perSectionCounts = sectionsToProcess.map((_, sectionIndex) =>
+      baseSectionCount + (sectionIndex < extraSectionExamples ? 1 : 0)
+    );
     // Give each complete conversation its own 4096-token output budget.
     const sectionJobs = sectionsToProcess.flatMap((text, sectionIndex) =>
-      Array.from({ length: perSectionCount }, (_, offset) => ({
+      Array.from({ length: perSectionCounts[sectionIndex] }, (_, offset) => ({
         text, sectionIndex, offset,
         count: 1
       })));
@@ -3219,7 +3225,7 @@ ${currentSectionText}
 [SYNTHESIS INSTRUCTIONS]
 Synthesize distinct, mindfully crafted SFT training examples based on the substantive content of this document section.
 Target count: Synthesize exactly ${sectionExampleCount} examples, following the user's content-focus instructions.
-Coverage assignment: examples ${offset + 1}-${offset + sectionExampleCount} of ${perSectionCount} for this section.
+Coverage assignment: examples ${offset + 1}-${offset + sectionExampleCount} of ${perSectionCounts[secIdx]} for this section.
 Order the section's substantive topics or narrative events by their appearance, then focus on this assigned portion to avoid repeating other groups.
 
 QUALITY & SANITIZATION MANDATES:
@@ -3260,6 +3266,7 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
         const aiRes = await callDigitalOceanAI({
           model: normalizeModel(extractionModel),
           contents: synthesisPrompt,
+          timeoutMs: DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS,
           config: {
             maxOutputTokens: 4096,
             responseMimeType: "application/json",
@@ -3306,21 +3313,29 @@ No internal deliberation, planning, or reasoning fields are permitted.`
 
     const conversionErrors: string[] = [];
     const CONCURRENCY_LIMIT = 2;
-    if (conversionJob) conversionJob.total = sectionJobs.length;
-    for (let i = 0; i < sectionJobs.length; i += CONCURRENCY_LIMIT) {
-      const batch = sectionJobs.slice(i, i + CONCURRENCY_LIMIT);
-      const batchResults = await Promise.allSettled(
-        batch.map(job => processSection(job.text, job.sectionIndex, job.count, job.offset))
+    const pendingJobs: Array<(typeof sectionJobs)[number] & { attempt: number }> =
+      sectionJobs.map(job => ({ ...job, attempt: 1 }));
+    while (pendingJobs.length > 0) {
+      const wave = pendingJobs.splice(0, CONCURRENCY_LIMIT);
+      const waveResults = await Promise.allSettled(
+        wave.map(job => processSection(job.text, job.sectionIndex, job.count, job.offset))
       );
-      for (const result of batchResults) {
-        if (result.status === "fulfilled") finalExamples.push(...result.value);
-        else conversionErrors.push(result.reason?.message || "Document conversion request failed.");
-      }
+      const retryJobs: typeof pendingJobs = [];
+      waveResults.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          finalExamples.push(...result.value);
+        } else if (wave[index].attempt < DOCUMENT_CONVERTER_MAX_ATTEMPTS) {
+          retryJobs.push({ ...wave[index], attempt: wave[index].attempt + 1 });
+        } else {
+          conversionErrors.push(result.reason?.message || "Document conversion request failed.");
+        }
+      });
+      pendingJobs.push(...retryJobs);
       if (conversionJob) {
-        conversionJob.completed += batchResults.length;
+        conversionJob.completed = Math.min(finalExamples.length, requestedCount);
         conversionJob.updatedAt = Date.now();
       }
-      if (i + CONCURRENCY_LIMIT < sectionJobs.length) {
+      if (pendingJobs.length > 0) {
         await new Promise((resolve) => setTimeout(resolve, 400));
       }
     }

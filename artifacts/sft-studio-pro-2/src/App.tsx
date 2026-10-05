@@ -520,6 +520,7 @@ export default function App() {
   const [literatureTheme, setLiteratureTheme] = useState<string>("");
   const [extractionModel, setExtractionModel] = useState("glm-5.3");
   const [isConverting, setIsConverting] = useState(false);
+  const [docConversionProgress, setDocConversionProgress] = useState<{ completed: number; total: number } | null>(null);
   const [isAnalyzingDoc, setIsAnalyzingDoc] = useState(false);
   const [docSuggestionExplanation, setDocSuggestionExplanation] = useState("");
   const [userTag, setUserTag] = useState<string>("");
@@ -1992,6 +1993,7 @@ export default function App() {
   const handleClearDocument = () => {
     setDocName("");
     setDocContent("");
+    setDocConversionProgress(null);
     setLiteratureTheme("");
     setDocSuggestionExplanation("");
     setDocCount(8);
@@ -2317,6 +2319,7 @@ export default function App() {
 
   // Process uploaded document file (PDF, DOCX, Image, Text)
   const processUploadedDoc = async (file: File) => {
+    setDocConversionProgress(null);
     const fileNameLower = file.name.toLowerCase();
     const isDocx = file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileNameLower.endsWith(".docx");
     const isPdf = file.type === "application/pdf" || fileNameLower.endsWith(".pdf");
@@ -2660,6 +2663,8 @@ export default function App() {
     }
     if (!checkGenerationLimit(docCount)) return;
 
+    const tracksGenerationProgress = docType === "knowledge_base" || docType === "literature";
+    setDocConversionProgress(tracksGenerationProgress ? { completed: 0, total: docCount } : null);
     setIsConverting(true);
     setNotification({ text: "Processing document and converting to structured SFT examples...", type: "info" });
 
@@ -2710,6 +2715,12 @@ export default function App() {
           const statusResponse = await projectApiFetch(`/api/convert-document/jobs/${encodeURIComponent(jobId)}`);
           const status = await statusResponse.json();
           if (!statusResponse.ok) throw new Error(status.error || "Unable to retrieve conversion results.");
+          if (tracksGenerationProgress && Number.isFinite(status.completed) && Number.isFinite(status.total)) {
+            setDocConversionProgress({
+              completed: Math.max(0, Math.min(status.completed, status.total)),
+              total: status.total
+            });
+          }
           if (status.status === "running") continue;
           if (!status.result) throw new Error("Conversion returned no result.");
           data = status.result;
@@ -2718,6 +2729,12 @@ export default function App() {
       }
 
       if (data.success && Array.isArray(data.examples) && data.examples.length > 0) {
+        if (tracksGenerationProgress) {
+          setDocConversionProgress({
+            completed: data.examples.length,
+            total: data.requestedCount || docCount
+          });
+        }
         const truncatedDocName = truncateFileName(docName, 32);
         const generatedBatchId = data.batchId || data.id || `batch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         const newBatch: SFTBatch = {
@@ -5866,7 +5883,35 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-800/60 pt-5 mt-6 flex justify-end">
+                  <div className="border-t border-slate-800/60 pt-5 mt-6 space-y-3">
+                    {isConverting && docConversionProgress && (docType === "knowledge_base" || docType === "literature") && (
+                      <div className="space-y-1.5" role="status" aria-live="polite">
+                        <div className="flex items-center justify-between text-[11px] text-slate-300">
+                          <span>
+                            Generating {docType === "literature" ? "literature" : "knowledge"} examples
+                          </span>
+                          <span className="font-mono text-blue-300">
+                            {docConversionProgress.completed} / {docConversionProgress.total}
+                          </span>
+                        </div>
+                        <div
+                          className="h-2 w-full overflow-hidden rounded-full bg-slate-800"
+                          role="progressbar"
+                          aria-label="Document conversion progress"
+                          aria-valuemin={0}
+                          aria-valuemax={docConversionProgress.total}
+                          aria-valuenow={docConversionProgress.completed}
+                        >
+                          <div
+                            className="h-full rounded-full bg-blue-500 transition-[width] duration-300"
+                            style={{
+                              width: `${Math.min(100, Math.round((docConversionProgress.completed / Math.max(1, docConversionProgress.total)) * 100))}%`
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex justify-end">
                     <button
                       disabled={isConverting || !docContent.trim() || isFieldsUnlocked || !selectedProjectId}
                       onClick={handleConvertDocument}
@@ -5893,6 +5938,7 @@ export default function App() {
                         </>
                       )}
                     </button>
+                    </div>
                   </div>
                 </div>
 
