@@ -819,9 +819,9 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
     sysText = sysInst.text || sysInst.parts?.[0]?.text || JSON.stringify(sysInst);
   }
 
-  if (params.config?.responseSchema) {
+  if (!params.exactMessages && params.config?.responseSchema) {
     sysText += `${sysText ? "\n\n" : ""}Return valid JSON that matches this schema: ${JSON.stringify(params.config.responseSchema)}`;
-  } else if (params.config?.responseMimeType === "application/json") {
+  } else if (!params.exactMessages && params.config?.responseMimeType === "application/json") {
     sysText += `${sysText ? "\n\n" : ""}Return only valid JSON.`;
   }
 
@@ -881,7 +881,7 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
 
   // Cap max_tokens to 4096 to avoid prefill memory buffer allocation overload on inference server
   const maxTokensToUse = Math.min(params.config?.maxOutputTokens ?? 4096, 4096);
-  const jsonMode = Boolean(params.config?.responseSchema) || params.config?.responseMimeType === "application/json";
+  const jsonMode = Boolean(params.exactMessages || params.config?.responseSchema) || params.config?.responseMimeType === "application/json";
 
   console.log(`[DigitalOcean Chat Completions] Request to model ${targetModel} (max_tokens: ${maxTokensToUse})...`);
   const timeoutMs = Number.isFinite(params.timeoutMs) && params.timeoutMs > 0
@@ -994,7 +994,7 @@ const DEFAULT_GENERATION_MODEL_GROUPS = [
   ],
 ];
 const SUPPORTED_GENERATION_BATCH_SIZES = [5, 10, 25, 50, 100, 200, 250] as const;
-const SFT_SINGLE_EXAMPLE_TIMEOUT_MS = 20_000;
+const SFT_SINGLE_EXAMPLE_TIMEOUT_MS = 120_000;
 const SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS = 180_000;
 
 function getGenerationModels(): string[] {
@@ -1350,7 +1350,7 @@ ${JSON.stringify({ examples: [{ messages: [
     }
 
     const generationModels = isReasoningGeneration
-      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(() => "nemotron-3-ultra-550b")
+      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(() => "glm-5.3-flash")
       : getGenerationModels();
     const modelAbortControllers = new Map(
       generationModels.map(model => [model, new AbortController()])
@@ -1366,6 +1366,99 @@ ${JSON.stringify({ examples: [{ messages: [
       for (let modelIndex = 0; modelIndex < generationStacks[c].length; modelIndex++) {
         const { model: targetModel, count: currentChunkSize } = generationStacks[c][modelIndex];
 
+      const reasoningUserPrompt = `Generate exactly 1 high-quality, diverse SFT training example for model stack ${c + 1} of ${generationStacks.length}.
+
+PROJECT CONTEXT:
+Project Name: ${projectName || "SFT Assistant"}
+System Prompt to Simulate: ${systemPrompt || "You are a helpful assistant."}
+Target Task and Persona: ${targetTask || "General helpfulness"}
+General Constraints: ${constraints || "Be accurate, detailed, and clear."}
+
+GOLDEN RESPONSE:
+${req.body.representativeCompletion || "No golden response provided."}
+
+Use the golden response only as a reference for tone, diction, voice, and response quality. Do not copy its content or treat it as the task to answer. Follow the project and batch instructions for what to generate.
+
+BATCH SETTINGS:
+Batch Description: ${batchDescription || "Standard synth batch"}
+Special Instructions: ${specialInstructions || "No additional instructions"}
+Temporary Constraints: ${temporaryConstraints || "None"}
+
+SELECTED TEMPLATE TYPE:
+${templateType}
+
+STRICT TEMPLATE REQUIREMENT:
+You MUST generate exactly 1 example using ONLY the selected TEMPLATE TYPE: "${templateType}".
+Do NOT scramble or mix template formats.
+Do NOT use any other template format.
+
+REASONING TEMPLATE STRUCTURE:
+The single example in the "examples" array MUST follow this exact structure.
+
+Return the complete output as one JSON object:
+{"examples":[...]}
+
+The example must contain exactly two messages, in this order:
+
+1. USER MESSAGE
+{
+  "role": "user",
+  "content": "A creative, diverse user prompt or question based on the scenario..."
+}
+
+2. ASSISTANT MESSAGE
+{
+  "role": "assistant",
+  "content": "<sft_reasoning>\\n[Concise explanation of the key reasoning steps, checks, or considerations]\\n</sft_reasoning>\\n[Clear, complete final assistant response]"
+}
+
+Do not add a system message or extra turns.
+
+The generated example must be original, realistic, self-contained, and tailored to the requested persona, task, and constraints.
+
+OUTPUT REQUIREMENTS:
+- Generate exactly 1 example.
+- Return exactly one JSON object with an "examples" array.
+- Do not return a top-level JSON array.
+- Do not return commentary before or after the JSON.
+- Do not use Markdown code fences.
+- Do not add extra properties to the example or its messages.
+- Ensure the final output is valid JSON.`;
+      const reasoningSystemPrompt = `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
+
+Your task is to generate high-quality training examples that follow the requested template exactly.
+
+REASONING TEMPLATE RULES:
+1. Return exactly one JSON object with one top-level property: "examples".
+2. "examples" must contain exactly the requested number of examples.
+3. Each example must contain exactly one property: "messages".
+4. Each "messages" array must contain exactly two messages:
+   - one user message
+   - one assistant message
+5. Do not include system messages inside individual examples.
+6. Do not include extra turns or extra properties.
+7. The assistant message must begin with exactly one non-empty <sft_reasoning>...</sft_reasoning> block.
+8. The final answer must appear immediately after the closing </sft_reasoning> tag.
+9. The reasoning section must contain a concise explanation of the key steps, checks, or considerations supporting the answer.
+10. Do not place the final answer inside the reasoning tags.
+11. Do not duplicate, nest, omit, or reorder the reasoning tags.
+12. Do not create separate "reasoning" or "reasoning_content" properties.
+13. Escape line breaks inside JSON strings as \\n.
+14. Do not include meta-commentary about dataset generation, prompt construction, or these instructions in generated examples.
+15. Generate original content appropriate to the requested project, persona, task, and constraints.
+
+REQUIRED ASSISTANT FORMAT:
+<sft_reasoning>\\nConcise explanation of the key steps, checks, or considerations supporting the answer.\\n</sft_reasoning>\\nFinal answer.
+
+STRUCTURAL EXAMPLE:
+${JSON.stringify({ examples: [{ messages: [
+  { role: "user", content: "What is 2 + 3?" },
+  { role: "assistant", content: "<sft_reasoning>\nI add 2 and 3 to determine the result.\n</sft_reasoning>\nThe answer is 5." }
+] }] })}
+
+The example demonstrates structure only. Generate new content based on the actual project instructions.
+
+The selected template type is authoritative. Never mix template types within a batch.`;
       const fullPrompt = `
         You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
         Your task is to generate exactly ${currentChunkSize} high-quality, diverse SFT training examples (model stack ${c + 1} of ${generationStacks.length}).
@@ -1686,13 +1779,7 @@ ${JSON.stringify({ examples: [{ messages: [
               : {}),
             ...(turnMode !== "Reasoning" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
             systemInstruction: turnMode === "Reasoning"
-              ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
-
-REASONING EXPLANATION DIRECTIVE (REASONING EXAMPLES ONLY):
-For every example, provide a concise explanation of the key reasoning steps and checks that support the final answer, written from the trainee assistant's perspective.
-Place the explanation inside <think>...</think> in the assistant content and place the final answer after </think>.
-Do not omit the explanation or either tag. Do not include meta commentary about dataset synthesis, writing prompts, or instructions.
-${reasoningFormatInstruction}`
+              ? reasoningSystemPrompt
               : `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
 
 ABSOLUTE ZERO CHAIN-OF-THOUGHT MANDATE (${turnMode.toUpperCase()}):
@@ -1713,7 +1800,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           const requestExamplesFromModel = async (
             model: string,
             requestedCount = currentChunkSize,
-            prompt = fullPrompt,
+            prompt = isReasoningGeneration ? reasoningUserPrompt : fullPrompt,
             requestedTimeoutMs = SFT_SINGLE_EXAMPLE_TIMEOUT_MS,
             ignoreModelAbort = false
           ) => {
@@ -1742,9 +1829,15 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               model,
               contents: isReasoningGeneration ? encodeReasoningProviderText(prompt) : prompt,
               config: isReasoningGeneration
-                ? JSON.parse(encodeReasoningProviderText(JSON.stringify(requestConfig)))
+                ? {
+                    systemInstruction: reasoningSystemPrompt,
+                    maxOutputTokens: requestConfig.maxOutputTokens,
+                    temperature: 0.7,
+                    reasoningEffort: "low"
+                  }
                 : requestConfig,
               timeoutMs,
+              exactMessages: isReasoningGeneration,
               ...(ignoreModelAbort || isReasoningGeneration ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
             });
             let parsed: any[];
@@ -1945,7 +2038,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     let recoveryExamples: any[] = [];
     let recoveryFailureReason: string | null = null;
     let recoveryFailureCategory: GenerationFailureCategory | undefined;
-    let recoveryModel = isReasoningGeneration ? "nemotron-3-ultra-550b" : "glm-5.3";
+    let recoveryModel = isReasoningGeneration ? "glm-5.3-flash" : "glm-5.3";
     let replacementCount = Math.max(0, countNum - completedExampleCount);
     if (replacementCount > 0 && requestExamplesForMissingBatch) {
       // Refill each missing example with an individual request, bounded by concurrency and deadline.
@@ -4051,9 +4144,9 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
     `;
 
     const response = await callDigitalOceanAI({
-      model: itemTemplate === "Reasoning" ? "nemotron-3-ultra-550b" : model,
+      model: itemTemplate === "Reasoning" ? "glm-5.3-flash" : model,
       contents: "Regenerate the single flagged example supplied in the system instructions, applying only its QA fixes.",
-      timeoutMs: 45000,
+      timeoutMs: itemTemplate === "Reasoning" ? SFT_SINGLE_EXAMPLE_TIMEOUT_MS : 45000,
       config: {
         systemInstruction: itemTemplate === "Reasoning" ? encodeReasoningProviderText(fullPrompt) : fullPrompt,
         temperature: 0.2,
