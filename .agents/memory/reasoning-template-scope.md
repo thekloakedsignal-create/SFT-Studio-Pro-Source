@@ -5,6 +5,12 @@ description: User-defined boundary for changes to SFT Reasoning batch generation
 
 For Reasoning-generation work, change only the Reasoning template and its tests. Do not alter Single Turn or Multi Turn prompts, schemas, or behavior. Keep the shared concurrent model schedule.
 
+For initial and refill Reasoning batch calls, use GLM-5.3-Flash with a 120-second request timeout. Send the user's supplied system and user messages together in one request, with project/batch placeholders filled and no appended schema or extra instructions. This overrides earlier Nemotron and 20-second Reasoning guidance below and in generation constraints.
+
+**Why:** The user explicitly replaced the Reasoning call with their supplied text, requested GLM-5.3-Flash and a longer timeout, and prohibited other changes.
+
+**How to apply:** Preserve the supplied wording and independent one-example scheduling. Keep other templates, QA repair behavior, parsing, and UI untouched.
+
 **Why:** The user explicitly set and reinforced this scope while correcting Reasoning generation.
 
 **How to apply:** Confine prompt, schema, and validation changes to Reasoning-specific branches; do not change the shared model pool or scheduler.
