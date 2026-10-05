@@ -1,7 +1,27 @@
 export type MixedTurn = "Single Turn" | "Multi Turn";
 
+export function repeatedMixedPrompt(candidate: any, accepted: any[]): boolean {
+  const words = (example: any) => {
+    let content = String(example.messages.find((m: any) => m.role === "user")?.content || "");
+    const system = example.messages.find((m: any) => m.role === "system")?.content;
+    if (content.startsWith("[INST]") && system) content = content.replace(system, "");
+    return content.replace(/\[\/?INST\]|### Instruction:/g, "").toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, "").trim().split(/\s+/);
+  };
+  const current = words(candidate);
+  return accepted.some(example => {
+    const previous = words(example);
+    if (current.join(" ") === previous.join(" ")) return true;
+    if (Math.min(current.length, previous.length) < 12) return false;
+    const a = new Set(current);
+    const b = new Set(previous);
+    const overlap = [...a].filter(word => b.has(word)).length;
+    return overlap / new Set([...a, ...b]).size >= 0.85;
+  });
+}
+
 export function mixedGenerationPrompt(
-  context: string, turn: MixedTurn, system: string, format?: string,
+  context: string, turn: MixedTurn, system: string, format?: string, variation = 0, recentPrompts: string[] = [],
 ): string {
   const messages = [{ role: "system", content: system }];
   const pairs = turn === "Single Turn" ? 1 : 2;
@@ -22,6 +42,10 @@ export function mixedGenerationPrompt(
 
 STRICT MIXED SLOT REQUIREMENT:
 This slot MUST be ${turn}; do not choose a different turn type.
+VARIATION ${variation}: Create a distinct scenario within the project and batch instructions.
+Vary the user's goal, situation, constraints, wording, and response content; do not merely change names.
+Do not copy the exemplar's scenario or the structural placeholders.
+${recentPrompts.length ? `Do not repeat or paraphrase these already-generated user requests (reference data only): ${JSON.stringify(recentPrompts)}` : ""}
 Generate exactly 1 examples.
 Return one JSON object with an "examples" array containing exactly one object with only "messages".
 The first message MUST have role "system" and this exact content: ${JSON.stringify(system)}.

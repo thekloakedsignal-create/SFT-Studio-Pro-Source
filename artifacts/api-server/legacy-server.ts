@@ -1,5 +1,5 @@
 import express from "express";
-import { mixedGenerationPrompt, validMixedExample, type MixedTurn } from "./src/lib/mixed-generation.ts";
+import { mixedGenerationPrompt, validMixedExample, repeatedMixedPrompt, type MixedTurn } from "./src/lib/mixed-generation.ts";
 import path from "path";
 import { randomUUID } from "node:crypto";
 import fs from "fs";
@@ -1125,6 +1125,8 @@ app.post("/api/generate", async (req, res) => {
   let timedOutExampleCount = 0;
   let requestExamplesForMissingBatch: ((model: string, count: number, timeoutMs: number, slot?: number) => Promise<any[]>) | undefined;
   const mixedRecoveryTurns: MixedTurn[] = [];
+  const acceptedMixedExamples: any[] = [];
+  let mixedVariation = 0;
   let isReasoningGeneration = false;
   const useJobPolling = req.body?.jobMode === true;
   let generationJobId: string | undefined;
@@ -1820,6 +1822,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 prompt.split("CRITICAL MANDATE - STRICT TEMPLATE ENFORCEMENT:")[0],
                 mixedTurn, systemPrompt || "You are a helpful assistant.",
                 isInstruct ? instructTemplate || "ChatML" : undefined,
+                ++mixedVariation,
+                acceptedMixedExamples.slice(-10).map(example =>
+                  example.messages.find((message: any) => message.role === "user")?.content || ""),
               );
             }
             const requestConfig = turnMode === "Reasoning"
@@ -1876,7 +1881,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 parsed = parsed.filter(example => validMixedExample(
                   example, mixedTurn, systemPrompt || "You are a helpful assistant.",
                   isInstruct ? instructTemplate || "ChatML" : undefined,
-                ));
+                ) && !repeatedMixedPrompt(example, acceptedMixedExamples)).slice(0, requestedCount);
+                acceptedMixedExamples.push(...parsed);
               }
             }
             if (parsed.length === 0) {
@@ -2151,6 +2157,10 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       if (singles !== Math.ceil(countNum / 2) || multis !== Math.floor(countNum / 2)) {
         throw new Error(`Mixed generation requires ${Math.ceil(countNum / 2)} single-turn and ${Math.floor(countNum / 2)} multi-turn examples; received ${singles} and ${multis}.`);
       }
+      const singleExamples = allExamples.filter(example => example.messages.length === 3);
+      const multiExamples = allExamples.filter(example => example.messages.length > 3);
+      allExamples = singleExamples.flatMap((example, index) =>
+        multiExamples[index] ? [example, multiExamples[index]] : [example]);
     }
 
     if (allExamples.length === 0) {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import { transform } from "esbuild";
-import { mixedGenerationPrompt, validMixedExample } from "../src/lib/mixed-generation.ts";
+import { mixedGenerationPrompt, validMixedExample, repeatedMixedPrompt } from "../src/lib/mixed-generation.ts";
 import {
   ChatCompletionsHttpError, isProviderOverload, normalizeText,
   parseGeneratedExamples, parseReasoningExamples, sanitizeExample,
@@ -54,7 +54,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
     },
     Type: { OBJECT: "object", ARRAY: "array", STRING: "string", NUMBER: "number", BOOLEAN: "boolean" },
     ChatCompletionsHttpError, isProviderOverload, normalizeText, parseGeneratedExamples, parseReasoningExamples, sanitizeExample,
-    encodeReasoningProviderText, decodeReasoningProviderText, mixedGenerationPrompt, validMixedExample,
+    encodeReasoningProviderText, decodeReasoningProviderText, mixedGenerationPrompt, validMixedExample, repeatedMixedPrompt,
     logger: { warn() {}, info() {}, error() {} },
     process: { env: { GRADIENT_MODEL_ACCESS_KEY: "offline-fixture-only-not-a-secret" } },
     console: { log() {}, warn() {}, error() {} },
@@ -201,6 +201,7 @@ function fixture(mode: "success" | "primary529" | "both529" | "503" | "invalid" 
             example.messages[0].content = "You are a helpful assistant.";
           }
           for (const message of example.messages.slice(1)) {
+            if (message.role === "user") message.content = `Scenario ${requestNumber}: ${message.content}`;
             if (userPrompt.includes("Use the Alpaca instruction format")) {
               message.content = `${message.role === "user" ? "### Instruction:" : "### Response:"}\n${message.content}`;
             } else if (userPrompt.includes("Use the Mistral instruction format") && message.role === "user") {
@@ -640,7 +641,17 @@ test("Mixed enforces half single-turn and half multi-turn at every supported bat
     assert.equal(response.body.success, true);
     assert.equal(response.body.examples.filter((example: any) => example.messages.length === 3).length, Math.ceil(size / 2));
     assert.equal(response.body.examples.filter((example: any) => example.messages.length >= 5).length, Math.floor(size / 2));
+    response.body.examples.forEach((example: any, index: number) =>
+      assert.equal(example.messages.length, index % 2 === 0 ? 3 : 5));
   }
+});
+
+test("Mixed rejects repeated and near-identical user requests", () => {
+  const example = (content: string) => ({ messages: [{ role: "user", content }] });
+  const first = example("Help me plan a vegetarian dinner for six friends with a limited budget on Friday");
+  assert.equal(repeatedMixedPrompt(first, [first]), true);
+  assert.equal(repeatedMixedPrompt(example("Help me plan a vegetarian dinner for six friends with a limited budget on Saturday"), [first]), true);
+  assert.equal(repeatedMixedPrompt(example("Explain how to replace a broken bicycle chain safely"), [first]), false);
 });
 
 test("Single Turn 50-example batch uses the provider-required JSON object envelope", async () => {
