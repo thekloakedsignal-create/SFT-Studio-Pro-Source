@@ -11,8 +11,8 @@ Keep the work color-only: preserve layout, typography, and behavior. Verify the 
 
 **How to apply:** Scope changes to the signed-in workspace, not the sign-in page. Remove only the enclosing work-area box when requested; preserve card layout and interactions. Keep the existing font family and unmarked header unchanged unless the user asks otherwise.
 
-Use the purple gradient from the highlighted batch-size “5” for selected option boxes sitewide. Batch example role labels must share a bright pink background and white lettering.
+Use the purple gradient from the highlighted batch-size “5” for selected option boxes sitewide. Batch example system, user, and target response labels must match the purple “Example #1” badge with white lettering, not pink/fuchsia.
 
-**Why:** The user requested one consistent selection color to avoid confusion, with no unrelated or functional changes.
+**Why:** The user requested one consistent selection color to avoid confusion, with no unrelated or functional changes, and replaced the pink/fuchsia role-label request because it was uncomfortable to look at.
 
 **How to apply:** Keep selected-choice styling consistent across tabs, templates, batch sizes, filters, and selected registry boxes; preserve existing selection behavior and layout.

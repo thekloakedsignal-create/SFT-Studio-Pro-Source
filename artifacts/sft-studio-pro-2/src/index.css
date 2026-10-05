@@ -417,8 +417,8 @@ main [class~="opacity-45"] { opacity: .72; }
 }
 
 .kk-workspace-panel .kk-example-card [class*="uppercase"][class*="px-1.5"] {
-  background: #db2777 !important;
-  border-color: #db2777 !important;
+  background: linear-gradient(135deg, #7e2ca0, #4f1d68) !important;
+  border-color: #794393 !important;
   color: #ffffff !important;
   font-weight: 900 !important;
 }
