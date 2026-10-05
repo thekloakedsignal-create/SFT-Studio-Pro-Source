@@ -766,13 +766,13 @@ export default function App() {
       
       let friendlyMessage = `Sign in with ${providerName} failed.`;
       if (error.code === 'auth/operation-not-allowed') {
-        friendlyMessage = `${providerName} provider is not enabled in your Firebase Console.`;
+        friendlyMessage = `${providerName} sign-in is currently unavailable.`;
       } else if (error.code === 'auth/unauthorized-domain') {
-        friendlyMessage = `Domain (${window.location.hostname}) is not in Firebase authorized domains.`;
+        friendlyMessage = "Sign-in is unavailable at this address.";
       } else if (error.code === 'auth/account-exists-with-different-credential') {
         friendlyMessage = `An account already exists with this email using a different sign-in method.`;
       } else if (error.message) {
-        friendlyMessage = `${providerName} Sign-In Error: ${error.message}`;
+        friendlyMessage = `${providerName} sign-in failed. Please try again.`;
       }
       setNotification({ text: friendlyMessage, type: "error" });
     } finally {
@@ -826,7 +826,7 @@ export default function App() {
       } else if (error.code === 'auth/weak-password') {
         friendlyMessage = "Password is too weak. Please use a stronger password.";
       } else if (error.code === 'auth/operation-not-allowed') {
-        friendlyMessage = "Email/password authentication is not enabled in Firebase. Please enable it in Firebase Console.";
+        friendlyMessage = "Email/password sign-in is currently unavailable.";
       }
       
       setNotification({ text: friendlyMessage, type: "error" });
@@ -1522,7 +1522,7 @@ export default function App() {
     } catch (error: any) {
       setExpertMessages(prev => [
         ...prev,
-        { role: "assistant" as const, content: `Error: ${error.message || "Failed to connect to the backend server."}` }
+        { role: "assistant" as const, content: "Unable to complete your request. Please try again." }
       ]);
     } finally {
       setIsExpertSending(false);
@@ -1741,9 +1741,9 @@ export default function App() {
         console.error("Redirect sign-in error:", error);
         let friendlyMessage = "Sign in via redirect failed.";
         if (error.code === 'auth/operation-not-allowed') {
-          friendlyMessage = "This auth provider is not enabled in your Firebase project under Authentication > Sign-in method.";
+          friendlyMessage = "This sign-in option is currently unavailable.";
         } else if (error.code === 'auth/unauthorized-domain') {
-          friendlyMessage = `This domain (${window.location.hostname}) is not authorized in your Firebase project. Please add it to "Authorized domains" under Authentication > Settings in your Firebase Console.`;
+          friendlyMessage = "Sign-in is unavailable at this address.";
         } else if (error.message) {
           friendlyMessage = error.message;
         }
@@ -4517,7 +4517,7 @@ export default function App() {
                 <span>Synthesis Engine</span>
               </div>
               <p className="text-[10px] text-slate-500 leading-snug">
-                Streaming SFT synthesis with DigitalOcean GenAI Inference &amp; automated schema validation.
+                Streaming SFT synthesis with automated quality validation.
               </p>
             </div>
           </div>
@@ -6929,7 +6929,7 @@ export default function App() {
                               <span className="bg-slate-900/60 px-1.5 py-0.5 rounded text-emerald-400/90 font-mono">
                                 ID: {b.batchId || b.id}
                               </span>
-                              <span className="bg-slate-900/60 px-1.5 py-0.5 rounded">Source: {b.source}</span>
+                              <span className="bg-slate-900/60 px-1.5 py-0.5 rounded">Source: {/transcript/i.test(b.source || "") ? "Transcript Conversion" : /doc/i.test(b.source || "") ? "Document Conversion" : /triad/i.test(b.source || "") ? "TRiAD Alignment" : /import/i.test(b.source || "") ? "Import" : "Generator"}</span>
                               <span className="bg-slate-900/60 px-1.5 py-0.5 rounded">Template: {b.templateType}</span>
                               <span className="bg-slate-900/60 px-1.5 py-0.5 rounded font-bold text-slate-300">{b.examplesCount} Examples</span>
                             </div>
@@ -7592,7 +7592,7 @@ export default function App() {
                         </span>
                         <h4 className="text-xs font-bold text-slate-200">Scale Beyond 1,000 Generations</h4>
                         <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
-                          All self-serve paygates have been removed. Build a custom package for high-volume datasets, private DigitalOcean inference pipelines, or bespoke TRiAD alignment directly with Triad AI Agency.
+                          Build a custom package for high-volume datasets, private generation services, or bespoke TRiAD alignment directly with Triad AI Agency.
                         </p>
                       </div>
                       <div className="text-right shrink-0">

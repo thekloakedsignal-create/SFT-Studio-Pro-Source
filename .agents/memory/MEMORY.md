@@ -7,3 +7,4 @@
 - [QA scope](quality-audit-intent.md) — QA must combine formatting/template checks with semantic assessment, not replace either one.
 - [Visual reference](visual-reference.md) — Use the supplied screenshot for palette changes; preserve layout and prioritize sharp work-area contrast.
 - [Sign-in workspace](sign-in-workspace.md) — New sign-ins and accounts start with a fresh unlocked draft, not an automatically reopened saved project.
+- [Interface naming](interface-naming.md) — Hide generation model/backend labels; preserve batch names.
