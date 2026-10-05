@@ -421,6 +421,22 @@ main [class~="opacity-45"] { opacity: .72; }
   font-weight: 900 !important;
 }
 
+.kk-compact-examples .kk-example-card {
+  margin-inline: -0.5rem;
+  width: calc(100% + 1rem);
+  padding: 0.625rem;
+}
+
+.kk-compact-examples .kk-example-card .pl-2.border-l-2 {
+  font-size: 0.8125rem !important;
+  line-height: 1.5 !important;
+}
+
+@media (min-width: 1024px) {
+  .kk-compact-examples > .lg\:col-span-3 { grid-column: span 2 / span 2; }
+  .kk-compact-examples > .lg\:col-span-9 { grid-column: span 10 / span 10; }
+}
+
 .kk-workspace-panel button.kk-reject-batch-button {
   color: #ffffff !important;
   font-weight: 900 !important;

@@ -4287,8 +4287,8 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 max-w-[1720px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-5">
-        <div className="kk-workspace-panel grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <main className={`flex-1 ${["define", "convert", "assess"].includes(activeTab) ? "max-w-[1920px]" : "max-w-[1720px]"} mx-auto w-full px-4 sm:px-6 lg:px-8 py-5`}>
+        <div className={`kk-workspace-panel grid grid-cols-1 lg:grid-cols-12 gap-5 ${["define", "convert", "assess"].includes(activeTab) ? "kk-compact-examples" : ""}`}>
         
         {/* Tab Sidebar Navigation (Desktop) & Tabs bar (Mobile) */}
         <div className="lg:col-span-3 xl:col-span-2 flex flex-col gap-3">
@@ -6146,21 +6146,21 @@ export default function App() {
                       <div className="flex items-center justify-between">
                         <h2 className="text-base font-bold text-white flex items-center gap-2">
                           <ShieldAlert className="h-5 w-5 text-amber-400" />
-                          Import TRiAD Dataset
+                          TRiAD Alignment
                         </h2>
                         <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full font-mono uppercase font-semibold">
-                          External source
+                          Pre-generated
                         </span>
                       </div>
                       <p className="text-xs text-slate-200 font-medium mt-1">
-                        Import examples from your own hosted dataset.
+                        Add pre-generated TRiAD alignment examples to your project.
                       </p>
                     </div>
 
                     {/* External dataset requirements */}
                     <div className="bg-slate-900/40 border border-slate-800/60 p-4 rounded-xl mb-6">
                       <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-                        Provide a URL to a CSV, JSON, or JSONL dataset with complete prompt and response examples. The importer uses source records only; it does not generate fallback examples or repeat records to fill the selected size.
+                        Choose a batch size and template to use the pre-generated TRiAD alignment dataset. This option is for alignment only, not file uploads.
                       </p>
                     </div>
 
@@ -6225,7 +6225,7 @@ export default function App() {
                       </div>
 
                       {/* Custom URL Input */}
-                      <div className="bg-slate-900/40 border border-slate-800 p-3.5 rounded-xl">
+                      <div hidden className="bg-slate-900/40 border border-slate-800 p-3.5 rounded-xl">
                         <label className="block text-[11px] font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
                           <span>Dataset URL for up to {triadSize} examples</span>
                           <span className="text-[9px] text-slate-500 font-normal italic">Required</span>
@@ -6267,7 +6267,7 @@ export default function App() {
                           <span>Import Locked (Save & Lock First)</span>
                         </>
                       ) : !triadUrls[triadSize]?.trim() ? (
-                        <span>Enter Dataset URL</span>
+                        <span>Alignment dataset unavailable</span>
                       ) : (
                         <>
                           <PlusCircle className="h-4 w-4 text-slate-950" />
