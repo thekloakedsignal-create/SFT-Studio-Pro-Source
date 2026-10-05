@@ -1362,6 +1362,7 @@ ${JSON.stringify({ examples: [{ messages: [
     const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);
     const taskOutputs: Array<Array<any[] | undefined>> = generationStacks.map(stack => new Array(stack.length));
     let completedExampleCount = 0;
+    const exemplarTargetResponse = req.body.representativeCompletion || "No exemplar target response provided.";
 
     for (let c = 0; c < generationStacks.length; c++) {
       const scheduledStackModels = new Set(generationStacks[c].map(({ model }) => model));
@@ -1377,10 +1378,10 @@ System Prompt to Simulate: ${systemPrompt || "You are a helpful assistant."}
 Target Task and Persona: ${targetTask || "General helpfulness"}
 General Constraints: ${constraints || "Be accurate, detailed, and clear."}
 
-GOLDEN RESPONSE:
-${req.body.representativeCompletion || "No golden response provided."}
+PROJECT DEFINITION — EXEMPLAR TARGET RESPONSE:
+${exemplarTargetResponse}
 
-Use the golden response only as a reference for tone, diction, voice, and response quality. Do not copy its content or treat it as the task to answer. Follow the project and batch instructions for what to generate.
+Use this project-defined exemplar only as a reference for target response tone, diction, voice, and quality. Do not copy its content or treat its original prompt as the task to answer. Follow the project and batch instructions for what to generate.
 
 BATCH SETTINGS:
 Batch Description: ${batchDescription || "Standard synth batch"}
@@ -1490,9 +1491,9 @@ The selected template type is authoritative. Never mix template types within a b
         - Target Task & Persona: ${targetTask || "General helpfulness"}
         - General Constraints: ${constraints || "Be accurate, detailed, and clear."}
 
-        GOLDEN RESPONSE — TONE AND DICTION REFERENCE:
-        ${req.body.representativeCompletion || "No golden response provided."}
-        Use this response only as a reference for the target AI's tone, diction, and voice. Do not copy its content or treat it as the task to answer. Follow the project and batch instructions for what to generate.
+        PROJECT DEFINITION — EXEMPLAR TARGET RESPONSE:
+        ${exemplarTargetResponse}
+        Use this project-defined exemplar only as a reference for the target AI's tone, diction, voice, and response quality. Do not copy its content or treat its original prompt as the task to answer. Follow the project and batch instructions for what to generate.
         
         BATCH TEMPORARY SETTINGS:
         - Batch Description: ${batchDescription || "Standard synth batch"}
