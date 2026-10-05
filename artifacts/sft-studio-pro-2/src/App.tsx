@@ -549,6 +549,7 @@ export default function App() {
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
   const [isAssessing, setIsAssessing] = useState(false);
   const [isRegeneratingFlagged, setIsRegeneratingFlagged] = useState(false);
+  const [qaRepairProgress, setQaRepairProgress] = useState<{ completed: number; total: number; saving: boolean } | null>(null);
   const [reports, setReports] = useState<Record<string, QualityReport>>({});
   const [inspectorFilter, setInspectorFilter] = useState<"flagged" | "all">("flagged");
   const [inspectorPage, setInspectorPage] = useState<number>(1);
@@ -2912,6 +2913,7 @@ export default function App() {
     }));
 
     setIsRegeneratingFlagged(true);
+    setQaRepairProgress({ completed: 0, total: flaggedItems.length, saving: false });
     setNotification({
       text: `Regenerating ${flaggedItems.length} flagged example(s) with AI using QA feedback...`,
       type: "info"
@@ -2952,6 +2954,7 @@ export default function App() {
           const statusRes = await projectApiFetch(`/api/regenerate-flagged/jobs/${encodeURIComponent(jobId)}`);
           const status = await statusRes.json();
           if (!statusRes.ok) throw new Error(status.error || "Unable to retrieve QA repairs.");
+          setQaRepairProgress({ completed: status.completed, total: status.total, saving: false });
           if (status.status === "running") {
             setNotification({ text: `Repairing flagged responses: ${status.completed}/${status.total} processed...`, type: "info" });
             continue;
@@ -2972,6 +2975,7 @@ export default function App() {
       }
 
       // Map new examples into the batch
+      setQaRepairProgress({ completed: flaggedItems.length, total: flaggedItems.length, saving: true });
       const newExamples = [...targetBatch.examples];
       const regeneratedIndices = new Set(regeneratedList.map(r => r.exampleIndex));
       regeneratedList.forEach(item => {
@@ -3025,6 +3029,7 @@ export default function App() {
       setNotification({ text: `Regeneration failed: ${err.message}`, type: "error" });
     } finally {
       setIsRegeneratingFlagged(false);
+      setQaRepairProgress(null);
     }
   };
 
@@ -6524,6 +6529,29 @@ export default function App() {
                           <RefreshCw className={`h-3.5 w-3.5 ${isRegeneratingFlagged ? "animate-spin" : ""}`} />
                           <span>{isRegeneratingFlagged ? "Regenerating Flagged..." : "Regenerate Flagged"}</span>
                         </button>
+                        {isRegeneratingFlagged && qaRepairProgress && (
+                          <div className="space-y-2" aria-live="polite">
+                            <div className="flex items-center justify-between gap-2 text-[11px] text-slate-300">
+                              <span>{qaRepairProgress.saving ? "Saving repaired examples..." : "Processing flagged examples..."}</span>
+                              <span className="font-mono text-green-300">
+                                {qaRepairProgress.completed} / {qaRepairProgress.total}
+                              </span>
+                            </div>
+                            <div
+                              className="h-2 w-full overflow-hidden rounded-full bg-slate-800"
+                              role="progressbar"
+                              aria-label="Regenerate flagged progress"
+                              aria-valuemin={0}
+                              aria-valuemax={qaRepairProgress.total}
+                              aria-valuenow={qaRepairProgress.completed}
+                            >
+                              <div
+                                className="h-full rounded-full bg-green-500 transition-[width] duration-300"
+                                style={{ width: `${Math.min(100, qaRepairProgress.completed / Math.max(1, qaRepairProgress.total) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
 
                         <button
                           onClick={() => handleDeduplicate(currentBatch.id)}
