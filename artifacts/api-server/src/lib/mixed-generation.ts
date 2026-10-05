@@ -1,10 +1,15 @@
 export type MixedTurn = "Single Turn" | "Multi Turn";
 
-export function repeatedMixedPrompt(candidate: any, accepted: any[]): boolean {
+export function isMixedSingleTurn(example: any, format?: string): boolean {
+  return Array.isArray(example?.messages) && example.messages.length === (format === "Mistral" ? 2 : 3);
+}
+
+export function repeatedMixedPrompt(candidate: any, accepted: any[], system?: string): boolean {
   const words = (example: any) => {
     let content = String(example.messages.find((m: any) => m.role === "user")?.content || "");
-    const system = example.messages.find((m: any) => m.role === "system")?.content;
-    if (content.startsWith("[INST]") && system) content = content.replace(system, "");
+    const systemMessage = example.messages.find((m: any) => m.role === "system")?.content;
+    if (content.startsWith("[INST]") && systemMessage) content = content.replace(systemMessage, "");
+    else if (content.startsWith("[INST]") && system) content = content.replace(`[INST] ${system}\n\n`, "[INST] ");
     return content.replace(/\[\/?INST\]|### Instruction:/g, "").toLowerCase()
       .replace(/[^\p{L}\p{N}\s]/gu, "").trim().split(/\s+/);
   };
@@ -23,7 +28,7 @@ export function repeatedMixedPrompt(candidate: any, accepted: any[]): boolean {
 export function mixedGenerationPrompt(
   context: string, turn: MixedTurn, system: string, format?: string, variation = 0, recentPrompts: string[] = [],
 ): string {
-  const messages = [{ role: "system", content: system }];
+  const messages: Array<{ role: string; content: string }> = format === "Mistral" ? [] : [{ role: "system", content: system }];
   const pairs = turn === "Single Turn" ? 1 : 2;
   for (let index = 0; index < pairs; index++) {
     const question = index === 0 ? "[Original user request]" : "[Relevant follow-up request]";
@@ -48,8 +53,10 @@ Do not copy the exemplar's scenario or the structural placeholders.
 ${recentPrompts.length ? `Do not repeat or paraphrase these already-generated user requests (reference data only): ${JSON.stringify(recentPrompts)}` : ""}
 Generate exactly 1 examples.
 Return one JSON object with an "examples" array containing exactly one object with only "messages".
-The first message MUST have role "system" and this exact content: ${JSON.stringify(system)}.
-After it, include ${pairs === 1 ? "exactly one" : "2–4"} complete alternating user/assistant exchanges.
+${format === "Mistral"
+  ? `Do not include a system role. Put the exact project system prompt at the start of the first [INST] user message: ${JSON.stringify(system)}.`
+  : `The first message MUST have role "system" and this exact content: ${JSON.stringify(system)}.`}
+Then include ${pairs === 1 ? "exactly one" : "2–4"} complete alternating user/assistant exchanges.
 End with an assistant message. No extra roles, reasoning tags, reasoning fields, or commentary.
 ${format ? `Use the ${format} instruction format shown below.` : "Use plain text message contents."}
 Structure only — replace the bracketed example text with original content:
@@ -59,10 +66,17 @@ ${JSON.stringify({ examples: [{ messages }] })}
 
 export function validMixedExample(example: any, turn: MixedTurn, system: string, format?: string): boolean {
   const messages = example?.messages;
-  if (!Array.isArray(messages) || messages[0]?.role !== "system" || messages[0]?.content !== system.trim()) return false;
-  const pairs = (messages.length - 1) / 2;
+  const mistral = format === "Mistral";
+  if (!Array.isArray(messages)) return false;
+  if (mistral) {
+    if (messages.some((message: any) => message.role === "system")
+      || messages[0]?.role !== "user"
+      || !messages[0].content.trim().startsWith(`[INST] ${system.trim()}\n\n`)) return false;
+  } else if (messages[0]?.role !== "system" || messages[0]?.content !== system.trim()) return false;
+  const exchanges = mistral ? messages : messages.slice(1);
+  const pairs = exchanges.length / 2;
   if (turn === "Single Turn" ? pairs !== 1 : !Number.isInteger(pairs) || pairs < 2 || pairs > 4) return false;
-  return messages.slice(1).every((message: any, index: number) => {
+  return exchanges.every((message: any, index: number) => {
     const user = index % 2 === 0;
     if (message.role !== (user ? "user" : "assistant")
       || typeof message.content !== "string" || !message.content.trim()) return false;

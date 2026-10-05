@@ -1,5 +1,5 @@
 import express from "express";
-import { mixedGenerationPrompt, validMixedExample, repeatedMixedPrompt, type MixedTurn } from "./src/lib/mixed-generation.ts";
+import { mixedGenerationPrompt, validMixedExample, repeatedMixedPrompt, isMixedSingleTurn, type MixedTurn } from "./src/lib/mixed-generation.ts";
 import path from "path";
 import { randomUUID } from "node:crypto";
 import fs from "fs";
@@ -1881,7 +1881,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 parsed = parsed.filter(example => validMixedExample(
                   example, mixedTurn, systemPrompt || "You are a helpful assistant.",
                   isInstruct ? instructTemplate || "ChatML" : undefined,
-                ) && !repeatedMixedPrompt(example, acceptedMixedExamples)).slice(0, requestedCount);
+                ) && !repeatedMixedPrompt(example, acceptedMixedExamples, systemPrompt || "You are a helpful assistant.")).slice(0, requestedCount);
                 acceptedMixedExamples.push(...parsed);
               }
             }
@@ -2152,13 +2152,14 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     });
 
     if (turnMode === "Mixed") {
-      const singles = allExamples.filter(example => example.messages.length === 3).length;
+      const format = isInstruct ? instructTemplate || "ChatML" : undefined;
+      const singles = allExamples.filter(example => isMixedSingleTurn(example, format)).length;
       const multis = allExamples.length - singles;
       if (singles !== Math.ceil(countNum / 2) || multis !== Math.floor(countNum / 2)) {
         throw new Error(`Mixed generation requires ${Math.ceil(countNum / 2)} single-turn and ${Math.floor(countNum / 2)} multi-turn examples; received ${singles} and ${multis}.`);
       }
-      const singleExamples = allExamples.filter(example => example.messages.length === 3);
-      const multiExamples = allExamples.filter(example => example.messages.length > 3);
+      const singleExamples = allExamples.filter(example => isMixedSingleTurn(example, format));
+      const multiExamples = allExamples.filter(example => !isMixedSingleTurn(example, format));
       allExamples = singleExamples.flatMap((example, index) =>
         multiExamples[index] ? [example, multiExamples[index]] : [example]);
     }
