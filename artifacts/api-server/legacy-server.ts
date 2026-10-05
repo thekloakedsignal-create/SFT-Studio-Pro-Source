@@ -3729,58 +3729,50 @@ app.post("/api/analyze-quality", async (req, res) => {
       await Promise.allSettled(chunks.map(async (chunk) => {
         try {
           const chunkPrompt = `
-            You are an elite, uncompromising AI Quality Assurance Auditor for Supervised Fine-Tuning (SFT) datasets.
-            Your task is to conduct an in-depth, rigorous quality audit on the following SFT training examples.
+            You are a calibrated SFT dataset auditor. Identify invalid examples and direct violations of the supplied project and batch definitions. Do not maximize the number of findings.
 
-            CRITICAL AUDIT DIRECTIVE:
-            - NEVER default to an instant pass.
-            - Inspect EVERY example critically with high standards.
-            - High-performance fine-tuned models depend on pristine training examples. A single defective, shallow, or contradictory example degrades model performance.
-            - If an example has defects, you MUST flag it with specific, constructive feedback and the appropriate severity.
-
+            AUTHORITATIVE PROJECT AND BATCH DEFINITIONS:
+            These supplied values are the authority for this audit. Do not invent additional requirements.
             TARGET SYSTEM PROMPT & PERSONA:
             ${systemPrompt || "Standard helpful assistant"}
-
             TARGET TASK & OBJECTIVE:
             ${targetTask || "Supervised fine-tuning high quality conversations"}
-
             PROJECT CONSTRAINTS & NEGATIVE RULES:
             ${constraints || "None specified"}
-
             DATASET TEMPLATE TYPE:
             ${templateType || "Single Turn"}
+            INSTRUCTION FORMAT:
+            ${instructTemplate || "Structured role/content messages"}
 
             EXAMPLES TO AUDIT (Global zero-based indices provided in "exampleIndex"):
             ${JSON.stringify(chunk.items, null, 2)}
 
-            EVALUATION CRITERIA:
-            1. Persona & Constraint Adherence:
-               - Does the assistant completion strictly respect the target system prompt, tone, domain constraints, formatting requirements, and negative rules (e.g., 'never use bullet points', 'respond in JSON', specific persona tone)?
-               - Flag any violation, persona drift, or broken negative constraints.
-            2. Instruction Following & Completeness:
-               - Did the assistant completely and accurately answer all parts of the user prompt?
-               - Flag evasive answers, partial answers, or failure to follow prompt instructions.
-            3. Substance, Depth & Factual Soundness:
-               - Is the response detailed, logically coherent, and factually sound?
-               - Flag factual hallucinations, broken code, nonsensical logic, or superficial/lazy completions.
-            4. Reasoning Quality (for Reasoning/Thought templates):
-               - If reasoning tags or thinking steps are present, are they logically sound, thorough, and genuine? Flag fake, circular, or trivial reasoning.
-            5. Tone, Style & SFT Fitness:
-               - Is the tone professional, aligned with the persona, and free of unwanted fluff or boilerplate?
+            AUDIT PRIORITIES:
+            1. TEMPLATE, TEXT INTEGRITY, AND FORMATTING — CHECK THESE FIRST:
+               - Inspect every example for a broken or mismatched conversation template, invalid message order or required turn count, missing required role, malformed/conflicting delimiters or tags, corrupted or garbled text, obvious truncation, or unfilled placeholders.
+               - Flag objective defects that make the example invalid or materially interfere with reading, training, or the selected format, even when its meaning is otherwise acceptable.
+               - Do not mistake clean structured role/content messages for missing export markers. Validate serialization markers when present; do not require export-only markers unless the supplied format explicitly requires them.
+               - Ignore cosmetic whitespace or harmless stylistic differences that do not break the template or format.
+
+            2. SEMANTIC REVIEW — STRICTLY LIMITED TO DIRECT DEFINITION VIOLATIONS:
+               - Create a semantic issue ONLY when the assistant response directly conflicts with an explicit requirement in the supplied system prompt, task, constraints, or batch/template definition.
+               - For each semantic issue, quote a short relevant excerpt from the response and identify the exact supplied requirement it violates.
+               - Do not flag general concerns about depth, polish, brevity, redundancy, awkward phrasing, preferred tone, or factual nuance unless they directly violate an explicit supplied requirement.
+               - Do not infer unstated expectations or flag an answer merely because it could be better. If there is no clear direct conflict, report no semantic issue.
 
             SEVERITY CLASSIFICATION:
-            - "High": Fatal defect (blatant violation of system prompt/negative constraints, factual hallucination, broken code, refusal/evasion, empty or missing content).
-            - "Medium": Significant flaw (partial instruction omission, shallow/vague response, subtle persona drift, poor explanation).
-            - "Low": Minor issue (awkward phrasing, suboptimal formatting, slight redundancy).
+            - "High": A broken template, materially corrupted/unreadable text, or direct definition violation that makes the example unusable.
+            - "Medium": An objective, material format defect or a clear, direct definition violation that does not make the example wholly unusable.
+            - Do not put minor style preferences or polish suggestions in "issues"; do not use "Low" to turn a nit into a finding.
 
             OUTPUT REQUIREMENTS:
             Return an object with:
-            - "issues": Array of detected issues. Each issue MUST specify:
+            - "issues": Array containing only objective template/format/text-integrity defects or direct violations of the supplied definitions. An empty array is appropriate when none are present. Each issue MUST specify:
               - "exampleIndex": The integer global index of the example (from the provided examples).
-              - "severity": "High" | "Medium" | "Low"
-              - "type": Short category name (e.g., "Constraint Violation", "Instruction Drift", "Factual Error", "Shallow Response", "Tone Mismatch", "Hallucinated Logic")
-              - "message": Clear, specific explanation of why this example is flawed and how to fix it.
-            - "suggestions": Array of 1 to 3 actionable, high-level improvement recommendations for this dataset chunk.
+              - "severity": "High" | "Medium"
+              - "type": Short category name (e.g., "Template Anomaly", "Corrupted Text", "Formatting Error", "Direct Constraint Violation")
+              - "message": Specific evidence and explanation of the objective defect or exact definition violated.
+            - "suggestions": Array of 0 to 3 optional, non-blocking recommendations for recurring improvements. Suggestions must not imply that examples fail QA.
           `;
 
           const response = await callDigitalOceanAI({
