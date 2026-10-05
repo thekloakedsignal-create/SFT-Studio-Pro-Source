@@ -3993,8 +3993,8 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
         try {
     const fullPrompt = `
       You are an expert Supervised Fine-Tuning (SFT) Dataset Engineer and Quality Improvement Specialist.
-      Your task is to fix the following flagged SFT training example based on quality assessment feedback.
-      You must eliminate every reported issue, conform strictly to the system prompt and persona constraints, and ensure high diversity, accuracy, and formatting compliance.
+      Your task is to regenerate exactly one original flagged SFT training example, correcting only the QA reasons and recommended fixes supplied for that example.
+      Preserve the original response exactly except for the changes necessary to resolve those flags. Do not add diversity, expand, restyle, or otherwise rewrite unaffected content.
 
       TARGET SYSTEM PROMPT:
       ${item.example.messages.find((message: any) => message.role === "system")?.content || systemPrompt || "Standard helpful assistant"}
@@ -4019,13 +4019,14 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
       ${itemTemplate || "Single Turn"}
 
       GLOBAL QA SUGGESTIONS:
-      ${Array.isArray(suggestions) && suggestions.length > 0 ? suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n") : "Provide rich, accurate, and completely resolved responses."}
+      ${Array.isArray(suggestions) && suggestions.length > 0 ? suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n") : "None."}
+      Apply these only when they address this example's specific flag reasons.
 
       FLAGGED EXAMPLES AND SPECIFIC AUDIT ISSUES:
       ${JSON.stringify([item], null, 2)}
 
       RULES:
-      1. For each item in the input, preserve its exact original "exampleIndex".
+      1. Return exactly one repaired example and preserve its exact original "exampleIndex".
       2. Retain the exact message structure and roles already set in each example.
       3. Regenerate the content to fix the specific flagged audit issues without altering the established template or conversation format.
       4. Ensure the regenerated response completely resolves all formatting anomalies (properly close all markdown code fences and reasoning tags like <think>, finish any truncated thoughts, remove unpopulated placeholder tokens, and ensure coherent turn ordering) and satisfies all system prompt guidelines and negative constraints.
@@ -4037,9 +4038,10 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
 
     const response = await callDigitalOceanAI({
       model: itemTemplate === "Reasoning" ? "nemotron-3-ultra-550b" : model,
-      contents: itemTemplate === "Reasoning" ? encodeReasoningProviderText(fullPrompt) : fullPrompt,
+      contents: "Regenerate the single flagged example supplied in the system instructions, applying only its QA fixes.",
       timeoutMs: 45000,
       config: {
+        systemInstruction: itemTemplate === "Reasoning" ? encodeReasoningProviderText(fullPrompt) : fullPrompt,
         temperature: 0.2,
         maxOutputTokens: 4096,
         responseMimeType: "application/json"

@@ -34,7 +34,9 @@ function fixture(badIndex = -1) {
       peak = Math.max(peak, ++active);
       await new Promise(resolve => setImmediate(resolve));
       active--;
-      const input = JSON.parse(params.contents.split("FLAGGED EXAMPLES AND SPECIFIC AUDIT ISSUES:")[1].split("RULES:")[0].trim())[0];
+      const inputs = JSON.parse(params.config.systemInstruction.split("FLAGGED EXAMPLES AND SPECIFIC AUDIT ISSUES:")[1].split("RULES:")[0].trim());
+      assert.equal(inputs.length, 1);
+      const input = inputs[0];
       const messages = input.example.messages.map((message: any) => ({
         ...message, content: message.role === "assistant" ? "Corrected substantive response." : "Provider must not change this."
       }));
@@ -95,10 +97,13 @@ test("QA repairs use concurrent batch stacks, original templates, and only flagg
       if (message.role !== "assistant") assert.equal(message.content, original.example.messages[index].content);
     });
   }
-  assert.match(f.calls[0].contents, /DATASET TEMPLATE TYPE:\s+Single Turn/);
-  assert.match(f.calls[1].contents, /DATASET TEMPLATE TYPE:\s+Multi Turn/);
-  assert.ok(f.calls.every(call => /Keep examples practical|No invented statistics/.test(call.contents)
-    && call.contents.includes("Use the supplied evidence")));
+  assert.equal(f.calls.length, items.length);
+  assert.match(f.calls[0].config.systemInstruction, /DATASET TEMPLATE TYPE:\s+Single Turn/);
+  assert.match(f.calls[1].config.systemInstruction, /DATASET TEMPLATE TYPE:\s+Multi Turn/);
+  assert.ok(f.calls.every(call => /Keep examples practical|No invented statistics/.test(call.config.systemInstruction)
+    && call.config.systemInstruction.includes("Use the supplied evidence")
+    && call.config.systemInstruction.includes("Preserve the original response exactly except")
+    && call.config.systemInstruction.includes("Flagged response")));
 });
 
 test("a wrong-index repair remains flagged while valid concurrent repairs finish", async () => {
