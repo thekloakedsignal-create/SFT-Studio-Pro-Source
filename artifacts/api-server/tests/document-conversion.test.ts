@@ -149,7 +149,7 @@ test("large requested counts use bounded small groups with custom instructions r
   const result = await f.run({ docType: "knowledge_base", count: 8, converterInstructions: "Focus on backup procedures." });
   assert.equal(result.body.examples.length, 8);
   assert.equal(f.calls.length, 8);
-  assert.equal(f.peak(), 2);
+  assert.equal(f.peak(), 5);
   assert.ok(f.calls.every(call => call.timeoutMs === 180_000));
   assert.ok(f.calls.every(call => /Synthesize exactly 1 examples/.test(call.contents)
     && /Focus on backup procedures/.test(call.contents)));
@@ -239,7 +239,7 @@ test("long documents analyze every section, including sections formerly skipped"
   }
   assert.equal(result.body.examples.length, 8);
   assert.equal(f.calls.length, 8);
-  assert.ok(f.peak() <= 2);
+  assert.equal(f.peak(), 5);
 });
 
 test("invalid input fails explicitly and malformed generated examples are retried", async () => {
