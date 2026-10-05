@@ -13,7 +13,7 @@ const code = (await transform(
   { loader: "ts", format: "cjs" }
 )).code;
 
-function fixture(badIndex = -1) {
+function fixture(badIndex = -1, repair?: (input: any) => any[]) {
   const routes = new Map<string, Function>();
   const calls: any[] = [];
   let active = 0, peak = 0;
@@ -37,7 +37,7 @@ function fixture(badIndex = -1) {
       const inputs = JSON.parse(params.config.systemInstruction.split("FLAGGED EXAMPLES AND SPECIFIC AUDIT ISSUES:")[1].split("RULES:")[0].trim());
       assert.equal(inputs.length, 1);
       const input = inputs[0];
-      const messages = input.example.messages.map((message: any) => ({
+      const messages = repair ? repair(input) : input.example.messages.map((message: any) => ({
         ...message, content: message.role === "assistant" ? "Corrected substantive response." : "Provider must not change this."
       }));
       return { text: JSON.stringify({ regeneratedExamples: [{
@@ -113,6 +113,34 @@ test("a wrong-index repair remains flagged while valid concurrent repairs finish
   assert.equal(result.regeneratedExamples.length, 2);
   assert.equal(result.failures[0].exampleIndex, 2);
   assert.ok(result.regeneratedExamples.every((item: any) => item.exampleIndex !== 2 && item.exampleIndex !== 999));
+});
+
+test("format repairs accept merged assistant turns and reconstructed missing user prompts", async () => {
+  const broken = [
+    { exampleIndex: 0, example: { messages: [
+      { role: "user", content: "What is two plus two?" },
+      { role: "assistant", content: "Four." },
+      { role: "assistant", content: "The answer is four." }
+    ] }, issues: [{ message: "Double assistant response" }] },
+    { exampleIndex: 1, example: { messages: [
+      { role: "assistant", content: "Four." }
+    ] }, issues: [{ message: "Missing user prompt" }] }
+  ];
+  const f = fixture(-1, () => [
+    { role: "user", content: "What is two plus two?" },
+    { role: "assistant", content: "Four." }
+  ]);
+  const result = await f.run(broken, { templateType: "Single Turn" });
+  assert.equal(result.regeneratedExamples.length, 2);
+  assert.equal(result.failures.length, 0);
+  assert.ok(f.calls.every(call => call.config.systemInstruction.includes("You may add missing turns")));
+  for (const repaired of result.regeneratedExamples) {
+    assert.equal(auditTemplateFormat([repaired], { templateType: "Single Turn" }).length, 0);
+  }
+  const invalid = fixture(-1, input => input.example.messages);
+  const failed = await invalid.run(broken, { templateType: "Single Turn" });
+  assert.equal(failed.regeneratedExamples.length, 0);
+  assert.equal(failed.failures.length, 2);
 });
 
 test("QA UI polls, saves before updating score, and leaves unflagged examples untouched", async () => {
