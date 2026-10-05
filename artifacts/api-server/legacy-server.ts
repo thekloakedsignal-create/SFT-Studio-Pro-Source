@@ -1350,8 +1350,7 @@ ${JSON.stringify({ examples: [{ messages: [
     }
 
     const generationModels = isReasoningGeneration
-      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map((_, index) =>
-          ["nemotron-3-ultra-550b", "mistral-3-14B", "qwen3.8-max"][index % 3])
+      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(() => "nemotron-3-ultra-550b")
       : getGenerationModels();
     const modelAbortControllers = new Map(
       generationModels.map(model => [model, new AbortController()])
