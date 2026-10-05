@@ -21,11 +21,11 @@ Treat repeated Reasoning model slots as independent requests, not one shared fai
 
 **How to apply:** Keep Reasoning timeout isolation and result collection separate from prompt/template changes. Preserve Nemotron model selection, batch sizes, initial schedule, and spacing; apply the user-authorized per-example concurrent refill and longer shared batch deadline without changing provider transport or parsing.
 
-Use only `nemotron-3-ultra-550b` for Reasoning, including timeout recovery; the general GLM recovery rule applies only to other templates.
+Use `nemotron-3-ultra-550b`, `mistral-3-14B`, and `qwen3.8-max` for initial Reasoning requests. Keep existing Nemotron recovery unchanged; the general GLM recovery rule applies only to other templates.
 
-**Why:** The user stated, “Nemotron is the only model that responds correctly,” after reporting zero completed Reasoning examples.
+**Why:** The user superseded the Nemotron-only choice after repeated lighthouse examples, then explicitly narrowed the request to model names only.
 
-**How to apply:** Do not switch Reasoning to GLM or other models to compensate for response-format failures. Diagnose the actual response-format error rather than assuming a concurrency problem.
+**How to apply:** This model-name-only instruction supersedes earlier Nemotron-only instructions. Do not change prompts, scheduling, parsing, or provider endpoints. The user stopped the broader sequential/Responses-endpoint work before implementation.
 
 Treat `<think>` as a potentially reserved provider delimiter, not safe literal text inside generated JSON. Use a transport-only delimiter and restore dataset tags before strict validation.
 
