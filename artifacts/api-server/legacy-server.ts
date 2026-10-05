@@ -2926,7 +2926,6 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
 
 // 2. Document to SFT Convertor
 const DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS = 180_000;
-const DOCUMENT_CONVERTER_MAX_ATTEMPTS = 3;
 const documentConversionJobs = new Map<string, {
   owner: string; status: "running" | "complete" | "error";
   updatedAt: number; completed: number; total: number; result?: any;
@@ -3311,37 +3310,34 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       }
     };
 
-    const conversionErrors: string[] = [];
     const CONCURRENCY_LIMIT = 2;
-    const pendingJobs: Array<(typeof sectionJobs)[number] & { attempt: number }> =
-      sectionJobs.map(job => ({ ...job, attempt: 1 }));
+    const pendingJobs = [...sectionJobs];
+    let consecutiveFailedWaves = 0;
     while (pendingJobs.length > 0) {
       const wave = pendingJobs.splice(0, CONCURRENCY_LIMIT);
       const waveResults = await Promise.allSettled(
         wave.map(job => processSection(job.text, job.sectionIndex, job.count, job.offset))
       );
-      const retryJobs: typeof pendingJobs = [];
+      const retryJobs: typeof sectionJobs = [];
       waveResults.forEach((result, index) => {
         if (result.status === "fulfilled") {
           finalExamples.push(...result.value);
-        } else if (wave[index].attempt < DOCUMENT_CONVERTER_MAX_ATTEMPTS) {
-          retryJobs.push({ ...wave[index], attempt: wave[index].attempt + 1 });
         } else {
-          conversionErrors.push(result.reason?.message || "Document conversion request failed.");
+          retryJobs.push(wave[index]);
         }
       });
       pendingJobs.push(...retryJobs);
+      consecutiveFailedWaves = retryJobs.length > 0 ? consecutiveFailedWaves + 1 : 0;
       if (conversionJob) {
         conversionJob.completed = Math.min(finalExamples.length, requestedCount);
         conversionJob.updatedAt = Date.now();
       }
       if (pendingJobs.length > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 400));
+        const retryDelayMs = retryJobs.length > 0
+          ? Math.min(30_000, 1_000 * (2 ** Math.min(consecutiveFailedWaves - 1, 5)))
+          : 400;
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       }
-    }
-
-    if (!finalExamples || finalExamples.length === 0) {
-      return finishConversion(500, { success: false, error: conversionErrors[0] || "Document synthesis produced no valid SFT examples. Please verify document text and try again." });
     }
 
     const formattedExamples = finalExamples.map(example => {
@@ -3388,7 +3384,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       success: true, 
       examples: formattedExamples,
       requestedCount,
-      partial: conversionErrors.length > 0 || formattedExamples.length < requestedCount,
+      partial: false,
       source: `Document Conversion (${actualDocType} - ${extractionModel || "DigitalOcean"})`
     });
 

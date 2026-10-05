@@ -5883,9 +5883,9 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-800/60 pt-5 mt-6 space-y-3">
+                  <div className="border-t border-slate-800/60 pt-5 mt-6 flex flex-col gap-3">
                     {isConverting && docConversionProgress && (docType === "knowledge_base" || docType === "literature") && (
-                      <div className="space-y-1.5" role="status" aria-live="polite">
+                      <div className="w-full space-y-1.5" role="status" aria-live="polite">
                         <div className="flex items-center justify-between text-[11px] text-slate-300">
                           <span>
                             Generating {docType === "literature" ? "literature" : "knowledge"} examples
@@ -5911,34 +5911,32 @@ export default function App() {
                         </div>
                       </div>
                     )}
-                    <div className="flex justify-end">
-                      <button
-                        disabled={isConverting || !docContent.trim() || isFieldsUnlocked || !selectedProjectId}
-                        onClick={handleConvertDocument}
-                        className={`px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
-                          isFieldsUnlocked || !selectedProjectId
-                            ? "bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed opacity-60"
-                            : "bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40"
-                        }`}
-                      >
-                        {isConverting ? (
-                          <>
-                            <RefreshCw className="h-4 w-4 animate-spin" />
-                            <span>Parsing & Converting...</span>
-                          </>
-                        ) : (isFieldsUnlocked || !selectedProjectId) ? (
-                          <>
-                            <Lock className="h-4 w-4 text-slate-500" />
-                            <span>Convert Locked (Save & Lock Definition First)</span>
-                          </>
-                        ) : (
-                          <>
-                            <ArrowRight className="h-4 w-4" />
-                            <span>Convert Document to SFT</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
+                    <button
+                      disabled={isConverting || !docContent.trim() || isFieldsUnlocked || !selectedProjectId}
+                      onClick={handleConvertDocument}
+                      className={`px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 self-end transition cursor-pointer ${
+                        isFieldsUnlocked || !selectedProjectId
+                          ? "bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed opacity-60"
+                          : "bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40"
+                      }`}
+                    >
+                      {isConverting ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          <span>Parsing & Converting...</span>
+                        </>
+                      ) : (isFieldsUnlocked || !selectedProjectId) ? (
+                        <>
+                          <Lock className="h-4 w-4 text-slate-500" />
+                          <span>Convert Locked (Save & Lock Definition First)</span>
+                        </>
+                      ) : (
+                        <>
+                          <ArrowRight className="h-4 w-4" />
+                          <span>Convert Document to SFT</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
 

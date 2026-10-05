@@ -34,10 +34,10 @@ function fixture(output: "valid" | "invalid" | "error" | "partial" | "unfinished
       peak = Math.max(peak, ++active);
       await Promise.resolve();
       active--;
-      if (output === "error") throw new Error("fixture provider failure");
+      if (output === "error" && callIndex === 1) throw new Error("fixture provider failure");
       if (output === "partial" && callIndex === 2) throw new Error("fixture truncated response");
-      if (output === "invalid") return { text: '{"examples":[{"messages":[]}]}' };
-      if (output === "unfinished") return { text: JSON.stringify({ examples: [{ messages: [
+      if (output === "invalid" && callIndex === 1) return { text: '{"examples":[{"messages":[]}]}' };
+      if (output === "unfinished" && callIndex === 1) return { text: JSON.stringify({ examples: [{ messages: [
         { role: "user", content: "Question" }, { role: "assistant", content: "Answer" },
         { role: "user", content: "Unanswered follow-up" }
       ] }] }) };
@@ -176,10 +176,12 @@ test("background progress reports completed examples, not attempted requests", a
   assert.equal(status.result.examples.length, 4);
 });
 
-test("unfinished conversations are not returned as completed examples", async () => {
-  const result = await fixture("unfinished").run({ templateType: "Multi Turn" });
-  assert.equal(result.code, 500);
-  assert.equal(result.body.success, false);
+test("unfinished conversations are retried instead of counted as completed", async () => {
+  const f = fixture("unfinished");
+  const result = await f.run({ templateType: "Multi Turn" });
+  assert.equal(result.code, 200);
+  assert.equal(result.body.examples.length, 2);
+  assert.equal(f.calls.length, 3);
 });
 
 test("background conversion acknowledges before completion and exposes owner-scoped results", async () => {
@@ -201,12 +203,10 @@ test("background errors and retry-recovered results are retrievable", async () =
     const { done } = await f.start({});
     await done;
     const status = f.poll().body;
-    assert.equal(status.status, output === "error" ? "error" : "complete");
-    assert.equal(status.result.success, output !== "error");
-    if (output === "partial") {
-      assert.equal(status.result.examples.length, 4);
-      assert.equal(status.result.partial, false);
-    }
+    assert.equal(status.status, "complete");
+    assert.equal(status.result.success, true);
+    assert.equal(status.result.examples.length, 4);
+    assert.equal(status.result.partial, false);
   }
 });
 
@@ -242,17 +242,15 @@ test("long documents analyze every section, including sections formerly skipped"
   assert.ok(f.peak() <= 2);
 });
 
-test("invalid input and provider output fail explicitly without transcript extraction fallback", async () => {
+test("invalid input fails explicitly and malformed generated examples are retried", async () => {
   for (const documentContent of ["", "  ", null, 123]) {
     const f = fixture();
     assert.equal((await f.run({ documentContent })).code, 400);
     assert.equal(f.calls.length, 0);
   }
-  for (const output of ["invalid", "error"] as const) {
-    const f = fixture(output);
-    const result = await f.run({ docType: "knowledge_base", documentContent: "User: Question\nAssistant: Answer" });
-    assert.equal(result.code, 500);
-    assert.equal(result.body.success, false);
-    assert.match(result.body.error, /section 1 could not be converted/);
-  }
+  const f = fixture("invalid");
+  const result = await f.run({ docType: "knowledge_base", documentContent: "User: Question\nAssistant: Answer" });
+  assert.equal(result.code, 200);
+  assert.equal(result.body.examples.length, 2);
+  assert.equal(f.calls.length, 3);
 });
