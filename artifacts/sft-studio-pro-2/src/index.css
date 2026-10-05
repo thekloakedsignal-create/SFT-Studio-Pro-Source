@@ -417,7 +417,9 @@ main [class~="opacity-45"] { opacity: .72; }
 }
 
 .kk-workspace-panel .kk-example-card [class*="uppercase"][class*="px-1.5"] {
-  color: #09040d !important;
+  background: #db2777 !important;
+  border-color: #db2777 !important;
+  color: #ffffff !important;
   font-weight: 900 !important;
 }
 
@@ -517,4 +519,43 @@ main [class~="opacity-45"] { opacity: .72; }
 #root > div:has(> .kk-header) > main .kk-qa-panel button :is(span, strong, b, small, em, p, label, div) {
   color: #ffffff !important;
   font-weight: 900 !important;
+}
+
+/* Selected choices share the highlighted batch-size 5's purple gradient. */
+#root :is(
+  button.kk-tab-active,
+  button[class~="bg-green-500"][class~="border-transparent"],
+  button[class~="bg-green-500"][class~="font-semibold"],
+  button[class~="bg-green-500/15"],
+  button[class~="bg-green-500/10"],
+  button[class~="bg-amber-500/15"],
+  button[class~="bg-amber-500/10"][class~="border-amber-500/40"],
+  button[class~="bg-amber-500/20"][class~="border-amber-500/30"],
+  button[class~="bg-blue-600/15"],
+  button[class~="bg-blue-600/20"],
+  button[class~="bg-purple-600/15"],
+  button[class~="bg-purple-600/20"],
+  button[class~="bg-purple-600/30"],
+  button[class~="bg-purple-500/20"][class~="border-purple-500/50"],
+  button[class~="bg-slate-800"][class~="text-white"][class~="border-slate-700"],
+  button[class~="border-b-2"][class~="border-green-500"],
+  [class~="border-green-500"][class~="bg-green-500/5"],
+  select
+) {
+  background: linear-gradient(180deg, #d1afe2 0%, #9f70b8 44%, #654078 100%) !important;
+  border-color: #e1c7ed !important;
+  color: #ffffff !important;
+
+  & :is(span, strong, b, small, em, p, label, div, h3, svg) {
+    color: #ffffff !important;
+  }
+}
+
+#root select option:checked {
+  background: #9f70b8 !important;
+  color: #ffffff !important;
+}
+
+#root input:is([type="checkbox"], [type="radio"]) {
+  accent-color: #9f70b8;
 }

@@ -1,5 +1,144 @@
 [
   {
+    "id": "project-1791178081115",
+    "userId": "0l3DRt7a96NkbBJ736dNKf1mASn1",
+    "name": "General Instruction Tuner",
+    "settings": {
+      "name": "General Instruction Tuner",
+      "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+      "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+      "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+      "selectedPreset": "General Use AI",
+      "projectFormat": "Instruction",
+      "templateType": "Instruction Template",
+      "instructTemplate": "Mistral",
+      "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      "representativePrompt": "[INST] Explain why the sky appears blue. [/INST]",
+      "representativeCompletion": "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
+    },
+    "batches": [
+      {
+        "id": "bcb9e913-387d-4650-8938-936b85c37117",
+        "batchId": "bcb9e913-387d-4650-8938-936b85c37117",
+        "name": "General Instruction following and explanations",
+        "source": "Generator",
+        "generationSettings": {
+          "name": "General Instruction Tuner",
+          "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+          "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+          "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+          "selectedPreset": "General Use AI",
+          "projectFormat": "Instruction",
+          "templateType": "Instruction Template",
+          "instructTemplate": "Mistral",
+          "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+          "representativePrompt": "[INST] Explain why the sky appears blue. [/INST]",
+          "representativeCompletion": "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
+        },
+        "templateType": "Single Turn",
+        "examplesCount": 5,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "[INST] You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.\n\nWhy does ice float on water? [/INST]"
+              },
+              {
+                "role": "assistant",
+                "content": "Ice floats on water because it is less dense than liquid water. When water freezes, its molecules arrange themselves into a crystalline structure that holds them farther apart than in the liquid state. This open lattice structure causes ice to occupy about 9% more space than the same amount of liquid water, making it less dense per unit of volume. Because a less dense substance displaces a denser one, ice remains buoyant at the surface. This property is unusual among substances, as most materials become denser when they solidify. It also has an important ecological effect: floating ice insulates the water below, allowing fish and other aquatic life to survive through winter."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791178106732-0"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "[INST] You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.\n\nWhy does ice float on liquid water? [/INST]"
+              },
+              {
+                "role": "assistant",
+                "content": "Ice floats on liquid water because it is less dense than its liquid form. When water freezes, its molecules arrange into a crystalline structure held together by hydrogen bonds, which spaces the molecules farther apart than in liquid water. This expansion increases the volume while the mass remains constant, resulting in lower density that allows ice to remain buoyant."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791178106732-1"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "[INST] You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.\n\nCan you explain the concept of 'quantum entanglement' in simple terms for someone without a physics background? [/INST]"
+              },
+              {
+                "role": "assistant",
+                "content": "Quantum entanglement is a phenomenon in physics where two or more particles become connected in such a way that the state of one particle instantly influences the state of the other, regardless of the distance separating them. \n\nTo visualize this, imagine a pair of magical coins. In the ordinary world, if you flip two coins, the result of one has no effect on the other. However, if these coins were 'entangled,' flipping one to reveal 'heads' would cause the other coin to instantly show 'tails,' even if that second coin was located on the other side of the galaxy. \n\nIn the quantum world, particles like electrons or photons don't have a fixed state until they are measured; they exist in a haze of possibilities called superposition. Entanglement ensures that as soon as the measurement of one particle 'collapses' its state into a definite value, its partner's state is determined immediately. Albert Einstein famously referred to this counterintuitive behavior as \"spooky action at a distance.\""
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791178106732-2"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "[INST] You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.\n\nExplain why the Great Wall of China was built. [/INST]"
+              },
+              {
+                "role": "assistant",
+                "content": "The Great Wall of China was built primarily to protect Chinese states and empires from invasions and raids by nomadic groups from the north, such as the Mongols and Xiongnu. It also served to control trade along the Silk Road, regulate immigration and emigration, and assert territorial sovereignty."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791178106732-3"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "<s>[INST] You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.\n\nWhat are the primary differences between a limited liability company (LLC) and a corporation (Inc.) in the United States? [/INST]"
+              },
+              {
+                "role": "assistant",
+                "content": "The primary differences between an LLC and a corporation in the U.S. lie in taxation, ownership structure, and formal requirements:\n\n1. **Taxation**: LLCs typically use pass-through taxation (profits/losses reported on owners' personal returns), while C-Corporations face double taxation (corporate tax + dividend tax). S-Corporations avoid double taxation but have strict eligibility rules.\n\n2. **Ownership**: LLCs have \"members\" with flexible profit-sharing arrangements. Corporations have \"shareholders\" who own stock; C-Corps allow unlimited shareholders and multiple stock classes, while S-Corps are limited to 100 U.S. resident shareholders and one stock class.\n\n3. **Formalities**: Corporations require strict formalities (bylaws, annual meetings, minutes, board of directors). LLCs are more flexible, usually requiring only an operating agreement and minimal annual filings.\n\n4. **Liability Protection**: Both provide limited liability protection, shielding personal assets from business debts.\n\n5. **Perpetuity**: Corporations exist perpetually regardless of ownership changes. LLCs may dissolve upon a member's departure unless the operating agreement states otherwise.\n\nChoosing between them depends on factors like funding needs (VCs prefer C-Corps), tax preferences, and administrative capacity."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791178106732-4"
+          }
+        ],
+        "status": "Pending",
+        "timestamp": "2026-10-05 05:28:26.732Z",
+        "description": "General Instruction following and explanations",
+        "specialInstructions": "Prioritize clear, informative, and direct explanations.",
+        "temporaryConstraints": "None"
+      }
+    ],
+    "updatedAt": "2026-10-05T05:28:27.075Z"
+  },
+  {
     "id": "project-1791177785852",
     "userId": "0l3DRt7a96NkbBJ736dNKf1mASn1",
     "name": "Savant (Academic Scholar)",
