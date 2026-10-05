@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "A2y6cN_sSXEZCAnUJmmxi"
+uri = "file://attached_assets/production-last-100-generation-output.json"
+type = "unspecified"
+title = "Production generation result — 100 examples"
+description = "Final saved result returned by the production generation job, including all 100 examples. This is the parsed application result, not the raw DigitalOcean HTTP response body, which is not present in production logs."
+logical_id = "3b10d468-4a17-49ee-810b-e8a48edaa11b"
+content_hash = "sha256:04cf2a4ebe80f20489493985e34ea7e65ca06a9656247482fc971e59693e2168"
+size = 296134
+mtime_ms = 1791194934933
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:9d24e0ab-bd71-4ed5-8eaf-9ec4f88a2453/3b10d468-4a17-49ee-810b-e8a48edaa11b/f5d30c1f-6141-435a-b1ad-2544099eee8b"
+storage_version_token = "1791194939923162"
+content_type = "application/octet-stream"
