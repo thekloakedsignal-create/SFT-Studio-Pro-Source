@@ -3344,13 +3344,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       return finishConversion(500, { success: false, error: conversionErrors[0] || "Document synthesis produced no valid SFT examples. Please verify document text and try again." });
     }
 
-    // Keep representative results across the entire document when rounding
-    // section allocations produces more examples than requested.
-    if (finalExamples.length > requestedCount) {
-      const available = finalExamples;
-      finalExamples = Array.from({ length: requestedCount }, (_, index) =>
-        available[Math.floor(index * available.length / requestedCount)]);
-    }
     const formattedExamples = finalExamples.map(example => {
       const sanitized = sanitizeExample(example, (format === "reasoning" || format === "mixed") ? format : "Single Turn");
       if (isInstructionTemplate && Array.isArray(sanitized.messages)) {

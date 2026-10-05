@@ -150,19 +150,30 @@ test("large requested counts use bounded small groups with custom instructions r
   assert.equal(result.body.examples.length, 8);
   assert.equal(f.calls.length, 8);
   assert.equal(f.peak(), 2);
+  assert.ok(f.calls.every(call => call.timeoutMs === 180_000));
   assert.ok(f.calls.every(call => /Synthesize exactly 1 examples/.test(call.contents)
     && /Focus on backup procedures/.test(call.contents)));
   assert.match(f.calls.at(-1).contents, /examples 8-8 of 8/);
 });
 
-test("failed requests do not discard completed examples or stop later requests", async () => {
+test("failed requests retry missing examples without discarding successes", async () => {
   const f = fixture("partial");
   const result = await f.run({ count: 4 });
   assert.equal(result.code, 200);
-  assert.equal(result.body.examples.length, 3);
-  assert.equal(result.body.partial, true);
+  assert.equal(result.body.examples.length, 4);
+  assert.equal(result.body.partial, false);
   assert.equal(result.body.requestedCount, 4);
-  assert.equal(f.calls.length, 4);
+  assert.equal(f.calls.length, 5);
+});
+
+test("background progress reports completed examples, not attempted requests", async () => {
+  const f = fixture("partial");
+  const { done } = await f.start({ count: 4, docType: "knowledge_base" });
+  await done;
+  const status = f.poll().body;
+  assert.equal(status.completed, 4);
+  assert.equal(status.total, 4);
+  assert.equal(status.result.examples.length, 4);
 });
 
 test("unfinished conversations are not returned as completed examples", async () => {
@@ -184,7 +195,7 @@ test("background conversion acknowledges before completion and exposes owner-sco
   assert.equal(status.body.completed, 4);
 });
 
-test("background errors and partial results are retrievable", async () => {
+test("background errors and retry-recovered results are retrievable", async () => {
   for (const output of ["error", "partial"] as const) {
     const f = fixture(output);
     const { done } = await f.start({});
@@ -192,7 +203,10 @@ test("background errors and partial results are retrievable", async () => {
     const status = f.poll().body;
     assert.equal(status.status, output === "error" ? "error" : "complete");
     assert.equal(status.result.success, output !== "error");
-    if (output === "partial") assert.equal(status.result.examples.length, 3);
+    if (output === "partial") {
+      assert.equal(status.result.examples.length, 4);
+      assert.equal(status.result.partial, false);
+    }
   }
 });
 
@@ -206,6 +220,13 @@ test("converter UI excludes Reasoning and retains partial results for review", a
   assert.ok(app.includes("latestDocBatch.partial"));
 });
 
+test("converter UI displays live progress for Knowledge and Literature", async () => {
+  const app = await readFile(new URL("../../sft-studio-pro-2/src/App.tsx", import.meta.url), "utf8");
+  assert.ok(app.includes('role="progressbar"'));
+  assert.ok(app.includes("status.completed"));
+  assert.ok(app.includes('docType === "knowledge_base" || docType === "literature"'));
+});
+
 test("long documents analyze every section, including sections formerly skipped", async () => {
   const f = fixture();
   const result = await f.run({
@@ -217,6 +238,7 @@ test("long documents analyze every section, including sections formerly skipped"
     assert.ok(f.calls.some(call => call.contents.includes(`SECTION_${index} `)));
   }
   assert.equal(result.body.examples.length, 8);
+  assert.equal(f.calls.length, 8);
   assert.ok(f.peak() <= 2);
 });
 
