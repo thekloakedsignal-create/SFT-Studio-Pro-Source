@@ -1757,6 +1757,42 @@ export default function App() {
       try {
         setCurrentUser(user);
         if (user) {
+          // Sign-in starts an unsaved, editable workspace; saved projects remain in the picker.
+          projectLoadVersion.current += 1;
+          setSelectedProjectId(null);
+          setIsFieldsUnlocked(true);
+          setProject({
+            name: PROJECT_PRESETS[PresetType.GENERAL_USE].name,
+            systemPrompt: PROJECT_PRESETS[PresetType.GENERAL_USE].systemPrompt,
+            targetTask: PROJECT_PRESETS[PresetType.GENERAL_USE].targetTask,
+            constraints: PROJECT_PRESETS[PresetType.GENERAL_USE].constraints,
+            selectedPreset: PresetType.GENERAL_USE,
+            projectFormat: ProjectFormat.CONVERSATION,
+            templateType: TemplateType.SINGLE_TURN,
+            instructTemplate: InstructTemplate.CHATML,
+            customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+            representativePrompt: PROJECT_PRESETS[PresetType.GENERAL_USE].examples[0]?.prompt || "",
+            representativeCompletion: PROJECT_PRESETS[PresetType.GENERAL_USE].examples[0]?.completion || "",
+          });
+          setBatches([]);
+          initSelectedRegistryBatches([]);
+          setReports({});
+          setSelectedBatchId("");
+          setEditingExampleIndex(null);
+          setEditingExampleBatchId(null);
+          setEditingMessages([]);
+          setExportedPreview("");
+          setBatchDesc(PROJECT_PRESETS[PresetType.GENERAL_USE].batchDesc);
+          setBatchInstructions(PROJECT_PRESETS[PresetType.GENERAL_USE].batchInstructions);
+          setBatchTempConstraints(PROJECT_PRESETS[PresetType.GENERAL_USE].batchTempConstraints);
+          setBatchTemplate(TemplateType.SINGLE_TURN);
+          setBatchSize(5);
+          setDocName("");
+          setDocContent("");
+          setLatestConvertedDocBatchId(null);
+          setExpertMessages([]);
+          setExpertInput("");
+          setActiveTab("define");
           setNotification({ text: `Welcome, ${user.displayName || user.email}!`, type: "success" });
           await loadUserProfile(user.uid);
           
@@ -1793,13 +1829,6 @@ export default function App() {
 
                 localStorage.removeItem("local_sft_project");
                 
-                setSelectedProjectId(targetId);
-                setIsFieldsUnlocked(false);
-                setProject(payload.settings);
-                const activeBatches = payload.batches || [];
-                setBatches(activeBatches);
-                initSelectedRegistryBatches(activeBatches);
-                
                 await loadUserProjects(user.uid);
                 setNotification({ text: `Your offline workspace has been securely synced to your cloud account!`, type: "success" });
                 migrated = true;
@@ -1813,48 +1842,13 @@ export default function App() {
           }
 
           if (!migrated) {
-            const projectsList = await loadUserProjects(user.uid);
-            if (projectsList && projectsList.length > 0) {
-              const targetProj = projectsList.find(p => p.id === activeProjectId.current) || projectsList[0];
-              if (targetProj) {
-                await handleSelectProject(targetProj.id);
-              }
-            } else {
-              // Auto-save initial workspace as their first project in Postgres
-              const defaultProjId = `project-${Date.now()}`;
-              try {
-                await projectApiFetch("/api/sql/projects", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    id: defaultProjId,
-                    userId: user.uid,
-                    name: project.name || "My First SFT Project",
-                    settings: {
-                      name: project.name,
-                      systemPrompt: project.systemPrompt,
-                      targetTask: project.targetTask,
-                      constraints: project.constraints,
-                      selectedPreset: project.selectedPreset,
-                      representativePrompt: project.representativePrompt || "",
-                      representativeCompletion: project.representativeCompletion || "",
-                    },
-                    batches: batches
-                  })
-                });
-
-                setSelectedProjectId(defaultProjId);
-                setIsFieldsUnlocked(false);
-                await loadUserProjects(user.uid);
-              } catch (error) {
-                console.warn("Initial user project creation notice:", error);
-              }
-            }
+            await loadUserProjects(user.uid);
           }
         } else {
           // Load projects from Postgres using deviceId for guest/unauthenticated users
           try {
             const guestProjects = await loadUserProjects(getDeviceId());
+            if (auth.currentUser) return;
             if (guestProjects && guestProjects.length > 0) {
               const targetProj = guestProjects.find(p => p.id === activeProjectId.current) || guestProjects[0];
               await handleSelectProject(targetProj.id);
