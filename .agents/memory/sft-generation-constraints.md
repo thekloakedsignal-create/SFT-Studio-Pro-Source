@@ -25,6 +25,12 @@ Single Turn, Multi Turn, and Mixed must collect in-flight responses and continue
 
 Single Turn recovery uses individual concurrent requests for missing examples rather than one large fill request.
 
+The golden response is a tone, diction, and voice reference for every batch-generation call, including replacements. Do not include the golden prompt.
+
+**Why:** The user explicitly clarified that the response demonstrates the target AI's tonality and diction, and requested a prompt-only change.
+
+**How to apply:** Include the golden response in the shared generation prompt as a style reference, not a task to answer or content to copy.
+
 **Why:** The user explicitly approved individual recovery after the single GLM fill returned only one of twelve requested replacements, then clarified on 2026-10-04 that all missing examples must be requested individually and concurrently rather than as one bulk job.
 
 **How to apply:** Preserve completed examples, bound refill concurrency to ten, keep the existing per-request timeout and size-scaled total deadline, and permit only one distinct-model backup per HTTP 529 response. Retry failed one-example refills only until the total deadline; do not change prompts, schemas, provider payload structure, fetch, or parsing.

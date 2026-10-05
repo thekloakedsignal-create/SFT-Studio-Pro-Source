@@ -1393,6 +1393,10 @@ ${JSON.stringify({ examples: [{ messages: [
         - System Prompt to include/simulate: ${systemPrompt || "You are a helpful assistant."}
         - Target Task & Persona: ${targetTask || "General helpfulness"}
         - General Constraints: ${constraints || "Be accurate, detailed, and clear."}
+
+        GOLDEN RESPONSE — TONE AND DICTION REFERENCE:
+        ${req.body.representativeCompletion || "No golden response provided."}
+        Use this response only as a reference for the target AI's tone, diction, and voice. Do not copy its content or treat it as the task to answer. Follow the project and batch instructions for what to generate.
         
         BATCH TEMPORARY SETTINGS:
         - Batch Description: ${batchDescription || "Standard synth batch"}
