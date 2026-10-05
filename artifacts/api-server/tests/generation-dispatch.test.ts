@@ -611,7 +611,7 @@ test("Multi Turn and Mixed retain responses and continue large batches after fir
   }
 });
 
-test("Multi Turn and Mixed retry failed replacements but stop at the batch deadline", async () => {
+test("Mixed continues fresh calls past the batch deadline; Multi Turn retains its deadline", async () => {
   for (const mode of ["Multi Turn", "Mixed"]) {
     const f = fixture("singleRecovery12", "timeout");
     const response = await f.generate(50, false, mode);
@@ -621,14 +621,16 @@ test("Multi Turn and Mixed retry failed replacements but stop at the batch deadl
     const expired = fixture("singleRecovery12", "deadline");
     const partial = await expired.generate(50, false, mode);
     if (mode === "Mixed") {
-      assert.equal(partial.body.success, false);
-      assert.match(partial.body.error, /Mixed generation requires 25 single-turn and 25 multi-turn/);
-      assert.equal(partial.body.examples, undefined);
+      assert.equal(partial.body.success, true);
+      assert.equal(partial.body.partial, undefined);
+      assert.equal(partial.body.examples.filter((example: any) => example.messages.length === 3).length, 25);
+      assert.equal(partial.body.examples.filter((example: any) => example.messages.length >= 5).length, 25);
+      assert.ok(new Set(expired.calls.slice(50).map(call => call.model)).size > 1);
     } else {
       assert.equal(partial.body.partial, true);
       assert.equal(partial.body.examples.length, 39);
+      assert.equal(expired.calls.length, 42);
     }
-    assert.equal(expired.calls.length, 42);
   }
 });
 

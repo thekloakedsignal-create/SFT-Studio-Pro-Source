@@ -41,6 +41,12 @@ Treat `<think>` as a potentially reserved provider delimiter, not safe literal t
 
 Mixed must contain 50% Single Turn and 50% Multi Turn across batch sizes, never Reasoning.
 
+Mixed generation must keep issuing fresh one-example calls concurrently across the model pool until the requested split is complete, rather than stopping at an overall batch deadline or relying on one recovery model. This overrides earlier deadline guidance for Mixed only.
+
+**Why:** The user clarified that generation should keep going until complete using concurrent individual calls across many models.
+
+**How to apply:** Preserve individual call timeouts and the required turn type of each missing slot; do not change Reasoning or other templates.
+
 **Why:** The user explicitly confirmed “50% Single Turn + 50% Multi Turn” and clarified that mentioning Reasoning was a mistake: “Don’t touch reasoning.”
 
 **How to apply:** Apply this boundary to both generation and document conversion, including instruction-formatted output. Mixed must not preserve reasoning fields or thinking traces; leave the dedicated Reasoning template unchanged.

@@ -1120,7 +1120,7 @@ app.post("/api/generate", async (req, res) => {
   }
   const generationBatchId = randomUUID();
   const generationTimeoutMs = Math.ceil(countNum / 50) * SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS;
-  const generationDeadline = Date.now() + generationTimeoutMs;
+  let generationDeadline = Date.now() + generationTimeoutMs;
   const stalledModels = new Set<string>();
   let timedOutExampleCount = 0;
   let requestExamplesForMissingBatch: ((model: string, count: number, timeoutMs: number, slot?: number) => Promise<any[]>) | undefined;
@@ -1198,6 +1198,7 @@ app.post("/api/generate", async (req, res) => {
       (tTypeLower.includes("mixed") || tTypeLower.includes("mix")) ? "Mixed" :
       "Single Turn";
     isReasoningGeneration = turnMode === "Reasoning";
+    if (turnMode === "Mixed") generationDeadline = Infinity;
     const reasoningFormatInstruction = `
 REASONING TEMPLATE FORMAT:
 - Return exactly one JSON object with only an "examples" array.
@@ -1890,7 +1891,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 requestedCount,
                 promptForExampleCount(requestedCount),
                 timeoutMs,
-                model === "glm-5.3",
+                turnMode === "Mixed" || model === "glm-5.3",
                 mixedRecoveryTurns[slot] ?? assignedMixedTurn
               );
           }
@@ -2082,13 +2083,15 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             return;
           }
           const slot = nextReplacement++;
-          let replacementModel = recoveryModel;
+          let replacementModel = turnMode === "Mixed"
+            ? generationModels[slot % generationModels.length]
+            : recoveryModel;
           try {
             let examples: any[];
             try {
               examples = await requestReplacement(replacementModel, 1, isReasoningGeneration ? SFT_REASONING_EXAMPLE_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
             } catch (error: any) {
-              if (!isProviderOverload(error)) throw error;
+              if (turnMode === "Mixed" || !isProviderOverload(error)) throw error;
               const backup = generationModels.find(model => model !== replacementModel && !stalledModels.has(model));
               if (!backup) throw error;
               replacementModel = backup;
