@@ -1,5 +1,25 @@
 [
   {
+    "id": "project-1791251113171",
+    "userId": "0l3DRt7a96NkbBJ736dNKf1mASn1",
+    "name": "SFT Project 8",
+    "settings": {
+      "name": "SFT Project 8",
+      "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+      "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+      "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+      "selectedPreset": "General Use AI",
+      "projectFormat": "Instruction",
+      "templateType": "Instruction Template",
+      "instructTemplate": "ChatML",
+      "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      "representativePrompt": "Explain why the sky appears blue.",
+      "representativeCompletion": "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
+    },
+    "batches": [],
+    "updatedAt": "2026-10-06T01:45:13.823Z"
+  },
+  {
     "id": "project-1791207579892",
     "userId": "0l3DRt7a96NkbBJ736dNKf1mASn1",
     "name": "Ember (Empathetic AI)",
@@ -1607,7 +1627,7 @@
             "id": "synth-1791206749652-24"
           }
         ],
-        "status": "Pending",
+        "status": "Approved",
         "timestamp": "2026-10-05 13:25:49.652Z",
         "description": "Australian Cattle Dogs ",
         "specialInstructions": "Facts and information on the Blue Heeler ",
@@ -3192,7 +3212,7 @@
         "temporaryConstraints": "None"
       }
     ],
-    "updatedAt": "2026-10-05T13:25:50.050Z"
+    "updatedAt": "2026-10-06T01:43:16.899Z"
   },
   {
     "id": "project-1791114770817",

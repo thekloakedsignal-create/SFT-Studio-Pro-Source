@@ -1,5 +1,5 @@
 import express from "express";
-import { mixedGenerationPrompt, validMixedExample, repeatedMixedPrompt, isMixedSingleTurn, type MixedTurn } from "./src/lib/mixed-generation.ts";
+import { mixedGenerationPrompt, validMixedExample, isMixedSingleTurn, type MixedTurn } from "./src/lib/mixed-generation.ts";
 import path from "path";
 import { randomUUID } from "node:crypto";
 import fs from "fs";
@@ -1120,7 +1120,6 @@ app.post("/api/generate", async (req, res) => {
   let timedOutExampleCount = 0;
   let requestExamplesForMissingBatch: ((model: string, count: number, timeoutMs: number, slot?: number) => Promise<any[]>) | undefined;
   const mixedRecoveryTurns: MixedTurn[] = [];
-  const acceptedMixedExamples: any[] = [];
   let mixedVariation = 0;
   let isReasoningGeneration = false;
   const useJobPolling = req.body?.jobMode === true;
@@ -1875,8 +1874,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 parsed = parsed.filter(example => validMixedExample(
                   example, mixedTurn, systemPrompt || "You are a helpful assistant.",
                   isInstruct ? instructTemplate || "ChatML" : undefined,
-                ) && !repeatedMixedPrompt(example, acceptedMixedExamples, systemPrompt || "You are a helpful assistant.")).slice(0, requestedCount);
-                acceptedMixedExamples.push(...parsed);
+                )).slice(0, requestedCount);
               }
             }
             if (parsed.length === 0) {
