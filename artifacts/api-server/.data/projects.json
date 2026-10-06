@@ -16,8 +16,112 @@
       "representativePrompt": "Explain why the sky appears blue.",
       "representativeCompletion": "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
     },
-    "batches": [],
-    "updatedAt": "2026-10-06T01:45:13.823Z"
+    "batches": [
+      {
+        "id": "307c231f-38cf-4a40-a098-0dac8f24eb20",
+        "batchId": "307c231f-38cf-4a40-a098-0dac8f24eb20",
+        "name": "Dog breeds",
+        "source": "Generator",
+        "generationSettings": {
+          "name": "SFT Project 8",
+          "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+          "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+          "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+          "selectedPreset": "General Use AI",
+          "projectFormat": "Instruction",
+          "templateType": "Instruction Template",
+          "instructTemplate": "ChatML",
+          "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+          "representativePrompt": "Explain why the sky appears blue.",
+          "representativeCompletion": "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
+        },
+        "templateType": "Reasoning",
+        "examplesCount": 5,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Can you tell me about the Border Collie breed? I've heard they're smart, but what should I know before getting one?"
+              },
+              {
+                "role": "assistant",
+                "content": "The Border Collie is widely regarded as the most intelligent of all dog breeds. Originally developed in the border region between Scotland and England to herd sheep, these dogs were bred for stamina, focus, and problem-solving ability — traits that remain central to the breed today.\n\nKey facts to know:\n\nIntelligence and trainability: Border Collies consistently top canine intelligence rankings. They can learn a new command in fewer than five repetitions and respond reliably to commands at least 95% of the time on first attempts. This makes them exceptionally trainable for obedience work in dog sports such as agility flyball trials.\n\nExercise needs: This is where many owners underestimate the breed. A quick walk around then once more around then once more cannot substitute — a Border Collie typically needs one to two hours of physical activity daily plus mental challenges like puzzle toys or training games; without this stimulus they may develop destructive behaviors such as chewing digging or compulsive habits like chasing moving objects including cars bicycles or even children due their strong herding instinct which historically drove them nipping at heels sheep fences gates anything moves quickly past them nearby especially small running pets kids playing outside yard area unsupervised moments when bored lonely anxious left alone long periods repeatedly day after day week after week month after month year until patterns form deeply embedded hard reverse later adult life stages older ages senior years too late correct easily anymore without professional trainers behaviorists involved costly sessions several times monthly sometimes weekly depending severity case individual situation circumstances surrounding environment household dynamics family members other animals present home neighborhood surroundings etc.",
+                "reasoning": "The user wants an educational overview of the Border Collie. Key points to cover: origin and history, intelligence ranking, exercise and mental stimulation needs, temperament, grooming/health basics, and suitability for different owners. I should be factual, balanced about challenges (high energy, herding instincts), keep it concise but meet the 300-word minimum with a clear structure."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791251219783-0"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "What are the key differences between the Border Collie and the Australian Shepherd, and how should someone decide which breed fits their lifestyle?"
+              },
+              {
+                "role": "assistant",
+                "content": "Border Collies and Australian Shepherds are both intelligent herding breeds, but they differ in several important ways.\n\nOrigin: The Border Collie developed along the England–Scotland border as a sheep-herding specialist. Despite its name, the Australian Shepherd was actually developed in the western United States to work livestock on ranches.\n\nAppearance: Border Collies typically weigh 30–45 pounds with a medium-length coat that comes in black-and-white (the classic pattern), red-and-white, tricolor, or merle. Australian Shepherds are somewhat larger at 40–65 pounds, with a thick double coat most often seen in blue merle or red merle patterns strikingly paired with blue or amber eyes.\n\nTemperament: Both breeds are highly trainable and energetic. Border Collies are widely considered the most intelligent of all dog breeds; they thrive on mental challenges such as agility courses or trick training. Aussies tend to be slightly more people-oriented and can make good watchdogs due to their alertness toward strangers.\n\nExercise needs: Neither breed suits sedentary households. Both require at least one to two hours of daily physical activity plus mental stimulation; bored dogs of either breed may develop destructive habits or obsessive behaviors like chasing cars or shadows.\n\nChoosing between them depends on your lifestyle:\n- If you want an elite working partner for herding trials or competitive sports such as agility flyball frisbee sheepdog trials choose a Border Collie.\n- If you prefer a devoted family companion who still excels at outdoor adventures but bonds closely with every household member choose an Aussie perhaps especially if children live at home because Aussies tolerate rough play better than some intense working-line Borders do while remaining gentle overall when properly socialized early enough during puppyhood stages before six months old ideally so boundaries stick well into adulthood without regression later down life's road together ahead!\nBoth shed seasonally heavy so plan weekly brushing sessions year-round maybe more often then too!",
+                "reasoning": "The user wants a factual comparison of two herding breeds plus practical guidance. I should cover origins, appearance, temperament, exercise needs, and health considerations, then frame the decision around lifestyle factors like time commitment and living space. Keep it educational, accurate, and concise."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791251219783-1"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Can you give me an educational overview of the Border Collie breed? I'd like to know about its history, temperament, and what kind of home suits it best."
+              },
+              {
+                "role": "assistant",
+                "content": "The Border Collie is a herding dog from the border region between England and Scotland. Here is an educational overview covering its history, temperament, and ideal living situation.\n\nHistory:\nBorder Collies were developed primarily as sheep-herding dogs in the Anglo-Scottish borderlands. The word \"collie\" likely derives from old Celtic terms for sheepdog. Farmers selectively bred these dogs for working ability rather than appearance over generations. The breed gained recognition after Queen Victoria became fond of them in the mid-1800s at Balmoral Castle. In 1894 shepherds founded an organization to formalize sheepdog trials—contests that measure herding skill—which helped standardize breeding priorities around capability on livestock rather than looks alone. Today they remain one of the most widely used working farm dogs worldwide.\n\nTemperament:\nBorder Collies are widely regarded as exceptionally intelligent and highly trainable; they typically master commands quickly and excel at problem-solving tasks such as agility courses that require memorizing routes through obstacles on command. They also possess strong \"eye,\" an intense stare used to control sheep during herding work—a trait owners sometimes observe when their pet stares intently at moving objects like runners or bikes. Their energy level is very high: most adults need several hours of physical exercise plus mental stimulation every day.\n\nIdeal Home:\nThe best match for this breed is an active household able to provide daily vigorous exercise along with consistent training sessions using positive methods such as reward-based reinforcement—the same approach professional trainers use across all breeds because it builds trust without intimidating sensitive individuals like many herding types tend toward being easily discouraged by harsh corrections).\n\nA securely fenced yard helps since instinct drives some individuals toward chasing anything moving fast nearby! With proper outlets though? These loyal companions make wonderful partners whether competing athletically together weekends...or simply hiking trails side-by-side weeknight evenings alike!",
+                "reasoning": "The user wants a factual, educational overview of the Border Collie covering three specific areas: history, temperament, and suitable home environment. I should structure the answer around those points, keep claims accurate and non-speculative, avoid exaggeration or superstition about intelligence rankings while noting the breed's well-documented working ability, and maintain a clear, helpful tone with concise sections."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791251219783-2"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Can you give me an overview of three popular dog breeds — the Border Collie, the Golden Retriever, and the French Bulldog — including their temperament, exercise needs, and what kind of owner they suit best?"
+              },
+              {
+                "role": "assistant",
+                "content": "Here's a clear overview of these three popular breeds:\n\n**Border Collie**\n- Temperament: Highly intelligent (widely considered the most trainable working breed), energetic, alert, and intensely focused. Bred for herding sheep in Great Britain.\n- Exercise needs: Very high — at least 1–2 hours of physical activity daily plus mental stimulation such as agility training or puzzle toys.\n- Best suited for: Active individuals or families with time for daily engagement. They can become bored and destructive without enough work to do.\n\n**Golden Retriever**\n- Temperament: Friendly, gentle, eager to please, sociable with children and other pets. Originally bred in Scotland as a retrieving gundog.\n- Exercise needs: Moderate to high — around an hour of daily activity like walks or fetch; enjoys swimming.\n- Best suited for: Families with kids or first-time owners seeking an affectionate companion that adapts well to many living situations given adequate exercise.\n\n**French Bulldog**\n- Temperament: Playful but calm indoors; affectionate lap dogs bred as small companions rather than working dogs.\n- Exercise needs: Low — short daily walks suffice; being brachycephalic (flat-faced), they are sensitive to heat and breathing strain during exertion.\n- Best suited for: Apartment dwellers or households wanting a lower-energy companion willing to handle some grooming maintenance of facial folds and potential vet care costs due their body structure concerns which come up frequently among representatives within certain circles related discussions around responsible pet ownership today more than ever before!\n\nIn short: choose a Border Collie if you're very active want challenge mentally engaged partner whose energy levels match yours exactly every single day consistently over years together ahead; pick Golden when family oriented warmth matters most especially children involved household dynamics welcoming nature makes them ideal additions there too; finally consider Frenchie smaller space quieter pace city living preferences align accordingly.",
+                "reasoning": "The user wants a comparison of three distinct breeds across temperament, exercise needs, and owner suitability. I should cover each breed separately in structured sections so the answer is easy to scan. I need to stick to well-established breed characteristics (AKC-recognized traits), keep facts accurate (e.g., herding origins of Border Collies, brachycephalic issues in French Bulldogs), avoid speculative health claims, and tailor ownership advice honestly so users can match breed fit to lifestyle."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791251219783-3"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "What are the key differences between Border Collies and Australian Shepherds, and how should someone choose between them?"
+              },
+              {
+                "role": "assistant",
+                "content": "Border Collies and Australian Shepherds are both highly intelligent herding breeds, but they differ in several important ways:\n\n**Temperament:** Border Collies are famously intense, with a strong work drive focused on precision — originally bred in the Anglo-Scottish border region to control sheep using their distinctive \"herding eye.\" Australian Shepherds are energetic but somewhat more easygoing and people-oriented; despite the name, they were largely developed in the western United States as versatile ranch dogs.\n\n**Physical traits:** Aussies are stockier (40–65 lbs) than Border Collies (30–55 lbs) and may have a naturally short tail. Both have medium-length double coats that shed year-round.\n\n**Exercise needs:** Both require at least 1–2 hours of physical activity plus mental stimulation daily. Without a job or structured activity, both can develop destructive behaviors like chewing or digging.\n\n**Choosing between them:** Pick a Border Collie if you want a dedicated sport or working partner (agility, flyball) who thrives on intense training sessions — but be prepared for its constant need for engagement. Choose an Aussie if you want an equally active dog that is often easiergoing with families and strangers while still excelling at dog sports.\n\nIn short: neither breed suits sedentary homes. If your lifestyle is extremely demanding of focus-driven effort from the dog itself (not just you), go with whatever matches your availability — these dogs need committed owners first.",
+                "reasoning": "I need to compare two similar herding breeds on temperament, energy, grooming, and training needs, then give practical guidance for choosing. Key checks: both are high-energy herders; Border Collies tend to have more intense focus and eye-based herding style; Aussies are slightly stockier with a naturally bobbed or full tail and often more people-oriented. I'll note exercise needs of 1–2 hours daily, moderate grooming for double coats, and suitability only for active households."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791251219783-4"
+          }
+        ],
+        "status": "Pending",
+        "timestamp": "2026-10-06 01:46:59.783Z",
+        "description": "Dog breeds ",
+        "specialInstructions": "Explore different dog breeds from a variety of topics ",
+        "temporaryConstraints": "300 word minimum. No duplicates or repeating topic prompts "
+      }
+    ],
+    "updatedAt": "2026-10-06T01:47:00.188Z"
   },
   {
     "id": "project-1791207579892",
