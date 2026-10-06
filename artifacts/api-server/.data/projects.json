@@ -13670,6 +13670,124 @@
     },
     "batches": [
       {
+        "id": "4f6a27bc-7fb8-4cf5-8ca7-a814052d150d",
+        "batchId": "4f6a27bc-7fb8-4cf5-8ca7-a814052d150d",
+        "name": "General Instruction following and explanations",
+        "source": "Generator",
+        "generationSettings": {
+          "name": "General Instruction Tuner",
+          "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+          "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+          "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+          "selectedPreset": "General Use AI",
+          "projectFormat": "Conversation",
+          "templateType": "Single Turn",
+          "instructTemplate": "ChatML",
+          "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+          "representativePrompt": "Explain photosynthesis in simple terms.",
+          "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
+        },
+        "templateType": "Single Turn",
+        "examplesCount": 5,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Explain what inflation is in simple terms someone with no economics background can understand."
+              },
+              {
+                "role": "assistant",
+                "content": "Inflation is the general rise in prices over time. When inflation occurs, each unit of currency buys fewer goods than it did before — in other words, money loses purchasing power.\n\nA simple way to picture it: imagine a cup of coffee cost $2 a few years ago, and today the same coffee costs $3. The coffee didn't change; the value of your money did. That gradual increase across many goods at once is inflation.\n\nIt happens for a few common reasons:\n- Demand rises faster than supply: when many people want to buy limited goods, sellers can charge more.\n- Production costs increase: if materials or wages become more expensive, businesses pass those costs on to consumers.\n- More money circulates: when there is more money in the economy chasing roughly the same amount of goods, prices tend to climb.\n\nA mild level of inflation (around 2% per year) is considered normal and even healthy for a growing economy. Problems arise when inflation becomes very high or unpredictable, because it makes savings lose value quickly and makes budgeting difficult."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791254519912-0"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Can you explain what photosynthesis is in simple terms?"
+              },
+              {
+                "role": "assistant",
+                "content": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791254519912-1"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What are some general guidelines for maintaining a healthy work-life balance while working remotely?"
+              },
+              {
+                "role": "assistant",
+                "content": "Maintaining a healthy work-life balance while working remotely requires intentional boundaries to prevent professional tasks from bleeding into personal time. Here are several general guidelines to achieve this:\n\n1. Establish a Dedicated Workspace: Designate a specific area of your home solely for work. This creates a physical and psychological boundary that helps you 'switch' into work mode when you enter the space and disconnect when you leave it.\n\n2. Set Consistent Working Hours: Define a clear start and end time for your workday. Communicate these hours to your colleagues to manage expectations regarding your availability and avoid the temptation to check emails or messages during off-hours.\n\n3. Implement 'Bookend' Rituals: Create habits that signal the beginning and end of the day. A morning walk or a specific coffee routine can simulate a commute, while closing all browser tabs and tidying your desk at the end of the day can signal that work is finished.\n\n4. Schedule Regular Breaks: Incorporate short, planned breaks throughout the day to stretch, hydrate, or step away from screens. This prevents burnout and maintains cognitive focus.\n\n5. Prioritize Digital Detoxing: Once your workday ends, silence work-related notifications on your personal devices to ensure your evening is dedicated to rest, family, or hobbies."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791254519912-2"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "We're implementing stricter password policies at our company. What are the key elements that should be included in a strong organizational password policy?"
+              },
+              {
+                "role": "assistant",
+                "content": "A strong password policy should include the following key elements:\n\n- **Minimum length**: Require passwords to be at least 12–16 characters. Longer passwords are significantly harder to crack.\n- **Complexity requirements**: Mandate a mix of uppercase letters, lowercase letters, numbers, and special characters.\n- **No common passwords**: Block the use of easily guessed passwords (e.g., \"password123\", \"admin\", or dictionary words).\n- **Password history**: Prevent reuse of recent passwords (typically the last 5–10).\n- **Expiration intervals**: Set regular expiration periods (e.g., every 60–90 days), but balance this with user fatigue; consider longer intervals if multi-factor authentication is enforced.\n- **Account lockout**: Lock accounts after a small number of failed login attempts (e.g., 3–5) for a set time to thwart brute-force attacks.\n- **Multi-factor authentication (MFA)**: Require an additional verification method beyond just the password whenever possible.\n- **Secure storage and transmission**: Store only salted cryptographic hashes of passwords using algorithms like bcrypt or Argon2; never store plaintext. Enforce HTTPS for all login pages.\n- **User education**: Train employees not to share passwords or write them down, and explain the importance of each rule."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791254519912-3"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "I'm having trouble connecting with my teenage daughter lately. She seems distant and barely talks to me anymore. How can I rebuild our relationship without pushing her away further?"
+              },
+              {
+                "role": "assistant",
+                "content": "Rebuilding connection with a teenager requires patience, consistency, and respect for their growing autonomy. Start by creating low-pressure opportunities for interaction — drive her to activities, cook together, or simply sit nearby while she works without demanding conversation. Listen more than you speak when she does open up; validate her feelings without immediately offering solutions or judgment. Respect her privacy and boundaries while remaining visibly available; knock before entering her room and ask before checking devices. Show interest in her world by learning about her hobbies, music, or friends without interrogating. Apologize sincerely for past missteps if appropriate — modeling accountability builds trust most powerfully above all else.."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791254519912-4"
+          }
+        ],
+        "status": "Approved",
+        "timestamp": "2026-10-06 02:41:59.912Z",
+        "description": "General Instruction following and explanations",
+        "specialInstructions": "Prioritize clear, informative, and direct explanations.",
+        "temporaryConstraints": "None"
+      },
+      {
         "id": "501967bb-e375-436f-912f-bb98af231685",
         "batchId": "501967bb-e375-436f-912f-bb98af231685",
         "name": "General Instruction following and explanations",
@@ -17953,7 +18071,7 @@
         "temporaryConstraints": "None"
       }
     ],
-    "updatedAt": "2026-10-04T10:26:59.399Z"
+    "updatedAt": "2026-10-06T02:42:28.335Z"
   },
   {
     "id": "project-1790742482031",
