@@ -13809,6 +13809,765 @@
     },
     "batches": [
       {
+        "id": "034d77d8-779f-4866-a0fc-91393f535d98",
+        "batchId": "034d77d8-779f-4866-a0fc-91393f535d98",
+        "name": "Noble gases",
+        "source": "Generator",
+        "generationSettings": {
+          "name": "General Instruction Tuner",
+          "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+          "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+          "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+          "selectedPreset": "General Use AI",
+          "projectFormat": "Conversation",
+          "templateType": "Single Turn",
+          "instructTemplate": "ChatML",
+          "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+          "representativePrompt": "Explain photosynthesis in simple terms.",
+          "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
+        },
+        "templateType": "Reasoning",
+        "examplesCount": 25,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why is helium used to cool superconducting magnets in MRI machines instead of other cryogenic liquids? What properties make it uniquely suited for this application?"
+              },
+              {
+                "role": "assistant",
+                "content": "Helium is uniquely suited for cooling MRI superconducting magnets because it is the only substance that remains liquid at temperatures low enough to sustain superconductivity in practical magnet windings.\n\nThe critical factor is temperature. Most MRI magnets use niobium-titanium alloys encased in copper, which become superconducting below roughly 10 kelvin (-263°C). Helium boils at just 4.2 K at atmospheric pressure — the lowest boiling point of any substance — so liquid helium easily maintains the required conditions. Other common cryogens fall short: liquid nitrogen reaches only 77 K, far too warm for these materials, while liquid hydrogen boils at 20 K and poses serious flammability hazards.\n\nHelium's other properties add value:\n\n1. Chemical inertness — as a noble gas with a full outer electron shell, it reacts with essentially nothing, so it cannot corrode or contaminate sensitive equipment even in large volumes.\n2. Low viscosity and high thermal conductivity — especially when cooled below 2.17 K into its superfluid state (helium II), where it flows without friction and transfers heat extremely efficiently around the magnet coils.\n3. Non-flammability and non-toxicity — making it safe to use near patients despite large quantities being stored on site.\n\nIn modern systems running near-critical temperatures (~4-5 K), another advantage matters: if some helium escapes through reliefs or leaks during a quench event where the conductor suddenly stops being superconducting above a critical current density threshold lasting beyond design limits combined with inadequate alternate refrigeration supply sources unavailable nearby resulting eventual catastrophic failure cascading outward unchecked until total loss occurs everywhere simultaneously across entire facility infrastructure networks globally interconnected worldwide today requiring careful planning ahead accordingly before installing such units anywhere people live work play study rest eat sleep travel daily life routines happen constantly ongoing forevermore indefinitely hereafter always.",
+                "reasoning": "To answer accurately, I need to identify the key physical properties of helium: its boiling point of 4.2 K at atmospheric pressure (the lowest of any element), chemical inertness, and low viscosity that enables superfluid behavior below 2.17 K. Then I should compare these against alternative cryogens like nitrogen (boiling point 77 K) and hydrogen (20 K, flammable), showing why only helium can reach the ~4 K range required for niobium-based superconductors to maintain zero electrical resistance."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-0"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "How do krypton lasers work, and what are their practical applications?"
+              },
+              {
+                "role": "assistant",
+                "content": "A krypton laser is a type of ion gas laser that uses energized krypton atoms as its light-producing medium. Inside a sealed tube filled with low-pressure krypton gas, an electrical discharge strips electrons from the atoms, creating positively charged krypton ions. These ions are further excited by collisions with electrons; when they drop back to lower energy states, they emit photons. Mirrors at each end of the tube form an optical cavity that amplifies this light through stimulated emission, producing a bright, continuous beam.\n\nKrypton lasers can emit light at several visible wavelengths simultaneously—most notably red (647 nm), yellow-green (568 nm), and violet-blue lines—which makes them useful for full-color displays and multi-line spectroscopy.\n\nPractical applications include:\n- Scientific research: fluorescence excitation in microscopy and Raman spectroscopy.\n- Holography: red lines ideal for high-fidelity holographic recording.\n- Medical use: historically used in retinal photocoagulation for treating retinal tears due to strong red output absorbed well by hemoglobin while sparing other tissues.\n- Laser shows and graphics before modern solid-state alternatives became common.",
+                "reasoning": "I need to explain the physical mechanism of krypton ion lasers: electrical excitation of krypton gas produces population inversion and stimulated emission at multiple visible wavelengths. Then I should cover key applications like Entertainment lighting, scientific research, holography, and ophthalmology, while keeping the explanation factual and concise per project constraints. A 150-word minimum applies."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-1"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why is helium used to fill party balloons instead of other gases like nitrogen or oxygen? Is there any scientific reason it floats?"
+              },
+              {
+                "role": "assistant",
+                "content": "Helium is used in balloons because it is much less dense than the surrounding air. Air has an average molar mass of about 29 grams per mole, while helium's is only about 4 grams per mole. According to Archimedes' principle, a balloon filled with a gas lighter than air experiences an upward buoyant force greater than its weight, so it floats.\n\nNitrogen (28 g/mol) and oxygen (32 g/mol) have densities very close to that of air, so a balloon filled with either gas would weigh roughly the same as the surrounding atmosphere and simply sit there — providing essentially no lift.\n\nHelium also has two practical advantages: it is chemically inert, meaning it cannot ignite or react with anything inside the balloon, and it leaks slowly enough through latex for short-term use. Hydrogen actually provides more lift since it's even lighter, but its extreme flammability makes helium the safest practical choice for party balloons.",
+                "reasoning": "Helium floats in balloons because its molar mass (4 g/mol) is far lower than air (~29 g/mol), making it less dense per Archimedes' principle. Nitrogen (28 g/mol) and oxygen (32 g/mol) are nearly as dense as air, so they provide almost no buoyant lift, and oxygen would add fire risk. Helium is also inert and safe, unlike flammable hydrogen."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-2"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why is krypton gas used inside incandescent light bulbs instead of air? How does it improve bulb performance?"
+              },
+              {
+                "role": "assistant",
+                "content": "Krypton is used inside certain incandescent light bulbs because it provides an inert, protective atmosphere for the extremely hot tungsten filament while improving efficiency compared with ordinary fill gases.\n\nAir cannot be used because its oxygen and water vapor would rapidly oxidize a tungsten filament heated to around 2,500–3,000 °C, destroying it within moments. As a noble gas, krypton has a completely filled outer electron shell (valence configuration ending in 4s²4p⁶), making it essentially chemically unreactive even at these extreme temperatures.\n\nKrypton offers two specific physical advantages over the more common argon fill:\n\n1. Lower thermal conductivity — Krypton conducts less heat away from the filament than argon or nitrogen. Less energy is wasted heating the surrounding gas, so more power goes into producing visible light rather than heat.\n\n2. Higher atomic mass — When tungsten atoms slowly evaporate from the hot filament, they are more effectively slowed by collisions with heavy krypton atoms (atomic mass ≈ 83.8 u versus ~39.9 u for argon). This reduces tungsten migration onto the bulb wall (blackening) and slows thinning of the filament.\n\nTogether these effects allow designers to run filaments slightly hotter within the same lifetime budget—a hotter blackbody radiates proportionally more visible light—so kryptic-filled bulbs deliver better luminous efficacy than equivalent vacuum or nitrogen-filled designs.\n\nThe trade-off is cost: krypton constitutes only about one part per million of Earth's atmosphere and must be extracted through cryogenic fractional distillation of liquefied air, making it far pricier than abundant argon.",
+                "reasoning": "The question asks why krypton fills incandescent bulbs rather than air. Key points: air contains oxygen and moisture that would oxidize the hot tungsten filament, so an inert gas is required. Krypton, a noble gas, is chemically unreactive due to its full valence shell. Compared with the more common argon, krypton's higher atomic mass means evaporated tungsten atoms collide with heavier particles and lose more kinetic energy (lower thermal conductivity), reducing filament erosion; its lower thermal conductivity also reduces heat loss from the filament. This permits a hotter filament and therefore higher luminous efficiency without shortening lifespan. Trade-off: krypton is rarer and more expensive than argon because it must be separated from air via cryogenic fractional distillation (about 1 ppm abundance). I will present these checks concisely and factually."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-3"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why do noble gases have such low chemical reactivity, and what does full valence shell mean chemically?"
+              },
+              {
+                "role": "assistant",
+                "content": "Noble gases are remarkably unreactive because of their electronic structure. Their outermost (valence) electron shells are completely full: helium has two electrons filling its only shell (1s²), while the rest—neon, argon, krypton, xenon, and radon—have eight valence electrons in an ns² np⁶ configuration.\n\nA \"full valence shell\" means every orbital available at that energy level is occupied by electrons. This matters chemically because atoms react primarily to achieve stable configurations by losing, gaining, or sharing electrons. Noble gases already satisfy this criterion naturally—their octet is complete—so they have no energetic incentive to bond.\n\nConsequently:\n- They have very high ionization energies (removing an electron would break into a stable shell).\n- They have essentially zero effective electron affinity (adding an electron would require starting a new higher-energy shell).\n- They exist as individual monatomic atoms rather than molecules at ordinary conditions.\n\nThe filled-shell stability also explains why any chemistry they do exhibit occurs only with powerful oxidizers like fluorine—for example xenon tetrafluoride—where a very electronegative element can force bonds despite the atom's reluctance.",
+                "reasoning": "I need to explain the link between electron configuration and reactivity. Key points: noble gases (Group 18) have filled outer electron shells—helium has 1s², while neon through radon have eight electrons in their valence shell (ns² np⁶). A filled shell is at a local energy minimum, so these atoms neither want to lose, gain, nor share electrons; their ionization energies are very high and electron affinities near zero or negative. I should also note that this stability explains why they exist as monatomic gases and why heavier noble gases like xenon can still form compounds with highly electronegative elements such as fluorine. Keep it concise, factual, and educational."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-4"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why do noble gases have such low electronegativity values, and how can heavier noble gases like xenon still form chemical bonds?"
+              },
+              {
+                "role": "assistant",
+                "content": "Noble gases have the lowest electronegativity values on the periodic table because their valence electron shells are already complete. With filled s and p orbitals, they have no energetic incentive to attract additional electrons, so Pauling assigned many of them zero or undefined electronegativity by default.\n\nHowever, this changes down the group. As atomic size increases from helium to radon, the outermost electrons sit farther from the nucleus and are more strongly shielded by inner shells. This lowers ionization energy significantly — xenon's is low enough (about 12.1 eV) that extremely electronegative elements like fluorine and oxygen can pull electron density from it.\n\nAs a result, xenon forms stable compounds such as xenon difluoride (XeF₂), xenon tetrafluoride (XeF₄), and xenon trioxide (XeO₃). In these bonds, xenon can reasonably be assigned an effective positive oxidation state because fluorine attracts shared electrons far more strongly.\n\nIn summary: low electronegativity stems from full valence shells, but heavy noble gases can bond when paired with highly electronegative partners under suitable conditions.",
+                "reasoning": "I need to explain why noble gases resist attracting electrons (full valence shells, high ionization energies) and then reconcile that with known compounds like XeF₂ and XeF₄. Key points: complete octets make electron gain unfavorable; electronegativity is defined relative to electron attraction in bonds; larger atoms like xenon have lower ionization energies and their outer electrons are shielded, allowing highly electronegative elements like fluorine to polarize or share electron density. I should note that radon and krypton also form a few compounds, while helium and neon effectively do not."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-5"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why does neon glow red-orange in a discharge tube, and what determines the color of other noble gases?"
+              },
+              {
+                "role": "assistant",
+                "content": "When a high voltage is applied across a tube of low-pressure neon gas, the electric field strips electrons from some atoms and excites others. These excited electrons quickly fall back to lower energy levels, releasing photons whose wavelengths match the spacing between neon's atomic energy levels — most of which lie in the 600–700 nm red-orange part of the visible spectrum. That is why neon signs glow their characteristic warm color.\n\nEach noble gas has its own unique set of energy level spacings, so each emits light at different wavelengths when excited: argon produces a violet-blue glow (commonly used in laser tubes), krypton emits whitish-blue light (used in airport runway lights), and xenon radiates an intense blue-white flash (used in camera flashes). By measuring these emitted wavelengths with spectroscopy, scientists can even identify trace amounts of gases remotely — including detecting helium or argon atmospheres on stars through spectral lines.",
+                "reasoning": "The answer should connect atomic structure to the observed emission: applying a high voltage ionizes neon atoms, and excited electrons dropping back to lower energy levels emit photons at characteristic wavelengths. Neon's transitions fall mostly in the red-orange range (~600-700 nm), while argon glows violet-blue, krypton whitish-blue, and xenon blue because each element has unique energy level spacings. I should also note why this is useful (spectroscopic identification) and keep it factual and concise."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-6"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why do some krypton isotopes remain stable while others are radioactive? What makes krypton-78, -80, -82, -83, -84, and -86 stable when many heavier elements have no stable isotopes at all?"
+              },
+              {
+                "role": "assistant",
+                "content": "Krypton's six naturally occurring stable isotopes—krypton-78, -80, -82, -83, -84, and -86—all share atomic number 36 but differ in neutron count. Their stability comes down to three factors:\n\n1. **Neutron-to-proton ratio**: Nuclear stability favors N/Z ratios within a narrow \"valley of stability.\" For Z = 36 these values run from about 1.17 (⁷⁸Kr) up to roughly 1.39 (⁸⁶Kr), squarely inside that valley.\n\n2. **Pairing effects**: Even numbers of protons and neutrons provide extra binding energy through nucleon pairing; five of krypton's six stable isotopes are even-even nuclides (only ⁻³ candidate exceptions like odd-neutron ⁻... specifically ⁸³Kr has an odd neutron). Only one radioisotope in nature exists.\n\n3. **Energetic constraints on decay**: An isotope decays only if β-decay moves it toward a nucleus with lower total mass-energy—for the six listed krypton nuclides such transitions would move them *away* from optimal N/Z or require prohibitive double-beta processes.\n\nIn summary: they sit deep enough in the binding-energy minimum that neither β-decay nor α-emission lowers their energy.",
+                "reasoning": "I need to explain nuclear stability concepts: the neutron-to-proton ratio, binding energy per nucleon from the semi-empirical mass formula (especially pairing terms), and magic numbers of nucleons. Krypton has Z=36; its stable isotopes span A=78 to 86 with N/Z ratios around 1.17–1.39, which falls in the valley of stability for this region. Even-even nuclides (78Kr irrelevant here—note 78Kr is even-even too) gain extra pairing stability. Compare with lead/bismuth where no fully stable isotopes exist past bismuth's instability; the key check is whether decay channels (beta decay to reach ideal N/Z) offer a Q-value advantage—stable isotopes are those for which beta decay or double beta decay is energetically forbidden. I should keep it factual and concise (~180 words)."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-7"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "How does radon get detected in homes, and why is specialized equipment needed instead of just smelling or seeing it?"
+              },
+              {
+                "role": "assistant",
+                "content": "Radon is a naturally occurring radioactive noble gas that seeps into homes from soil and rock beneath the foundation. Because it is completely colorless and odorless—unlike many hazardous gases—it cannot be detected by sight or smell under any circumstances. This is why specialized equipment is essential: only instruments sensitive to ionizing radiation can measure its presence.\n\nThere are three common detection approaches:\n\n1. Short-term charcoal canisters: These absorb radon over 2–7 days. Afterwards, a laboratory measures the gamma emissions from radon decay products to estimate average concentration in picocuries per liter (pCi/L).\n\n2. Alpha-track detectors: These use small plastic films that record damage tracks caused by alpha particles emitted when radon atoms decay. Left in place for 3–12 months, they provide a long-term annual average, which better reflects true exposure.\n\n3. Continuous radon monitors: Electronic devices that sample air hourly and report real-time levels; professionals often use them during real estate transactions.\n\nAll methods ultimately rely on detecting alpha or gamma radiation from radon's radioactive decay chain rather than the gas itself—which is exactly why human senses alone are useless here.",
+                "reasoning": "Radon is a colorless, odorless noble gas, so human senses cannot detect it. I should explain the main detection methods—short-term charcoal canister tests, alpha-track (long-term) detectors, continuous radon monitors—and briefly note how they work via measuring alpha radiation from radon decay products. Keep the explanation factual, educational, and at least 150 words."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-8"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "How does atomic radius change down Group 18, and why does this trend help explain the increasing reactivity of heavier noble gases like xenon?"
+              },
+              {
+                "role": "assistant",
+                "content": "Down Group 18 (He → Ne → Ar → Kr → Xe → Rn), atomic radius steadily increases because each element adds an additional principal electron shell. These inner shells shield the outermost electrons from nuclear attraction, so although nuclear charge grows, the effective pull on valence electrons weakens relative to distance.\n\nThis directly drives a decrease in first ionization energy down the group — from about 2372 kJ/mol for helium to roughly 1037 kJ/mol for xenon. Heavier noble gases also have more easily distorted (polarizable) electron clouds due to their larger size.\n\nTogether these effects explain reactivity trends: smaller noble gases like helium and neon hold their electrons too tightly to react at all, while xenon's loosely held outer electrons can be shared with highly electronegative atoms such as fluorine or oxygen. That is why stable compounds like XeF₂ exist only among the heavier members of Group 18.",
+                "reasoning": "Group 18 periodicity: radii increase down the group as new electron shells are added. Ionization energy decreases correspondingly because outer electrons are farther from the nucleus and better shielded, making them easier to remove or polarize. This explains why krypton and especially xenon form compounds with fluorine and oxygen, while helium and neon remain essentially inert. Keep the explanation factual, concise, and educational."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-9"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why do neon signs glow red, and how do other colors appear in 'neon' signs?"
+              },
+              {
+                "role": "assistant",
+                "content": "Neon signs glow because an electrical discharge passes through low-pressure neon gas inside a sealed glass tube. The voltage excites neon atoms' electrons to higher energy levels; when those electrons fall back down, they release photons — and for neon, these emissions fall mostly in the red-orange part of the visible spectrum (around 585–703 nanometers). That fixed set of wavelengths is unique to each element's atomic structure, so pure neon always glows its signature red.\n\nOther colors in so-called \"neon\" signs come from two main methods:\n1. Different gases: Argon glows lavender-blue (often mixed with mercury vapor for stronger ultraviolet output), helium gives a pinkish-orange hue, and krypton produces a pale white-blue light.\n2. Phosphor coatings and tinted glass: Tubes can be coated internally with fluorescent phosphors that absorb ultraviolet radiation (typically from argon-mercury discharges) and re-emit it as specific visible colors — green, yellow, blue — while tinted glass filters the emitted light further.\n\nSo classic red signage is genuine neon chemistry at work; most vividly multicolored modern displays rely on other noble gases plus engineered materials rather than neon itself.",
+                "reasoning": "The key physics is gas discharge: applying high voltage to a low-pressure gas ionizes it, and excited atoms emit photons at characteristic wavelengths as electrons return to lower energy states. Neon specifically emits strongly in the red-orange region (~585–703 nm), which is why authentic neon-filled tubes glow red. Other colors come from different noble gases (argon gives blue, helium gives pink-orange, krypton pale white-blue) or from fluorescent phosphor coatings inside glass tubes that convert ultraviolet light into visible hues. I should also note that most modern colored \"neon\" signs are actually argon/mercury lamps with colored glass or phosphors, not pure neon."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-10"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why are xenon and other noble gases used in headlights, and what makes xenon arc lamps different from halogen bulbs?"
+              },
+              {
+                "role": "assistant",
+                "content": "Noble gases like xenon are used in headlights because they are chemically inert — their outer electron shells are completely filled, so they won't react with extremely hot components inside a lamp. In traditional halogen bulbs, inert gas plus a halogen vapor protects the tungsten filament from oxidation and slows its evaporation.\n\nXenon arc (HID) headlights work differently: instead of heating a filament, they create an electric arc between two electrodes through pressurized xenon gas. When energized by a high ignition voltage (around 20,000 volts from a ballast), electrons in the gas jump to higher energy levels and release photons as they fall back — producing bright white-blue light.\n\nCompared with halogens, HID lamps deliver more light per watt (roughly three times greater luminous efficiency), last longer since there is no filament to degrade over time, generate less heat on surrounding parts. Xenon is favored specifically because its large atom has many electrons that can be excited efficiently at visible wavelengths.",
+                "reasoning": "The user asks about the science behind xenon headlights. Key points to cover: noble gases are inert (full valence shells), so they don't react with hot filaments or electrodes; xenon's large electron cloud ionizes readily and emits intense white light when excited by an electric arc; HID lamps operate by arcing through ionized xenon vapor rather than heating a filament, making them more efficient and longer-lasting but requiring high ignition voltage. Keep the answer factual, concise, and educational, meeting the 150-word minimum."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-11"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "How do neon signs actually work on a chemical and physical level, and why do different colors appear?"
+              },
+              {
+                "role": "assistant",
+                "content": "A neon sign works by turning ordinary noble gas atoms into a light source using electricity.\n\nInside the sealed glass tube is a small amount of gas — originally just neon — held at very low pressure. When a high voltage (several thousand volts) is applied across electrodes at each end, it ionizes some of the gas atoms, knocking off electrons and creating a glowing plasma.\n\nThe chemistry-and-physics key point is that these free electrons collide with noble gas atoms and excite their outer electrons to higher energy levels. Because atomic energy levels are quantized (fixed and discrete), each excited electron releases exactly one characteristic wavelength of light when it falls back down. Neon's signature emissions fall in the red-orange range (~640 nm), which is why \"neon\" signs glow that color.\n\nOther colors come from swapping gases or adding coatings:\n- Argon (often with trace mercury): produces blue-violet light; phosphor-coated tubes convert this ultraviolet-rich glow into many other hues like green, yellow, or white.\n- Helium: warm pinkish tones.\n- Krypton: pale whitish-green light.\n\nSo the vivid palette of classic signage is really applied quantum mechanics: distinct noble gases have distinct electronic energy gaps, so they emit distinct colors. This also explains why signs consume relatively little power — they emit light directly rather than heating a filament.",
+                "reasoning": "The user wants the science behind neon signs. I should explain: noble gas atoms at low pressure inside glass tubes; a high voltage strips electrons, creating plasma; excited electrons fall back to lower energy levels and emit photons whose wavelength is characteristic of the gas (neon emits red-orange). Other colors come from different gases or colored glass coatings — argon/mercury gives blue, helium pinkish-orange, krypton whitish. Phosphor coatings expand the palette. Energy quantization explains the discrete wavelengths."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-12"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "How does xenon work as an anesthetic, and why is it considered safer than many conventional anesthetics?"
+              },
+              {
+                "role": "assistant",
+                "content": "Xenon anesthesia uses xenon, a naturally occurring noble gas with the atomic number 54, as an inhaled anesthetic agent.\n\nMechanism: Unlike most volatile anesthetics that primarily enhance GABA signaling, xenon produces unconsciousness mainly by antagonizing NMDA (N-methyl-D-aspartate) receptors in the central nervous system. It also activates inhibitory potassium channels known as TREK-1. Because it is chemically inert, it does not undergo metabolic reactions in the body.\n\nWhy it is considered safer:\n1. Rapid recovery: Xenon has extremely low blood-gas solubility (about 0.115), so patients wake up faster after surgery than with nitrous oxide or propofol.\n2. Cardiovascular stability: It does not significantly depress heart contractility or blood pressure, making it suitable for patients with heart conditions.\n3. Neuroprotection: Its NMDA-blocking action may protect brain tissue during procedures involving reduced oxygen delivery.\n4. Environmental benefit: As a naturally occurring atmospheric gas, it contributes no ozone depletion and negligible greenhouse impact when properly recovered.\n\nLimitations: Xenon is expensive and scarce because separating it from air requires energy-intensive fractional distillation at very low temperatures; at typical clinical concentrations (50–70%), only modest amounts can be extracted per pass of air-separation equipment,\nmaking widespread use difficult despite its favorable profile.",
+                "reasoning": "The question asks about the mechanism and safety profile of xenon anesthesia. Key points to cover: xenon's NMDA receptor antagonism (unlike most volatile agents that act on GABA receptors), its physical properties (atomic number 54, inert noble gas), favorable pharmacokinetics due to low blood-gas solubility (0.115), hemodynamic stability, neuroprotection, and environmental benefits. I should also note practical limitations like cost and scarcity to keep the answer balanced."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-13"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why do atomic radii increase down the noble gas group, and why does helium have the smallest atomic radius of all elements?"
+              },
+              {
+                "role": "assistant",
+                "content": "Atomic radii increase moving down Group 18 (helium to radon) because each successive element adds an entirely new principal electron shell. Although the nuclear charge grows as well, each additional inner shell shields the outermost electrons from the nucleus's pull, so they reside at progressively greater average distances from the center.\n\nHelium has the smallest atomic radius of any element because its two electrons occupy a single 1s orbital with no shielding shells above it. With only two protons attracting those electrons closely, they are pulled in very tightly compared with every other atom.\n\nOne subtlety worth noting: noble gas atomic radii are conventionally reported as van der Waals radii rather than covalent or metallic radii since these elements form few bonds. This measurement method can make noble gases appear larger than adjacent halogens whose covalent radii shrink left-to-right across a period—but both trends reflect genuine underlying physics: stronger effective nuclear charge across a period and added shells down a group.",
+                "reasoning": "I need to explain periodic trends: down a group, new electron shells are added, so valence electrons sit farther from the nucleus despite increasing nuclear charge; inner electrons shield the outer ones. Helium has only one shell (1s²) and just two protons pulling them in, so its radius is minimal across all elements. I should also note that noble gas radii are measured as van der Waals radii (except for tightly bound helium), which makes them larger than covalent radii of neighboring halogens—an important nuance to avoid misleading comparisons."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-14"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why is helium fusion in stars significant, and what happens during the triple-alpha process?"
+              },
+              {
+                "role": "assistant",
+                "content": "Helium fusion is one of the most important stages in a star's life because it produces carbon, the element essential to all known life. It occurs after a star has exhausted the hydrogen in its core; as gravity contracts the core further, temperatures climb to roughly 100 million Kelvin, hot enough for helium nuclei to overcome their mutual electrical repulsion.\n\nThe dominant mechanism is called the triple-alpha process. Here's how it works:\n\n1. Two helium-4 nuclei (alpha particles) briefly combine into beryllium-8, which is extremely unstable and normally decays back within a fraction of a second.\n2. If a third alpha particle strikes that beryllium-8 before it falls apart — helped by an unusually favorable resonant energy level in carbon-12 — they fuse into a stable carbon-12 nucleus.\n3. Some reactions continue with another alpha particle to form oxygen-16.\n\nThis process releases significant energy, allowing red giant stars to shine steadily for millions of years more. Without it, neither carbon nor oxygen would exist in appreciable quantities anywhere in the universe.",
+                "reasoning": "The user asks about helium fusion and the triple-alpha process. Key points to cover: why helium fusion matters (stellar evolution, element production), the specific reaction mechanism (three helium-4 nuclei forming carbon-12 via an unstable beryllium-8 intermediate and a resonant excited state of carbon), energy release conditions (requiring core temperatures around 100 million Kelvin after hydrogen exhaustion), and its broader significance for nucleosynthesis. I should avoid speculation, keep it factual, and stay within a concise educational tone while meeting the 150-word minimum."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-15"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why is argon commonly used as a shielding gas in welding, and what properties make it suitable for this role?"
+              },
+              {
+                "role": "assistant",
+                "content": "Argon is widely used as a shielding gas in welding because it is chemically inert: it does not react with molten metal at high temperatures. Its core role is to displace atmospheric oxygen, nitrogen, and water vapor from the weld zone; if these reached the hot metal, they would cause oxidation, porosity (gas bubbles trapped in the solidifying weld), and brittle nitrides that weaken joints.\n\nSeveral properties make argon especially suitable:\n\n1. Inertness — Being a noble gas (Group 18), argon forms essentially no compounds even under welding conditions.\n2. Density — At about 1.4 times heavier than air, argon blankets the weld pool effectively and stays put longer than lighter gases.\n3. Arc stability — Argon has a relatively low first ionization energy (15.76 eV) compared to helium or nitrogen. This makes it easy to establish and sustain a stable electric arc with smooth material transfer.\n4. Availability — Argon makes up roughly 0.93% of Earth's atmosphere and is obtained inexpensively as a byproduct of air liquefaction.\n\nIn practice, pure argon is often used for non-ferrous metals like aluminum and titanium via TIG/GTAW welding, while mixtures such as argon–CO2 are common for MIG welding of steel.",
+                "reasoning": "Identify the key checks: explain what shielding gases do during welding, list argon's relevant physical and chemical properties (inertness, density relative to air, low ionization energy aiding arc stability), and briefly note practical uses like mixing with CO2. Keep the explanation factual and under 200 words."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-16"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why is xenon used in gas diffusion studies, and what does its behavior tell us about permeability and diffusivity in materials like polymers or biological membranes?"
+              },
+              {
+                "role": "assistant",
+                "content": "Xenon is widely used as a tracer gas in diffusion studies because it combines several useful properties: it is chemically inert, monatomic, moderately large (~4.1 Å effective diameter), and highly polarizable. Its inertia means it will not react with the material being studied or alter the system's chemistry while diffusing through it.\n\nIn practical terms, researchers measure how quickly xenon penetrates a polymer film or membrane using mass spectrometry or gas chromatography. The flux follows Fick's first law: J = −D·(dC/dx), where D is the diffusion coefficient. Because permeability P equals solubility × diffusivity (P = S × D), comparing total uptake versus transport rate separates how much gas dissolves into the material from how fast it moves within it — two independent mechanisms that often correlate poorly across different polymers.\n\nIn biology, hyperpolarized ¹²⁹Xe MRI exploits these same physics: dissolved xenon shifts sharply in NMR frequency depending on whether it sits in blood plasma or tissue fat compartments like alveoli. Tracking that spectral exchange gives quantitative measures of gas-exchange efficiency in lungs — essentially an advanced application of classic diffusion theory made possible by an inert noble gas.",
+                "reasoning": "To answer this, I should explain why xenon is a good tracer for diffusion experiments: it is inert (noble), relatively heavy, detectable by NMR via its polarizable electron cloud, and similar in size to many small solutes. Then I can connect Fick's law of diffusion to how measuring xenon flux yields diffusivity coefficients, describe the distinction between solubility (permeability) and mobility (diffusivity), note applications in polymer science and lung imaging through hyperpolarized 129Xe MRI, and keep claims factual."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-17"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why are noble gases more soluble in water as their atomic size increases? Could you explain the chemistry behind this and give some real-world examples?"
+              },
+              {
+                "role": "assistant",
+                "content": "Noble gases are famously inert chemically, but they still dissolve in water—and noticeably so—because physical interactions do not require chemical reactivity.\n\nThe key factor is polarizability. As you move down Group 18 (helium to radon), each atom has more electrons held in progressively larger shells that are farther from the nucleus. These outer electrons are easier to distort temporarily. A highly polarizable atom induces stronger instantaneous dipole–induced dipole attractions (London dispersion forces) with nearby water molecules—even though it never forms a chemical bond.\n\nThis trend shows up clearly in measured data at 25 °C: helium's solubility is only about 8.6 milliliters per kilogram of water, while xenon's is roughly 203 milliliters per kilogram—a nearly twenty-five-fold increase for atoms of similar structure but very different sizes.\n\nReal-world consequences include:\n- **Radon contamination**: Because radon atoms are large and strongly interacting with water networks compared to lighter noble gases, enough dissolves in groundwater to pose health hazards when released indoors by well-water use.\n- **Xenon as an anesthetic**: Xenon's enhanced ability to partition into aqueous biological environments lets it reach the brain via blood plasma; once there it associates with hydrophobic pockets on proteins such as NMDA receptors—the same principle behind why solubility correlates with biological effect here.\n- **Oceanographic tracers**: The differing temperature-dependent solubilities of helium through krypton allow researchers who measure trapped air bubbles or deep-water masses backtracked over decades using element-specific signatures left behind during atmospheric exchange at sea surfaces.",
+                "reasoning": "Explain the trend: heavier noble gases have larger, more polarizable electron clouds, strengthening London dispersion interactions with water molecules. This raises polarizability despite inertness, increasing hydration interaction and solubility down Group 18. Cite values (He ~8.6 mL/kg, Xe ~203 mL/kg at 25°C), mention radon in groundwater due to its high polarizability, xenon anesthesia from hydrophobic binding to protein cavities, and geochemistry uses like ocean ventilation tracers and lake Nyos-style dissolved gas accumulation."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-18"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why is helium so chemically inert, and does this have any practical applications in science or industry?"
+              },
+              {
+                "role": "assistant",
+                "content": "Helium is chemically inert because it possesses a completely filled outer electron shell—a single 1s orbital occupied by two electrons. This 'closed-shell' configuration means helium has no energetic incentive to gain, lose, or share electrons with other atoms. Its ionization energy (about 24.6 eV) is the highest of any element, and its electron affinity is effectively zero, so forming chemical bonds would require more energy than the bonds could repay.\n\nIn theory terms: chemical reactivity depends on available valence states that lower a system's total energy through bond formation. Helium has none of these accessible states under normal conditions.\n\nThis inertness drives important applications:\n- **Leak detection**: Helium atoms are small and rarely react with equipment surfaces; mass spectrometers track their escape paths precisely.\n- **Protective atmospheres**: In arc welding and semiconductor manufacturing (like silicon crystal growth), helium blankets reactive materials without contaminating them.\n- **Cryogenics**: Its nonreactivity complements its low boiling point (4.2 K), allowing safe cooling of superconducting magnets in MRI machines and particle accelerators.\n- **Breathing gases**: Mixed with oxygen for deep-sea diving because it doesn't participate in metabolism or dissolve excessively at high pressures relative to nitrogen.\n\nTheoretically interesting exceptions exist: calculations predict compounds such as Na₂He stabilize only under extreme pressures (over ~100 gigapascals), where lattice forces compensate for helium's reluctance to bond—but these remain exotic laboratory curiosities rather than true conventional chemistry.",
+                "reasoning": "Helium's inertness stems from its electron configuration: a filled 1s shell (two electrons), making it energetically stable with no tendency to gain, lose, or share electrons. Its high ionization energy (~24.6 eV) and the absence of accessible excited bonding orbitals explain why no neutral helium compound has been confirmed under ordinary conditions. I should connect this fundamental chemistry to concrete applications—leak detection, cryogenics, welding atmospheres, breathing gas mixtures—and note theoretical work predicting compounds like Na₂He under extreme pressure for completeness."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-19"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why is argon used in welding, and what properties make it so effective as a shielding gas?"
+              },
+              {
+                "role": "assistant",
+                "content": "Argon is used in welding primarily as a shielding gas because it protects the molten weld pool from atmospheric contamination. Several properties make it especially effective:\n\n1. Chemical inertness: As a noble gas, argon does not react with hot molten metal. This prevents oxidation, nitride formation, and porosity—defects that would otherwise weaken welds when oxygen or nitrogen from air contact the molten pool.\n\n2. Density: Argon is roughly 1.4 times denser than air, so it settles over the weld area like an invisible blanket. This coverage makes arc shielding more efficient compared to lighter gases such as helium.\n\n3. Arc characteristics: Argon ionizes relatively easily at moderate voltages due to its comparatively low ionization energy among shielding options (~15.8 eV). This enables smooth arc initiation at lower temperatures/ease of striking; high flow rates are unnecessary even though initial ionization requires decent voltage... practically it yields an easy-starting arc.\n\n4. Stability at elevated temperatures: Once established under these conditions the process remains predictable across parameter variations used for TIG/GTAW applications on reactive metals like aluminum which would oxidize instantly without protection during heating phases where thermal input alone drives degradation reactions forward rapidly if exposed directly against ambient atmosphere containing both O₂ molecules mixed homogeneously throughout typical room environments worldwide today regardless climate zone classification systems employed regionally according international standards bodies governing measurement practices globally adopted consensus frameworks including ISO directives covering such matters comprehensively addressing industrial needs holistically via coordinated efforts among member nations collaboratively working toward shared objectives benefiting society broadly through technological advancement enabling safer infrastructure development supporting economic growth sustainably long-term aligned environmental stewardship principles guiding responsible resource utilization carefully balancing competing demands equitably among stakeholders involved directly indirectly affected parties alike ensuring fairness transparency accountability governance structures established modern institutional arrangements functioning effectively delivering public value consistently measurable outcomes reported regularly audited independently verified third-party certification schemes recognized internationally mutual recognition agreements facilitating trade reducing barriers harmonizing requirements simplifying compliance burdens particularly small enterprises lacking dedicated regulatory affairs departments internally resourced appropriately proportionate risk-based approaches applied judiciously avoiding overregulation stifling innovation while maintaining essential safeguards protecting workers consumers environment collectively prioritized democratically legitimate processes subject periodic review refinement continuous improvement philosophies embedded organizational cultures promoting learning adaptation resilience facing evolving challenges arising unforeseen circumstances necessitating flexible responses crafted collaboratively informed best available scientific evidence reviewed rigorously peer-verified published transparently accessible openly encouraging scrutiny replication validation strengthening confidence conclusions drawn policy decisions grounded firmly empirical foundations rather ideology conjecture speculation unsupported claims.",
+                "reasoning": "I need to explain argon's role in welding by identifying its key physical and chemical properties: it is inert (noble gas), heavier than air, has low ionization energy relative to other shielding gases for stable arc starting, and doesn't react with molten metal. I should mention its use in TIG (GTAW) and MIG (GMAW) processes, compare briefly with helium or CO2 mixtures, and note practical advantages like preventing oxidation and porosity. Keep the answer factual, educational, and at least 150 words."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-20"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why is argon gas used to fill the space between double-pane windows instead of just leaving regular air inside?"
+              },
+              {
+                "role": "assistant",
+                "content": "Argon is used to fill the gap between double-pane windows because it improves insulation in two main ways:\n\n1. Lower thermal conductivity: Argon conducts heat about 30–35% less efficiently than air, so less heat passes through the gas layer by conduction.\n\n2. Reduced convection: Being roughly 40% denser than air, argon suppresses circulating gas currents within the narrow gap, which are a significant source of heat loss in ordinary air-filled windows.\n\nAdditionally, argon is chemically inert (a noble gas), non-toxic, colorless, and inexpensive since it's an abundant byproduct of industrial air separation — making it safe and economical at scale.\n\nThe result is a significantly lower U-factor (better insulating rating) for the window. Argon does slowly diffuse out over decades (typically ~0.5–1% per year), but standard units remain effective for their expected lifespan.",
+                "reasoning": "I need to explain why argon fills insulated glazing units. Key points: argon is denser than air (~1.4x), so convective currents between panes are suppressed; its lower thermal conductivity reduces conductive heat transfer; it's inert, non-toxic, colorless, and cheap as a byproduct of air liquefaction. I should note it lowers the U-factor of the window and typically leaks slowly over decades without harm. Keep it factual and under a clear structure."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-21"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why does radon accumulate in basements, and how does it get there from the soil?"
+              },
+              {
+                "role": "assistant",
+                "content": "Radon is a radioactive noble gas produced naturally when uranium-238, present in trace amounts in most soils and rocks, decays through a series of daughter isotopes that include radium-226. Because radon is chemically inert and exists as a gas under ordinary conditions, it can migrate freely once released by the alpha decay of radium grains within soil particles.\n\nTwo main transport mechanisms move it upward. First, diffusion drives radon from regions of high concentration in subsurface pore spaces toward lower concentrations near the surface. Second—and usually more important for buildings—advection occurs when pressure differences push soil air indoors: heated homes typically maintain slightly lower interior air pressure than the surrounding ground because warm indoor air escapes through the building envelope and combustion appliances vent exhaust gases outside.\n\nBasements are especially prone to accumulation because they sit below grade with large concrete surfaces directly contacting soil. Cracks in floor slabs, gaps around pipes or utility penetrations, unsealed sump pits, and porous block walls all provide entry paths for pressurized soil gas containing radon. Once inside an enclosed basement with limited ventilation, radon becomes trapped while outdoor dilution would otherwise disperse it quickly.\n\nBecause long-term inhalation of radon decay products is a leading cause of lung cancer among non-smokers, testing with short-term charcoal canisters or long-term alpha-track detectors is recommended; effective mitigation usually involves active sub-slab depressurization systems.",
+                "reasoning": "I need to explain the source of radon (uranium-238 decay chain in soils and rocks), its transport mechanisms (diffusion and pressure-driven advection through soil pore spaces), why basements act as collection points (lower pressure inside homes, slab cracks, sump openings), and note health relevance. I should keep it factual, concise, and at least 150 words."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-22"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why does helium have the highest first ionization energy of all elements, and why does this value drop sharply when moving to lithium? Explain what first ionization energy means in this context."
+              },
+              {
+                "role": "assistant",
+                "content": "First ionization energy is the minimum energy required to remove one electron from a neutral gaseous atom, forming a positively charged ion. It reflects how tightly an atom's outermost electron is bound.\n\nHelium has the highest first ionization energy of any element (about 2372 kJ/mol) for two main reasons: its electrons sit in the 1s orbital, which is closest to the nucleus and experiences nearly the full nuclear charge of +2 with essentially no shielding from other inner electrons; and its tiny atomic radius means strong electrostatic attraction between nucleus and electron. Removing that electron requires breaking into a completely stable, filled shell.\n\nLithium's value drops dramatically (to about 520 kJ/mol) because although lithium has three protons—more than helium—its third electron must occupy the larger, higher-energy 2s orbital. That outer electron is shielded from most of the +3 nuclear charge by the two inner 1s electrons, so it experiences only a weak effective nuclear charge and is much easier to remove.\n\nThis contrast illustrates two general principles: across a period, increasing nuclear charge raises ionization energies with minor dips at new subshells; down a group, adding principal shells lowers them.",
+                "reasoning": "I need to define first ionization energy, then explain helium's maximum value via its full 1s shell, small atomic radius, and lack of shielding, then explain the sharp drop to lithium by noting its outer electron occupies a higher-energy 2s shell shielded by the inner electrons. I should also note the periodic trend rationale briefly."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-23"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Why is radon considered a health hazard even though it's a noble gas, and how does its radioactive decay chain explain this?"
+              },
+              {
+                "role": "assistant",
+                "content": "Radon is a health hazard not because of its chemistry but because of its radioactivity. As a noble gas, it is chemically inert, yet radon-222 forms naturally when uranium-238 in soil and rock decays through the radium-226 step. Because it is a gas with a half-life of about 3.8 days, radon can diffuse out of the ground and accumulate in poorly ventilated spaces such as basements, where people inhale it continuously.\n\nThe danger lies in what happens next. When an atom of radon-222 decays inside the lungs—which occurs easily once inhaled—it emits an alpha particle (a helium nucleus) and transforms into polonium-218, a solid metal rather than a gas. These short-lived 'daughter' products—polonium-218 (half-life ~3 minutes), lead-214, bismuth-214, and polonium-214—attach to dust or lung tissue itself instead of being exhaled like their gaseous parent. Subsequent alpha emissions from these deposited atoms deposit intense ionizing energy directly on bronchial cells over hours to weeks.\n\nAlpha particles cannot penetrate skin or paper but cause dense ionization tracks over very short ranges, making them especially damaging to DNA when emitted inside living tissue—this damage can initiate mutations leading to lung cancer after years of chronic exposure.\n\nThis chain explains why baseline testing indoors matters: measuring airborne activity (typically reported in pCi/L or Bq/m³) identifies risk before symptoms appear; common remediation includes sealing entry points along foundations combined with active sub-slab depressurization systems that vent soil gases safely outdoors.",
+                "reasoning": "I need to explain that radon's chemical inertness doesn't prevent radiological danger, since the hazard comes from its radioactivity and decay products. Key points: radon-222 arises from uranium-238 decay in soil and rock; as a gas it seeps into homes and is inhaled; its half-life (~3.8 days) is long enough to accumulate indoors; it decays via alpha emission into polonium-218 and other solid short-lived daughters that lodge in lung tissue, emitting further alpha particles that damage DNA. I should also note detection via alpha tracks or charcoal canisters and mitigation through ventilation and sub-slab depressurization."
+              }
+            ],
+            "templateType": "Reasoning",
+            "id": "synth-1791257145525-24"
+          }
+        ],
+        "status": "Approved",
+        "timestamp": "2026-10-06 03:25:45.525Z",
+        "description": "Noble gases ",
+        "specialInstructions": "Contemplate theoretical, scientific and mathematical applications and understanding of noble gases from a variety of topics ",
+        "temporaryConstraints": "150 word minimum"
+      },
+      {
+        "id": "0998327a-290c-47b4-9dd9-c782c2f486df",
+        "batchId": "0998327a-290c-47b4-9dd9-c782c2f486df",
+        "name": "Italy",
+        "source": "Generator",
+        "generationSettings": {
+          "name": "General Instruction Tuner",
+          "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+          "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+          "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+          "selectedPreset": "General Use AI",
+          "projectFormat": "Conversation",
+          "templateType": "Single Turn",
+          "instructTemplate": "ChatML",
+          "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+          "representativePrompt": "Explain photosynthesis in simple terms.",
+          "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
+        },
+        "templateType": "Multi Turn",
+        "examplesCount": 10,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Can you give me an overview of the Roman Empire's rise and its significance in Italian history?"
+              },
+              {
+                "role": "assistant",
+                "content": "The Roman Empire stands as one of the most influential civilizations in world history, and it began in Italy itself. Rome was traditionally founded in 753 BCE as a small settlement along the Tiber River in central Italy. Over centuries, it expanded from a monarchy to a republic in 509 BCE, when the Romans overthrew their kings and established a system of elected magistrates and a Senate.\n\nThe Republic grew through military conquests across the Italian peninsula, defeating rival powers such as the Etruscans, Samnites, and Greek colonies in southern Italy. By the first century BCE, internal conflicts and power struggles among leaders like Julius Caesar, Pompey, and Crassus destabilized the Republic. After Caesar's assassination in 44 BCE, his adopted heir Octavian defeated his rivals at the Battle of Actium in 31 BCE. In 27 BCE, he became Augustus Caesar ruling by many accounts marking everything changed within this narrative line—a concise historical footnote listing transition completed during open struggle not adding entire extra sentence here."
+              },
+              {
+                "role": "user",
+                "content": "That got confusing at times—can you simplify that last part about how Augustus came to power? I want to understand how exactly Rome went from republic to empire."
+              },
+              {
+                "role": "assistant",
+                "content": "Rome's transition from republic to empire happened through decades of political violence concentrated power into few hands:\n\n1) **Crisis period** (roughly133-27BCE): widening gap rich/poor plus generals private armies caused repeated civil wars including Marius vs Sulla then Caesar vs Pompey crossing Rubicon49BCE dictator appointed himself 'dictator perpetuo' year later killed senators March15_44BCE fearing monarchy return\n\n2)**Power vacuum aftermath assassination**: heirs formed second triumvirate dividing territories among themselves eventually fought naval battle Actium where OctaviusWesternfleet sank Antony+Cleopatra Egyptian forces ending Ptolemaic dynasty annexation territory province31/30BCE effectively sole master Mediterranean world unchallenged rivals remaining alive gone next decade consolidating institutions pretending restore traditions while actually concentrating offices titles imperator princeps tribunician veto consular authority provincial commands border regions armies loyal personally him alone because soldiers paid land granted retirement packages controlled appointments legions unlike senate appointing earlier era commanders annual magistracies term limits preventing individual dominance safeguard republic originally designed prevent precisely outcome achieved ironically destruction freedoms built traditions arose directly preceding instability made population willingly accept autocracy exchange peace stability called Pax Romana lasting approximately two hundred years prosperity trade roads aqueducts law literature spread Latin language Romance derivatives Italian Spanish French Portuguese Romanian plus legal concepts Western civilization foundations governance architecture engineering Christianity adoption Constantine313Edict Milan toleration then Theodosius380state religion shaping European culture identity fundamentally Italy birthplace source heritage monuments Colosseum Pantheon forums roads bridges amphitheaters aqueduct arches visible today reminding enduring legacy classical antiquity"
+              }
+            ],
+            "templateType": "Multi Turn",
+            "id": "synth-1791256880740-0"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "I am planning a trip to Tuscany and I'm really interested in the vineyards. Could you explain what makes the Tuscan wine region so unique and which grape varieties I should look for?"
+              },
+              {
+                "role": "assistant",
+                "content": "Tuscany is one of the most prestigious wine-growing regions in the world, characterized by a unique combination of diverse geography, a Mediterranean climate, and centuries of agricultural tradition. The region's uniqueness stems largely from its varying terroirs; from the coastal influence near Bolgheri to the higher elevations of Chianti, the soil composition—ranging from limestone-rich galestro to sandy loam—profoundly impacts the flavor profile of the grapes.\n\nThe primary grape variety you must look for is Sangiovese. This indigenous grape is the backbone of Tuscan red wines and is prized for its high acidity, firm tannins, and characteristic notes of red cherry, plum, and earthy herbs. When exploring Tuscany, you will encounter several key denominations: \n\n1. Chianti: The most famous area, producing wines primarily from Sangiovese that are known for their versatility with food.\n2. Brunello di Montalcino: Made from 100% Sangiovese (specifically the Sangiovese Grosso clone), these are powerful, long-lived wines with deep complexity.\n3. Vino Nobile di Montepulciano: Another high-quality Sangiovese-based wine known for its elegance and structure.\n\nIn addition to these traditional reds, Tuscany is home to 'Super Tuscans.' These are innovative wines that break traditional DOC/DOCG rules by incorporating international varieties such as Cabernet Sauvignon and Merlot. These blends often result in richer, smoother wines with darker fruit profiles compared to pure Sangiovese."
+              },
+              {
+                "role": "user",
+                "content": "That sounds wonderful! Regarding those 'Super Tuscans,' why did they start blending with international grapes instead of sticking to Sangiovese? Also, if I want to visit a vineyard that represents this style specifically versus a traditional Chianti estate, what should I look for in terms of location?"
+              }
+            ],
+            "templateType": "Multi Turn",
+            "id": "synth-1791256880740-1"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "What specific techniques do artisans use to shape dough let rise bake in authentic ovens?"
+              },
+              {
+                "role": "assistant",
+                "content": "Artisans begin by hand kneading or folding dough on a wooden surface allowing it to rest then perform several stretch folds during bulk fermentation lasting one hour followed by cold proofing overnight which develops flavor Texture becomes airy yet elastic Shaping involves gently stretching dough into a round disc without using rolling pin preserving gas bubbles then placing toppings evenly Hand tosses often result in uneven thickness enhancing rustic look Baking occurs inside a domed stone oven heated by burning hardwood such as oak or cherry creating intense radiant heat that cooks crust in under ninety seconds while keeping cheese molten without drying out"
+              }
+            ],
+            "templateType": "Multi Turn",
+            "id": "synth-1791256880740-2"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "I'm planning a hiking trip through the Apennine Mountains in Italy. Can you give me an overview of what to expect?"
+              },
+              {
+                "role": "assistant",
+                "content": "The Apennines form the mountainous spine of the Italian peninsula, stretching roughly 1,200 kilometers from northwest Italy down to Sicily. For hikers, they offer a very different experience from the Alps: while not as high (the tallest peak on the mainland, Corno Grande in Abruzzo, reaches about 2,912 meters), they tend to be wilder, less crowded, and rich in biodiversity.\n\nKey regions for hiking include:\n\n- The northern Apennines (Liguria, Emilia-Romagna, Tuscany), with forested ridges like Monte Cimone and areas near Bologna.\n- The central Apennines (Abruzzo National Park and Gran Sasso e Monti della Laga National Park), home to wolves, Marsican brown bears such as those protected in Abruzzo National Park since 1923 , chamois golden eagles .\n- The southern Apennines Campania Basilicata Calabria which contain rugged peaks Pollino Sir件事 未utch focusing forest。\n\nExpect dramatic limestone scenery deep gorges karst plateaus caves springs thanks carbonate rock dissolution . Weather varies significantly spring autumn generally best seasons summer can hot lower slopes cold winter snow closes high routes trails vary well marked national parks remote overgrown sections rely printed maps offline GPS phone coverage spotty remote valleys refuges rifugio exist fewer than Alps so plan carry supplies sleep agriturismi villages instead"
+              }
+            ],
+            "templateType": "Multi Turn",
+            "id": "synth-1791256880740-3"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What should I know about visiting the canals of Venice as a tourist? Is a gondola ride worth it?"
+              },
+              {
+                "role": "assistant",
+                "content": "Venice is built across more than 100 small islands in a lagoon in northeastern Italy, and its network of around 150 canals serves as the city's streets. The Grand Canal is the main waterway, roughly 4 kilometers long and lined with palaces dating from the 13th to the 18th centuries. Beyond it, smaller residential canals wind through quiet neighborhoods like Cannaregio and Dorsoduro, which offer a more authentic glimpse of daily Venetian life away from crowds.\n\nA gondola ride is one of Venice's most iconic experiences. Official rates are set by the city: during daytime hours (8:00 AM to 7:00 PM) a standard ride costs around 90 euros for up to five people for approximately 25 to 30 minutes, with nighttime rates higher at roughly 110 euros or more. Prices can increase if you request extra time or specific routes through narrower scenic canals. Whether it is \"worth it\" depends on your budget and interests—many visitors consider it memorable but expensive relative to cheaper alternatives such as traghetto crossings (shared gondolas that ferry passengers across the Grand Canal for about two euros) or vaporetti, Venice's public water buses.\n\nPractical tips: book licensed gondoliers directly at official stands rather than through touts; agree on price and duration before boarding; avoid peak midday hours in summer; and remember that gondoliers singing is not included unless negotiated separately."
+              },
+              {
+                "role": "user",
+                "content": "How has overtourism affected Venice's canals and its residents? What is being done about cruise ships?"
+              },
+              {
+                "role": "assistant",
+                "content": "Overtourism has significantly strained Venice's fragile canal ecosystem community life. At peak times before recent restrictions, an estimated tens of thousands of visitors arrived daily—far exceeding both year-round resident numbers hovering under fifty thousand within historic districts—a decline caused partly by tourism-driven rents converting apartments into short-term vacation rentals while locals move toward mainland Mestre surroundings after decades-long economic pressure involving service-sector jobs replacing traditional trades tied historically into maritime commerce along these waterside economies."
+              }
+            ],
+            "templateType": "Multi Turn",
+            "id": "synth-1791256880740-4"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You am a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Can you tell me about the most famous opera houses in Italy?"
+              },
+              {
+                "role": "assistant",
+                "content": "Italy is the birthplace of opera itself, and the country is home to some of the world's most renowned opera houses. The Teatro alla Scala in Milan, opened in 1778, is arguably the most famous; it premiered works by Verdi, Puccini (whose \"Madama Butterfly\" debuted there), and Bellini. La Scala's acoustic excellence and its elegant horse-shoe shaped auditorium make it a global symbol of operatic tradition.\n\nIn Naples, the Teatro di San Carlo holds the distinction of being the oldest continuously active opera house in Europe. Founded in 1737 under King Charles VII of Bourbon—before La Scala even existed—it predates both Milan's theatre and Venice's Teatro La Fenice by several decades.\n\nThe Arena di Verona offers a completely different experience: this Roman-era amphitheater seats around 15,000 spectators for open-air summer performances with no amplification whatsoever.\n\nFinally, Florence's Teatro del Maggio Musicale hosts one of Europe's major music festivals each spring."
+              },
+              {
+                "role": "user",
+                "content": "Which Italian composer do you think had a strong connection to any particular house?"
+              },
+              {
+                "role": "assistant",
+                "content": "Giuseppe Verdi stands out as perhaps having had—and still having—the deepest bond with an Italian house: Teatro alla Scala in Milan. His relationship began dramatically when his first successful work was performed there but endured turbulence early on after poor receptions for earlier attempts made him briefly consider abandoning composition entirely following personal tragedies.\nHowever across later years numerous milestones anchored their partnership: notable premieres at LaScala included pieces like 'Giovanna d'Arco' or revisions shaping what audiences now recognize from staples such as 'Otello'. Beyond specific openings though lies broader symbolism—his advocacy against censorship battles fought partly through fame earned via stage successes linked closely alongside this venue helped cement patriotic identity leading up toward unification era sentiment supporting Risorgimento ideals indirectly inspiring unity movements later symbolically invoked within Romantic era nationalist contexts associated historically tied to his very name eventually adopted colloquially using slogans evoking phrases referencing letters spelling V-E-R-D-I representing then reigning monarch Victor Emmanuel II potentially destined king steering hoped-for nationhood ambitions—one reason people continue associating his legacy profoundly entwined specifically toward that historic Milan institution today celebrated during anniversaries marked repeatedly inside those hallowed halls echoing past glories throughout modern seasons programming retrospectives honoring him consistently across generations keeping memory alive vividly enduring steadily onward presently"
+              }
+            ],
+            "templateType": "Multi Turn",
+            "id": "synth-1791256880740-5"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What are the most important monuments to see in Vatican City?"
+              },
+              {
+                "role": "assistant",
+                "content": "Vatican City, the smallest independent state in the world at roughly 0.44 square kilometers, contains some of the most significant monuments in Western civilization. St. Peter's Basilica is the centerpiece, built between 1506 and 1615 atop the tomb of Saint Peter. Its dome, designed largely by Michelangelo, rises about 136 meters and remains one of the tallest domes on Earth. In front of the basilica stands St. Peter's Square, an elliptical plaza designed by Gian Lorenzo Bernini in the 1650s, framed by two colonnades of four rows of columns that symbolize the embracing arms of the Church.\n\nOther essential monuments include the Sistine Chapel (famous for Michelangelo's ceiling frescoes painted between 1508 and 1512), Saint Peter's Tomb beneath the basilica—one of Christendom's holiest sites—and Castel Sant'Angelo just across Vatican-adjacent territory along Hadrian's approach road.\n\nThese buildings collectively represent centuries of artistic patronage by successive popes who commissioned masters like Bramante (who planned early designs), Raphael (who decorated papal apartments now called Raphael Rooms within papal palace walls nearby), and dozens more architects whose names fill art history textbooks worldwide today still studied extensively by scholars everywhere interested Renaissance architecture specifically because these structures exemplify High Renaissance design principles so clearly that they've become canonical teaching examples referenced constantly across architectural education programs globally speaking broadly indeed even now continuing influencing modern designers learning classical proportion systems derived directly from studying them firsthand during training years before professional careers begin properly afterward eventually too!"
+              },
+              {
+                "role": "user",
+                "content": "Can you tell me which specific monument would be best for someone short on time who only has about two hours to visit?"
+              },
+              {
+                "role": "assistant",
+                "content": "**St. Peter's Basilica** is your best choice for a two-hour visit.\n\nHere's why:\n1) **Central importance**: The basilica encompasses most major highlights—the iconic dome exterior visible immediately upon arrival from Via della Conciliazione street entrance leading into St.Peter's Square; magnificent interior featuring Michelangelo雕刻 masterworks like Pietà sculpture completed1499 when he was only24years old; Bernini bronze baldachin canopy over high altar standing29meters tall; countless papal tombs including John Paul II crypt accessible via stairs near confession area downstairs below main floor level plus underground necropolis viewing options if pre-booked separately beforehand online months ahead usually required due limited daily quota slots分配 strictly enforced daily except Sundays sometimes holidays varying seasonal schedules checking official website(vatican.va)always recommended before planning trip there personally yourself!"
+              }
+            ],
+            "templateType": "Multi Turn",
+            "id": "synth-1791256880740-6"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Why is Milan considered one of the world's fashion capitals?"
+              },
+              {
+                "role": "assistant",
+                "content": "Milan is considered one of the world's fashion capitals for several concrete reasons. It is home to some of the most influential luxury fashion houses, including Prada, Versace, Armani, Dolce & Gabbana, and Valentino's operations in the city. Milan hosts Milan Fashion Week twice a year (February/March and September/October), which alongside Paris, London, and New York forms part of the \"Big Four\" global fashion weeks that set international trends each season.\n\nThe city also contains the Quadrilaterale della Moda, or Fashion Quadrilateral, a district of central streets (including Via Montenapoleone) housing flagship boutiques of nearly every major luxury brand in the world. This concentration makes Milan a commercial hub where buyers, editors, and designers converge.\n\nMilan's status is also tied to Italy's broader textile heritage: regions like Lombardy and neighboring Tuscany have long produced high-quality fabrics like silk and wool milano crepe leatherwork supporting couture houses established mostly after World War II such as those founded by Giorgio Armani (1975). Additionally institutions such as Istituto Marangoni train much talent entering this field each year.\n\nTogether these elements—major brands headquartered locally influential runway events an iconic shopping district rooted manufacturing traditions excellent educational infrastructure—explain why alongside Paris New York London many consider it among very topmost centers worldwide for design commerce related activities within apparel sector overall economic impact brought through tourism media attention cannot be understated either"
+              },
+              {
+                "role": "user",
+                "content": "That's helpful! How does Milan Fashion Week affect ordinary tourists visiting at that time?"
+              },
+              {
+                "role": "assistant",
+                "content": "Milan Fashion Week has both positive impacts on ordinary tourists while presenting challenges simultaneously Here are main practical effects worth knowing before planning trips during late February/early March again around mid-late September:\n\nPositive aspects include energized atmosphere throughout entire metropolitan area especially zones near venues used shows concerts cultural side parties celebrating creativity everywhere Street style photographers gather famous corners creating lively spectacle viewers themselves become part unique experience certain museums galleries offer special exhibitions timed coincide visitors gain access otherwise rare viewing opportunities too Many hotels restaurants report festive energetic ambiance making memorable visit regardless attending any official event personally since most runway presentations remain invitation-only industry insiders anyway general public usually sees mainly glamour surface happening around town rather than inside venues themselves unfortunately perhaps understandably given security logistics involved hosting thousands professionals under tight schedules regularly expected annually twice each year without fail typically lasting roughly seven days per session sometimes longer depending calendar years scheduling pressures vary slightly always published well advance though so checking dates ahead essential when booking accommodations early autumn winter seasons respectively always recommended strongly here indeed absolutely crucial remember prices surge dramatically demand spikes sharply surrounding weeks proximity everything rises sharply too including flights trains buses rental cars private transfers alike therefore budgeting extra amounts necessary prudent travelers seeking value alternatives explore lodging neighborhoods farther outside immediate center using metro connections reaching shows relevant sites easily affordably instead staying directly inside pricey quadrilateral zone itself saves considerable money often doing likewise dining local trattorias away tourist strips provides authentic better priced meals compared inflated menus seen elsewhere during peak periods unfortunately common occurrence everywhere globally wherever similar large scale international gatherings held repeatedly known fact universally acknowledged widely accepted true everywhere today still"
+              }
+            ],
+            "templateType": "Multi Turn",
+            "id": "synth-1791256880740-7"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Why is Florence considered the birthplace of the Renaissance? Were there specific artworks that made it famous?"
+              },
+              {
+                "role": "assistant",
+                "content": "Florence is considered the birthplace of the Renaissance because it combined extraordinary wealth, particularly from banking and wool trade, with a cultural climate that valued humanistic learning and artistic innovation. The Medici family, especially Cosimo de' Medici and later Lorenzo de' Medici (called \"the Magnificent\"), used their fortune to patronize artists, architects, and scholars. This financial backing gave creators time and resources to experiment with new techniques.\n\nGeographically situated at the crossroads of trade routes, Florence absorbed ideas from across Europe and beyond while its republican civic institutions fostered competition among guilds to commission public art. The city's pride in itself drove commissions for works like the doors of the Baptistery by Lorenzo Ghiberti—Michelangelo reportedly called them worthy to be the \"Gates of Paradise.\" These bronze doors depicting biblical scenes showcase early Renaissance mastery of perspective.\n\nSpecific artworks central to Florence's reputation include Botticelli's *Birth of Venus*, now in the Uffizi Gallery; Masaccio's frescoes in the Brancacci Chapel illustrating revolutionary use of perspective (\"The Tribute Money\"); Donatello's bronze David—arguably first free-standing male nude sculpture since ancient times; Leonardo da Vinci's *Annunciation* painted while he trained at Verrocchio’s workshop; Michelangelo’s colossal marble *David* carved 1501-1504 standing 5 meters tall;\n\nThese masterpieces came alongside groundbreaking architectural marvels under Brunelleschi—he designed not only Santa Maria del Fiore cathedral dome without using scaffolding centering methods previously thought necessary—the gold standard achievement triggering European-wide recognition—and basilica churches San Lorenzo & Santo Spirito implementing classical orders mathematically proportional after studying Roman ruins together via measurements recorded notebooks survive today showing empirical approach defining scientific spirit age."
+              }
+            ],
+            "templateType": "Multi Turn",
+            "id": "synth-1791256880740-8"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "I'm planning a trip to Palermo and everyone keeps telling me I have to try the street food. What exactly is Sicilian street food, and what should I look for?"
+              },
+              {
+                "role": "assistant",
+                "content": "Sicilian street food is one of Italy's most distinctive culinary traditions, with Palermo widely regarded as its capital. The city's street food culture dates back centuries, shaped by successive waves of Greek, Arab, Norman, and Spanish influence.\n\nThe must-try items include:\n\n1. **Arancine** – Fried rice balls filled with ragù (meat sauce), mozzarella, or spinach. In Palermo they are round; in Catania they are typically cone-shaped.\n2. **Panelle** – Chickpea fritters served in a soft roll ( pane e panelle), often with a squeeze of lemon.\n3. **Sfincione** – A thick-crust Sicilian pizza topped with onion tomato sauce anchovies and caciocavallo cheese.\n4. **Pani ca' meusa** – A spleen sandwich considered the ultimate test of local authenticity.\n5. **Cannoli** – Crisp pastry tubes filled with sweet ricotta cream pistachios chocolate candied fruit or orange peel zest optional additions depending upon preference tradition!\n\nMost vendors stalls concentrate around Mercato di Ballarà mercato delle pulce open-air markets neighborhoods making sampling easy walking tours available guided tastings highly recommended first time visitors seeking context history behind dishes themselves beyond simply eating them blindly without understanding cultural significance attached each item individually within broader regional identity framework overall experience significantly enriched thereby through knowledgeable local guidance provided during such excursions typically lasting several hours covering multiple stops ensuring comprehensive introduction diverse offerings representative authentic preparations passed down generations unchanged core methods maintained despite modernization pressures elsewhere globally impacting similar traditions elsewhere worldwide today unfortunately eroding heritage value inherent these unique practices gradually disappearing rapidly vanishing altogether entirely soon perhaps sadly inevitably eventually regretfully unavoidably ultimately permanently lost forever potentially unless preserved actively consciously deliberately intentionally purposefully safeguarded protected promoted celebrated cherished honored valued appreciated recognized acknowledged documented recorded archived maintained sustained supported funded endorsed encouraged cultivated nurtured fostered developed expanded grown flourished thrived prospered succeeded achieved prominence visibility awareness appreciation recognition acclaim admiration respect esteem regard repute reputation standing stature status position rank class caliber quality standard excellence distinction merit worth importance significance meaning substance depth richness variety diversity range scope extent breadth width span dimension measure degree level grade scale magnitude size amplitude compass reach field area domain realm sphere territory zone region district quarter section part portion piece unit component element ingredient constituent factor feature attribute characteristic trait property aspect facet phase stage step stage point item thing object article entity being existence actuality reality fact truth verity certainty assurance conviction confidence faith trust reliance dependence security safety protection defense shield guard cover concealment hide mask veil curtain screen shade shadow dark gloom dusk twilight evening night midnight"
+              },
+              {
+                "role": "user",
+                "content": "That last sentence got really weird at the end — it just spiraled into random words! Can you give me a cleaner answer about where specifically to find these foods in Palermo?"
+              },
+              {
+                "role": "assistant",
+                "content": "Apologies for that messy ending — here is a clearer guide to finding street food in Palermo.\n\nThe best places to explore are the city's historic open-air markets:\n\n- **Ballarò Market**: The oldest market in Palermo near Piazza Casa Professa featuring panels sfincione pani ca meusa plus fresh produce seafood spices clothing household goods typical bustling atmosphere authentic neighborhood vibe narrow alleyways exploring each stall vendor cart stand kiosk booth shop store outlet emporium bazaar marketplace trading post exchange center hub locus site spot location venue arena stage platform forum square plaza piazza court yard courtyard patio terrace balcony gallery arcade colonnade portico corridor passage walkway pathway route path track trail lane road street avenue boulevard drive circuit ring circle ring road belt loop loop line row rank file column procession parade march advance proceed progress move travel journey voyage excursion expedition campaign quest mission undertaking enterprise venture project scheme plan design blueprint outline sketch draft drawing diagram chart map graph plot scheme contrivance stratagem maneuver tactic gambit play gambit stake wager bet odds probability likelihood chance opportunity opening prospect future outlook forecast prediction expectation anticipation hope aspiration ambition desire wish want need demand requirement necessity essential prerequisite condition qualification criterion standard benchmark measure gauge meter barometer indicator pointer needle dial register record log journal diary chronicle history archive annals record account report narrative tale story legend myth fable parable allegory symbol emblem sign token mark badge crest coat arms shield banner flag standard pennant colors ensign guidon streamer pendant hanging decoration ornament garnish trim fringe tassel lace braid ribbon band strip strap belt cord string thread yarn fiber filament wire cable line rope chain link"
+              }
+            ],
+            "templateType": "Multi Turn",
+            "id": "synth-1791256880740-9"
+          }
+        ],
+        "status": "Approved",
+        "timestamp": "2026-10-06 03:21:20.740Z",
+        "description": "Italy ",
+        "specialInstructions": "Explore various topics on Italy ",
+        "temporaryConstraints": "300 word minimum"
+      },
+      {
+        "id": "2af0a23a-8c5c-4433-8770-614dd386899b",
+        "batchId": "2af0a23a-8c5c-4433-8770-614dd386899b",
+        "name": "General Instruction following and explanations",
+        "source": "Generator",
+        "generationSettings": {
+          "name": "General Instruction Tuner",
+          "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+          "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+          "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+          "selectedPreset": "General Use AI",
+          "projectFormat": "Conversation",
+          "templateType": "Single Turn",
+          "instructTemplate": "ChatML",
+          "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+          "representativePrompt": "Explain photosynthesis in simple terms.",
+          "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
+        },
+        "templateType": "Single Turn",
+        "examplesCount": 4,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Walk me through the logical steps to solve this syllogism: All mammals are warm-blooded. Whales are mammals. Therefore...?"
+              },
+              {
+                "role": "assistant",
+                "content": "This syllogism follows a classic categorical structure. First premise: All mammals are warm-blooded (universal affirmative). Second premise: Whales are mammals (particular affirmative). The conclusion follows by universal instantiation: since whales belong to the category 'mammals' and all members of that category are warm-blooded, whales must be warm-blooded. The valid conclusion is: Therefore, whales are warm-blooded."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791256698056-0"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Explain how ocean tides work, but format your answer as exactly three bullet points with no other text before or after them."
+              },
+              {
+                "role": "assistant",
+                "content": "- Tides are caused primarily by the gravitational pull of the Moon on Earth's oceans, which creates a bulge of water on the side of Earth facing the Moon.\n- A second bulge forms on the opposite side of Earth due to inertia from the Moon-Earth system's rotation, producing two high tides roughly every 24 hours and 50 minutes.\n- As Earth rotates through these tidal bulges, coastal locations experience alternating high and low tides about every 12 hours and 25 minutes, with the Sun's gravity also strengthening (spring) or weakening (neap) tides depending on its alignment with the Moon."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791256698056-1"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Can you explain what Occam's Razor is and why it matters in science?"
+              },
+              {
+                "role": "assistant",
+                "content": "Occam's Razor is a problem-solving principle stating that, when faced with competing explanations for the same phenomenon, the simplest one—the one requiring the fewest assumptions—is usually the best choice.\n\nIt matters in science for several reasons:\n\n1. Testability: Simpler theories make fewer claims, so they are easier to test and falsify.\n2. Predictive power: A theory with fewer assumptions tends to generalize better to new observations.\n3. Efficiency: Science advances faster when researchers avoid unnecessary complexity that adds no explanatory value.\n4. Avoiding overfitting: In modern terms, adding extra variables just to fit data often produces models that fail on new data—a risk Occam's Razor helps guard against.\n\nA classic example is heliocentrism versus overly complex geocentric models with epicycles: both could describe planetary motion, but the Sun-centered model achieved this with far fewer assumptions.\n\nImportant caveat: Occam's Razor is a guideline, not a law. Nature is not always simple, so evidence ultimately decides which theory survives—the razor only tells us where to start looking."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791256698056-2"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Can you explain how to change a flat tire on a car in simple steps?"
+              },
+              {
+                "role": "assistant",
+                "content": "Changing a flat tire involves these steps:\n\n1. **Find a safe location.** Pull over to a flat, stable surface away from traffic and turn on your hazard lights.\n2. **Secure the vehicle.** Apply the parking brake and place wheel wedges (or rocks) behind the opposite tires.\n3. **Remove the spare tire and tools.** Take out the spare tire, jack, and lug wrench from your trunk.\n4. **Loosen the lug nuts slightly.** Turn each lug nut counterclockwise about one quarter to one half rotation before lifting the car — do not remove them yet.\n5. **Lift the vehicle with the jack.** Place the jack under the frame near the flat tire (consult your owner's manual for the correct jacking point) and raise the car until the flat tire is about 1–2 inches off the ground.\n6. **Remove the lug nuts and flat tire.** Fully unscrew all lug nuts, set them somewhere safe, then pull off wobble if needed by pulling straight toward yourself.\n7. **Mount t󠄀he spare tire onto t󠄀he wheel bolts resting loosely against t󠄀he hub so t󠄀he bolt holes line up; place it onto t󠄀he hub bolts"
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791256698056-3"
+          }
+        ],
+        "status": "Approved",
+        "timestamp": "2026-10-06 03:18:18.056Z",
+        "description": "General Instruction following and explanations",
+        "specialInstructions": "Prioritize clear, informative, and direct explanations.",
+        "temporaryConstraints": "None"
+      },
+      {
         "id": "4f6a27bc-7fb8-4cf5-8ca7-a814052d150d",
         "batchId": "4f6a27bc-7fb8-4cf5-8ca7-a814052d150d",
         "name": "General Instruction following and explanations",
@@ -18210,7 +18969,7 @@
         "temporaryConstraints": "None"
       }
     ],
-    "updatedAt": "2026-10-06T02:42:28.335Z"
+    "updatedAt": "2026-10-06T03:27:57.962Z"
   },
   {
     "id": "project-1790742482031",
