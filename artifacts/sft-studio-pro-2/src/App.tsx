@@ -4019,6 +4019,7 @@ export default function App() {
                 <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 px-2.5 py-1 rounded-lg text-xs flex-1 min-w-[200px] sm:min-w-[280px]">
                   <FolderOpen className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                   <select
+                    id="project-selector"
                     key={dropdownKey}
                     value={selectedProjectId || ""}
                     onChange={(e) => handleSelectProject(e.target.value)}
