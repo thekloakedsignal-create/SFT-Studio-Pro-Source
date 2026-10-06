@@ -1375,6 +1375,7 @@ ${JSON.stringify({ examples: [{ messages: [
           responseMimeType: "application/json",
           maxOutputTokens: 4096,
           temperature: 0.7,
+          reasoningEffort: "low",
         },
         timeoutMs: Math.min(SFT_TOPIC_PLAN_TIMEOUT_MS, Math.max(1, generationDeadline - Date.now())),
       })),
@@ -1786,6 +1787,7 @@ The selected template type is authoritative. Never mix template types within a b
           const configObj: any = {
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
+            reasoningEffort: "low",
             ...(turnMode === "Reasoning"
               ? {
                   responseSchema: {
