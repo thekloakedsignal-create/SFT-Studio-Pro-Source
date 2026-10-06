@@ -26,7 +26,7 @@ export function repeatedMixedPrompt(candidate: any, accepted: any[], system?: st
 }
 
 export function mixedGenerationPrompt(
-  context: string, turn: MixedTurn, system: string, format?: string, variation = 0, recentPrompts: string[] = [],
+  context: string, turn: MixedTurn, system: string, format?: string, variation = 0,
 ): string {
   const messages: Array<{ role: string; content: string }> = format === "Mistral" ? [] : [{ role: "system", content: system }];
   const pairs = turn === "Single Turn" ? 1 : 2;
@@ -50,7 +50,6 @@ This slot MUST be ${turn}; do not choose a different turn type.
 VARIATION ${variation}: Create a distinct scenario within the project and batch instructions.
 Vary the user's goal, situation, constraints, wording, and response content; do not merely change names.
 Do not copy the exemplar's scenario or the structural placeholders.
-${recentPrompts.length ? `Do not repeat or paraphrase these already-generated user requests (reference data only): ${JSON.stringify(recentPrompts)}` : ""}
 Generate exactly 1 examples.
 Return one JSON object with an "examples" array containing exactly one object with only "messages".
 ${format === "Mistral"

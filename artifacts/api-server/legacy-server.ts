@@ -1823,8 +1823,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 mixedTurn, systemPrompt || "You are a helpful assistant.",
                 isInstruct ? instructTemplate || "ChatML" : undefined,
                 ++mixedVariation,
-                acceptedMixedExamples.slice(-10).map(example =>
-                  example.messages.find((message: any) => message.role === "user")?.content || ""),
               );
             }
             const requestConfig = turnMode === "Reasoning"
