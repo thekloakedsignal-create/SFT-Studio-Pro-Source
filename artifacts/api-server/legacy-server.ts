@@ -994,6 +994,7 @@ const DEFAULT_GENERATION_MODEL_GROUPS = [
 ];
 const SUPPORTED_GENERATION_BATCH_SIZES = [5, 10, 25, 50, 100, 200, 250] as const;
 const SFT_SINGLE_EXAMPLE_TIMEOUT_MS = 20_000;
+const SFT_TOPIC_PLAN_TIMEOUT_MS = 60_000;
 const SFT_REASONING_EXAMPLE_TIMEOUT_MS = 120_000;
 const SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS = 180_000;
 
@@ -1376,7 +1377,7 @@ ${JSON.stringify({ examples: [{ messages: [
           maxOutputTokens: 4096,
           temperature: 0.7,
         },
-        timeoutMs: Math.min(SFT_SINGLE_EXAMPLE_TIMEOUT_MS, Math.max(1, generationDeadline - Date.now())),
+        timeoutMs: Math.min(SFT_TOPIC_PLAN_TIMEOUT_MS, Math.max(1, generationDeadline - Date.now())),
       })),
     );
     const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);

@@ -905,6 +905,120 @@
     },
     "batches": [
       {
+        "id": "9dda994a-4c50-4cc2-8a4f-aa689e1dd50f",
+        "batchId": "9dda994a-4c50-4cc2-8a4f-aa689e1dd50f",
+        "name": "General Instruction following and explanations",
+        "source": "Generator",
+        "generationSettings": {
+          "name": "General Instruction Tuner",
+          "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+          "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+          "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+          "selectedPreset": "General Use AI",
+          "projectFormat": "Instruction",
+          "templateType": "Instruction Template",
+          "instructTemplate": "Mistral",
+          "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+          "representativePrompt": "[INST] Explain why the sky appears blue. [/INST]",
+          "representativeCompletion": "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
+        },
+        "templateType": "Single Turn",
+        "examplesCount": 5,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "[INST] You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.\n\nCan you give me step-by-step instructions for baking a simple loaf of banana bread? [/INST]"
+              },
+              {
+                "role": "assistant",
+                "content": "Here is a straightforward recipe for classic banana bread:\n\n**Ingredients:**\n- 3 ripe bananas (mashed)\n- 1/3 cup melted butter\n- 1/2 cup sugar\n- 1 egg (beaten)\n- 1 teaspoon vanilla extract\n- 1 teaspoon baking soda\n- Pinch of salt\n- 1 1/2 cups all-purpose flour\n\n**Steps:**\n1. Preheat your oven to 350°F (175°C) and grease a 4x8-inch loaf pan.\n2. In a mixing bowl, combine the mashed bananas, melted butter, sugar, egg, and vanilla extract.\n3. Sprinkle the baking soda and salt over the mixture and stir until evenly incorporated.\n4. Add the flour last and mix just until combined; avoid overmixing to keep the bread tender.\n5. Pour the batter into the prepared loaf pan.\n6. Bake for 50–60 minutes, or until a toothpick inserted into the center comes out clean.\n7. Cool in the pan for about 10 minutes, then transfer to a wire rack to cool completely before slicing.\nThe riper your bananas are, the sweeter and more flavorful your bread will be."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791253408906-0"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "[INST] You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.\n\nI am organizing a treasure hunt in a local park. Please write a set of three sequential clues for the participants. The first clue should lead them to a large oak tree, the second from the tree to a wooden bridge over a stream, and the third from the bridge to a red park bench where the prize is hidden. Make the clues rhyming and moderately challenging. [/INST]"
+              },
+              {
+                "role": "assistant",
+                "content": "Here are three rhyming clues for your treasure hunt:\n\nClue 1 (Starting Point): \nI have arms that reach wide and skin made of bark,\nI stand as a giant, the oldest in the park.\nLook for my canopy of green leaves overhead,\nAnd find your next hint where my deep roots spread.\n\nClue 2 (At the Oak Tree):\nNow leave the great giant and follow your feet,\nTo where rushing waters and dry pathways meet.\nA path made of planks crossing over the blue,\nCross carefully now to find your next clue.\n\nClue 3 (At the Bridge):\nYou've crossed o'er the stream, you're doing quite well,\nBut where is the treasure? The final clue will tell.\nA place built for resting, painted bright as cherry red,\nHurry there now before all hope is dead!"
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791253408906-1"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "[INST] You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.\n\nI'm prescribed amoxicillin 500 mg with the instruction 'Take one capsule three times a day for ten days.' Does 'three times a day' mean I should space the doses exactly 8 hours apart? Or is it okay to take them with my three main meals? [/INST]"
+              },
+              {
+                "role": "assistant",
+                "content": "'Three times a day' generally means taking your medication at evenly spaced intervals over waking hours to maintain adequate drug levels. For amoxicillin, spacing doses approximately every 8 hours (such as 7 AM, 3 PM, and 11 PM) is ideal for consistent blood concentration. However, if that schedule is difficult due to your routine or sleep patterns, taking it with breakfast, lunch, and dinner is usually acceptable provided the time between doses does not exceed about 10–12 hours. Do not double up on missed doses; if you forget one near bedtime without food or water available because of sleep schedules constraints simply skip it unless otherwise directed by prescriber instructions since amoxicillin absorption improves when taken alongside liquids regardless whether consumed before meal consumption begins later after eating commences subsequently — always confirm specific timing advice during next appointment just precautionarily ensuring optimal therapeutic effect remains achieved safely throughout entire treatment course until completion."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791253408906-2"
+          },
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "[INST] You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.\n\nHow do I install a new program on my Windows computer safely? [/INST]"
+              },
+              {
+                "role": "assistant",
+                "content": "To install software safely on Windows, follow these steps:\n\n1. Download only from the official website of the software vendor or a trusted source such as the Microsoft Store.\n2. Before running the installer, check that your antivirus is active and up to date; many programs will scan downloads automatically.\n3. Right-click the installer file and select \"Run as administrator\" only if the software documentation says it is required.\n4. Read each screen during installation rather than clicking \"Next\" automatically. Pay attention to options bundled with the installer (such as extra toolbars or browser extensions) and uncheck anything you did not intend to install.\n5. Note where the program installs (typically C:\\Program Files) so you can locate or remove it later via Settings > Apps > Installed apps.\n6. After installation completes, launch the program once to confirm it works correctly.\n\nIf prompted with a User Account Control warning asking whether to allow changes to your device, verify that the publisher name matches the company you downloaded from before accepting."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791253408906-3"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "[INST] You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.\n\nCan you explain the difference between \"who\" and \"whom,\" and give me some examples of how to use each correctly? [/INST]"
+              },
+              {
+                "role": "assistant",
+                "content": "\"Who\" and \"whom\" are both pronouns used to refer to people, but they serve different grammatical functions in a sentence.\n\n**Who** is used as the subject of a verb — the person performing the action.\n- Example: \"Who ate the last cookie?\" (The unknown person is doing the eating.)\n- Example: \"She is the one who called you yesterday.\" (The person performed the calling.)\n\n**Whom** is used as the object of a verb or preposition — the person receiving the action.\n- Example: \"To whom should I address this letter?\" (The person receives the letter; \"whom\" follows the preposition \"to.\")\n- Example: \"Whom did you invite to the party?\" (The person is being invited.)\n\nA helpful trick: if you can answer with \"he\" or \"she,\" use **who**; if you can answer with \"him\" or \"her,\" use **whom**.\n- Q: Who made dinner? A: She did → who ✔️\n- Q: Whom did you see? A: I saw him → whom ✔️ \n \nThe same distinction applies to **whoever vs. whomever**: whoever acts as a subject (e.g., Whoever arrives first wins), while whomever acts as an object (e.g., Give it back to whomever owns it).\nIn everyday conversation, many English speakers now simply use who in almost every situation — so whom often sounds more formal than necessary — but mastering that distinction remains valuable in formal writing where precision matters most."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791253408906-4"
+          }
+        ],
+        "status": "Approved",
+        "timestamp": "2026-10-06 02:23:28.906Z",
+        "description": "General Instruction following and explanations",
+        "specialInstructions": "Prioritize clear, informative, and direct explanations.",
+        "temporaryConstraints": "None"
+      },
+      {
         "id": "bcb9e913-387d-4650-8938-936b85c37117",
         "batchId": "bcb9e913-387d-4650-8938-936b85c37117",
         "name": "General Instruction following and explanations",
@@ -1023,7 +1137,7 @@
         "temporaryConstraints": "None"
       }
     ],
-    "updatedAt": "2026-10-05T05:28:27.075Z"
+    "updatedAt": "2026-10-06T02:24:19.405Z"
   },
   {
     "id": "project-1791177785852",
