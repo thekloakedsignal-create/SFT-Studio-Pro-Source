@@ -47,8 +47,8 @@ Multi Turn and Mixed replace missing examples individually, including non-timeou
 
 **How to apply:** Preserve successful output, bounded concurrency, per-request timeouts, and the size-scaled total deadline. Pace failed replacements to avoid a tight request loop. Apply the shared one-example refill policy without changing the template logic.
 
-Use the smallest suitable low-latency model for the one batch topic-planning request; keep planner use separate from the example-generation model schedule.
+Use `nemotron-nano-12b-v2-vl` for the single batch topic-planning request, with no added reasoning; keep planner use separate from the example-generation model schedule.
 
-**Why:** The user specified that the topic planner should be lightweight and not replace the existing generation models.
+**Why:** The user specified this low-latency model for planning and excluded OpenAI-backed models.
 
-**How to apply:** Change only the planner model; do not alter the model pool or reasoning settings for generated examples.
+**How to apply:** Change only the planner model; do not alter the example-generation model pool or reasoning settings.

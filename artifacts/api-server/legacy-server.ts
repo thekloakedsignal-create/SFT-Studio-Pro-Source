@@ -1369,7 +1369,7 @@ ${JSON.stringify({ examples: [{ messages: [
       generationStacks,
       String(batchDescription || ""),
       async prompt => extractResponseText(await callDigitalOceanChatCompletions({
-        model: "openai-gpt-5-nano",
+        model: "nemotron-nano-12b-v2-vl",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
