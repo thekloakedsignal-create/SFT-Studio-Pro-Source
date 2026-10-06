@@ -1934,12 +1934,16 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             generated = await requestExamplesFromModel(targetModel);
           } catch (primaryError: any) {
             if (isDigitalOceanRequestTimeout(primaryError)) {
-              stalledModels.add(targetModel);
-              if (!isReasoningGeneration) modelAbortControllers.get(targetModel)?.abort();
+              if (turnMode !== "Multi Turn") {
+                stalledModels.add(targetModel);
+                if (!isReasoningGeneration) modelAbortControllers.get(targetModel)?.abort();
+              }
               timedOutExampleCount += currentChunkSize;
               logger.warn(
                 { model: targetModel, stack: c + 1, timeoutMs: SFT_SINGLE_EXAMPLE_TIMEOUT_MS, batchId: generationBatchId },
-                isReasoningGeneration
+                turnMode === "Multi Turn"
+                  ? "Multi Turn request timed out; leaving later scheduled requests running"
+                  : isReasoningGeneration
                   ? "Reasoning request timed out; leaving independent slots running"
                   : "Model request timed out; skipping it for the rest of this batch"
               );
@@ -1976,8 +1980,10 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               generated = await requestExamplesFromModel(backupModel);
             } catch (backupError: any) {
               if (isDigitalOceanRequestTimeout(backupError)) {
-                stalledModels.add(backupModel);
-                modelAbortControllers.get(backupModel)?.abort();
+                if (turnMode !== "Multi Turn") {
+                  stalledModels.add(backupModel);
+                  modelAbortControllers.get(backupModel)?.abort();
+                }
                 timedOutExampleCount += currentChunkSize;
                 logger.warn(
                   { model: backupModel, stack: c + 1, batchId: generationBatchId },
