@@ -394,6 +394,10 @@ main [class~="opacity-45"] { opacity: .72; }
   box-shadow: 0 2px 8px rgb(126 44 160 / 32%);
 }
 
+#root .kk-example-card span[class~="text-[10px]"][class~="font-bold"][class~="uppercase"][class~="tracking-wide"] {
+  color: #ffffff !important;
+}
+
 .kk-header [class~="bg-slate-900/60"] span.kk-neon-example-count {
   color: #d000ff !important;
   text-shadow: 0 0 5px rgb(208 0 255 / 72%), 0 0 12px rgb(208 0 255 / 48%);
