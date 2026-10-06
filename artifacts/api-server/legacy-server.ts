@@ -897,6 +897,9 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         model: targetModel,
         messages: baseMessages,
         temperature: params.config?.temperature ?? 0.7,
+        ...(params.applySftSamplingPenalties
+          ? { frequency_penalty: 0.7, presence_penalty: 0.6 }
+          : {}),
         ...(params.exactMessages
           ? { max_completion_tokens: maxTokensToUse }
           : { max_tokens: maxTokensToUse }),
@@ -1841,6 +1844,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             const response = await callDigitalOceanChatCompletions({
               model,
               contents: isReasoningGeneration ? encodeReasoningProviderText(prompt) : prompt,
+              applySftSamplingPenalties: true,
               config: isReasoningGeneration
                 ? {
                     systemInstruction: reasoningSystemPrompt,
