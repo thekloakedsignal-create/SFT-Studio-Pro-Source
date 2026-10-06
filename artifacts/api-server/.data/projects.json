@@ -1,5 +1,25 @@
 [
   {
+    "id": "project-1791254756356",
+    "userId": "0l3DRt7a96NkbBJ736dNKf1mASn1",
+    "name": "General Instruction Tuner",
+    "settings": {
+      "name": "General Instruction Tuner",
+      "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+      "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+      "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+      "selectedPreset": "General Use AI",
+      "projectFormat": "Conversation",
+      "templateType": "Single Turn",
+      "instructTemplate": "ChatML",
+      "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      "representativePrompt": "Explain photosynthesis in simple terms.",
+      "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
+    },
+    "batches": [],
+    "updatedAt": "2026-10-06T02:45:56.665Z"
+  },
+  {
     "id": "project-1791251113171",
     "userId": "0l3DRt7a96NkbBJ736dNKf1mASn1",
     "name": "SFT Project 8",
