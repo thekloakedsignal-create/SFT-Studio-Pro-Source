@@ -32,5 +32,13 @@
     "limit": 5000,
     "redeemedCode": null,
     "updatedAt": "2026-10-03T21:59:47.535Z"
+  },
+  "4GfBMYFJX2U2yeWTKwxEyG6DLCG2": {
+    "uid": "4GfBMYFJX2U2yeWTKwxEyG6DLCG2",
+    "email": "triadai@yahoo.com",
+    "subscriptionStatus": "Free",
+    "limit": 5000,
+    "redeemedCode": null,
+    "updatedAt": "2026-10-06T07:43:34.248Z"
   }
 }
