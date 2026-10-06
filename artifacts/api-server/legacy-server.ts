@@ -1369,10 +1369,9 @@ ${JSON.stringify({ examples: [{ messages: [
       generationStacks,
       String(batchDescription || ""),
       async prompt => extractResponseText(await callDigitalOceanChatCompletions({
-        model: "deepseek-4-flash",
+        model: "openai-gpt-5-nano",
         contents: prompt,
         config: {
-          reasoningEffort: "low",
           responseMimeType: "application/json",
           maxOutputTokens: 4096,
           temperature: 0.7,

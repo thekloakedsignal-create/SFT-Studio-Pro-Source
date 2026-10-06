@@ -46,3 +46,9 @@ Multi Turn and Mixed replace missing examples individually, including non-timeou
 **Why:** The user explicitly said, “It should keep generating until complete. The same way single turn does.”
 
 **How to apply:** Preserve successful output, bounded concurrency, per-request timeouts, and the size-scaled total deadline. Pace failed replacements to avoid a tight request loop. Apply the shared one-example refill policy without changing the template logic.
+
+Use the smallest suitable low-latency model for the one batch topic-planning request; keep planner use separate from the example-generation model schedule.
+
+**Why:** The user specified that the topic planner should be lightweight and not replace the existing generation models.
+
+**How to apply:** Change only the planner model; do not alter the model pool or reasoning settings for generated examples.
