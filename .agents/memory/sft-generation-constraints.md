@@ -52,3 +52,9 @@ Use `nemotron-nano-12b-v2-vl` for the single batch topic-planning request, with 
 **Why:** The user specified this low-latency model for planning and excluded OpenAI-backed models.
 
 **How to apply:** Change only the planner model; do not alter the example-generation model pool or reasoning settings.
+
+Have the topic planner return one flat list; distribute topics into per-stack slots in server code.
+
+**Why:** The lightweight planner failed a nested per-stack length check before generation began.
+
+**How to apply:** Keep the planner to one request per batch and validate the flat list's total count before slicing it into the existing schedule.

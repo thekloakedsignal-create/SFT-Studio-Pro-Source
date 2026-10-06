@@ -16,8 +16,127 @@
       "representativePrompt": "Explain photosynthesis in simple terms.",
       "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
     },
-    "batches": [],
-    "updatedAt": "2026-10-06T02:45:56.665Z"
+    "batches": [
+      {
+        "id": "dca420d0-266e-43ff-9ce1-aa04e98f9406",
+        "batchId": "dca420d0-266e-43ff-9ce1-aa04e98f9406",
+        "name": "General Instruction following and explanations",
+        "source": "Generator",
+        "generationSettings": {
+          "name": "General Instruction Tuner",
+          "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+          "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+          "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+          "selectedPreset": "General Use AI",
+          "projectFormat": "Conversation",
+          "templateType": "Single Turn",
+          "instructTemplate": "ChatML",
+          "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+          "representativePrompt": "Explain photosynthesis in simple terms.",
+          "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
+        },
+        "templateType": "Single Turn",
+        "examplesCount": 5,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Why is it important to follow instructions carefully when taking prescription medication?"
+              },
+              {
+                "role": "assistant",
+                "content": "Following prescription medication instructions carefully is important for several key reasons. First, dosages are calculated based on factors like your age, weight, kidney function, and the condition being treated; taking too much can cause serious harm or overdose, while taking too little may allow the illness to progress untreated. Second, timing matters—some medications must be taken with food to prevent stomach irritation or improve absorption, while others require an empty stomach to work properly. Third, mixing medications incorrectly or combining them with alcohol can cause dangerous interactions that reduce effectiveness or produce harmful side effects. Additionally, completing the full course of treatment (such as finishing all antibiotics) helps prevent relapse and reduces risks like antibiotic resistance in the wider community. If you are ever unsure about how to take a medication correctly, contact your pharmacist or prescribing doctor rather than guessing—minor errors in instruction following can have significant health consequences."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791254782308-0"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Can you provide a brief tutorial explanation on how to perform the Heimlich maneuver on a conscious adult?"
+              },
+              {
+                "role": "assistant",
+                "content": "To perform the Heimlich maneuver on a conscious adult, first confirm they are choking by asking if they can speak or cough. If they cannot breathe, stand behind them and wrap your arms around their waist. Make a fist with one hand and place the thumb side against the middle of their abdomen, just above the navel but below the ribcage. Grasp your fist with your other hand. Perform quick, upward thrusts into the abdomen until the object is dislodged or the person becomes unconscious. If they lose consciousness, lower them to the ground carefully and begin CPR while calling emergency services immediately."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791254782308-1"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What are the core principles of creating a high-quality dataset for Supervised Fine-Tuning (SFT), and why is data diversity important in this process?"
+              },
+              {
+                "role": "assistant",
+                "content": "High-quality Supervised Fine-Tuning (SFT) datasets are built on three core principles: accuracy, consistency, and diversity. Accuracy ensures that the ground-truth responses provided to the model are factually correct and free of hallucinations. Consistency requires that the formatting, tone, and adherence to system prompts remain uniform across all examples to prevent the model from learning contradictory behaviors. Diversity involves including a wide array of tasks, domains, complex constraints, and linguistic styles.\n\nData diversity is critical because it prevents 'overfitting' or 'mode collapse,' where a model becomes overly specialized in one specific type of response while losing its general reasoning capabilities. By exposing the model to diverse scenarios—such as switching between creative writing, technical coding, and logical analysis—the developer ensures the model can generalize its knowledge to unseen prompts in real-world applications."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791254782308-2"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What is the difference between a fruit and a vegetable?"
+              },
+              {
+                "role": "assistant",
+                "content": "A fruit is the mature ovary of a flowering plant, typically containing seeds, while a vegetable is any other edible part of the plant such as leaves (spinach), stems (celery), roots (carrots), bulbs (onions), or flowers (broccoli). Botanically speaking, items like tomatoes, cucumbers, peppers, squash, green beans, okra, pumpkins and peas are all fruits because they develop from a flower's ovary and contain seeds; however in culinary terms these foods with savory flavors are often treated as vegetables. So the distinction depends on perspective: botanical definitions classify by plant structure whereas culinary usage classifies by taste profile - sweet items tend to be considered fruits while more savory items get grouped with vegetables."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791254782308-3"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "How do I change a flat tire on my car safely?"
+              },
+              {
+                "role": "assistant",
+                "content": "<ol><li>Find a safe location away from traffic on level ground. Turn on hazard lights.</li><li>Engage the parking brake and place wheel wedges behind the tires opposite the flat.</li><li>Remove the hubcap if present, then loosen lug nuts counterclockwise about 1/4 to 1/2 turn (do not remove yet).</li><li>Position the jack under the vehicle frame near the flat tire (consult owner's manual for exact spot) and raise vehicle until tire is 6 inches off ground.</li><li>Remove lug nuts completely, then pull tire straight toward you to remove.</li><li>Mount spare tire onto lug bolts, push gently until seated, then hand-tighten lug nuts.</li><li>Lower vehicle slightly so spare touches ground but full weight isn't on it. Tighten lug nuts in star pattern with wrench.</li><li>Lower vehicle completely, remove jack, give lug nuts final tightening. Replace hubcap if applicable.</li><li>Check spare tire pressure immediately. Drive cautiously to repair shop as temporary spares have speed/distance limits.</li></ol>"
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791254782308-4"
+          }
+        ],
+        "status": "Approved",
+        "timestamp": "2026-10-06 02:46:22.308Z",
+        "description": "General Instruction following and explanations",
+        "specialInstructions": "Prioritize clear, informative, and direct explanations.",
+        "temporaryConstraints": "None"
+      }
+    ],
+    "updatedAt": "2026-10-06T02:46:51.435Z"
   },
   {
     "id": "project-1791251113171",
