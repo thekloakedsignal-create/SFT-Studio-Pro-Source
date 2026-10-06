@@ -26,7 +26,7 @@ function fixture(initial: MemoryState, local: any[] = [], sqlEnabled = true) {
   const projectsFile = "/offline-fixture/.data/projects.json";
   files.set(projectsFile, JSON.stringify(local));
   const routes = new Map<string, Function>();
-  const tableProjects = { kind: "projects", id: "id" };
+  const tableProjects = { kind: "projects", id: "id", userId: "userId" };
   const tableBatches = { kind: "batches", id: "id", projectId: "projectId" };
   let failSQL = false;
   let failFiles = false;
@@ -167,7 +167,7 @@ const incremental = {
   data: { id: "shared", examples: ["latest"] }
 };
 
-test("list and detail load saved SQL batches by project ID and merge by ID", async () => {
+test("list and detail load saved SQL batches without merging local copies", async () => {
   const f = fixture({
     projects: [project],
     batches: [incremental, { id: "new", projectId: "p1", name: "New", data: { id: "new" } },
@@ -176,9 +176,10 @@ test("list and detail load saved SQL batches by project ID and merge by ID", asy
   const list = await f.request("GET", "/api/sql/projects");
   const detail = await f.request("GET", "/api/sql/projects/:id", {}, { id: "p1" });
   for (const loaded of [list.body.projects[0], detail.body.project]) {
-    assert.equal(loaded.batches.length, 4);
+    assert.equal(loaded.batches.length, 3);
     assert.deepEqual(loaded.batches.find((batch: any) => batch.id === "shared").examples, ["latest"]);
     assert.equal(loaded.batches.some((batch: any) => batch.id === "foreign"), false);
+    assert.equal(loaded.batches.some((batch: any) => batch.id === "local-only"), false);
   }
 });
 
@@ -239,7 +240,8 @@ test("local-only save works without SQL; disk failure and missing project are ex
   assert.equal(saved.body.storage, "local");
   await f.request("DELETE", "/api/sql/projects/:id/batches/:batchId", {}, { id: "p1", batchId: "b" });
   const detail = await f.request("GET", "/api/sql/projects/:id", {}, { id: "p1" });
-  assert.equal(detail.body.project.batches.some((batch: any) => batch.id === "b"), false);
+  assert.equal(detail.statusCode, 503);
+  assert.equal(f.local()[0].batches.some((batch: any) => batch.id === "b" && !batch.__deleted), false);
   f.failFiles();
   const failed = await f.request("POST", "/api/sql/projects/:id/batches", { batch: { id: "failed" } }, { id: "p1" });
   assert.equal(failed.statusCode, 500);
@@ -306,4 +308,38 @@ test("project ownership helpers reject missing and reserved default identities",
   assert.equal(projectOwnerId({ user: { uid: "user-a" }, deviceId: "device-a" }), "user-a");
   assert.equal(projectBelongsTo(project, "owner-a"), true);
   assert.equal(projectBelongsTo(project, "owner-b"), false);
+});
+
+test("local-only projects are never restored, even when SQL fails", async () => {
+  const f = fixture({ projects: [], batches: [] }, [project]);
+  assert.deepEqual((await f.request("GET", "/api/sql/projects")).body.projects, []);
+  assert.equal((await f.request("GET", "/api/sql/projects/:id", {}, { id: "p1" })).statusCode, 404);
+  f.failSQL();
+  for (const route of ["/api/sql/projects", "/api/sql/projects/:id"]) {
+    const response = await f.request("GET", route, {}, { id: "p1" });
+    assert.equal(response.statusCode, 503);
+    assert.equal(response.body.success, false);
+    assert.equal(response.body.project, undefined);
+    assert.equal(response.body.projects, undefined);
+  }
+});
+
+test("project saves do not import local-only batches and still write a local backup", async () => {
+  const f = fixture({ projects: [project], batches: [] }, [
+    { ...project, batches: [{ id: "local-only", examples: ["must not return"] }] }
+  ]);
+  const saved = await f.request("POST", "/api/sql/projects", { ...project, name: "Saved", batches: [] });
+  assert.equal(saved.body.success, true);
+  assert.equal(f.state.projects[0].batches.some((batch: any) => batch.id === "local-only"), false);
+  assert.equal(f.local()[0].name, "Saved");
+  assert.deepEqual(f.local()[0].batches, f.state.projects[0].batches);
+});
+
+test("browser project and batch storage is write-only", async () => {
+  const app = await readFile(new URL("../../sft-studio-pro-2/src/App.tsx", import.meta.url), "utf8");
+  const reads = [...app.matchAll(/localStorage\.getItem\(([^)]*)\)/g)].map(match => match[1]);
+  assert.deepEqual(reads, ['"sft_device_id"']);
+  assert.doesNotMatch(app, /\bpendingBatches\s*\(/);
+  assert.match(app, /rememberBatch\(localStorage/);
+  assert.match(app, /localStorage\.setItem\(`cached_projects_/);
 });

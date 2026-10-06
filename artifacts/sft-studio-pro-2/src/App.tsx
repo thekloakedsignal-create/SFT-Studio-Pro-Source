@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { pendingBatches, rememberBatch, forgetBatch, orderBatchesForReview } from "./lib/batch-recovery";
+import { rememberBatch, forgetBatch, orderBatchesForReview } from "./lib/batch-recovery";
 import { validateRegistryOutput } from "./lib/registry-validation";
 import { 
   Sparkles, 
@@ -853,32 +853,8 @@ export default function App() {
         console.warn("SQL projects lookup notice:", e);
       }
 
-      // 2. Merge any localStorage cached projects as additional offline fallback
-      const mergedMap = new Map<string, any>();
-      sqlProjects.forEach(p => {
-        if (p && p.id) {
-          mergedMap.set(p.id, p);
-        }
-      });
-
-      try {
-        const cachedList = localStorage.getItem(`cached_projects_${userId}`)
-          || localStorage.getItem("local_sft_projects_list");
-        if (cachedList) {
-          const parsed = JSON.parse(cachedList);
-          if (Array.isArray(parsed)) {
-            parsed.forEach(cp => {
-              if (cp && cp.id && cp.userId === userId && !mergedMap.has(cp.id)) {
-                mergedMap.set(cp.id, cp);
-              }
-            });
-          }
-        }
-      } catch (e) {
-        console.warn("LocalStorage merge notice:", e);
-      }
-
-      const projectsList = Array.from(mergedMap.values());
+      // Local copies are save-only; never merge them into the server's result.
+      const projectsList = sqlProjects.filter(p => p && p.id);
 
       // Sort in-memory descending by updatedAt
       projectsList.sort((a, b) => {
@@ -1220,17 +1196,12 @@ export default function App() {
       if (!response.ok || !result?.success) {
         throw new Error(result?.error || `Project save failed (${response.status}).`);
       }
-      // Update local storage cache
-      const cached = localStorage.getItem(`cached_projects_${userIdToUse}`) || "[]";
+      const fullProj = { ...projectMetadataPayload, batches: batches };
+      const list = [fullProj, ...userProjects.filter(p => p.id !== idToSave && p.userId === userIdToUse)];
+      setUserProjects(list);
+      // Write a backup from current state without reading cached projects.
       try {
-        let list = JSON.parse(cached);
-        if (!Array.isArray(list)) list = [];
-        const fullProj = { ...projectMetadataPayload, batches: batches };
-        const idx = list.findIndex((p: any) => p.id === idToSave);
-        if (idx >= 0) list[idx] = fullProj;
-        else list.unshift(fullProj);
         localStorage.setItem(`cached_projects_${userIdToUse}`, JSON.stringify(list));
-        setUserProjects(list);
       } catch (e) {}
 
       setNotification({ 
@@ -1318,12 +1289,9 @@ export default function App() {
     try {
       forgetBatch(localStorage, auth.currentUser?.uid || getDeviceId(), projectId, batchId);
       const cacheKey = `cached_projects_${auth.currentUser?.uid || getDeviceId()}`;
-      const cached = JSON.parse(localStorage.getItem(cacheKey) || "[]");
-      if (Array.isArray(cached)) {
-        localStorage.setItem(cacheKey, JSON.stringify(cached.map((p: any) => p.id === projectId
+      localStorage.setItem(cacheKey, JSON.stringify(userProjects.map((p: any) => p.id === projectId
           ? { ...p, batches: (p.batches || []).filter((b: any) => (b.id || b.batchId) !== batchId) }
           : p)));
-      }
     } catch (error) {
       console.warn("Batch recovery cache update failed:", error);
     }
@@ -1381,26 +1349,6 @@ export default function App() {
     }
     if (loadVersion !== projectLoadVersion.current) return;
 
-    // 2. Fallback to localStorage cache if project not found yet
-    if (!selected) {
-      try {
-        const devId = getDeviceId();
-        const userIdToUse = auth.currentUser ? auth.currentUser.uid : devId;
-        const cached = localStorage.getItem(`cached_projects_${userIdToUse}`);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed)) {
-            const found = parsed.find((p: any) => p.id === selectedId && p.userId === userIdToUse);
-            if (found) selected = found;
-          } else if (parsed && parsed.id === selectedId && parsed.userId === userIdToUse) {
-            selected = parsed;
-          }
-        }
-      } catch (e) {
-        console.warn("LocalStorage project lookup notice:", e);
-      }
-    }
-    
     if (!selected) return;
     
     // 3. Collect batches
@@ -1426,15 +1374,6 @@ export default function App() {
     }
 
     const preferredBatchIds: string[] = [];
-    try {
-      pendingBatches(localStorage, auth.currentUser?.uid || getDeviceId(), selectedId)
-        .forEach(batch => {
-          batchesMap.set(batch.id, batch);
-          preferredBatchIds.push(batch.id);
-        });
-    } catch (error) {
-      console.warn("Batch recovery cache could not be loaded:", error);
-    }
     sessionBatches.current.get(selectedId)?.forEach((batch, id) => {
       if (batchesAtLoadStart.get(id) !== batch) {
         batchesMap.set(id, batch);
@@ -1621,10 +1560,7 @@ export default function App() {
 
     // Update local storage cache
     try {
-      const cached = localStorage.getItem(`cached_projects_${userIdToUse}`) || "[]";
-      let list = JSON.parse(cached);
-      if (!Array.isArray(list)) list = [];
-      list.unshift(newProjectRecord);
+      const list = [newProjectRecord, ...userProjects.filter(p => p.id !== newProjId && p.userId === userIdToUse)];
       localStorage.setItem(`cached_projects_${userIdToUse}`, JSON.stringify(list));
       localStorage.setItem("local_sft_project", JSON.stringify(newProjectRecord));
     } catch (e) {
@@ -1797,54 +1733,7 @@ export default function App() {
           setNotification({ text: `Welcome, ${user.displayName || user.email}!`, type: "success" });
           await loadUserProfile(user.uid);
           
-          let migrated = false;
-          const savedLocal = localStorage.getItem("local_sft_project");
-          if (savedLocal) {
-            try {
-              const parsed = JSON.parse(savedLocal);
-              // Only migrate if created while unauthenticated
-              if (parsed && (parsed.userId === "local" || !parsed.userId)) {
-                const targetId = `proj-${user.uid.slice(0, 6)}-${Date.now()}`;
-                const projName = (parsed.name || parsed.settings?.name || "My Synced SFT Project").slice(0, 200);
-                const payload = {
-                  id: targetId,
-                  userId: user.uid,
-                  name: projName,
-                  settings: {
-                    name: projName,
-                    systemPrompt: parsed.settings?.systemPrompt || "",
-                    targetTask: parsed.settings?.targetTask || "",
-                    constraints: parsed.settings?.constraints || "",
-                    selectedPreset: parsed.settings?.selectedPreset || PresetType.CUSTOM,
-                    representativePrompt: parsed.settings?.representativePrompt || "",
-                    representativeCompletion: parsed.settings?.representativeCompletion || "",
-                  },
-                  batches: parsed.batches || []
-                };
-
-                await projectApiFetch("/api/sql/projects", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(payload)
-                });
-
-                localStorage.removeItem("local_sft_project");
-                
-                await loadUserProjects(user.uid);
-                setNotification({ text: `Your offline workspace has been securely synced to your cloud account!`, type: "success" });
-                migrated = true;
-              } else {
-                localStorage.removeItem("local_sft_project");
-              }
-            } catch (e) {
-              console.warn("Notice: Local project migration check:", e);
-              localStorage.removeItem("local_sft_project");
-            }
-          }
-
-          if (!migrated) {
-            await loadUserProjects(user.uid);
-          }
+          await loadUserProjects(user.uid);
         } else {
           // Load projects from Postgres using deviceId for guest/unauthenticated users
           try {
@@ -1854,59 +1743,13 @@ export default function App() {
               const targetProj = guestProjects.find(p => p.id === activeProjectId.current) || guestProjects[0];
               await handleSelectProject(targetProj.id);
             } else {
-              // Fallback to local storage if no guest projects found
-              let localList: any[] = [];
-              try {
-                const listStr = localStorage.getItem("local_sft_projects_list");
-                if (listStr) {
-                  localList = JSON.parse(listStr);
-                }
-              } catch (e) {
-                console.warn("Local projects list read notice:", e);
-              }
-
-              const savedLocal = localStorage.getItem("local_sft_project");
-              if (savedLocal) {
-                try {
-                  const parsed = JSON.parse(savedLocal);
-                  setSelectedProjectId(parsed.id);
-                  setIsFieldsUnlocked(false);
-                  setProject({
-                    name: parsed.name || parsed.settings?.name || "My SFT Custom Assistant",
-                    systemPrompt: parsed.settings?.systemPrompt || "",
-                    targetTask: parsed.settings?.targetTask || "",
-                    constraints: parsed.settings?.constraints || "",
-                    selectedPreset: parsed.settings?.selectedPreset || PresetType.CUSTOM,
-                    representativePrompt: parsed.settings?.representativePrompt || (PROJECT_PRESETS[parsed.settings?.selectedPreset as PresetType || PresetType.GENERAL_USE]?.examples[0]?.prompt || ""),
-                    representativeCompletion: parsed.settings?.representativeCompletion || (PROJECT_PRESETS[parsed.settings?.selectedPreset as PresetType || PresetType.GENERAL_USE]?.examples[0]?.completion || ""),
-                  });
-                  if (parsed.batches) {
-                    const activeBatches = parsed.batches;
-                    setBatches(activeBatches);
-                    initSelectedRegistryBatches(activeBatches);
-                  } else {
-                    setBatches(DEFAULT_INITIAL_BATCHES);
-                    initSelectedRegistryBatches(DEFAULT_INITIAL_BATCHES);
-                  }
-                  if (localList.length === 0 || !localList.some(p => p.id === parsed.id)) {
-                    localList = [parsed, ...localList.filter(p => p.id !== parsed.id)];
-                    localStorage.setItem("local_sft_projects_list", JSON.stringify(localList));
-                  }
-                } catch (e) {
-                  console.warn("Local SFT project parsing notice:", e);
-                  setSelectedProjectId(null);
-                  setBatches(DEFAULT_INITIAL_BATCHES);
-                  initSelectedRegistryBatches(DEFAULT_INITIAL_BATCHES);
-                }
-              } else {
-                setSelectedProjectId(null);
-                setBatches(DEFAULT_INITIAL_BATCHES);
-                initSelectedRegistryBatches(DEFAULT_INITIAL_BATCHES);
-              }
-              setUserProjects(localList);
+              setSelectedProjectId(null);
+              setBatches(DEFAULT_INITIAL_BATCHES);
+              initSelectedRegistryBatches(DEFAULT_INITIAL_BATCHES);
+              setUserProjects([]);
             }
           } catch (e) {
-            console.warn("Guest projects lookup notice (using local storage):", e);
+            console.warn("Guest projects lookup notice:", e);
           }
           setUserProfile(null);
           setIsTeacherVerified(false);

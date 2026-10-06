@@ -9,7 +9,7 @@
    - Never call OpenAI or Anthropic directly; use the DigitalOcean inference infrastructure.
 
 2. **Persistence Rules**:
-   - Uses local `.data/projects.json` file storage as a fail-safe offline fallback alongside Firestore to prevent quota limits from blocking project loading and saving.
+   - Local project and batch copies are write-only backups. Preserve saves; never restore, merge, or migrate browser or local-file copies into active projects, generation inputs, or database records.
 
 3. **No Automated Downgrades**:
    - Route all model inference through the DigitalOcean Gradient API. Use `DO_MODEL` for text requests and `DO_VISION_MODEL` for image OCR.
