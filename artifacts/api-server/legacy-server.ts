@@ -1369,13 +1369,13 @@ ${JSON.stringify({ examples: [{ messages: [
       generationStacks,
       String(batchDescription || ""),
       async prompt => extractResponseText(await callDigitalOceanChatCompletions({
-        model: "nemotron-nano-12b-v2-vl",
+        model: "gemma-4",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
           maxOutputTokens: 4096,
           temperature: 0.7,
-          reasoningEffort: "low",
+          reasoningEffort: "none",
         },
         timeoutMs: Math.min(SFT_TOPIC_PLAN_TIMEOUT_MS, Math.max(1, generationDeadline - Date.now())),
       })),

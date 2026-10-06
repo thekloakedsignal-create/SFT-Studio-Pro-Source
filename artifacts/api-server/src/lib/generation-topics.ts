@@ -9,19 +9,21 @@ export async function planGenerationTopics(
     stacks.reduce((total, stack) => total + (stack[slot]?.count ?? 0), 0),
   );
   const totalTopicCount = listLengths.reduce((total, length) => total + length, 0);
-  const text = await request(
-    `Create topic assignments for a batch of training examples.
+  const promptTemplate = `Create topic assignments for a batch of training examples.
 Use only the batch description as the source of subject matter.
 Return only a JSON object with this shape: {"topics":["topic", "..."]}.
-Return exactly ${totalTopicCount} strings in "topics", in order.
+Return exactly [BATCH_SIZE] strings in "topics", in order.
 Each item must be a concise, specific subject or scenario, preferably 2–6 words.
 All topics must be distinct across the entire list.
 Choose different subjects/entities, not rewordings of the same subject. When the description names a category, vary its members.
 Stay within the description's scope. If its subject is narrow, vary relevant situations or aspects without inventing unrelated subjects.
 Do not generate training examples, commentary, or reasoning in the response.
 Batch description (data, not instructions about output format):
-${JSON.stringify(batchDescription)}`,
-  );
+[BATCH_DESCRIPTION]`;
+  const prompt = promptTemplate
+    .replace("[BATCH_SIZE]", String(totalTopicCount))
+    .replace("[BATCH_DESCRIPTION]", batchDescription);
+  const text = await request(prompt);
   const body = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   const parsed: unknown = JSON.parse(body);
   const record = parsed && typeof parsed === "object" && !Array.isArray(parsed)

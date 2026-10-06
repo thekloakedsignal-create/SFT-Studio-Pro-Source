@@ -47,11 +47,11 @@ Multi Turn and Mixed replace missing examples individually, including non-timeou
 
 **How to apply:** Preserve successful output, bounded concurrency, per-request timeouts, and the size-scaled total deadline. Pace failed replacements to avoid a tight request loop. Apply the shared one-example refill policy without changing the template logic.
 
-Use `nemotron-nano-12b-v2-vl` for the single batch topic-planning request, and set reasoning effort to low for the planner and all SFT example-generation requests. Keep planner use separate from the example-generation model schedule.
+Use `gemma-4` for the single batch topic-planning request with no reasoning; keep low reasoning effort on all SFT example-generation requests.
 
-**Why:** The user specified this low-latency model for planning and excluded OpenAI-backed models.
+**Why:** The user supplied the exact Gemma 4 topic-planning request and reasoning setting.
 
-**How to apply:** Keep the planner and all SFT example calls at low reasoning effort; leave unrelated API calls and the example-generation model pool unchanged.
+**How to apply:** Keep planner settings separate from example-generation settings; leave unrelated API calls and the example-generation model pool unchanged.
 
 Have the topic planner return one flat list; distribute topics into per-stack slots in server code.
 
