@@ -1125,6 +1125,7 @@ app.post("/api/generate", async (req, res) => {
   let requestExamplesForMissingBatch: ((model: string, count: number, timeoutMs: number, slot?: number) => Promise<any[]>) | undefined;
   const mixedRecoveryTurns: MixedTurn[] = [];
   const recoveryTopics: string[] = [];
+  const recoveryTurnCounts: number[] = [];
   let mixedVariation = 0;
   let isReasoningGeneration = false;
   const useJobPolling = req.body?.jobMode === true;
@@ -1360,7 +1361,9 @@ ${JSON.stringify({ examples: [{ messages: [
 
     const generationModels = isReasoningGeneration
       ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(() => "glm-5.3-flash")
-      : getGenerationModels();
+      : getGenerationModels().map(model =>
+          turnMode === "Multi Turn" && model.startsWith("qwen")
+            ? "gemma-4-31B-it" : model);
     const modelAbortControllers = new Map(
       generationModels.map(model => [model, new AbortController()])
     );
@@ -1832,7 +1835,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             requestedTimeoutMs = isReasoningGeneration ? SFT_REASONING_EXAMPLE_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS,
             ignoreModelAbort = false,
             mixedTurn: MixedTurn = assignedMixedTurn,
-            topic: string = generationTopics[c][modelIndex]
+            topic: string = generationTopics[c][modelIndex],
+            turnCount = 2 + (generationStacks.slice(0, c).reduce((sum, stack) => sum + stack.length, 0) + modelIndex) % 3
           ) => {
             if (turnMode === "Mixed") {
               // Use one unambiguous subtype structure, including on replacement calls.
@@ -1844,6 +1848,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               );
             }
             prompt += `\nASSIGNED TOPIC FOR THIS EXAMPLE:\n${JSON.stringify(topic)}\nUse this subject within the batch description. Preserve all required template, style, and output-format instructions.`;
+            if (turnMode === "Multi Turn") {
+              prompt += `\nASSIGNED USER–ASSISTANT EXCHANGES: ${turnCount}.\nFor the assigned topic, generate exactly ${turnCount} user messages and ${turnCount} assistant replies, alternating user then assistant. This exact count overrides any other turn-count guidance. Do not include the assignment label in the output.`;
+            }
             const requestConfig = turnMode === "Reasoning"
               ? {
                   ...configObj,
@@ -1916,7 +1923,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 timeoutMs,
                 turnMode === "Mixed" || model === "glm-5.3",
                 mixedRecoveryTurns[slot] ?? assignedMixedTurn,
-                recoveryTopics[slot]
+                recoveryTopics[slot],
+                turnMode === "Multi Turn" ? recoveryTurnCounts[slot] : undefined
               );
           }
 
@@ -2025,6 +2033,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     }
 
     let singleTurnFailure: unknown;
+    const multiTurnStacks: Promise<void>[] = [];
     if (generationJobId) {
       const job = generationJobs.get(generationJobId);
       if (job?.status === "running") {
@@ -2043,11 +2052,14 @@ No internal deliberation, planning, or reasoning fields are permitted.`
         // Collect all in-flight responses; non-Reasoning modes also continue
         // later scheduled stacks rather than stopping after one failed slot.
         {
-          const results = await Promise.allSettled(chunkTasks[stackIndex].map(task => task()));
-          const failure = results.find(result => result.status === "rejected");
-          if (failure?.status === "rejected") {
-            singleTurnFailure ??= failure.reason;
-          }
+          const completion = Promise.allSettled(chunkTasks[stackIndex].map(task => task())).then(results => {
+            const failure = results.find(result => result.status === "rejected");
+            if (failure?.status === "rejected") {
+              singleTurnFailure ??= failure.reason;
+            }
+          });
+          if (turnMode === "Multi Turn") multiTurnStacks.push(completion);
+          else await completion;
         }
       } catch (error: any) {
         const detail = formatAIErrorMessage(error);
@@ -2094,6 +2106,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       }
     }
 
+    await Promise.all(multiTurnStacks);
     let recoveryExamples: any[] = [];
     let recoveryFailureReason: string | null = null;
     let recoveryFailureCategory: GenerationFailureCategory | undefined;
@@ -2104,6 +2117,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       generationStacks.forEach((stack, stackIndex) => stack.forEach((_, modelIndex) => {
         if (!taskOutputs[stackIndex][modelIndex]?.length) {
           recoveryTopics.push(generationTopics[stackIndex][modelIndex]);
+          if (turnMode === "Multi Turn") recoveryTurnCounts.push(2 + slot % 3);
           if (turnMode === "Mixed") mixedRecoveryTurns.push(slot % 2 === 0 ? "Single Turn" : "Multi Turn");
         }
         slot++;
@@ -2123,14 +2137,18 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           const slot = nextReplacement++;
           let replacementModel = turnMode === "Mixed"
             ? generationModels[slot % generationModels.length]
-            : recoveryModel;
+            : turnMode === "Multi Turn"
+              ? ["glm-5.3", "gemma-4-31B-it"][slot % 2]
+              : recoveryModel;
           try {
             let examples: any[];
             try {
               examples = await requestReplacement(replacementModel, 1, isReasoningGeneration ? SFT_REASONING_EXAMPLE_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
             } catch (error: any) {
               if (turnMode === "Mixed" || !isProviderOverload(error)) throw error;
-              const backup = generationModels.find(model => model !== replacementModel && !stalledModels.has(model));
+              const backup = turnMode === "Multi Turn"
+                ? (replacementModel === "glm-5.3" ? "gemma-4-31B-it" : "glm-5.3")
+                : generationModels.find(model => model !== replacementModel && !stalledModels.has(model));
               if (!backup) throw error;
               replacementModel = backup;
               examples = await requestReplacement(replacementModel, 1, isReasoningGeneration ? SFT_REASONING_EXAMPLE_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
@@ -2156,6 +2174,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             );
             replacementCount++;
             recoveryTopics.push(recoveryTopics[slot]);
+            if (turnMode === "Multi Turn") recoveryTurnCounts.push(recoveryTurnCounts[slot]);
             if (turnMode === "Mixed") mixedRecoveryTurns.push(mixedRecoveryTurns[slot]);
             // Pace persistent provider failures instead of creating a tight request loop.
             const pauseMs = Math.min(2000, Math.max(0, generationDeadline - Date.now()));
