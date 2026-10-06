@@ -1361,7 +1361,10 @@ ${JSON.stringify({ examples: [{ messages: [
 
     const generationModels = isReasoningGeneration
       ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(() => "glm-5.3-flash")
-      : getGenerationModels().map(model =>
+      : turnMode === "Single Turn"
+        ? getGenerationModels().map(model =>
+            model.startsWith("qwen") ? "gemma-4-31B-it" : model)
+        : getGenerationModels().map(model =>
           turnMode === "Multi Turn" && model.startsWith("qwen")
             ? "gemma-4-31B-it" : model);
     const modelAbortControllers = new Map(
@@ -1902,6 +1905,15 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               parsed = result.examples;
             } else {
               parsed = parseGeneratedExamples(extractResponseText(response), turnMode);
+              if (turnMode === "Single Turn") {
+                parsed = parsed.map(example => ({
+                  ...example,
+                  messages: [
+                    { role: "system", content: systemPrompt || "You are a helpful assistant." },
+                    ...example.messages.filter((message: any) => message.role !== "system")
+                  ]
+                }));
+              }
               if (turnMode === "Mixed") {
                 parsed = parsed.filter(example => validMixedExample(
                   example, mixedTurn, systemPrompt || "You are a helpful assistant.",

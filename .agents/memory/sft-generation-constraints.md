@@ -31,6 +31,12 @@ Single Turn, Multi Turn, and Mixed must collect in-flight responses and continue
 
 Single Turn recovery uses individual concurrent requests for missing examples rather than one large fill request.
 
+Single Turn must include the project's system prompt and use Gemma instead of Qwen, independently of Multi Turn.
+
+**Why:** The user reported Single Turn responses displaying without the system prompt and explicitly requested a separate Single Turn change.
+
+**How to apply:** Apply to initial Single Turn generation and replacements. Do not copy Multi Turn's group scheduling, refill model split, or rotating exchange counts into Single Turn.
+
 The golden response is a tone, diction, and voice reference for every batch-generation call, including replacements. Do not include the golden prompt.
 
 **Why:** The user explicitly clarified that the response demonstrates the target AI's tonality and diction, and requested a prompt-only change.
