@@ -35,7 +35,7 @@ The golden response is a tone, diction, and voice reference for every batch-gene
 
 **How to apply:** Preserve completed examples, bound refill concurrency to ten, keep the existing per-request timeout and size-scaled total deadline, and permit only one distinct-model backup per HTTP 529 response. Retry failed one-example refills only until the total deadline; do not change prompts, schemas, provider payload structure, fetch, or parsing.
 
-The one batch-level topic-planning request may use a timeout of up to 60 seconds, still capped by the batch deadline; keep ordinary example-generation requests at 20 seconds.
+The one batch-level topic-planning request may use a timeout of up to 120 seconds, still capped by the batch deadline; keep ordinary example-generation requests at 20 seconds.
 
 **Why:** The planner's full-list response exceeded the 20-second example timeout before returning.
 
