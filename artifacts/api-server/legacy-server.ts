@@ -34,7 +34,7 @@ const Type = {
   BOOLEAN: "boolean"
 } as const;
 
-// Local file storage helpers (write-only backups, never a project load source)
+// Local file storage helpers (saved-project persistence, never a generation source)
 const DATA_DIR = path.join(process.cwd(), ".data");
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -238,25 +238,36 @@ app.get("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
   const ownerId = projectOwnerId(req);
   if (!ownerId) return res.status(401).json({ success: false, error: "Project access requires a signed-in account or guest device identity." });
   
+  const ownedLocal = getLocalProjects().filter(project => projectBelongsTo(project, ownerId));
   try {
     const userProjects = await db.select().from(projects).where(eq(projects.userId, ownerId));
-    const projectIds = userProjects.map((project: any) => project.id);
+    const projectIds = [...new Set<string>([
+      ...userProjects.map((project: any) => project.id), ...ownedLocal.map(project => project.id)
+    ])];
     const batchRows = projectIds.length > 0
       ? await db.select().from(batches).where(inArray(batches.projectId, projectIds))
       : [];
     const merged = userProjects.map((sp: any) => {
+      const lp = ownedLocal.find(project => project.id === sp.id);
       return projectForResponse({
         ...sp,
-        settings: sp.settings || {},
+        settings: sp.settings || lp?.settings || {},
         batches: mergeProjectSnapshot(
-          sp.batches, undefined, sqlBatchData(batchRows, sp.id)
+          mergeBatchRecords(lp?.batches, sp.batches), undefined, sqlBatchData(batchRows, sp.id)
         )
       });
     });
+    ownedLocal.forEach(lp => {
+      if (!merged.some((project: any) => project.id === lp.id)) {
+        merged.push(projectForResponse({
+          ...lp, batches: mergeProjectSnapshot(lp.batches, undefined, sqlBatchData(batchRows, lp.id))
+        }));
+      }
+    });
     return res.json({ success: true, projects: merged });
   } catch (error: any) {
-    logger.warn({ error: error?.message }, "Project list unavailable");
-    return res.status(503).json({ success: false, error: "Projects could not be loaded." });
+    logger.warn({ error: error?.message }, "Loading saved projects from local storage");
+    return res.json({ success: true, projects: ownedLocal.map(projectForResponse) });
   }
 });
 
@@ -415,6 +426,7 @@ app.get("/api/sql/projects/:id", optionalAuth, async (req: AuthRequest, res) => 
   const projId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
   const ownerId = projectOwnerId(req);
   if (!ownerId) return res.status(401).json({ success: false, error: "Project access requires a signed-in account or guest device identity." });
+  const foundLocal = getLocalProjects().find(p => p.id === projId && projectBelongsTo(p, ownerId));
   try {
     const projRows = await db.select().from(projects).where(eq(projects.id, projId));
     const batchRows = await db.select().from(batches).where(eq(batches.projectId, projId));
@@ -422,21 +434,26 @@ app.get("/api/sql/projects/:id", optionalAuth, async (req: AuthRequest, res) => 
     if (sqlProj && !projectBelongsTo(sqlProj, ownerId)) {
       return res.status(404).json({ success: false, error: "Project not found." });
     }
-    if (sqlProj) {
+    if (sqlProj || foundLocal) {
       return res.json({
         success: true,
         project: projectForResponse({
-          ...sqlProj,
-          settings: sqlProj.settings || {},
+          ...(sqlProj || foundLocal),
+          settings: sqlProj?.settings || foundLocal?.settings || {},
           batches: mergeProjectSnapshot(
-            sqlProj.batches, undefined, sqlBatchData(batchRows, projId)
+            mergeBatchRecords(foundLocal?.batches, sqlProj?.batches), undefined, sqlBatchData(batchRows, projId)
           )
         })
       });
     }
   } catch (error: any) {
-    logger.warn({ error: error?.message }, "Project unavailable");
-    return res.status(503).json({ success: false, error: "Project could not be loaded." });
+    logger.warn({ error: error?.message }, "Loading saved project from local storage");
+    if (!foundLocal) {
+      return res.status(503).json({ success: false, error: "Project could not be loaded." });
+    }
+  }
+  if (foundLocal) {
+    return res.json({ success: true, project: projectForResponse(foundLocal) });
   }
   return res.status(404).json({ success: false, error: "Project not found." });
 });

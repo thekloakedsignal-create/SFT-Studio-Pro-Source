@@ -1,10 +1,10 @@
 ---
-name: Local storage is save-only
-description: Local project and batch copies must not be restored into active data.
+name: Keep saved projects separate from generation
+description: Preserve deliberate project loading; do not feed local batch caches into generation.
 ---
 
-The user directed: “Batches should save to storage. Never pull from it.” This refers to local storage. Preserve local saves, but do not restore or merge browser or server-local project/batch copies into active state or database records.
+Preserve saving and deliberate loading of saved projects, including browser and server-local copies. Do not automatically reopen cached projects or use stored batch examples as generation input or replacement output.
 
-**Why:** The user identified local storage as the source of repetitive batch themes and explicitly instructed not to investigate that cause again.
+**Why:** The user identified local storage as the repetition source and instructed not to investigate that cause again. They corrected the overly broad removal of saved-project loading: their restriction concerns generation, not opening saved work.
 
-**How to apply:** Keep normal database persistence and deliberate project loading. Local copies are output-only backups; they must not supply settings, examples, or generation inputs. Do not restore old cache migration or offline recovery behavior.
+**How to apply:** Keep the project list and explicit project selection functional across storage types. Keep generation independent of cached batch outputs, and leave automatic cache migration/restoration disabled.

@@ -9,7 +9,7 @@
    - Never call OpenAI or Anthropic directly; use the DigitalOcean inference infrastructure.
 
 2. **Persistence Rules**:
-   - Local project and batch copies are write-only backups. Preserve saves; never restore, merge, or migrate browser or local-file copies into active projects, generation inputs, or database records.
+   - Preserve saving and deliberate loading of saved projects, including local copies. Never automatically reopen a cached project or use stored batch examples as generation input or replacement output.
 
 3. **No Automated Downgrades**:
    - Route all model inference through the DigitalOcean Gradient API. Use `DO_MODEL` for text requests and `DO_VISION_MODEL` for image OCR.

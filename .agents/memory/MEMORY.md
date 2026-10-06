@@ -9,4 +9,4 @@
 - [Sign-in workspace](sign-in-workspace.md) — New sign-ins and accounts start with a fresh unlocked draft, not an automatically reopened saved project.
 - [Interface naming](interface-naming.md) — Hide generation model/backend labels; preserve batch names.
 - [Registry QA gate](registry-qa-gate.md) — Registry inclusion requires a completed QA check, not a perfect score; final serialized output gets a format-only check.
-- [Local storage is save-only](local-project-storage.md) — Preserve local saves; never restore or merge local project/batch copies into active data.
+- [Storage and generation](local-project-storage.md) — Preserve deliberate saved-project loading; never automatically reopen cached projects or reuse cached batches for generation.

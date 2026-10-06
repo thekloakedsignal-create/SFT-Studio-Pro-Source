@@ -853,8 +853,22 @@ export default function App() {
         console.warn("SQL projects lookup notice:", e);
       }
 
-      // Local copies are save-only; never merge them into the server's result.
-      const projectsList = sqlProjects.filter(p => p && p.id);
+      // List saved projects for explicit selection; do not activate cached settings.
+      const projectsById = new Map(sqlProjects.filter(p => p && p.id).map(p => [p.id, p]));
+      for (const key of [`cached_projects_${userId}`, "local_sft_projects_list", "local_sft_project"]) {
+        try {
+          const saved = JSON.parse(localStorage.getItem(key) || "null");
+          for (const p of Array.isArray(saved) ? saved : saved ? [saved] : []) {
+            const legacyGuest = !auth.currentUser && (!p?.userId || p.userId === "local");
+            if (p?.id && (p.userId === userId || legacyGuest) && !projectsById.has(p.id)) {
+              projectsById.set(p.id, { ...p, userId });
+            }
+          }
+        } catch (error) {
+          console.warn("Saved project list could not be read:", error);
+        }
+      }
+      const projectsList = Array.from(projectsById.values());
 
       // Sort in-memory descending by updatedAt
       projectsList.sort((a, b) => {
@@ -1737,17 +1751,12 @@ export default function App() {
         } else {
           // Load projects from Postgres using deviceId for guest/unauthenticated users
           try {
-            const guestProjects = await loadUserProjects(getDeviceId());
+            await loadUserProjects(getDeviceId());
             if (auth.currentUser) return;
-            if (guestProjects && guestProjects.length > 0) {
-              const targetProj = guestProjects.find(p => p.id === activeProjectId.current) || guestProjects[0];
-              await handleSelectProject(targetProj.id);
-            } else {
-              setSelectedProjectId(null);
-              setBatches(DEFAULT_INITIAL_BATCHES);
-              initSelectedRegistryBatches(DEFAULT_INITIAL_BATCHES);
-              setUserProjects([]);
-            }
+            // Saved projects remain selectable, but never reopen one automatically.
+            setSelectedProjectId(null);
+            setBatches(DEFAULT_INITIAL_BATCHES);
+            initSelectedRegistryBatches(DEFAULT_INITIAL_BATCHES);
           } catch (e) {
             console.warn("Guest projects lookup notice:", e);
           }
