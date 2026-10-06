@@ -1,5 +1,6 @@
 import express from "express";
 import { mixedGenerationPrompt, validMixedExample, isMixedSingleTurn, type MixedTurn } from "./src/lib/mixed-generation.ts";
+import { planGenerationTopics } from "./src/lib/generation-topics.ts";
 import path from "path";
 import { randomUUID } from "node:crypto";
 import fs from "fs";
@@ -1122,6 +1123,7 @@ app.post("/api/generate", async (req, res) => {
   let timedOutExampleCount = 0;
   let requestExamplesForMissingBatch: ((model: string, count: number, timeoutMs: number, slot?: number) => Promise<any[]>) | undefined;
   const mixedRecoveryTurns: MixedTurn[] = [];
+  const recoveryTopics: string[] = [];
   let mixedVariation = 0;
   let isReasoningGeneration = false;
   const useJobPolling = req.body?.jobMode === true;
@@ -1362,6 +1364,21 @@ ${JSON.stringify({ examples: [{ messages: [
       generationModels.map(model => [model, new AbortController()])
     );
     const generationStacks = createModelGenerationStacks(countNum, generationModels);
+    const generationTopics = await planGenerationTopics(
+      generationStacks,
+      String(batchDescription || ""),
+      async prompt => extractResponseText(await callDigitalOceanChatCompletions({
+        model: "deepseek-4-flash",
+        contents: prompt,
+        config: {
+          reasoningEffort: "low",
+          responseMimeType: "application/json",
+          maxOutputTokens: 4096,
+          temperature: 0.7,
+        },
+        timeoutMs: Math.min(SFT_SINGLE_EXAMPLE_TIMEOUT_MS, Math.max(1, generationDeadline - Date.now())),
+      })),
+    );
     const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);
     const taskOutputs: Array<Array<any[] | undefined>> = generationStacks.map(stack => new Array(stack.length));
     let completedExampleCount = 0;
@@ -1812,7 +1829,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             prompt = isReasoningGeneration ? reasoningUserPrompt : fullPrompt,
             requestedTimeoutMs = isReasoningGeneration ? SFT_REASONING_EXAMPLE_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS,
             ignoreModelAbort = false,
-            mixedTurn: MixedTurn = assignedMixedTurn
+            mixedTurn: MixedTurn = assignedMixedTurn,
+            topic: string = generationTopics[c][modelIndex]
           ) => {
             if (turnMode === "Mixed") {
               // Use one unambiguous subtype structure, including on replacement calls.
@@ -1823,6 +1841,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 ++mixedVariation,
               );
             }
+            prompt += `\nASSIGNED TOPIC FOR THIS EXAMPLE:\n${JSON.stringify(topic)}\nUse this subject within the batch description. Preserve all required template, style, and output-format instructions.`;
             const requestConfig = turnMode === "Reasoning"
               ? {
                   ...configObj,
@@ -1894,7 +1913,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 promptForExampleCount(requestedCount),
                 timeoutMs,
                 turnMode === "Mixed" || model === "glm-5.3",
-                mixedRecoveryTurns[slot] ?? assignedMixedTurn
+                mixedRecoveryTurns[slot] ?? assignedMixedTurn,
+                recoveryTopics[slot]
               );
           }
 
@@ -2071,11 +2091,12 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     let recoveryFailureCategory: GenerationFailureCategory | undefined;
     let recoveryModel = isReasoningGeneration ? "glm-5.3-flash" : "glm-5.3";
     let replacementCount = Math.max(0, countNum - completedExampleCount);
-    if (turnMode === "Mixed") {
+    {
       let slot = 0;
       generationStacks.forEach((stack, stackIndex) => stack.forEach((_, modelIndex) => {
         if (!taskOutputs[stackIndex][modelIndex]?.length) {
-          mixedRecoveryTurns.push(slot % 2 === 0 ? "Single Turn" : "Multi Turn");
+          recoveryTopics.push(generationTopics[stackIndex][modelIndex]);
+          if (turnMode === "Mixed") mixedRecoveryTurns.push(slot % 2 === 0 ? "Single Turn" : "Multi Turn");
         }
         slot++;
       }));
@@ -2126,6 +2147,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               "Replacement failed; preserving other completed examples"
             );
             replacementCount++;
+            recoveryTopics.push(recoveryTopics[slot]);
             if (turnMode === "Mixed") mixedRecoveryTurns.push(mixedRecoveryTurns[slot]);
             // Pace persistent provider failures instead of creating a tight request loop.
             const pauseMs = Math.min(2000, Math.max(0, generationDeadline - Date.now()));
