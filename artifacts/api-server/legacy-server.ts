@@ -1051,6 +1051,7 @@ function createModelGenerationStacks(
 
 type GenerationJob = {
   status: "running" | "complete" | "partial" | "error";
+  phase: "preparing" | "generating";
   batchId: string;
   createdAt: number;
   updatedAt: number;
@@ -1080,6 +1081,7 @@ app.get("/api/generate/jobs/:jobId", (req, res) => {
   return res.json({
     success: true,
     status: job.status,
+    phase: job.phase,
     batchId: job.batchId,
     progress: job.progress,
     ...(job.status === "complete" || job.status === "partial" ? { result: job.result } : {}),
@@ -1135,6 +1137,7 @@ app.post("/api/generate", async (req, res) => {
     generationJobId = randomUUID();
     generationJobs.set(generationJobId, {
       status: "running",
+      phase: "preparing",
       batchId: generationBatchId,
       createdAt: now,
       updatedAt: now,
@@ -1145,6 +1148,7 @@ app.post("/api/generate", async (req, res) => {
       jobId: generationJobId,
       batchId: generationBatchId,
       status: "running",
+      phase: "preparing",
       progress: { completed: 0, total: countNum }
     });
   }
@@ -1993,6 +1997,13 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     }
 
     let singleTurnFailure: unknown;
+    if (generationJobId) {
+      const job = generationJobs.get(generationJobId);
+      if (job?.status === "running") {
+        job.phase = "generating";
+        job.updatedAt = Date.now();
+      }
+    }
     startProgressStream();
     for (let stackIndex = 0; stackIndex < chunkTasks.length; stackIndex++) {
       if (stackIndex > 0) {

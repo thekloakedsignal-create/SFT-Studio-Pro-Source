@@ -509,6 +509,7 @@ export default function App() {
   const [batchSize, setBatchSize] = useState<number>(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState<{ current: number; total: number; percent: number } | null>(null);
+  const [generationStage, setGenerationStage] = useState<"Processing batch request" | "Preparing generation" | null>(null);
 
   // Tab 2: Document SFT extraction states
   const [docName, setDocName] = useState("");
@@ -1905,6 +1906,7 @@ export default function App() {
     const generationProjectId = selectedProjectId;
     setIsGenerating(true);
     setGenerationProgress({ current: 0, total: batchSize, percent: 0 });
+    setGenerationStage("Processing batch request");
     setNotification({ text: `Synthesizing ${batchSize} examples. Please wait...`, type: "info" });
     
     try {
@@ -1922,6 +1924,7 @@ export default function App() {
       let hasPartialResult = false;
       let lastSource = "Generator";
       let serverBatchId: string | null = null;
+      let generationHasStarted = false;
       const progressByChunk = new Map<number, number>();
       let completedProgressCount = 0;
 
@@ -1984,6 +1987,7 @@ export default function App() {
             if (typeof startData.batchId === "string" && startData.batchId) {
               serverBatchId = startData.batchId;
             }
+            if (!generationHasStarted) setGenerationStage("Preparing generation");
 
             let data: any;
             while (true) {
@@ -1998,6 +2002,10 @@ export default function App() {
               }
               if (statusData.progress && Number.isFinite(Number(statusData.progress.completed))) {
                 updateJobProgress(currentSubIdx, Number(statusData.progress.completed));
+              }
+              if (statusData.phase === "generating" && !generationHasStarted) {
+                generationHasStarted = true;
+                setGenerationStage(null);
               }
               if (statusData.status === "error") {
                 throw new Error(statusData.error || "Generation failed.");
@@ -2107,6 +2115,7 @@ export default function App() {
     } catch {
     } finally {
       setIsGenerating(false);
+      setGenerationStage(null);
       setTimeout(() => setGenerationProgress(null), 3000);
     }
   };
@@ -5042,7 +5051,7 @@ export default function App() {
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-semibold text-green-400 flex items-center gap-2">
                           <RefreshCw className="h-3.5 w-3.5 animate-spin text-green-400" />
-                          Synthesizing Batch: {generationProgress.current} / {generationProgress.total} examples completed
+                          {generationStage || `Synthesizing Batch: ${generationProgress.current} / ${generationProgress.total} examples completed`}
                         </span>
                         <span className="font-mono font-bold text-green-300">
                           {generationProgress.percent}%
