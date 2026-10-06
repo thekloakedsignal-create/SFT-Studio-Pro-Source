@@ -4929,12 +4929,11 @@ export default function App() {
                               <Code className="h-3 w-3" /> Instruction Format
                             </span>
                           </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             {[
                               { type: TemplateType.SINGLE_TURN, label: "Single Turn", sub: "Instruction Pair" },
-                              { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Multi-turn Dialogue" },
                               { type: TemplateType.REASONING, label: "Reasoning", sub: "<think> CoT" },
-                              { type: TemplateType.MIXED, label: "Mixed", sub: "Single + Multi" },
+                              { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Multi-turn Dialogue" },
                             ].map(({ type, label, sub }) => {
                               const isSelected = batchTemplate === type;
                               return (
@@ -4956,7 +4955,7 @@ export default function App() {
                             })}
                           </div>
                           <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
-                            Instruction format ({project.instructTemplate || "ChatML"}) supporting Single-turn, Multi-turn, Reasoning, and Mixed layouts.
+                            Instruction format ({project.instructTemplate || "ChatML"}) supporting Single-turn, Reasoning, and Multi-turn layouts.
                           </p>
                         </div>
                       ) : (
@@ -4964,12 +4963,11 @@ export default function App() {
                           <div className="flex items-center justify-between mb-2">
                             <label className="text-xs font-semibold text-slate-300">Batch Template Layout</label>
                           </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             {[
                               { type: TemplateType.SINGLE_TURN, label: "Single Turn", sub: "Q&A Pair" },
-                              { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Dialogue" },
                               { type: TemplateType.REASONING, label: "Reasoning", sub: "CoT Thoughts" },
-                              { type: TemplateType.MIXED, label: "Mixed", sub: "Single + Multi" },
+                              { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Dialogue" },
                             ].map(({ type, label, sub }) => {
                               const isSelected = batchTemplate === type;
                               return (
@@ -4991,7 +4989,7 @@ export default function App() {
                             })}
                           </div>
                           <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
-                            Single turn, multi-turn, and reasoning can be freely chosen and mixed in this conversation project.
+                            Single turn, reasoning, and multi-turn layouts are available for this batch.
                           </p>
                         </div>
                       )}
