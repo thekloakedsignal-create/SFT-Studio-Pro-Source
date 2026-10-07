@@ -59,9 +59,9 @@ Multi Turn and Mixed replace missing examples individually, including non-timeou
 
 **How to apply:** Preserve successful output, bounded concurrency, per-request timeouts, and the size-scaled total deadline. Pace failed replacements to avoid a tight request loop. Apply the shared one-example refill policy without changing the template logic.
 
-Use `gemma-4-31B-it` for the single batch topic-planning request with no reasoning; keep low reasoning effort on all SFT example-generation requests.
+Use `gemma-4` for the single batch topic-planning request with no reasoning; keep low reasoning effort on all SFT example-generation requests.
 
-**Why:** The user supplied the exact Gemma 4 topic-planning request and reasoning setting.
+**Why:** The user explicitly corrected the planner's model name to `gemma-4` and supplied the exact request shape.
 
 **How to apply:** Keep planner settings separate from example-generation settings; leave unrelated API calls and the example-generation model pool unchanged.
 
