@@ -996,7 +996,7 @@ const SUPPORTED_GENERATION_BATCH_SIZES = [5, 10, 25, 50, 100, 200, 250] as const
 const SFT_SINGLE_EXAMPLE_TIMEOUT_MS = 20_000;
 const SFT_TOPIC_PLAN_TIMEOUT_MS = 120_000;
 const SFT_REASONING_EXAMPLE_TIMEOUT_MS = 120_000;
-const SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS = 180_000;
+const SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS = 300_000;
 
 function getGenerationModels(): string[] {
   return DEFAULT_GENERATION_MODEL_GROUPS.flat().map((model) => normalizeModel(model));
@@ -1367,9 +1367,6 @@ ${JSON.stringify({ examples: [{ messages: [
         : getGenerationModels().map(model =>
           turnMode === "Multi Turn" && model.startsWith("qwen")
             ? "gemma-4-31B-it" : model);
-    const modelAbortControllers = new Map(
-      generationModels.map(model => [model, new AbortController()])
-    );
     const generationStacks = createModelGenerationStacks(countNum, generationModels);
     const generationTopics = await planGenerationTopics(
       generationStacks,
@@ -1836,7 +1833,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             requestedCount = currentChunkSize,
             prompt = isReasoningGeneration ? reasoningUserPrompt : fullPrompt,
             requestedTimeoutMs = isReasoningGeneration ? SFT_REASONING_EXAMPLE_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS,
-            ignoreModelAbort = false,
             mixedTurn: MixedTurn = assignedMixedTurn,
             topic: string = generationTopics[c][modelIndex],
             turnCount = 2 + (generationStacks.slice(0, c).reduce((sum, stack) => sum + stack.length, 0) + modelIndex) % 3
@@ -1888,8 +1884,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                   }
                 : requestConfig,
               timeoutMs,
-              exactMessages: isReasoningGeneration,
-              ...(ignoreModelAbort || isReasoningGeneration ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
+              exactMessages: isReasoningGeneration
             });
             let parsed: any[];
             if (turnMode === "Reasoning") {
@@ -1933,7 +1928,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 requestedCount,
                 promptForExampleCount(requestedCount),
                 timeoutMs,
-                turnMode === "Mixed" || model === "glm-5.3",
                 mixedRecoveryTurns[slot] ?? assignedMixedTurn,
                 recoveryTopics[slot],
                 turnMode === "Multi Turn" ? recoveryTurnCounts[slot] : undefined
@@ -1943,20 +1937,11 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           let responseModel = targetModel;
           let generated: any[] = [];
           try {
-            if (!isReasoningGeneration && stalledModels.has(targetModel)) {
-              timedOutExampleCount += currentChunkSize;
-              logger.warn(
-                { model: targetModel, stack: c + 1, batchId: generationBatchId },
-                "Skipping a model after its earlier request timed out"
-              );
-              return [];
-            }
             generated = await requestExamplesFromModel(targetModel);
           } catch (primaryError: any) {
             if (isDigitalOceanRequestTimeout(primaryError)) {
               if (turnMode !== "Multi Turn") {
                 stalledModels.add(targetModel);
-                if (!isReasoningGeneration) modelAbortControllers.get(targetModel)?.abort();
               }
               timedOutExampleCount += currentChunkSize;
               logger.warn(
@@ -1965,7 +1950,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                   ? "Multi Turn request timed out; leaving later scheduled requests running"
                   : isReasoningGeneration
                   ? "Reasoning request timed out; leaving independent slots running"
-                  : "Model request timed out; skipping it for the rest of this batch"
+                  : "Model request timed out; independent scheduled requests will continue"
               );
               return [];
             }
@@ -2002,7 +1987,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               if (isDigitalOceanRequestTimeout(backupError)) {
                 if (turnMode !== "Multi Turn") {
                   stalledModels.add(backupModel);
-                  modelAbortControllers.get(backupModel)?.abort();
                 }
                 timedOutExampleCount += currentChunkSize;
                 logger.warn(
