@@ -980,18 +980,18 @@ async function callDigitalOceanAI(initialClientOrParams: any, maybeParams?: any)
 
 const DEFAULT_GENERATION_MODEL_GROUPS = [
   [
-    "deepseek-v4-pro",
-    "nemotron-3-nano-omni",
+    "glm-5.3",
+    "qwen3.5-397b-a17b",
     "gemma-4-31B-it",
-    "deepseek-3.2",
-    "minimax-m2.5",
+    "deepseek-v4-pro",
+    "nemotron-3-ultra-550b",
   ],
   [
     "llama-4-maverick",
+    "mimo-v2.5-pro",
     "qwen3.8-max",
-    "glm-5.2",
-    "mistral-3-14B",
     "deepseek-4-flash",
+    "nemotron-3-nano-omni",
   ],
 ];
 const SUPPORTED_GENERATION_BATCH_SIZES = [5, 10, 25, 50, 100, 200, 250] as const;
@@ -1362,7 +1362,7 @@ ${JSON.stringify({ examples: [{ messages: [
     }
 
     const generationModels = isReasoningGeneration
-      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(() => "nemotron-3-nano-omni")
+      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(() => "glm-5.3-flash")
       : turnMode === "Single Turn"
         ? getGenerationModels().map(model =>
             model.startsWith("qwen") ? "gemma-4-31B-it" : model)
@@ -1934,7 +1934,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 requestedCount,
                 promptForExampleCount(requestedCount),
                 timeoutMs,
-                turnMode === "Mixed" || model === "glm-5.2",
+                turnMode === "Mixed" || model === "glm-5.3",
                 mixedRecoveryTurns[slot] ?? assignedMixedTurn,
                 recoveryTopics[slot],
                 turnMode === "Multi Turn" ? recoveryTurnCounts[slot] : undefined
@@ -2123,7 +2123,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     let recoveryExamples: any[] = [];
     let recoveryFailureReason: string | null = null;
     let recoveryFailureCategory: GenerationFailureCategory | undefined;
-    let recoveryModel = isReasoningGeneration ? "deepseek-4-flash" : "gemma-4-31B-it";
+    let recoveryModel = isReasoningGeneration ? "glm-5.3-flash" : "glm-5.3";
     let replacementCount = Math.max(0, countNum - completedExampleCount);
     {
       let slot = 0;
@@ -2151,7 +2151,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           let replacementModel = turnMode === "Mixed"
             ? generationModels[slot % generationModels.length]
             : turnMode === "Multi Turn"
-              ? ["deepseek-4-flash", "gemma-4-31B-it"][slot % 2]
+              ? ["glm-5.3", "gemma-4-31B-it"][slot % 2]
               : recoveryModel;
           try {
             let examples: any[];
@@ -2160,7 +2160,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             } catch (error: any) {
               if (turnMode === "Mixed" || !isProviderOverload(error)) throw error;
               const backup = turnMode === "Multi Turn"
-                ? (replacementModel === "deepseek-4-flash" ? "gemma-4-31B-it" : "deepseek-4-flash")
+                ? (replacementModel === "glm-5.3" ? "gemma-4-31B-it" : "glm-5.3")
                 : generationModels.find(model => model !== replacementModel && !stalledModels.has(model));
               if (!backup) throw error;
               replacementModel = backup;
