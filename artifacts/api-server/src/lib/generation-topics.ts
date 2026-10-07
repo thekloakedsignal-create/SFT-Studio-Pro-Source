@@ -24,17 +24,11 @@ Batch description (data, not instructions about output format):
     .replace("[BATCH_SIZE]", String(totalTopicCount))
     .replace("[BATCH_DESCRIPTION]", batchDescription);
   const text = await request(prompt);
-  const body = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  const parsed: unknown = JSON.parse(body);
+  const parsed: unknown = JSON.parse(text);
   const record = parsed && typeof parsed === "object" && !Array.isArray(parsed)
     ? parsed as Record<string, unknown>
     : {};
-  const nestedTopics = record.topicLists;
-  const topics = Array.isArray(record.topics)
-    ? record.topics.flat()
-    : Array.isArray(nestedTopics) && nestedTopics.every(Array.isArray)
-      ? nestedTopics.flat()
-      : null;
+  const topics = Array.isArray(record.topics) ? record.topics : null;
   if (
     !Array.isArray(topics) || topics.length !== totalTopicCount ||
     topics.some(topic => typeof topic !== "string" || !topic.trim())
