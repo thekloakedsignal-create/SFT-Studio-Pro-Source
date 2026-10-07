@@ -904,7 +904,9 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         ...(params.exactMessages
           ? { max_completion_tokens: maxTokensToUse }
           : { max_tokens: maxTokensToUse }),
-        reasoning_effort: params.config?.reasoningEffort ?? "none",
+        ...(params.omitReasoningEffort
+          ? {}
+          : { reasoning_effort: params.config?.reasoningEffort ?? "none" }),
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
       signal: abortSignal
@@ -1381,8 +1383,8 @@ ${JSON.stringify({ examples: [{ messages: [
           responseMimeType: "application/json",
           maxOutputTokens: 4096,
           temperature: 0.7,
-          reasoningEffort: "none",
         },
+        omitReasoningEffort: true,
         timeoutMs: Math.min(SFT_TOPIC_PLAN_TIMEOUT_MS, Math.max(1, generationDeadline - Date.now())),
       })),
     );
@@ -1878,7 +1880,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             const response = await callDigitalOceanChatCompletions({
               model,
               contents: isReasoningGeneration ? encodeReasoningProviderText(prompt) : prompt,
-              applySftSamplingPenalties: true,
               config: isReasoningGeneration
                 ? {
                     systemInstruction: reasoningSystemPrompt,
