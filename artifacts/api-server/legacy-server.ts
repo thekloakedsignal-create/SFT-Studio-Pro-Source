@@ -1362,7 +1362,9 @@ ${JSON.stringify({ examples: [{ messages: [
     }
 
     const generationModels = isReasoningGeneration
-      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(model => model)
+      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(model =>
+          model === "nemotron-3-nano-omni" ? "gemma-4-31B-it" :
+          model === "glm-5.2" ? "qwen3.8-max" : model)
       : turnMode === "Single Turn"
         ? getGenerationModels().map(model =>
             model.startsWith("qwen") ? "gemma-4-31B-it" : model)
@@ -2121,6 +2123,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     }
 
     await Promise.all(multiTurnStacks);
+    if (isReasoningGeneration) generationDeadline = Infinity;
     let recoveryExamples: any[] = [];
     let recoveryFailureReason: string | null = null;
     let recoveryFailureCategory: GenerationFailureCategory | undefined;
@@ -2149,7 +2152,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             return;
           }
           const slot = nextReplacement++;
-          let replacementModel = turnMode === "Mixed"
+          let replacementModel = turnMode === "Mixed" || isReasoningGeneration
             ? generationModels[slot % generationModels.length]
             : turnMode === "Multi Turn"
               ? ["deepseek-4-flash", "gemma-4-31B-it"][slot % 2]
