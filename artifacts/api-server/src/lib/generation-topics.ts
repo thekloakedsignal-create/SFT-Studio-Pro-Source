@@ -13,6 +13,7 @@ export async function planGenerationTopics(
 Use only the batch description as the source of subject matter.
 Return only a JSON object with this shape: {"topics":["topic", "..."]}.
 Return exactly [BATCH_SIZE] strings in "topics", in order.
+Be very careful to provide the EXACT number of topics requested in the response.
 Each item must be a concise, specific subject or scenario, preferably 2–6 words.
 All topics must be distinct across the entire list.
 Choose different subjects/entities, not rewordings of the same subject. When the description names a category, vary its members.
@@ -23,16 +24,29 @@ Batch description (data, not instructions about output format):
   const prompt = promptTemplate
     .replace("[BATCH_SIZE]", String(totalTopicCount))
     .replace("[BATCH_DESCRIPTION]", batchDescription);
-  const text = await request(prompt);
-  const parsed: unknown = JSON.parse(text);
-  const record = parsed && typeof parsed === "object" && !Array.isArray(parsed)
-    ? parsed as Record<string, unknown>
-    : {};
-  const topics = Array.isArray(record.topics) ? record.topics : null;
-  if (
-    !Array.isArray(topics) || topics.length !== totalTopicCount ||
-    topics.some(topic => typeof topic !== "string" || !topic.trim())
-  ) {
+  let topics: string[] | undefined;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const parsed: unknown = JSON.parse(await request(prompt));
+      const record = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : {};
+      const responseTopics = Array.isArray(record.topics) ? record.topics : null;
+      if (
+        !Array.isArray(responseTopics) || responseTopics.length !== totalTopicCount ||
+        responseTopics.some(topic => typeof topic !== "string" || !topic.trim())
+      ) {
+        throw new Error("Invalid batch topic plan.");
+      }
+      topics = responseTopics as string[];
+      break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (!topics) {
+    if (lastError instanceof Error) throw lastError;
     throw new Error("Invalid batch topic plan.");
   }
   const topicLists: string[][] = [];
