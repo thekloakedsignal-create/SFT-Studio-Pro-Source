@@ -904,9 +904,7 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         ...(params.exactMessages
           ? { max_completion_tokens: maxTokensToUse }
           : { max_tokens: maxTokensToUse }),
-        ...(params.omitReasoningEffort
-          ? {}
-          : { reasoning_effort: params.config?.reasoningEffort ?? "none" }),
+        reasoning_effort: params.config?.reasoningEffort ?? "none",
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
       signal: abortSignal
@@ -999,7 +997,6 @@ const SFT_SINGLE_EXAMPLE_TIMEOUT_MS = 20_000;
 const SFT_TOPIC_PLAN_TIMEOUT_MS = 120_000;
 const SFT_REASONING_EXAMPLE_TIMEOUT_MS = 120_000;
 const SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS = 180_000;
-const SFT_LARGE_BATCH_TIMEOUT_PER_50_EXAMPLES_MS = 300_000;
 
 function getGenerationModels(): string[] {
   return DEFAULT_GENERATION_MODEL_GROUPS.flat().map((model) => normalizeModel(model));
@@ -1121,11 +1118,7 @@ app.post("/api/generate", async (req, res) => {
     });
   }
   const generationBatchId = randomUUID();
-  const generationTimeoutMs = Math.ceil(countNum / 50) * (
-    countNum > 25
-      ? SFT_LARGE_BATCH_TIMEOUT_PER_50_EXAMPLES_MS
-      : SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS
-  );
+  const generationTimeoutMs = Math.ceil(countNum / 50) * SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS;
   let generationDeadline = Date.now() + generationTimeoutMs;
   const stalledModels = new Set<string>();
   let timedOutExampleCount = 0;
@@ -1367,14 +1360,13 @@ ${JSON.stringify({ examples: [{ messages: [
     }
 
     const generationModels = isReasoningGeneration
-      ? DEFAULT_GENERATION_MODEL_GROUPS.flat()
+      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(() => "glm-5.2")
       : turnMode === "Single Turn"
         ? getGenerationModels().map(model =>
             model.startsWith("qwen") ? "gemma-4-31B-it" : model)
         : getGenerationModels().map(model =>
           turnMode === "Multi Turn" && model.startsWith("qwen")
             ? "gemma-4-31B-it" : model);
-    const reasoningRetryModels = ["gemma-4-31B-it", "deepseek-4-flash"];
     const modelAbortControllers = new Map(
       generationModels.map(model => [model, new AbortController()])
     );
@@ -1384,12 +1376,12 @@ ${JSON.stringify({ examples: [{ messages: [
       String(batchDescription || ""),
       async prompt => extractResponseText(await callDigitalOceanChatCompletions({
         model: "gemma-4-31B-it",
-        omitReasoningEffort: isReasoningGeneration,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
           maxOutputTokens: 4096,
           temperature: 0.7,
+          reasoningEffort: "none",
         },
         timeoutMs: Math.min(SFT_TOPIC_PLAN_TIMEOUT_MS, Math.max(1, generationDeadline - Date.now())),
       })),
@@ -1886,12 +1878,13 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             const response = await callDigitalOceanChatCompletions({
               model,
               contents: isReasoningGeneration ? encodeReasoningProviderText(prompt) : prompt,
-              omitReasoningEffort: isReasoningGeneration,
+              applySftSamplingPenalties: true,
               config: isReasoningGeneration
                 ? {
                     systemInstruction: reasoningSystemPrompt,
                     maxOutputTokens: requestConfig.maxOutputTokens,
-                    temperature: 0.7
+                    temperature: 0.7,
+                    reasoningEffort: "low"
                   }
                 : requestConfig,
               timeoutMs,
@@ -1974,74 +1967,61 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                   ? "Reasoning request timed out; leaving independent slots running"
                   : "Model request timed out; skipping it for the rest of this batch"
               );
-              if (!isReasoningGeneration) return [];
+              return [];
             }
-            if (isReasoningGeneration) {
-              const preferredRetryModel = reasoningRetryModels[modelIndex % reasoningRetryModels.length];
-              const retryModel = preferredRetryModel === targetModel
-                ? reasoningRetryModels[(modelIndex + 1) % reasoningRetryModels.length]
-                : preferredRetryModel;
-              logger.warn(
-                { model: targetModel, retryModel, stack: c + 1, batchId: generationBatchId },
-                "Reasoning model failed; immediately retrying on a designated retry model"
-              );
-              generated = await requestExamplesFromModel(retryModel);
-              responseModel = retryModel;
-            } else {
-              if (!isProviderOverload(primaryError)) {
-                throw primaryError;
-              }
+            if (!isProviderOverload(primaryError)) {
+              throw primaryError;
+            }
 
-              const unusedBackupModels = generationModels.filter(
-                model =>
-                  model !== targetModel &&
-                  !scheduledStackModels.has(model) &&
-                  !backupModelsUsed.has(model) &&
-                  !stalledModels.has(model)
-              );
-              const availableBackupModels = unusedBackupModels.length > 0
-                ? unusedBackupModels
-                : generationModels.filter(
-                    model => model !== targetModel &&
-                      !backupModelsUsed.has(model) &&
-                      !stalledModels.has(model)
-                  );
-              const backupModel = availableBackupModels[0];
-              if (!backupModel) throw primaryError;
+            const unusedBackupModels = generationModels.filter(
+              model =>
+                model !== targetModel &&
+                !scheduledStackModels.has(model) &&
+                !backupModelsUsed.has(model) &&
+                !stalledModels.has(model)
+            );
+            const availableBackupModels = unusedBackupModels.length > 0
+              ? unusedBackupModels
+              : generationModels.filter(
+                  model => model !== targetModel &&
+                    !backupModelsUsed.has(model) &&
+                    !stalledModels.has(model)
+                );
+            const backupModel = availableBackupModels[0];
+            if (!backupModel) throw primaryError;
 
-              backupModelsUsed.add(backupModel);
-              logger.warn(
-                { model: targetModel, backupModel, stack: c + 1, batchId: generationBatchId },
-                "Model returned HTTP 529; trying its one permitted backup"
-              );
+            backupModelsUsed.add(backupModel);
+            logger.warn(
+              { model: targetModel, backupModel, stack: c + 1, batchId: generationBatchId },
+              "Model returned HTTP 529; trying its one permitted backup"
+            );
 
-              try {
-                generated = await requestExamplesFromModel(backupModel);
-              } catch (backupError: any) {
-                if (isDigitalOceanRequestTimeout(backupError)) {
-                  if (turnMode !== "Multi Turn") {
-                    stalledModels.add(backupModel);
-                    modelAbortControllers.get(backupModel)?.abort();
-                  }
-                  timedOutExampleCount += currentChunkSize;
-                  logger.warn(
-                    { model: backupModel, stack: c + 1, batchId: generationBatchId },
-                    "Backup model timed out; its example will be included in the GLM fill batch"
-                  );
-                  return [];
+            try {
+              generated = await requestExamplesFromModel(backupModel);
+            } catch (backupError: any) {
+              if (isDigitalOceanRequestTimeout(backupError)) {
+                if (turnMode !== "Multi Turn") {
+                  stalledModels.add(backupModel);
+                  modelAbortControllers.get(backupModel)?.abort();
                 }
-                const backupMessage = String(backupError?.message || backupError || "Unknown backup model error");
-                throw new Error(
-                  `Model ${targetModel} returned HTTP 529; backup model ${backupModel} failed: ${backupMessage}`
+                timedOutExampleCount += currentChunkSize;
+                logger.warn(
+                  { model: backupModel, stack: c + 1, batchId: generationBatchId },
+                  "Backup model timed out; its example will be included in the GLM fill batch"
                 );
+                return [];
               }
-              if (generated.length === 0) {
-                throw new Error(
-                  `Backup model ${backupModel} returned no examples after ${targetModel} returned HTTP 529.`
-                );
-              }
-              responseModel = backupModel;
+              const backupMessage = String(backupError?.message || backupError || "Unknown backup model error");
+              throw new Error(
+                `Model ${targetModel} returned HTTP 529; backup model ${backupModel} failed: ${backupMessage}`
+              );
             }
+            if (generated.length === 0) {
+              throw new Error(
+                `Backup model ${backupModel} returned no examples after ${targetModel} returned HTTP 529.`
+              );
+            }
+            responseModel = backupModel;
           }
 
           completedExampleCount += generated.length;
@@ -2090,7 +2070,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               singleTurnFailure ??= failure.reason;
             }
           });
-          if (turnMode === "Multi Turn" || isReasoningGeneration) multiTurnStacks.push(completion);
+          if (turnMode === "Multi Turn") multiTurnStacks.push(completion);
           else await completion;
         }
       } catch (error: any) {
