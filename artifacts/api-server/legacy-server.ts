@@ -904,7 +904,9 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         ...(params.exactMessages
           ? { max_completion_tokens: maxTokensToUse }
           : { max_tokens: maxTokensToUse }),
-        reasoning_effort: params.config?.reasoningEffort ?? "none",
+        ...(params.config?.reasoningEffort === null
+          ? {}
+          : { reasoning_effort: params.config?.reasoningEffort ?? "none" }),
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
       signal: abortSignal
@@ -1884,7 +1886,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                     systemInstruction: reasoningSystemPrompt,
                     maxOutputTokens: requestConfig.maxOutputTokens,
                     temperature: 0.7,
-                    reasoningEffort: "low"
+                    reasoningEffort: null
                   }
                 : requestConfig,
               timeoutMs,
@@ -2070,7 +2072,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               singleTurnFailure ??= failure.reason;
             }
           });
-          if (turnMode === "Multi Turn") multiTurnStacks.push(completion);
+          if (turnMode === "Multi Turn" || isReasoningGeneration) multiTurnStacks.push(completion);
           else await completion;
         }
       } catch (error: any) {
