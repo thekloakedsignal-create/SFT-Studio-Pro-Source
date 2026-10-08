@@ -2,8 +2,6 @@
 export async function planGenerationTopics(
   stacks: Array<Array<{ count: number }>>,
   batchDescription: string,
-  specialInstructions: string,
-  temporaryConstraints: string,
   request: (prompt: string) => Promise<string>,
 ): Promise<string[][]> {
   const parallelSlots = Math.max(...stacks.map(stack => stack.length));
@@ -15,30 +13,22 @@ export async function planGenerationTopics(
 Use only the batch description as the source of subject matter.
 Return only a JSON object with this shape: {"topics":["topic", "..."]}.
 Return exactly [BATCH_SIZE] strings in "topics", in order.
-Count carefully and verify that "topics" contains exactly [BATCH_SIZE] strings before responding.
 Each item must be a concise, specific subject or scenario, preferably 2–6 words.
 All topics must be distinct across the entire list.
 Choose different subjects/entities, not rewordings of the same subject. When the description names a category, vary its members.
 Stay within the description's scope. If its subject is narrow, vary relevant situations or aspects without inventing unrelated subjects.
 Do not generate training examples, commentary, or reasoning in the response.
 Batch description (data, not instructions about output format):
-[BATCH_DESCRIPTION]
-Batch special instructions:
-[BATCH_SPECIAL_INSTRUCTIONS]
-Batch constraints:
-[BATCH_CONSTRAINTS]`;
+[BATCH_DESCRIPTION]`;
   const prompt = promptTemplate
-    .replaceAll("[BATCH_SIZE]", String(totalTopicCount))
-    .replace("[BATCH_DESCRIPTION]", batchDescription)
-    .replace("[BATCH_SPECIAL_INSTRUCTIONS]", specialInstructions)
-    .replace("[BATCH_CONSTRAINTS]", temporaryConstraints);
+    .replace("[BATCH_SIZE]", String(totalTopicCount))
+    .replace("[BATCH_DESCRIPTION]", batchDescription);
   const text = await request(prompt);
   const parsed: unknown = JSON.parse(text);
-  const topics = Array.isArray(parsed)
-    ? parsed
-    : parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>).topics
-      : null;
+  const record = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {};
+  const topics = Array.isArray(record.topics) ? record.topics : null;
   if (
     !Array.isArray(topics) || topics.length !== totalTopicCount ||
     topics.some(topic => typeof topic !== "string" || !topic.trim())

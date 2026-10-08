@@ -1376,10 +1376,8 @@ ${JSON.stringify({ examples: [{ messages: [
     const generationTopics = await planGenerationTopics(
       generationStacks,
       String(batchDescription || ""),
-      String(specialInstructions || "No additional instructions"),
-      String(temporaryConstraints || "None"),
       async prompt => extractResponseText(await callDigitalOceanChatCompletions({
-        model: "qwen3.8-max",
+        model: "gemma-4-31B-it",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
