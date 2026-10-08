@@ -59,9 +59,9 @@ Multi Turn and Mixed replace missing examples individually, including non-timeou
 
 **How to apply:** Preserve successful output, bounded concurrency, per-request timeouts, and the size-scaled total deadline. Pace failed replacements to avoid a tight request loop. Apply the shared one-example refill policy without changing the template logic.
 
-Use `gemma-4-31B-it` for the initial batch topic-planning request, omitting the reasoning-effort parameter. One backup topic-planning request is permitted if the first fails; leave example-generation settings unchanged.
+Use `gemma-4-31B-it` for the initial batch topic-planning request, omitting the reasoning-effort parameter. If it fails, retry once with `Qwen3.5-8` as requested; leave example-generation settings unchanged.
 
-**Why:** The user confirmed the primary topic model, then requested removal of the reasoning-effort parameter and a different-model retry on failure, naming `Qwen3.5-8`.
+**Why:** The user confirmed the primary topic model, requested removal of the reasoning-effort parameter and a different-model retry using `Qwen3.5-8`. DigitalOcean returned 403 “not authorized” for that retry.
 
 **How to apply:** Keep planner settings separate from example-generation settings; leave unrelated API calls and the example-generation model pool unchanged.
 
@@ -69,4 +69,4 @@ Have the topic planner return one flat list; distribute topics into per-stack sl
 
 **Why:** The lightweight planner failed a nested per-stack length check before generation began.
 
-**How to apply:** Validate the flat list's total count before slicing it into the existing schedule. Permit the user-authorized backup request if the initial request or its validation fails.
+**How to apply:** Validate the flat list's total count before slicing it into the existing schedule. Permit one request to `Qwen3.5-8` if the initial request or its validation fails.
