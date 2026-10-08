@@ -11,6 +11,12 @@ Reasoning initial generation uses the user's ten-model list, not one repeated mo
 
 **How to apply:** For model-name-only requests, preserve slot order, branches, prompts, retries, and surrounding code. Do not infer model capabilities or add model-specific behavior. For Reasoning fixes, make only the smallest Reasoning-scoped correction; keep other templates, QA, the document converter, and UI untouched.
 
+Reasoning refills must cycle failed individual generations through the configured ten-model pool until the requested batch is filled, preserving completed examples and each failed slot's topic.
+
+**Why:** The user explicitly authorized “just cycle failed generations back through until filled” after a batch reached 40/50, and prohibited all other changes.
+
+**How to apply:** Keep individual request timeouts and concurrent one-example refills. Do not stop Reasoning refills at the overall batch deadline or restrict them to one recovery model. Leave initial slots, prompts, parsing, QA, the document converter, and other templates unchanged.
+
 **Why:** The user explicitly set and reinforced this scope while correcting Reasoning generation.
 
 **How to apply:** Confine prompt, schema, and validation changes to Reasoning-specific branches; do not change the shared model pool or scheduler.
