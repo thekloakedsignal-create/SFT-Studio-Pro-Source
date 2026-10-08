@@ -59,9 +59,9 @@ Multi Turn and Mixed replace missing examples individually, including non-timeou
 
 **How to apply:** Preserve successful output, bounded concurrency, per-request timeouts, and the size-scaled total deadline. Pace failed replacements to avoid a tight request loop. Apply the shared one-example refill policy without changing the template logic.
 
-Use `gemma-4-31B-it` for the single batch topic-planning request with no reasoning; keep low reasoning effort on all SFT example-generation requests.
+Use `gemma-4-31B-it` for the initial batch topic-planning request, omitting the reasoning-effort parameter. One backup topic-planning request is permitted if the first fails; leave example-generation settings unchanged.
 
-**Why:** The user explicitly confirmed `gemma-4-31B-it` as the required topic-planning model.
+**Why:** The user confirmed the primary topic model, then requested removal of the reasoning-effort parameter and a different-model retry on failure, naming `Qwen3.5-8`.
 
 **How to apply:** Keep planner settings separate from example-generation settings; leave unrelated API calls and the example-generation model pool unchanged.
 
@@ -69,4 +69,4 @@ Have the topic planner return one flat list; distribute topics into per-stack sl
 
 **Why:** The lightweight planner failed a nested per-stack length check before generation began.
 
-**How to apply:** Keep the planner to one request per batch and validate the flat list's total count before slicing it into the existing schedule.
+**How to apply:** Validate the flat list's total count before slicing it into the existing schedule. Permit the user-authorized backup request if the initial request or its validation fails.

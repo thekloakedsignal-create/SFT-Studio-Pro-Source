@@ -1373,21 +1373,25 @@ ${JSON.stringify({ examples: [{ messages: [
       generationModels.map(model => [model, new AbortController()])
     );
     const generationStacks = createModelGenerationStacks(countNum, generationModels);
-    const generationTopics = await planGenerationTopics(
+    const requestTopicPlan = (model: string) => planGenerationTopics(
       generationStacks,
       String(batchDescription || ""),
       async prompt => extractResponseText(await callDigitalOceanChatCompletions({
-        model: "gemma-4-31B-it",
+        model,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
           maxOutputTokens: 4096,
           temperature: 0.7,
-          reasoningEffort: "none",
+          reasoningEffort: null,
         },
         timeoutMs: Math.min(SFT_TOPIC_PLAN_TIMEOUT_MS, Math.max(1, generationDeadline - Date.now())),
       })),
+      String(specialInstructions || ""),
+      [constraints, temporaryConstraints].filter(Boolean).join("\n"),
     );
+    const generationTopics = await requestTopicPlan("gemma-4-31B-it")
+      .catch(() => requestTopicPlan("Qwen3.5-8"));
     const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);
     const taskOutputs: Array<Array<any[] | undefined>> = generationStacks.map(stack => new Array(stack.length));
     let completedExampleCount = 0;

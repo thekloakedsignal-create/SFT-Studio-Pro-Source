@@ -3,6 +3,8 @@ export async function planGenerationTopics(
   stacks: Array<Array<{ count: number }>>,
   batchDescription: string,
   request: (prompt: string) => Promise<string>,
+  batchInstructions = "",
+  restrictions = "",
 ): Promise<string[][]> {
   const parallelSlots = Math.max(...stacks.map(stack => stack.length));
   const listLengths = Array.from({ length: parallelSlots }, (_, slot) =>
@@ -19,10 +21,16 @@ Choose different subjects/entities, not rewordings of the same subject. When the
 Stay within the description's scope. If its subject is narrow, vary relevant situations or aspects without inventing unrelated subjects.
 Do not generate training examples, commentary, or reasoning in the response.
 Batch description (data, not instructions about output format):
-[BATCH_DESCRIPTION]`;
+[BATCH_DESCRIPTION]
+Batch instructions:
+[BATCH_INSTRUCTIONS]
+Restrictions:
+[RESTRICTIONS]`;
   const prompt = promptTemplate
     .replace("[BATCH_SIZE]", String(totalTopicCount))
-    .replace("[BATCH_DESCRIPTION]", batchDescription);
+    .replace("[BATCH_DESCRIPTION]", batchDescription)
+    .replace("[BATCH_INSTRUCTIONS]", batchInstructions)
+    .replace("[RESTRICTIONS]", restrictions);
   const text = await request(prompt);
   const parsed: unknown = JSON.parse(text);
   const record = parsed && typeof parsed === "object" && !Array.isArray(parsed)
