@@ -1797,7 +1797,7 @@ The selected template type is authoritative. Never mix template types within a b
           const configObj: any = {
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
-            reasoningEffort: "low",
+            reasoningEffort: null,
             ...(turnMode === "Reasoning"
               ? {
                   responseSchema: {
