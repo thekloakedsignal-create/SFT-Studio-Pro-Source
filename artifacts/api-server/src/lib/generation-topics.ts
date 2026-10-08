@@ -28,7 +28,7 @@ Batch special instructions:
 Batch constraints:
 [BATCH_CONSTRAINTS]`;
   const prompt = promptTemplate
-    .replace("[BATCH_SIZE]", String(totalTopicCount))
+    .replaceAll("[BATCH_SIZE]", String(totalTopicCount))
     .replace("[BATCH_DESCRIPTION]", batchDescription)
     .replace("[BATCH_SPECIAL_INSTRUCTIONS]", specialInstructions)
     .replace("[BATCH_CONSTRAINTS]", temporaryConstraints);
