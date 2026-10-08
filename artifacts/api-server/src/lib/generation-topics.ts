@@ -34,10 +34,11 @@ Batch constraints:
     .replace("[BATCH_CONSTRAINTS]", temporaryConstraints);
   const text = await request(prompt);
   const parsed: unknown = JSON.parse(text);
-  const record = parsed && typeof parsed === "object" && !Array.isArray(parsed)
-    ? parsed as Record<string, unknown>
-    : {};
-  const topics = Array.isArray(record.topics) ? record.topics : null;
+  const topics = Array.isArray(parsed)
+    ? parsed
+    : parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>).topics
+      : null;
   if (
     !Array.isArray(topics) || topics.length !== totalTopicCount ||
     topics.some(topic => typeof topic !== "string" || !topic.trim())
