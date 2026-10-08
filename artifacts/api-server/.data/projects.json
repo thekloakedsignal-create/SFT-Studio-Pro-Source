@@ -1,5 +1,144 @@
 [
   {
+    "id": "project-1791424454696",
+    "userId": "4GfBMYFJX2U2yeWTKwxEyG6DLCG2",
+    "name": "General Instruction Tuner",
+    "settings": {
+      "name": "General Instruction Tuner",
+      "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+      "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+      "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+      "selectedPreset": "General Use AI",
+      "projectFormat": "Conversation",
+      "templateType": "Single Turn",
+      "instructTemplate": "ChatML",
+      "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      "representativePrompt": "Explain photosynthesis in simple terms.",
+      "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
+    },
+    "batches": [
+      {
+        "id": "40bf0980-bc57-40d2-aa5b-7db6b6689453",
+        "batchId": "40bf0980-bc57-40d2-aa5b-7db6b6689453",
+        "name": "General Instruction following and explanations",
+        "source": "Generator",
+        "generationSettings": {
+          "name": "General Instruction Tuner",
+          "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+          "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+          "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+          "selectedPreset": "General Use AI",
+          "projectFormat": "Conversation",
+          "templateType": "Single Turn",
+          "instructTemplate": "ChatML",
+          "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+          "representativePrompt": "Explain photosynthesis in simple terms.",
+          "representativeCompletion": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."
+        },
+        "templateType": "Single Turn",
+        "examplesCount": 5,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Can you simplify the concept of blockchain for a high school student?"
+              },
+              {
+                "role": "assistant",
+                "content": "**Simplified explanation:** Blockchain is like an online notebook where each page (called a \"block\") records transactions such as who sent money to whom. Every new page is linked to the previous page using special math codes (cryptography), so once pages are added they can't be changed without breaking the whole chain. Many computers worldwide keep copies of this notebook and check each new entry together (a process called consensus), which means no single person can cheat or alter past records without everyone noticing."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791424493286-0"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "I need you to help me plan a short itinerary for a 2-day visit to Tokyo. Please follow these constraints: 1) Include exactly one traditional site and one modern landmark per day. 2) Ensure every location mentioned is within the Minato or Chiyoda wards. 3) Each day must include a recommendation for a specific type of Japanese cuisine (e.g., Ramen, Sushi). 4) Keep the entire response under 150 words."
+              },
+              {
+                "role": "assistant",
+                "content": "Day 1: Visit the Imperial Palace (Traditional) and Tokyo Tower (Modern), both located in Chiyoda and Minato respectively. For dinner, enjoy authentic Sushi.\n\nDay 2: Explore Zojoji Temple (Traditional) and the Roppongi Hills complex (Modern), both situated in Minato ward. For lunch, try a bowl of savory Ramen."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791424493286-1"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Can you show me how to properly format a formal business letter? I need to write one for job application purposes."
+              },
+              {
+                "role": "assistant",
+                "content": "Certainly! Here is the standard format for a formal business letter:\n\n**1. Your Information (Sender)**\nYour name\nYour address\nCity, State ZIP Code\nPhone number\nEmail address\nDate\n\n**2. Recipient Information**\nRecipient's name\nTitle/Position\nCompany name\nCompany address\nCity, State ZIP Code\n\n**3. Salutation**\nUse \"Dear [Mr./Ms./Mrs.] [Last Name]:\" If unknown gender or name: \"Dear Hiring Manager:\"\n\n**4. Body Paragraphs**\n- Introduction: State the position you're applying for and where you found the listing\n- Middle: Highlight relevant qualifications and experience matching the job requirements \n- Conclusion: Express enthusiasm and request an interview\n\n**5. Closing**\n\"Sincerely,\" or \"Respectfully,\" followed by four lines of space for your handwritten signature below your typed name.\n\n**6. Enclosures (if applicable)**\nInclude \"Enclosure\" if you're attaching resumes or other documents.\n Keep left-aligned throughout with single spacing within paragraphs and double spacing between sections.\n Use Times New Roman or Arial in 11-12 point font."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791424493286-2"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Can you explain the difference between deductive reasoning and inductive reasoning using simple examples?"
+              },
+              {
+                "role": "assistant",
+                "content": "Deductive reasoning is a top-down approach where you start with a general rule or premise and arrive at a specific, certain conclusion. If the premises are true, the conclusion must be true. For example: 'All humans are mortal (general rule). Socrates is a human (specific case). Therefore, Socrates is mortal (certain conclusion).'\n\nInductive reasoning is a bottom-up approach where you use specific observations to make a broad generalization. The conclusion in inductive reasoning is probable, but not guaranteed to be true. For example: 'Every swan I have seen so far is white (specific observations). Therefore, all swans are likely white (broad generalization).'"
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791424493286-3"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Can you provide a step-by-step guide on how to properly repot a houseplant that has outgrown its current container?"
+              },
+              {
+                "role": "assistant",
+                "content": "Repotting a houseplant is essential for ensuring it has enough space and nutrients to thrive. Follow these steps to repot your plant successfully:\n\n1. **Choose the Right Pot**: Select a new container that is 1 to 2 inches larger in diameter than the current one. Ensure the new pot has drainage holes at the bottom to prevent root rot.\n2. **Prepare Your Soil**: Use a high-quality potting mix appropriate for your specific plant type (e.g., cactus mix for succulents or peat-based mix for tropicals).\n3. **Remove the Plant**: Gently turn the plant sideways, hold it by the base of the stem, and slowly pull it from its old pot. If it is stuck, lightly press around the sides of the pot or run a butter knife around the inner edge to loosen the root ball.\n4. **Loosen the Roots**: Carefully tease apart any tightly coiled or circling roots with your fingers to encourage them to grow outward into the new soil.\n5. **Add Base Soil**: Place a layer of fresh potting soil at the bottom of the new container so that when you place the plant inside, the top of its root ball sits about an inch below the rim.\n6. **Position and Fill**: Center the plant in the pot and fill in around clinical edges with fresh soil. Press down lightly with your fingers to remove large air pockets without compacting the soil too tightly.\n7. **Water Thoroughly**: Water your plant immediately after repotting to help settle the soil around any remaining air gaps and reduce transplant shock.\n8. **Post-Care**: Place your plant back in its usual light conditions, but avoid direct sunlight for 2–3 days if it is a sensitive species."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1791424493286-4"
+          }
+        ],
+        "status": "Approved",
+        "timestamp": "2026-10-08 01:54:53.286Z",
+        "description": "General Instruction following and explanations",
+        "specialInstructions": "Prioritize clear, informative, and direct explanations.",
+        "temporaryConstraints": "None"
+      }
+    ],
+    "updatedAt": "2026-10-08T01:55:02.831Z"
+  },
+  {
     "id": "project-1791272689465",
     "userId": "4GfBMYFJX2U2yeWTKwxEyG6DLCG2",
     "name": "Ember (Empathetic AI)",
