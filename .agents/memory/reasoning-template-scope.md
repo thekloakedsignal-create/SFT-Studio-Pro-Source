@@ -5,11 +5,11 @@ description: User-defined boundary for changes to SFT Reasoning batch generation
 
 For Reasoning-generation work, change only the Reasoning template and its tests. Do not alter Single Turn or Multi Turn prompts, schemas, or behavior. Keep the shared concurrent model schedule.
 
-Reasoning keeps ten slots: replace its Nemotron slot with another Gemma and its GLM slot with another Qwen 3.8. Duplicate slots are separate concurrent calls, not deduplicated model entries. Reasoning retries cycle through this updated slot list until every requested example is complete, retaining individual request timeouts.
+Reasoning initial generation uses the user's ten-model list, not one repeated model. Keep recovery model selection separate; a generation-slot name replacement does not authorize changing refill routing. Keep shared model configuration shared, even where QA also uses it.
 
-**Why:** After a batch reached 40/50 with failures concentrated in Nemotron and GLM, the user explicitly requested duplicate Gemma/Qwen slots and authorized recycling retries until full. This supersedes earlier fixed-model recovery and overall recovery-deadline guidance for Reasoning only.
+**Why:** The user repeatedly required literal initial-slot model-name replacements, rejected separating the shared QA list, and objected to recovery-routing changes. This supersedes earlier single-model Nemotron/GLM guidance here and in generation constraints.
 
-**How to apply:** Keep the shared model configuration shared, even where QA also uses it; scope these substitutions and retry changes to Reasoning. For later model-name-only requests, do not infer permission to alter routing or model-specific behavior. Make only the smallest requested correction; keep other templates, QA, the document converter, and UI untouched.
+**How to apply:** For model-name-only requests, preserve slot order, branches, prompts, retries, and surrounding code. Do not infer model capabilities or add model-specific behavior. For Reasoning fixes, make only the smallest Reasoning-scoped correction; keep other templates, QA, the document converter, and UI untouched.
 
 **Why:** The user explicitly set and reinforced this scope while correcting Reasoning generation.
 

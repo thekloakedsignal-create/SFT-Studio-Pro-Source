@@ -1362,9 +1362,7 @@ ${JSON.stringify({ examples: [{ messages: [
     }
 
     const generationModels = isReasoningGeneration
-      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(model =>
-          model === "nemotron-3-nano-omni" ? "gemma-4-31B-it" :
-          model === "glm-5.2" ? "qwen3.8-max" : model)
+      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(model => model)
       : turnMode === "Single Turn"
         ? getGenerationModels().map(model =>
             model.startsWith("qwen") ? "gemma-4-31B-it" : model)
@@ -1797,7 +1795,7 @@ The selected template type is authoritative. Never mix template types within a b
           const configObj: any = {
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
-            reasoningEffort: null,
+            reasoningEffort: "low",
             ...(turnMode === "Reasoning"
               ? {
                   responseSchema: {
@@ -2123,7 +2121,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     }
 
     await Promise.all(multiTurnStacks);
-    if (isReasoningGeneration) generationDeadline = Infinity;
     let recoveryExamples: any[] = [];
     let recoveryFailureReason: string | null = null;
     let recoveryFailureCategory: GenerationFailureCategory | undefined;
@@ -2152,7 +2149,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             return;
           }
           const slot = nextReplacement++;
-          let replacementModel = turnMode === "Mixed" || isReasoningGeneration
+          let replacementModel = turnMode === "Mixed"
             ? generationModels[slot % generationModels.length]
             : turnMode === "Multi Turn"
               ? ["deepseek-4-flash", "gemma-4-31B-it"][slot % 2]
