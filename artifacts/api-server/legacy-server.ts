@@ -1360,7 +1360,7 @@ ${JSON.stringify({ examples: [{ messages: [
     }
 
     const generationModels = isReasoningGeneration
-      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(() => "glm-5.2")
+      ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(model => model)
       : turnMode === "Single Turn"
         ? getGenerationModels().map(model =>
             model.startsWith("qwen") ? "gemma-4-31B-it" : model)
