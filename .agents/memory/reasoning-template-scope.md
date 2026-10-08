@@ -27,6 +27,12 @@ Treat Reasoning model slots as independent requests, not one shared failure doma
 
 **How to apply:** Keep Reasoning timeout isolation and result collection separate from prompt/template changes. Preserve model names, batch sizes, and spacing. Do not diagnose all models as failed from recovery-only logs or from logs predating a server restart.
 
+Reasoning retries must keep cycling through the model list until the missing examples are filled, moving each failed example to the next model rather than holding it for two minutes.
+
+**Why:** The user explicitly requested this retry behavior after a batch stalled at 48 examples, overriding the earlier bounded-batch retry policy for Reasoning only.
+
+**How to apply:** Keep retries individual and concurrent, preserve each missing example's topic, and advance its model independently on failure. Keep initial generation, other templates, prompts, validation, QA, and document conversion unchanged.
+
 Treat `<think>` as a potentially reserved provider delimiter, not safe literal text inside generated JSON. Use a transport-only delimiter and restore dataset tags before strict validation.
 
 **Why:** A user-authorized Nemotron diagnostic returned complete JSON objects lacking required tags and JSON suffixes missing their prefixes. The same concurrent diagnostic passed with transport-only delimiters restored before validation, supporting provider reasoning-delimiter handling as the cause; prompt escaping and concurrency fixes alone did not resolve it.

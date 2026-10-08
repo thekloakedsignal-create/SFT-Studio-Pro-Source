@@ -2126,11 +2126,13 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     let recoveryFailureCategory: GenerationFailureCategory | undefined;
     let recoveryModel = isReasoningGeneration ? "deepseek-4-flash" : "gemma-4-31B-it";
     let replacementCount = Math.max(0, countNum - completedExampleCount);
+    const reasoningRetryModelIndices: number[] = [];
     {
       let slot = 0;
       generationStacks.forEach((stack, stackIndex) => stack.forEach((_, modelIndex) => {
         if (!taskOutputs[stackIndex][modelIndex]?.length) {
           recoveryTopics.push(generationTopics[stackIndex][modelIndex]);
+          if (isReasoningGeneration) reasoningRetryModelIndices.push(modelIndex + 1);
           if (turnMode === "Multi Turn") recoveryTurnCounts.push(2 + slot % 3);
           if (turnMode === "Mixed") mixedRecoveryTurns.push(slot % 2 === 0 ? "Single Turn" : "Multi Turn");
         }
@@ -2138,6 +2140,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       }));
     }
     if (replacementCount > 0 && requestExamplesForMissingBatch) {
+      if (isReasoningGeneration) generationDeadline = Infinity;
       // Refill each missing example with an individual request, bounded by concurrency and deadline.
       const requestReplacement = requestExamplesForMissingBatch;
       let nextReplacement = 0;
@@ -2149,23 +2152,25 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             return;
           }
           const slot = nextReplacement++;
-          let replacementModel = turnMode === "Mixed"
-            ? generationModels[slot % generationModels.length]
-            : turnMode === "Multi Turn"
-              ? ["deepseek-4-flash", "gemma-4-31B-it"][slot % 2]
-              : recoveryModel;
+          let replacementModel = isReasoningGeneration
+            ? generationModels[reasoningRetryModelIndices[slot] % generationModels.length]
+            : turnMode === "Mixed"
+              ? generationModels[slot % generationModels.length]
+              : turnMode === "Multi Turn"
+                ? ["deepseek-4-flash", "gemma-4-31B-it"][slot % 2]
+                : recoveryModel;
           try {
             let examples: any[];
             try {
-              examples = await requestReplacement(replacementModel, 1, isReasoningGeneration ? SFT_REASONING_EXAMPLE_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
+              examples = await requestReplacement(replacementModel, 1, SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
             } catch (error: any) {
-              if (turnMode === "Mixed" || !isProviderOverload(error)) throw error;
+              if (isReasoningGeneration || turnMode === "Mixed" || !isProviderOverload(error)) throw error;
               const backup = turnMode === "Multi Turn"
                 ? (replacementModel === "deepseek-4-flash" ? "gemma-4-31B-it" : "deepseek-4-flash")
                 : generationModels.find(model => model !== replacementModel && !stalledModels.has(model));
               if (!backup) throw error;
               replacementModel = backup;
-              examples = await requestReplacement(replacementModel, 1, isReasoningGeneration ? SFT_REASONING_EXAMPLE_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
+              examples = await requestReplacement(replacementModel, 1, SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
             }
             recoveryExamples.push(...examples);
             completedExampleCount += examples.length;
@@ -2188,6 +2193,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             );
             replacementCount++;
             recoveryTopics.push(recoveryTopics[slot]);
+            if (isReasoningGeneration) reasoningRetryModelIndices.push(reasoningRetryModelIndices[slot] + 1);
             if (turnMode === "Multi Turn") recoveryTurnCounts.push(recoveryTurnCounts[slot]);
             if (turnMode === "Mixed") mixedRecoveryTurns.push(mixedRecoveryTurns[slot]);
             // Pace persistent provider failures instead of creating a tight request loop.
