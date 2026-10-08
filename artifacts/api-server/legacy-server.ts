@@ -2138,7 +2138,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       }));
     }
     if (replacementCount > 0 && requestExamplesForMissingBatch) {
-      if (isReasoningGeneration) generationDeadline = Infinity;
       // Refill each missing example with an individual request, bounded by concurrency and deadline.
       const requestReplacement = requestExamplesForMissingBatch;
       let nextReplacement = 0;
@@ -2150,13 +2149,11 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             return;
           }
           const slot = nextReplacement++;
-          let replacementModel = isReasoningGeneration
+          let replacementModel = turnMode === "Mixed"
             ? generationModels[slot % generationModels.length]
-            : turnMode === "Mixed"
-              ? generationModels[slot % generationModels.length]
-              : turnMode === "Multi Turn"
-                ? ["deepseek-4-flash", "gemma-4-31B-it"][slot % 2]
-                : recoveryModel;
+            : turnMode === "Multi Turn"
+              ? ["deepseek-4-flash", "gemma-4-31B-it"][slot % 2]
+              : recoveryModel;
           try {
             let examples: any[];
             try {
