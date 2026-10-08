@@ -904,7 +904,9 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         ...(params.exactMessages
           ? { max_completion_tokens: maxTokensToUse }
           : { max_tokens: maxTokensToUse }),
-        reasoning_effort: params.config?.reasoningEffort ?? "none",
+        ...(params.omitReasoningEffort
+          ? {}
+          : { reasoning_effort: params.config?.reasoningEffort ?? "none" }),
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
       signal: abortSignal
@@ -1382,12 +1384,12 @@ ${JSON.stringify({ examples: [{ messages: [
       String(batchDescription || ""),
       async prompt => extractResponseText(await callDigitalOceanChatCompletions({
         model: "gemma-4-31B-it",
+        omitReasoningEffort: isReasoningGeneration,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
           maxOutputTokens: 4096,
           temperature: 0.7,
-          reasoningEffort: "none",
         },
         timeoutMs: Math.min(SFT_TOPIC_PLAN_TIMEOUT_MS, Math.max(1, generationDeadline - Date.now())),
       })),
@@ -1884,13 +1886,12 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             const response = await callDigitalOceanChatCompletions({
               model,
               contents: isReasoningGeneration ? encodeReasoningProviderText(prompt) : prompt,
-              applySftSamplingPenalties: true,
+              omitReasoningEffort: isReasoningGeneration,
               config: isReasoningGeneration
                 ? {
                     systemInstruction: reasoningSystemPrompt,
                     maxOutputTokens: requestConfig.maxOutputTokens,
-                    temperature: 0.7,
-                    reasoningEffort: "low"
+                    temperature: 0.7
                   }
                 : requestConfig,
               timeoutMs,
