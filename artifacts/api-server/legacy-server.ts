@@ -1401,99 +1401,86 @@ ${JSON.stringify({ examples: [{ messages: [
         const assignedMixedTurn: MixedTurn = (generationStacks.slice(0, c).reduce((sum, stack) => sum + stack.length, 0) + modelIndex) % 2 === 0
           ? "Single Turn" : "Multi Turn";
 
-      const reasoningUserPrompt = `Generate exactly 1 high-quality, diverse SFT training example for model stack ${c + 1} of ${generationStacks.length}.
+      const reasoningUserPrompt = `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
 
-PROJECT CONTEXT:
-Project Name: ${projectName || "SFT Assistant"}
-System Prompt to Simulate: ${systemPrompt || "You are a helpful assistant."}
-Target Task and Persona: ${targetTask || "General helpfulness"}
-General Constraints: ${constraints || "Be accurate, detailed, and clear."}
+Generate exactly ONE high-quality SFT training example.
 
-PROJECT DEFINITION — EXEMPLAR TARGET RESPONSE:
+PROJECT DEFINITION
+
+Project Name:
+${projectName || "SFT Assistant"}
+
+System Prompt to Simulate:
+${systemPrompt || "You are a helpful assistant."}
+
+Target Task and Persona:
+${targetTask || "General helpfulness"}
+
+General Constraints:
+${constraints || "Be accurate, detailed, and clear."}
+
+
+GOLDEN EXEMPLAR
+
 ${exemplarTargetResponse}
 
-Use this project-defined exemplar only as a reference for target response tone, diction, voice, and quality. Do not copy its content or treat its original prompt as the task to answer. Follow the project and batch instructions for what to generate.
+Use the golden exemplar only as a reference for target response tone, diction, voice, structure, and quality. Do not copy its content or treat its original prompt as the task to answer.
 
-BATCH SETTINGS:
-Batch Description: ${batchDescription || "Standard synth batch"}
-Special Instructions: ${specialInstructions || "No additional instructions"}
-Temporary Constraints: ${temporaryConstraints || "None"}
 
-SELECTED TEMPLATE TYPE:
+BATCH DEFINITION
+
+Batch Description:
+${batchDescription || "Standard synth batch"}
+
+Special Instructions:
+${specialInstructions || "No additional instructions"}
+
+Temporary Constraints:
+${temporaryConstraints || "None"}
+
+
+SELECTED TEMPLATE
+
 ${templateType}
 
-STRICT TEMPLATE REQUIREMENT:
-You MUST generate exactly 1 example using ONLY the selected TEMPLATE TYPE: "${templateType}".
-Do NOT scramble or mix template formats.
-Do NOT use any other template format.
+Use ONLY this selected template type. Do not mix or substitute template formats.
 
-REASONING TEMPLATE STRUCTURE:
-The single example in the "examples" array MUST follow this exact structure.
 
-Return the complete output as one JSON object:
-{"examples":[...]}
+GENERATION INSTRUCTION
 
-The example must contain exactly two messages, in this order:
+Generate exactly one original, diverse, realistic, self-contained example based on the complete project definition, golden exemplar, batch definition, and selected template above.
 
-1. USER MESSAGE
-{
-  "role": "user",
-  "content": "A creative, diverse user prompt or question based on the scenario..."
-}
+The generated example must contain exactly two messages: one user message followed by one assistant message.
 
-2. ASSISTANT MESSAGE
-{
-  "role": "assistant",
-  "content": "<sft_reasoning>\\n[Concise explanation of the key reasoning steps, checks, or considerations]\\n</sft_reasoning>\\n[Clear, complete final assistant response]"
-}
+The assistant response must contain exactly one concise <sft_reasoning> block, followed immediately by the complete final answer.
 
-Do not add a system message or extra turns.
+Do not include any text outside the required JSON object.
 
-The generated example must be original, realistic, self-contained, and tailored to the requested persona, task, and constraints.
 
-OUTPUT REQUIREMENTS:
-- Generate exactly 1 example.
-- Return exactly one JSON object with an "examples" array.
-- Do not return a top-level JSON array.
-- Do not return commentary before or after the JSON.
-- Do not use Markdown code fences.
-- Do not add extra properties to the example or its messages.
-- Ensure the final output is valid JSON.`;
-      const reasoningSystemPrompt = `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
+OUTPUT REQUIREMENTS
 
-Your task is to generate high-quality training examples that follow the requested template exactly.
+Return exactly one valid JSON object with exactly one top-level property: "examples".
 
-REASONING TEMPLATE RULES:
-1. Return exactly one JSON object with one top-level property: "examples".
-2. "examples" must contain exactly the requested number of examples.
-3. Each example must contain exactly one property: "messages".
-4. Each "messages" array must contain exactly two messages:
-   - one user message
-   - one assistant message
-5. Do not include system messages inside individual examples.
-6. Do not include extra turns or extra properties.
-7. The assistant message must begin with exactly one non-empty <sft_reasoning>...</sft_reasoning> block.
-8. The final answer must appear immediately after the closing </sft_reasoning> tag.
-9. The reasoning section must contain a concise explanation of the key steps, checks, or considerations supporting the answer.
-10. Do not place the final answer inside the reasoning tags.
-11. Do not duplicate, nest, omit, or reorder the reasoning tags.
-12. Do not create separate "reasoning" or "reasoning_content" properties.
-13. Escape line breaks inside JSON strings as \\n.
-14. Do not include meta-commentary about dataset generation, prompt construction, or these instructions in generated examples.
-15. Generate original content appropriate to the requested project, persona, task, and constraints.
+"examples" must contain exactly one example.
 
-REQUIRED ASSISTANT FORMAT:
-<sft_reasoning>\\nConcise explanation of the key steps, checks, or considerations supporting the answer.\\n</sft_reasoning>\\nFinal answer.
+Each example must contain exactly one property: "messages".
 
-STRUCTURAL EXAMPLE:
-${JSON.stringify({ examples: [{ messages: [
-  { role: "user", content: "What is 2 + 3?" },
-  { role: "assistant", content: "<sft_reasoning>\nI add 2 and 3 to determine the result.\n</sft_reasoning>\nThe answer is 5." }
-] }] })}
+Each "messages" array must contain exactly two messages:
+- one user message
+- one assistant message
 
-The example demonstrates structure only. Generate new content based on the actual project instructions.
+Do not include a system message inside the generated example.
+Do not include extra turns or properties.
+Do not create separate "reasoning" or "reasoning_content" properties.
+Escape line breaks inside JSON strings as \\n.
+Do not use Markdown code fences.
+Do not add commentary before or after the JSON.
 
-The selected template type is authoritative. Never mix template types within a batch.`;
+
+FINAL OUTPUT TEMPLATE
+
+{"examples":[{"messages":[{"role":"user","content":"A creative, diverse user prompt based on the project and batch context."},{"role":"assistant","content":"<sft_reasoning>\\nA concise explanation of the key reasoning steps, checks, or considerations supporting the answer.\\n</sft_reasoning>\\nThe complete final answer to the generated user prompt."}]}]}`;
+      const reasoningSystemPrompt = reasoningUserPrompt;
       const fullPrompt = `
         You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
         Your task is to generate exactly ${currentChunkSize} high-quality, diverse SFT training examples (model stack ${c + 1} of ${generationStacks.length}).
@@ -1879,11 +1866,11 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             }
             const response = await callDigitalOceanChatCompletions({
               model,
-              contents: isReasoningGeneration ? encodeReasoningProviderText(prompt) : prompt,
-              applySftSamplingPenalties: true,
+              ...(isReasoningGeneration ? {} : { contents: prompt }),
+              applySftSamplingPenalties: !isReasoningGeneration,
               config: isReasoningGeneration
                 ? {
-                    systemInstruction: reasoningSystemPrompt,
+                    systemInstruction: encodeReasoningProviderText(prompt),
                     maxOutputTokens: requestConfig.maxOutputTokens,
                     temperature: 0.7,
                     reasoningEffort: null

@@ -1,0 +1,107 @@
+completionResponse = await fetch("https://inference.do-ai.run/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${doApiKey.trim()}`,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    model: targetModel,
+    messages: [
+      {
+        role: "system",
+        content: `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
+
+Generate exactly ONE high-quality SFT training example.
+
+PROJECT DEFINITION
+
+Project Name:
+[project name]
+
+System Prompt to Simulate:
+[project system prompt]
+
+Target Task and Persona:
+[target task]
+
+General Constraints:
+[constraints]
+
+
+GOLDEN EXEMPLAR
+
+[exemplar target response]
+
+Use the golden exemplar only as a reference for target response tone, diction, voice, structure, and quality. Do not copy its content or treat its original prompt as the task to answer.
+
+
+BATCH DEFINITION
+
+Batch Description:
+[batch description]
+
+Special Instructions:
+[special instructions]
+
+Temporary Constraints:
+[temporary constraints]
+
+
+SELECTED TEMPLATE
+
+[template type]
+
+Use ONLY this selected template type. Do not mix or substitute template formats.
+
+
+GENERATION INSTRUCTION
+
+Generate exactly one original, diverse, realistic, self-contained example based on the complete project definition, golden exemplar, batch definition, and selected template above.
+
+The generated example must contain exactly two messages: one user message followed by one assistant message.
+
+The assistant response must contain exactly one concise <sft_reasoning> block, followed immediately by the complete final answer.
+
+Do not include any text outside the required JSON object.
+
+
+OUTPUT REQUIREMENTS
+
+Return exactly one valid JSON object with exactly one top-level property: "examples".
+
+"examples" must contain exactly one example.
+
+Each example must contain exactly one property: "messages".
+
+Each "messages" array must contain exactly two messages:
+- one user message
+- one assistant message
+
+Do not include a system message inside the generated example.
+Do not include extra turns or properties.
+Do not create separate "reasoning" or "reasoning_content" properties.
+Escape line breaks inside JSON strings as \\n.
+Do not use Markdown code fences.
+Do not add commentary before or after the JSON.
+
+FINAL OUTPUT TEMPLATE
+
+{"examples":[{"messages":[{"role":"user","content":"A creative, diverse user prompt based on the project and batch context."},{"role":"assistant","content":"<sft_reasoning>\\nA concise explanation of the key reasoning steps, checks, or considerations supporting the answer.\\n</sft_reasoning>\\nThe complete final answer to the generated user prompt."}]}]}`
+      }
+    ],
+    temperature: params.config?.temperature ?? 0.7,
+    ...(params.exactMessages
+      ? { max_completion_tokens: maxTokensToUse }
+      : { max_tokens: maxTokensToUse }),
+    ...(params.config?.reasoningEffort === null
+      ? {}
+      : {
+          reasoning_effort:
+            params.config?.reasoningEffort ?? "none"
+        }),
+    ...(jsonMode
+      ? { response_format: { type: "json_object" } }
+      : {})
+  }),
+  signal: abortSignal
+});
