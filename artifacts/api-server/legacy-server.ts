@@ -2146,7 +2146,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               ? generationModels[slot % generationModels.length]
               : turnMode === "Multi Turn"
                 ? ["deepseek-4-flash", "gemma-4-31B-it"][slot % 2]
-                : recoveryModel;
+                : generationModels[slot % generationModels.length];
           try {
             let examples: any[];
             try {
@@ -2184,9 +2184,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             if (isReasoningGeneration) reasoningRetryModelIndices.push(reasoningRetryModelIndices[slot] + 1);
             if (turnMode === "Multi Turn") recoveryTurnCounts.push(recoveryTurnCounts[slot]);
             if (turnMode === "Mixed") mixedRecoveryTurns.push(mixedRecoveryTurns[slot]);
-            // Pace persistent provider failures instead of creating a tight request loop.
-            const pauseMs = Math.min(2000, Math.max(0, generationDeadline - Date.now()));
-            if (pauseMs > 0) await new Promise(resolve => setTimeout(resolve, pauseMs));
           }
         }
       }));
