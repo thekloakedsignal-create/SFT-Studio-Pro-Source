@@ -4341,26 +4341,18 @@ export default function App() {
 
             <button
               id="tab-expert"
-              disabled={!selectedProjectId}
               onClick={() => {
-                if (!selectedProjectId) {
-                  setNotification({ text: "Please enter your SFT Project Name and click 'Save Work' to unlock the rest of SFT Studio.", type: "error" });
-                  return;
-                }
                 setActiveTab("expert");
                 setIsMobileNavOpen(false);
               }}
               className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 group ${
-                !selectedProjectId
-                  ? "opacity-45 cursor-not-allowed text-slate-500 hover:text-slate-500 hover:bg-transparent"
-                  : activeTab === "expert"
+                activeTab === "expert"
                   ? "bg-green-500/15 text-green-400 border border-green-500/25 shadow-sm cursor-pointer"
                   : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/40 cursor-pointer"
               }`}
             >
-              {!selectedProjectId ? <Lock className="h-4 w-4 shrink-0 text-slate-500/80 group-hover:text-red-400 transition" /> : <MessageSquare className="h-4 w-4 shrink-0" />}
+              <MessageSquare className="h-4 w-4 shrink-0" />
               <span>6. App Support</span>
-              {!selectedProjectId && <span className="ml-auto text-[9px] text-slate-600 uppercase font-bold tracking-wider">Locked</span>}
             </button>
 
           </div>
