@@ -24,7 +24,6 @@ import {
   ShieldAlert, 
   Sliders, 
   Database,
-  ArrowUp,
   ArrowRight,
   User,
   Cpu,
@@ -8085,16 +8084,25 @@ export default function App() {
         </div>
       )}
 
-      {["synthesizer", "convert", "triad", "assess"].includes(activeTab) && (
+      {["define", "synthesizer", "convert", "triad", "assess"].includes(activeTab) && (
         <div className="fixed bottom-24 right-0 z-40">
           <button
             type="button"
-            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            aria-label="Back to top"
-            title="Back to top"
+            onClick={() => {
+              const nextTab = activeTab === "define" ? "synthesizer" : activeTab === "synthesizer" ? "convert" : activeTab === "convert" ? "triad" : activeTab === "triad" ? "assess" : "registry";
+              const nextTabRequiresProject = nextTab === "convert" || nextTab === "triad" || nextTab === "assess" || nextTab === "registry";
+              if (nextTabRequiresProject && !selectedProjectId) {
+                setNotification({ text: "Please enter your SFT Project Name and click 'Save Work' to unlock the rest of SFT Studio.", type: "error" });
+                return;
+              }
+              setActiveTab(nextTab);
+              setIsMobileNavOpen(false);
+            }}
+            aria-label="Next page"
+            title="Next page"
             className="flex h-11 w-9 items-center justify-center rounded-l-xl border border-r-0 border-amber-300 bg-amber-400 text-slate-950 shadow-xl shadow-amber-400/20 transition-colors hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
           >
-            <ArrowUp className="h-4 w-4" aria-hidden="true" />
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       )}

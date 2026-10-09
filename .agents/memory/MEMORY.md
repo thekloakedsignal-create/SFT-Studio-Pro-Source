@@ -8,5 +8,6 @@
 - [Visual reference](visual-reference.md) — Follow the supplied palette and keep SFT Studio changes cosmetic only; do not alter behavior.
 - [Sign-in workspace](sign-in-workspace.md) — New sign-ins and accounts start with a fresh unlocked draft, not an automatically reopened saved project.
 - [Interface naming](interface-naming.md) — Hide generation model/backend labels; preserve batch names.
+- [SFT change scope](sft-change-scope.md) — For this app, follow wording literally and ask before resolving ambiguities or choosing among similar page names.
 - [Registry QA gate](registry-qa-gate.md) — Registry inclusion requires a completed QA check, not a perfect score; final serialized output gets a format-only check.
 - [Storage and generation](local-project-storage.md) — Preserve deliberate saved-project loading; never automatically reopen cached projects or reuse cached batches for generation.
