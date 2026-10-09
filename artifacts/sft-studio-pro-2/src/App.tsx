@@ -38,7 +38,6 @@ import {
   Cloud,
   CloudOff,
   MessageSquare,
-  Menu,
   Send,
   HelpCircle,
   Lightbulb,
@@ -4178,22 +4177,9 @@ export default function App() {
             aria-controls="sft-mobile-navigation"
             aria-expanded={isMobileNavOpen}
             onClick={() => setIsMobileNavOpen(true)}
-            className="flex w-full items-center justify-between rounded-xl border border-violet-500/40 bg-slate-950/80 px-3.5 py-2.5 text-sm font-semibold text-slate-100 shadow-sm transition hover:border-violet-400/70 hover:bg-slate-900"
+            className="flex w-full items-center justify-center rounded-xl border border-violet-500/40 bg-slate-200 px-3.5 py-2.5 text-sm font-bold text-black shadow-sm transition hover:border-violet-400/70 hover:bg-white"
           >
-            <span className="flex items-center gap-2">
-              <Menu className="h-4 w-4 text-violet-300" aria-hidden="true" />
-              <span>Menu</span>
-            </span>
-            <span className="text-xs font-medium text-violet-200">
-              {{
-                define: "Task & Generator",
-                convert: "Document to SFT",
-                triad: "TRiAD Alignment",
-                assess: "AI Quality Assessment",
-                registry: "Data Registry",
-                expert: "App Support",
-              }[activeTab]}
-            </span>
+            Menu
           </button>
         </div>
         <div className={`kk-workspace-panel grid grid-cols-1 lg:grid-cols-12 gap-5 ${["define", "convert", "assess"].includes(activeTab) ? "kk-compact-examples" : ""}`}>
