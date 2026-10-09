@@ -117,9 +117,9 @@ const PROJECT_PRESETS: Record<PresetType, Omit<ProjectSettings, "selectedPreset"
     systemPrompt: "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
     targetTask: "Instruction following, educational explanations, summaries, and general QA.",
     constraints: "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
-    batchDesc: "enter a training topic",
-    batchInstructions: "enter topic specific instructions",
-    batchTempConstraints: "enter topic specific restrictions",
+    batchDesc: "Enter a training topic",
+    batchInstructions: "Enter topic specific instructions",
+    batchTempConstraints: "Enter topic specific restrictions",
     examples: [
       {
         prompt: "Explain photosynthesis in simple terms.",
@@ -132,9 +132,9 @@ const PROJECT_PRESETS: Record<PresetType, Omit<ProjectSettings, "selectedPreset"
     systemPrompt: "You are Ember, a highly empathetic, supportive, and active-listening chat companion. You focus on validation, warm dialogue, and friendly brainstorming.",
     targetTask: "Empathetic active listening, life stories sharing, and warm creative conversations.",
     constraints: "Never provide clinical medical, legal, or psychiatric therapy. Use conversational vocabulary, gentle follow-up queries, and a highly positive tone.",
-    batchDesc: "enter a training topic",
-    batchInstructions: "enter topic specific instructions",
-    batchTempConstraints: "enter topic specific restrictions",
+    batchDesc: "Empathetic listening and active warm support dialogue",
+    batchInstructions: "Keep tone warm, validating, conversational, and friendly.",
+    batchTempConstraints: "Avoid medical advice",
     examples: [
       {
         prompt: "I'm feeling really overwhelmed with work today.",
@@ -147,9 +147,9 @@ const PROJECT_PRESETS: Record<PresetType, Omit<ProjectSettings, "selectedPreset"
     systemPrompt: "You are Socrates, the classical Greek philosopher. Speak in historical first-person classical style. You guide the user with irony and Socratic inquiry.",
     targetTask: "Deconstruction of opinions, logical interrogation, and Socratic philosophical dialogues.",
     constraints: "Respond mostly by asking leading, ironic, or analytical questions that force the user to examine their assumptions. Never drop the Socrates persona.",
-    batchDesc: "enter a training topic",
-    batchInstructions: "enter topic specific instructions",
-    batchTempConstraints: "enter topic specific restrictions",
+    batchDesc: "Socratic sage classical philosophical dialogue",
+    batchInstructions: "Speak as Socrates. Use irony and guide the conversation through logical questions.",
+    batchTempConstraints: "Never break the Socratic persona",
     examples: [
       {
         prompt: "What is truth?",
@@ -162,9 +162,9 @@ const PROJECT_PRESETS: Record<PresetType, Omit<ProjectSettings, "selectedPreset"
     systemPrompt: "You are Savant, an objective and rigorous academic research assistant specializing in science, math, and data synthesizing.",
     targetTask: "Statistical review, math explanations, scholarly summarization, and first-principles logical analysis.",
     constraints: "Provide confident yet highly precise scientific explanations. State assumptions and confidence bounds explicitly. Avoid emotional or colloquial slang.",
-    batchDesc: "enter a training topic",
-    batchInstructions: "enter topic specific instructions",
-    batchTempConstraints: "enter topic specific restrictions",
+    batchDesc: "Scholarly scientific summaries and data review",
+    batchInstructions: "Provide confident yet highly precise academic explanations. State confidence bounds.",
+    batchTempConstraints: "Avoid colloquial slang",
     examples: [
       {
         prompt: "What is the significance of the p-value?",
@@ -177,9 +177,9 @@ const PROJECT_PRESETS: Record<PresetType, Omit<ProjectSettings, "selectedPreset"
     systemPrompt: "You are a specialized AI model configured to...",
     targetTask: "Perform specific high-fidelity fine-tuning tasks...",
     constraints: "Ensure the output format stays strictly within...",
-    batchDesc: "enter a training topic",
-    batchInstructions: "enter topic specific instructions",
-    batchTempConstraints: "enter topic specific restrictions",
+    batchDesc: "",
+    batchInstructions: "",
+    batchTempConstraints: "",
     examples: [
       {
         prompt: "Design a customized prompt format.",
@@ -4978,7 +4978,7 @@ export default function App() {
                         type="text"
                         value={batchDesc}
                         onChange={(e) => setBatchDesc(e.target.value)}
-                        placeholder="enter a training topic"
+                        placeholder="Enter a training topic"
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:border-green-500/50 outline-none transition"
                       />
                     </div>
@@ -4988,7 +4988,7 @@ export default function App() {
                         type="text"
                         value={batchInstructions}
                         onChange={(e) => setBatchInstructions(e.target.value)}
-                        placeholder="enter topic specific instructions"
+                        placeholder="Enter topic specific instructions"
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:border-green-500/50 outline-none transition"
                       />
                     </div>
@@ -4998,7 +4998,7 @@ export default function App() {
                         type="text"
                         value={batchTempConstraints}
                         onChange={(e) => setBatchTempConstraints(e.target.value)}
-                        placeholder="enter topic specific restrictions"
+                        placeholder="Enter topic specific restrictions"
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:border-green-500/50 outline-none transition"
                       />
                     </div>
