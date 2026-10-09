@@ -4269,7 +4269,7 @@ export default function App() {
               }`}
             >
               {!selectedProjectId ? <Lock className="h-4 w-4 shrink-0 text-slate-500/80 group-hover:text-red-400 transition" /> : <FileText className="h-4 w-4 shrink-0" />}
-              <span>2. Document to SFT</span>
+              <span>3. Document to SFT</span>
               {!selectedProjectId && <span className="ml-auto text-[9px] text-slate-600 uppercase font-bold tracking-wider">Locked</span>}
             </button>
 
@@ -4293,7 +4293,7 @@ export default function App() {
               }`}
             >
               {!selectedProjectId ? <Lock className="h-4 w-4 shrink-0 text-slate-500/80 group-hover:text-red-400 transition" /> : <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400" />}
-              <span>3. TRiAD Alignment</span>
+              <span>4. TRiAD Alignment</span>
               {!selectedProjectId && <span className="ml-auto text-[9px] text-slate-600 uppercase font-bold tracking-wider">Locked</span>}
             </button>
 
@@ -4317,7 +4317,7 @@ export default function App() {
               }`}
             >
               {!selectedProjectId ? <Lock className="h-4 w-4 shrink-0 text-slate-500/80 group-hover:text-red-400 transition" /> : <Search className="h-4 w-4 shrink-0" />}
-              <span>4. AI Quality Assessment</span>
+              <span>5. AI Quality Assessment</span>
               {selectedProjectId && batches.filter(b => b.status === "Pending").length > 0 ? (
                 <span className="ml-auto bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] px-1.5 py-0.5 rounded font-mono">
                   {batches.filter(b => b.status === "Pending").length}
@@ -4347,7 +4347,7 @@ export default function App() {
               }`}
             >
               {!selectedProjectId ? <Lock className="h-4 w-4 shrink-0 text-slate-500/80 group-hover:text-red-400 transition" /> : <Database className="h-4 w-4 shrink-0" />}
-              <span>5. Data Registry</span>
+              <span>6. Data Registry</span>
               {selectedProjectId && batches.filter(b => b.status === "Approved").length > 0 ? (
                 <span className="ml-auto bg-green-500/15 text-green-400 border border-green-500/20 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold">
                   {batches.filter(b => b.status === "Approved").length}
@@ -4370,7 +4370,7 @@ export default function App() {
               }`}
             >
               <MessageSquare className="h-4 w-4 shrink-0" />
-              <span>6. App Support</span>
+              <span>7. App Support</span>
             </button>
 
           </div>
