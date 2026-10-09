@@ -465,7 +465,7 @@ export default function App() {
     return <AuthPopupHandler />;
   }
 
-  const [activeTab, setActiveTab] = useState<"define" | "convert" | "triad" | "assess" | "registry" | "expert">("define");
+  const [activeTab, setActiveTab] = useState<"define" | "synthesizer" | "convert" | "triad" | "assess" | "registry" | "expert">("define");
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [activeResourcePage, setActiveResourcePage] = useState<(typeof RESOURCE_LINKS)[number] | null>(null);
   
@@ -4230,7 +4230,23 @@ export default function App() {
               }`}
             >
               <Settings className="h-4 w-4 shrink-0" />
-              <span>1. Task & Generator</span>
+              <span>1. Project Definition</span>
+            </button>
+
+            <button
+              id="tab-synthesizer"
+              onClick={() => {
+                setActiveTab("synthesizer");
+                setIsMobileNavOpen(false);
+              }}
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 ${
+                activeTab === "synthesizer"
+                  ? "kk-tab-active shadow-sm"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
+              }`}
+            >
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span>2. Batch Synthesizer</span>
             </button>
 
             <button
@@ -4493,7 +4509,7 @@ export default function App() {
         <div className="lg:col-span-9 xl:col-span-10 flex flex-col gap-6 min-w-0">
           <AnimatePresence mode="wait">
             
-            {/* TAB 1: DEFINITIONS & BATCH GENERATION */}
+            {/* TAB 1: PROJECT DEFINITION */}
             {activeTab === "define" && (
               <motion.div
                 key="define-tab"
@@ -4958,6 +4974,18 @@ export default function App() {
                   </div>
                 </div>
 
+              </motion.div>
+            )}
+
+            {/* TAB 2: BATCH SYNTHESIZER */}
+            {activeTab === "synthesizer" && (
+              <motion.div
+                key="synthesizer-tab"
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                className="space-y-6"
+              >
                 {/* Batch Generator Settings Card */}
                 <div className="kk-synthetic-generator-card bg-slate-950/40 border border-slate-800/80 p-6 rounded-2xl relative overflow-hidden">
                   <div className="border-b border-slate-800 pb-4 mb-6">
