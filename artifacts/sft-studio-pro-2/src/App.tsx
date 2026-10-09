@@ -1477,6 +1477,8 @@ export default function App() {
             projectName: project.name,
             targetTask: project.targetTask,
             systemPrompt: project.systemPrompt,
+            projectDefinition: project,
+            hasSavedProject: Boolean(selectedProjectId),
             activeTab,
             totalBatches: batches.length,
             totalExamples: batches.reduce((acc, b) => acc + (b.examples?.length || 0), 0),
