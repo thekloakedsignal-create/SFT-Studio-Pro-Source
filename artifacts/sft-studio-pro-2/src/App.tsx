@@ -88,6 +88,24 @@ import {
 } from "./firebase";
 import { onAuthStateChanged, signInWithCredential, GoogleAuthProvider, User as FirebaseUser } from "firebase/auth";
 
+const RESOURCE_LINKS = [
+  {
+    id: "documentation",
+    title: "Documentation",
+    url: "https://thekloakedsignal-create.github.io/sft-studio-pro-v1.0-user-manual-p_O6Jmj/",
+  },
+  {
+    id: "privacy-policy",
+    title: "Privacy Policy",
+    url: "https://triadai.online/privacy",
+  },
+  {
+    id: "terms-and-conditions",
+    title: "Terms and Conditions",
+    url: "https://triadai.online/terms",
+  },
+] as const;
+
 // Constant presets for SFT Task Definition
 const PROJECT_PRESETS: Record<PresetType, Omit<ProjectSettings, "selectedPreset"> & {
   batchDesc: string;
@@ -450,6 +468,7 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<"define" | "convert" | "triad" | "assess" | "registry" | "expert">("define");
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [activeResourcePage, setActiveResourcePage] = useState<(typeof RESOURCE_LINKS)[number] | null>(null);
   
   // In-App Chat Assistant State
   const [expertMessages, setExpertMessages] = useState<Array<{ role: "user" | "assistant"; content: string; source?: string }>>([]);
@@ -4360,6 +4379,29 @@ export default function App() {
 
           </div>
 
+          <div className="rounded-xl border border-slate-800/60 bg-slate-950/30 p-3">
+            <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Resources
+            </h3>
+            <div className="flex flex-col gap-1">
+              {RESOURCE_LINKS.map((resource) => (
+                <button
+                  key={resource.id}
+                  type="button"
+                  data-testid={`button-open-resource-${resource.id}`}
+                  onClick={() => {
+                    setActiveResourcePage(resource);
+                    setIsMobileNavOpen(false);
+                  }}
+                  className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-300 transition hover:bg-slate-900/70 hover:text-white"
+                >
+                  <BookOpen className="h-4 w-4 shrink-0 text-violet-300" aria-hidden="true" />
+                  <span>{resource.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Consolidated Sidebar Overview Panel (Replaces 3 redundant separate bordered cards) */}
           <div className="bg-slate-950/30 border border-slate-800/60 p-3.5 rounded-xl hidden lg:flex flex-col gap-3.5 text-xs">
             {/* Quick Metrics */}
@@ -7984,6 +8026,53 @@ export default function App() {
               </button>
             </div>
           </motion.div>
+        </div>
+      )}
+
+      {activeResourcePage && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="resource-page-title"
+          className="fixed inset-0 z-[70] flex bg-slate-950/90 p-2 sm:p-5"
+        >
+          <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-950 shadow-2xl">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
+              <h2 id="resource-page-title" className="text-sm font-semibold text-slate-100 sm:text-base">
+                {activeResourcePage.title}
+              </h2>
+              <div className="flex items-center gap-2">
+                <a
+                  data-testid="link-open-resource-new-tab"
+                  href={activeResourcePage.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
+                >
+                  Open in new tab
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                </a>
+                <button
+                  type="button"
+                  data-testid="button-close-resource-page"
+                  aria-label={`Close ${activeResourcePage.title}`}
+                  onClick={() => setActiveResourcePage(null)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-100 transition hover:border-violet-400/60 hover:bg-slate-800"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                  Close
+                </button>
+              </div>
+            </div>
+            <iframe
+              key={activeResourcePage.id}
+              title={activeResourcePage.title}
+              src={activeResourcePage.url}
+              referrerPolicy="no-referrer"
+              sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
+              className="min-h-0 flex-1 border-0 bg-white"
+            />
+          </div>
         </div>
       )}
 

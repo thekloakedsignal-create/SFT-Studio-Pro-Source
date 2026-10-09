@@ -5,7 +5,7 @@
 - [TRiAD import source](triad-import-source.md) — Keep TRiAD imports URL-based; do not restore embedded helpful/harmful seed examples or fallback records.
 - [Document conversion intent](document-conversion-intent.md) — Transcript copies tagged dialogue verbatim; Knowledge and Literature synthesize examples.
 - [QA scope](quality-audit-intent.md) — QA must combine formatting/template checks with semantic assessment, not replace either one.
-- [Visual reference](visual-reference.md) — Use the supplied screenshot for palette changes; preserve layout and prioritize sharp work-area contrast.
+- [Visual reference](visual-reference.md) — Follow the supplied palette and keep SFT Studio changes cosmetic only; do not alter behavior.
 - [Sign-in workspace](sign-in-workspace.md) — New sign-ins and accounts start with a fresh unlocked draft, not an automatically reopened saved project.
 - [Interface naming](interface-naming.md) — Hide generation model/backend labels; preserve batch names.
 - [Registry QA gate](registry-qa-gate.md) — Registry inclusion requires a completed QA check, not a perfect score; final serialized output gets a format-only check.

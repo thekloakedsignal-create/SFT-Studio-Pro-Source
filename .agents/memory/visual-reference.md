@@ -1,7 +1,13 @@
 ---
 name: SFT visual reference
-description: User's screenshot-based palette requirements and contrast correction.
+description: Visual design requirements and the cosmetic-only scope for SFT Studio changes.
 ---
+
+For SFT Studio changes, make cosmetic changes only; do not change anything else.
+
+**Why:** The user asked.
+
+**How to apply:** Keep changes cosmetic and leave application logic and behavior untouched.
 
 Use the user's latest marked screenshot as the visual reference. The signed-in workspace should have a dark-purple surrounding field and clearly distinct light-gray boxes inside it, with bold readable text and metallic-purple accents. Do not make the entire area one solid color or place overlays over content. When asked to remove the box around the main work area, remove only that enclosing border; keep individual content cards. Keep the font family unchanged unless explicitly asked. Workspace text inputs and textareas should have black backgrounds with bright metallic-purple text. Keep the separate title/header area and purple actions as shown; do not substitute pale lavender for metallic purple.
 
