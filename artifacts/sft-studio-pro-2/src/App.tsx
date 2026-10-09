@@ -8086,13 +8086,13 @@ export default function App() {
       )}
 
       {["synthesizer", "convert", "triad", "assess"].includes(activeTab) && (
-        <div className="fixed bottom-24 right-6 z-40">
+        <div className="fixed bottom-24 right-0 z-40">
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             aria-label="Back to top"
             title="Back to top"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-300 bg-amber-400 text-slate-950 shadow-xl shadow-amber-400/20 transition-colors hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
+            className="flex h-11 w-9 items-center justify-center rounded-l-xl border border-r-0 border-amber-300 bg-amber-400 text-slate-950 shadow-xl shadow-amber-400/20 transition-colors hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
           >
             <ArrowUp className="h-4 w-4" aria-hidden="true" />
           </button>
