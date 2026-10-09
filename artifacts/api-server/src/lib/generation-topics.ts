@@ -28,12 +28,16 @@ Before responding, count the topics in your response and verify you have provide
   let topics: string[] | undefined;
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
+    let rawResponse = "";
+    let receivedCount: number | string = "unparseable";
     try {
-      const parsed: unknown = JSON.parse(await request(prompt));
+      rawResponse = await request(prompt);
+      const parsed: unknown = JSON.parse(rawResponse);
       const record = parsed && typeof parsed === "object" && !Array.isArray(parsed)
         ? parsed as Record<string, unknown>
         : {};
       const responseTopics = Array.isArray(record.topics) ? record.topics : null;
+      if (Array.isArray(responseTopics)) receivedCount = responseTopics.length;
       if (
         !Array.isArray(responseTopics) || responseTopics.length !== totalTopicCount ||
         responseTopics.some(topic => typeof topic !== "string" || !topic.trim())
@@ -44,6 +48,7 @@ Before responding, count the topics in your response and verify you have provide
       break;
     } catch (error) {
       lastError = error;
+      console.error(`[Topic Planner] attempt ${attempt + 1} failed: expected ${totalTopicCount} topics, received ${receivedCount}. Raw response:\n${rawResponse || "(empty)"}`);
     }
   }
   if (!topics) {
