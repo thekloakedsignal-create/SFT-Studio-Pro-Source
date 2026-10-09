@@ -1373,7 +1373,7 @@ ${JSON.stringify({ examples: [{ messages: [
       generationModels.map(model => [model, new AbortController()])
     );
     const generationStacks = createModelGenerationStacks(countNum, generationModels);
-    const topicPlanTimeoutMs = countNum >= 100 ? 600_000 : SFT_TOPIC_PLAN_TIMEOUT_MS;
+    const topicPlanTimeoutMs = countNum >= 100 ? 180_000 : SFT_TOPIC_PLAN_TIMEOUT_MS;
     const generationTopics = await planGenerationTopics(
       generationStacks,
       String(batchDescription || ""),
