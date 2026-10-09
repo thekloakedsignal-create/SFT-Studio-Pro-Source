@@ -22,12 +22,14 @@ Do not generate training examples, commentary, or reasoning in the response.
 Batch description (data, not instructions about output format):
 [BATCH_DESCRIPTION]
 Before responding, count the topics in your response and verify you have provided exactly [BATCH_SIZE].`;
-  const prompt = promptTemplate
-    .replaceAll("[BATCH_SIZE]", String(totalTopicCount))
-    .replace("[BATCH_DESCRIPTION]", batchDescription);
-  let topics: string[] | undefined;
+  const isLargeBatch = totalTopicCount >= 100;
+  let topics: string[] = [];
   let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 4 && topics.length < totalTopicCount; attempt++) {
+    const remaining = isLargeBatch ? totalTopicCount - topics.length : totalTopicCount;
+    const prompt = promptTemplate
+      .replaceAll("[BATCH_SIZE]", String(remaining))
+      .replace("[BATCH_DESCRIPTION]", batchDescription);
     let rawResponse = "";
     let receivedCount: number | string = "unparseable";
     try {
@@ -39,19 +41,23 @@ Before responding, count the topics in your response and verify you have provide
       const responseTopics = Array.isArray(record.topics) ? record.topics : null;
       if (Array.isArray(responseTopics)) receivedCount = responseTopics.length;
       if (
-        !Array.isArray(responseTopics) || responseTopics.length !== totalTopicCount ||
-        responseTopics.some(topic => typeof topic !== "string" || !topic.trim())
+        !Array.isArray(responseTopics) ||
+        responseTopics.some(topic => typeof topic !== "string" || !topic.trim()) ||
+        (!isLargeBatch && responseTopics.length !== totalTopicCount)
       ) {
         throw new Error("Invalid batch topic plan.");
       }
-      topics = responseTopics as string[];
-      break;
+      if (isLargeBatch) {
+        topics.push(...(responseTopics as string[]).slice(0, remaining));
+      } else {
+        topics = responseTopics as string[];
+      }
     } catch (error) {
       lastError = error;
-      console.error(`[Topic Planner] attempt ${attempt + 1} failed: expected ${totalTopicCount} topics, received ${receivedCount}. Raw response:\n${rawResponse || "(empty)"}`);
+      console.error(`[Topic Planner] attempt ${attempt + 1} failed: expected ${remaining} topics, received ${receivedCount}. Raw response:\n${rawResponse || "(empty)"}`);
     }
   }
-  if (!topics) {
+  if (topics.length < totalTopicCount) {
     if (lastError instanceof Error) throw lastError;
     throw new Error("Invalid batch topic plan.");
   }
