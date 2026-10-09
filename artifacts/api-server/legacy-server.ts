@@ -1783,7 +1783,7 @@ FINAL OUTPUT TEMPLATE
           const configObj: any = {
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
-            reasoningEffort: "low",
+            reasoningEffort: null,
             ...(turnMode === "Reasoning"
               ? {
                   responseSchema: {
@@ -1868,7 +1868,6 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             const response = await callDigitalOceanChatCompletions({
               model,
               ...(isReasoningGeneration ? {} : { contents: prompt }),
-              applySftSamplingPenalties: !isReasoningGeneration,
               config: isReasoningGeneration
                 ? {
                     systemInstruction: encodeReasoningProviderText(prompt),
