@@ -1858,14 +1858,14 @@
             "id": "synth-1791251219783-4"
           }
         ],
-        "status": "Pending",
+        "status": "Approved",
         "timestamp": "2026-10-06 01:46:59.783Z",
         "description": "Dog breeds ",
         "specialInstructions": "Explore different dog breeds from a variety of topics ",
         "temporaryConstraints": "300 word minimum. No duplicates or repeating topic prompts "
       }
     ],
-    "updatedAt": "2026-10-06T01:47:00.188Z"
+    "updatedAt": "2026-10-09T21:20:07.343Z"
   },
   {
     "id": "project-1791207579892",
