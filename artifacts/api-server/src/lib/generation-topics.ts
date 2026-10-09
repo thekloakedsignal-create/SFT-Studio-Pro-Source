@@ -14,6 +14,7 @@ Use only the batch description as the source of subject matter.
 Return only a JSON object with this shape: {"topics":["topic", "..."]}.
 Return exactly [BATCH_SIZE] strings in "topics", in order.
 Be very careful to provide the EXACT number of topics requested in the response.
+Before responding, count the topics and verify the count exactly matches the requested number.
 Each item must be a concise, specific subject or scenario, preferably 2–6 words.
 All topics must be distinct across the entire list.
 Choose different subjects/entities, not rewordings of the same subject. When the description names a category, vary its members.

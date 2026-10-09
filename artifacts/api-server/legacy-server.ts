@@ -1378,7 +1378,7 @@ ${JSON.stringify({ examples: [{ messages: [
       generationStacks,
       String(batchDescription || ""),
       async prompt => extractResponseText(await callDigitalOceanChatCompletions({
-        model: "gemma-4-31B-it",
+        model: countNum >= 100 ? "qwen3.8-max" : "gemma-4-31B-it",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
