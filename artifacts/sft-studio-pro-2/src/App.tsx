@@ -5315,7 +5315,7 @@ export default function App() {
                         items={latestGeneratorBatch.examples}
                         title="Generated SFT Examples"
                         renderItem={(ex: SFTExample, exIdx: number) => (
-                          <div key={exIdx} className="bg-slate-900/50 border border-slate-800/70 rounded-xl p-3 sm:p-4 relative overflow-hidden group kk-example-card">
+                          <div key={exIdx} className="bg-slate-900/50 border border-slate-800/70 rounded-xl p-3 sm:p-4 relative overflow-hidden group kk-example-card kk-synth-generated-example">
                             {/* Example Header with Controls */}
                             <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-slate-800/60">
                               <span className="font-mono text-xs font-bold kk-example-label">

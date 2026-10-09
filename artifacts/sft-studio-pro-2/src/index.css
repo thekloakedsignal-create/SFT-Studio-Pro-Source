@@ -438,6 +438,24 @@ main [class~="opacity-45"] { opacity: .72; }
   line-height: 1.5 !important;
 }
 
+.kk-workspace-panel .kk-synth-generated-example {
+  width: calc(100% + 2.5rem);
+  margin-inline: -1.25rem;
+}
+
+.kk-workspace-panel .kk-synth-generated-example .pl-2.border-l-2 {
+  font-size: 0.75rem !important;
+  font-weight: 400 !important;
+  line-height: 1.5 !important;
+}
+
+@media (min-width: 640px) {
+  .kk-workspace-panel .kk-synth-generated-example {
+    width: calc(100% + 3rem);
+    margin-inline: -1.5rem;
+  }
+}
+
 @media (min-width: 1024px) {
   .kk-compact-examples > .lg\:col-span-3 { grid-column: span 2 / span 2; }
   .kk-compact-examples > .lg\:col-span-9 { grid-column: span 10 / span 10; }
