@@ -117,9 +117,9 @@ const PROJECT_PRESETS: Record<PresetType, Omit<ProjectSettings, "selectedPreset"
     systemPrompt: "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
     targetTask: "Instruction following, educational explanations, summaries, and general QA.",
     constraints: "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
-    batchDesc: "General Instruction following and explanations",
-    batchInstructions: "Prioritize clear, informative, and direct explanations.",
-    batchTempConstraints: "None",
+    batchDesc: "Enter a training topic",
+    batchInstructions: "Enter topic specific instructions",
+    batchTempConstraints: "Enter topic specific restrictions",
     examples: [
       {
         prompt: "Explain photosynthesis in simple terms.",
@@ -177,9 +177,9 @@ const PROJECT_PRESETS: Record<PresetType, Omit<ProjectSettings, "selectedPreset"
     systemPrompt: "You are a specialized AI model configured to...",
     targetTask: "Perform specific high-fidelity fine-tuning tasks...",
     constraints: "Ensure the output format stays strictly within...",
-    batchDesc: "Custom SFT Batch Generator",
-    batchInstructions: "Tailor the generated dataset strictly to customized parameters.",
-    batchTempConstraints: "None",
+    batchDesc: "",
+    batchInstructions: "",
+    batchTempConstraints: "",
     examples: [
       {
         prompt: "Design a customized prompt format.",
@@ -4984,7 +4984,7 @@ export default function App() {
                         type="text"
                         value={batchDesc}
                         onChange={(e) => setBatchDesc(e.target.value)}
-                        placeholder="e.g. Edge Cases and Hard Prompts"
+                        placeholder="Enter a training topic"
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:border-green-500/50 outline-none transition"
                       />
                     </div>
@@ -4994,7 +4994,7 @@ export default function App() {
                         type="text"
                         value={batchInstructions}
                         onChange={(e) => setBatchInstructions(e.target.value)}
-                        placeholder="e.g. Focus on physical sciences"
+                        placeholder="Enter topic specific instructions"
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:border-green-500/50 outline-none transition"
                       />
                     </div>
@@ -5004,7 +5004,7 @@ export default function App() {
                         type="text"
                         value={batchTempConstraints}
                         onChange={(e) => setBatchTempConstraints(e.target.value)}
-                        placeholder="e.g. Length must be exactly 100 words"
+                        placeholder="Enter topic specific restrictions"
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:border-green-500/50 outline-none transition"
                       />
                     </div>
