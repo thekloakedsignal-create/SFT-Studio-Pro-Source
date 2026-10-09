@@ -1373,6 +1373,7 @@ ${JSON.stringify({ examples: [{ messages: [
       generationModels.map(model => [model, new AbortController()])
     );
     const generationStacks = createModelGenerationStacks(countNum, generationModels);
+    const topicPlanTimeoutMs = countNum >= 100 ? 600_000 : SFT_TOPIC_PLAN_TIMEOUT_MS;
     const generationTopics = await planGenerationTopics(
       generationStacks,
       String(batchDescription || ""),
@@ -1385,7 +1386,7 @@ ${JSON.stringify({ examples: [{ messages: [
           temperature: 0.7,
           reasoningEffort: "none",
         },
-        timeoutMs: Math.min(SFT_TOPIC_PLAN_TIMEOUT_MS, Math.max(1, generationDeadline - Date.now())),
+          timeoutMs: Math.min(topicPlanTimeoutMs, Math.max(1, generationDeadline - Date.now())),
       })),
     );
     const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);
