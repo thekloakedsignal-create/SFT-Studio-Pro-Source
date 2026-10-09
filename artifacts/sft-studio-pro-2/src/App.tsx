@@ -38,6 +38,7 @@ import {
   Cloud,
   CloudOff,
   MessageSquare,
+  Menu,
   Send,
   HelpCircle,
   Lightbulb,
@@ -448,6 +449,7 @@ export default function App() {
   }
 
   const [activeTab, setActiveTab] = useState<"define" | "convert" | "triad" | "assess" | "registry" | "expert">("define");
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   
   // In-App Chat Assistant State
   const [expertMessages, setExpertMessages] = useState<Array<{ role: "user" | "assistant"; content: string; source?: string }>>([]);
@@ -4150,15 +4152,70 @@ export default function App() {
       </AnimatePresence>
 
       <main className={`flex-1 ${["define", "convert", "assess"].includes(activeTab) ? "max-w-[1920px]" : "max-w-[1720px]"} mx-auto w-full px-4 sm:px-6 lg:px-8 py-5`}>
+        <div className="mb-3 lg:hidden">
+          <button
+            type="button"
+            data-testid="button-open-mobile-navigation"
+            aria-controls="sft-mobile-navigation"
+            aria-expanded={isMobileNavOpen}
+            onClick={() => setIsMobileNavOpen(true)}
+            className="flex w-full items-center justify-between rounded-xl border border-violet-500/40 bg-slate-950/80 px-3.5 py-2.5 text-sm font-semibold text-slate-100 shadow-sm transition hover:border-violet-400/70 hover:bg-slate-900"
+          >
+            <span className="flex items-center gap-2">
+              <Menu className="h-4 w-4 text-violet-300" aria-hidden="true" />
+              <span>Menu</span>
+            </span>
+            <span className="text-xs font-medium text-violet-200">
+              {{
+                define: "Task & Generator",
+                convert: "Document to SFT",
+                triad: "TRiAD Alignment",
+                assess: "AI Quality Assessment",
+                registry: "Data Registry",
+                expert: "App Support",
+              }[activeTab]}
+            </span>
+          </button>
+        </div>
         <div className={`kk-workspace-panel grid grid-cols-1 lg:grid-cols-12 gap-5 ${["define", "convert", "assess"].includes(activeTab) ? "kk-compact-examples" : ""}`}>
         
         {/* Tab Sidebar Navigation (Desktop) & Tabs bar (Mobile) */}
-        <div className="lg:col-span-3 xl:col-span-2 flex flex-col gap-3">
-          <div className="bg-slate-950/30 border border-slate-800/60 p-2 rounded-xl flex flex-row lg:flex-col gap-1 overflow-x-auto custom-scrollbar">
+        <div
+          id="sft-mobile-navigation"
+          className={`${isMobileNavOpen ? "fixed inset-0 z-50 flex bg-black/60 lg:static lg:inset-auto lg:z-auto lg:bg-transparent" : "hidden lg:flex"} lg:col-span-3 xl:col-span-2 flex-col gap-3`}
+        >
+          {isMobileNavOpen && (
+            <button
+              type="button"
+              data-testid="button-dismiss-mobile-navigation"
+              aria-label="Close navigation menu"
+              onClick={() => setIsMobileNavOpen(false)}
+              className="absolute inset-0 bg-black/60 lg:hidden"
+            />
+          )}
+          <div className={`${isMobileNavOpen ? "relative z-10 h-full w-[min(18rem,88vw)] overflow-y-auto border-r border-violet-500/30 bg-slate-950 p-3 shadow-2xl" : ""} flex flex-col gap-3 lg:h-auto lg:w-auto lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none`}>
+          <div className="bg-slate-950/30 border border-slate-800/60 p-2 rounded-xl flex flex-col gap-1 custom-scrollbar">
+            {isMobileNavOpen && (
+              <div className="mb-2 flex items-center justify-between border-b border-slate-800 px-2 pb-2 lg:hidden">
+                <span className="text-sm font-semibold text-slate-100">Navigation</span>
+                <button
+                  type="button"
+                  data-testid="button-close-mobile-navigation"
+                  aria-label="Close navigation menu"
+                  onClick={() => setIsMobileNavOpen(false)}
+                  className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            )}
             
             <button
               id="tab-define"
-              onClick={() => setActiveTab("define")}
+              onClick={() => {
+                setActiveTab("define");
+                setIsMobileNavOpen(false);
+              }}
               className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 ${
                 activeTab === "define"
                   ? "kk-tab-active shadow-sm"
@@ -4178,6 +4235,7 @@ export default function App() {
                   return;
                 }
                 setActiveTab("convert");
+                setIsMobileNavOpen(false);
               }}
               className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 group ${
                 !selectedProjectId
@@ -4201,6 +4259,7 @@ export default function App() {
                   return;
                 }
                 setActiveTab("triad");
+                setIsMobileNavOpen(false);
               }}
               className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 group ${
                 !selectedProjectId
@@ -4224,6 +4283,7 @@ export default function App() {
                   return;
                 }
                 setActiveTab("assess");
+                setIsMobileNavOpen(false);
               }}
               className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 group ${
                 !selectedProjectId
@@ -4253,6 +4313,7 @@ export default function App() {
                   return;
                 }
                 setActiveTab("registry");
+                setIsMobileNavOpen(false);
               }}
               className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 group ${
                 !selectedProjectId
@@ -4282,6 +4343,7 @@ export default function App() {
                   return;
                 }
                 setActiveTab("expert");
+                setIsMobileNavOpen(false);
               }}
               className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 group ${
                 !selectedProjectId
@@ -4400,6 +4462,7 @@ export default function App() {
                 Streaming SFT synthesis with automated quality validation.
               </p>
             </div>
+          </div>
           </div>
 
         </div>
