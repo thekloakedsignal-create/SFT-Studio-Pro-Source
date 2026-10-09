@@ -466,6 +466,7 @@ export default function App() {
   }
 
   const [activeTab, setActiveTab] = useState<"define" | "convert" | "triad" | "assess" | "registry" | "expert">("define");
+  const [activeDefineTab, setActiveDefineTab] = useState<"project" | "synthesizer">("project");
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [activeResourcePage, setActiveResourcePage] = useState<(typeof RESOURCE_LINKS)[number] | null>(null);
   
@@ -4502,6 +4503,31 @@ export default function App() {
                 exit={{ opacity: 0, x: -10 }}
                 className="space-y-6"
               >
+                <div role="tablist" aria-label="Project setup" className="flex flex-wrap gap-1 rounded-xl border border-slate-800 bg-slate-950/40 p-1 w-fit">
+                  <button
+                    type="button"
+                    role="tab"
+                    id="project-definition-tab"
+                    aria-controls="project-definition-panel"
+                    aria-selected={activeDefineTab === "project"}
+                    onClick={() => setActiveDefineTab("project")}
+                    className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${activeDefineTab === "project" ? "bg-green-500 text-slate-950" : "text-slate-400 hover:text-white"}`}
+                  >
+                    Project Definition
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    id="batch-synthesizer-tab"
+                    aria-controls="batch-synthesizer-panel"
+                    aria-selected={activeDefineTab === "synthesizer"}
+                    onClick={() => setActiveDefineTab("synthesizer")}
+                    className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${activeDefineTab === "synthesizer" ? "bg-green-500 text-slate-950" : "text-slate-400 hover:text-white"}`}
+                  >
+                    Batch Synthesizer
+                  </button>
+                </div>
+                <div role="tabpanel" id="project-definition-panel" aria-labelledby="project-definition-tab" hidden={activeDefineTab !== "project"}>
                 {/* Preset Selection & Project Definition Card */}
                 <div className="bg-slate-950/30 border border-slate-800/50 p-5 sm:p-6 rounded-xl">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/70 pb-4 mb-6">
@@ -4957,7 +4983,9 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+                </div>
 
+                <div role="tabpanel" id="batch-synthesizer-panel" aria-labelledby="batch-synthesizer-tab" hidden={activeDefineTab !== "synthesizer"}>
                 {/* Batch Generator Settings Card */}
                 <div className="kk-synthetic-generator-card bg-slate-950/40 border border-slate-800/80 p-6 rounded-2xl relative overflow-hidden">
                   <div className="border-b border-slate-800 pb-4 mb-6">
@@ -5378,6 +5406,7 @@ export default function App() {
                       </p>
                     </div>
                   )}
+                </div>
                 </div>
               </motion.div>
             )}
