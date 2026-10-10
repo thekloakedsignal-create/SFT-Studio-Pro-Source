@@ -56,6 +56,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { AboutModal } from "./components/AboutModal";
+import { ProjectOnboarding } from "./components/ProjectOnboarding";
 import { PricingModal } from "./components/PricingModal";
 import { CustomPackageModal } from "./components/CustomPackageModal";
 import { AccountModal } from "./components/AccountModal";
@@ -466,6 +467,7 @@ export default function App() {
   }
 
   const [activeTab, setActiveTab] = useState<"define" | "synthesizer" | "convert" | "triad" | "assess" | "registry" | "expert">("define");
+  const [showProjectOnboarding, setShowProjectOnboarding] = useState(true);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [activeResourcePage, setActiveResourcePage] = useState<(typeof RESOURCE_LINKS)[number] | null>(null);
   
@@ -1353,6 +1355,7 @@ export default function App() {
 
   // Switch/Load selected project from Postgres or local cache
   const handleSelectProject = async (selectedId: string) => {
+    setShowProjectOnboarding(false);
     const loadVersion = ++projectLoadVersion.current;
     const batchesAtLoadStart = new Map(sessionBatches.current.get(selectedId));
     if (selectedId === "NEW_PROJECT") {
@@ -1576,6 +1579,7 @@ export default function App() {
     setSelectedProjectId(newProjId);
     setIsFieldsUnlocked(true);
     setProject(defaultSettings);
+    setShowProjectOnboarding(true);
     setBatches([]);
     initSelectedRegistryBatches([]);
 
@@ -3971,6 +3975,22 @@ export default function App() {
           accountTotalGenerations={accountTotalGenerations}
         />
       </div>
+    );
+  }
+
+  if (showProjectOnboarding) {
+    return (
+      <ProjectOnboarding
+        onComplete={(settings) => {
+          setProject(settings);
+          setIsFieldsUnlocked(true);
+          setBatchTemplate(settings.templateType || TemplateType.SINGLE_TURN);
+          setDocTemplate(settings.templateType || TemplateType.SINGLE_TURN);
+          setTriadTemplate(settings.templateType || TemplateType.SINGLE_TURN);
+          setActiveTab("define");
+          setShowProjectOnboarding(false);
+        }}
+      />
     );
   }
 

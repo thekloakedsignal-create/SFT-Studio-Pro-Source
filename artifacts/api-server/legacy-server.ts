@@ -4712,7 +4712,7 @@ app.post("/api/expert-chat", async (req, res) => {
       parts: [{ text: msg.content }]
     }));
 
-    const systemInstruction = `You are the in-app Chat Assistant for SFT Studio Pro, a web platform designed to build, curate, audit, and export high-quality Supervised Fine-Tuning (SFT) datasets for large language models.
+    const supportSystemInstruction = `You are the in-app Chat Assistant for SFT Studio Pro, a web platform designed to build, curate, audit, and export high-quality Supervised Fine-Tuning (SFT) datasets for large language models.
 
 YOUR IDENTITY & ROLE:
 - You are the in-app HELP & CHAT ASSISTANT, NOT the dataset generator.
@@ -4769,6 +4769,10 @@ GUIDELINES:
 - When a user asks how to do something, tell them which tab to click and what steps to take.
 - Answer questions on fine-tuning workflows, optimal dataset sizing, formatting differences, and negative constraints.
 - Keep responses readable, utilizing clean formatting with bullet points and code blocks when appropriate.`;
+
+    const systemInstruction = appContext?.mode === "project-onboarding"
+      ? `You are generating reviewable drafts for SFT Studio Pro project onboarding. Follow the user's requested output format exactly. When asked for a voice sample, write the requested sample only. When asked for a training example, provide only the requested JSON object. When asked for a system prompt, return only the complete prompt. Never claim that a draft is approved; only the user can approve or edit it. Keep drafts aligned with the supplied project goal, constraints, and voice reference.`
+      : supportSystemInstruction;
 
     const response = await callDigitalOceanAI(client, {
       model: normalizeModel(),
