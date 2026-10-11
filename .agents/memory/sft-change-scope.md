@@ -9,11 +9,11 @@ For this app, follow the user's instructions directly and literally. Ask before 
 
 **How to apply:** If the requested page, exclusion, or behavior is unclear, ask before changing code.
 
-Keep these requests within Project Onboarding. Never modify the main app, backend, batch generation, batch settings, or batch data. For curated-recipe requests, update the onboarding recommendation library only.
+Keep requests within Project Onboarding, except that onboarding recommendations may be passed to the existing main app for UI display. Never modify backend behavior, batch generation, batch settings, or batch data.
 
-**Why:** The user clarified that the recommendations are for Project Onboarding only and the app must never be changed.
+**Why:** The user permits only a display-only main-app handoff for the recommendations and prohibits changes to the app's actual functions.
 
-**How to apply:** Keep recipe edits in ProjectOnboarding only. Do not change App.tsx, app surfaces, or generation behavior.
+**How to apply:** Keep recipe logic in ProjectOnboarding. In App.tsx, limit changes to displaying and navigating the handed-off recommendations; preserve all existing generation and application behavior.
 
 The Project Setup base-model choice is temporary and must not be passed into project settings until the app has a supported field for it.
 

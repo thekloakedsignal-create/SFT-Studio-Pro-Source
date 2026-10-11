@@ -24,6 +24,7 @@ import {
   ShieldAlert, 
   Sliders, 
   Database,
+  ArrowLeft,
   ArrowRight,
   User,
   Cpu,
@@ -529,6 +530,8 @@ export default function App() {
   const [batchTempConstraints, setBatchTempConstraints] = useState(PROJECT_PRESETS[PresetType.GENERAL_USE].batchTempConstraints);
   const [batchTemplate, setBatchTemplate] = useState<TemplateType>(TemplateType.SINGLE_TURN);
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
+  const [activeRecommendedBatchIndex, setActiveRecommendedBatchIndex] = useState(0);
+  const activeRecommendedBatch = batchRecommendations[activeRecommendedBatchIndex];
   const [completedRecommendedBatches, setCompletedRecommendedBatches] = useState<string[]>([]);
   const [copiedRecommendedField, setCopiedRecommendedField] = useState("");
   const [batchSize, setBatchSize] = useState<number>(5);
@@ -3993,6 +3996,7 @@ export default function App() {
           if (recommendations?.length) {
             setBatchRecommendations(recommendations);
             setCompletedRecommendedBatches([]);
+            setActiveRecommendedBatchIndex(0);
             setActiveTab("synthesizer");
           } else {
             setActiveTab("define");
@@ -5034,28 +5038,62 @@ export default function App() {
                       </summary>
                       <div className="space-y-3 border-t border-purple-500/20 px-4 py-4">
                         <p className="text-xs text-slate-300">Check each recommendation after you have generated it.</p>
-                        {batchRecommendations.map(recommendation => (
-                          <div key={recommendation.topic} className="flex items-start gap-3 rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+                        {activeRecommendedBatch && (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                aria-label="Previous recommended batch"
+                                disabled={activeRecommendedBatchIndex === 0}
+                                onClick={() => setActiveRecommendedBatchIndex(index => Math.max(0, index - 1))}
+                                className="rounded border border-purple-300 bg-purple-300 p-2 text-black disabled:opacity-40"
+                              >
+                                <ArrowLeft className="h-4 w-4" />
+                              </button>
+                              <select
+                                aria-label="Choose a recommended batch"
+                                value={activeRecommendedBatchIndex}
+                                onChange={event => setActiveRecommendedBatchIndex(Number(event.target.value))}
+                                className="min-w-0 flex-1 rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+                              >
+                                {batchRecommendations.map((recommendation, index) => (
+                                  <option key={`${recommendation.topic}-${index}`} value={index}>{index + 1}. {recommendation.topic}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                aria-label="Next recommended batch"
+                                disabled={activeRecommendedBatchIndex >= batchRecommendations.length - 1}
+                                onClick={() => setActiveRecommendedBatchIndex(index => Math.min(batchRecommendations.length - 1, index + 1))}
+                                className="rounded border border-purple-300 bg-purple-300 p-2 text-black disabled:opacity-40"
+                              >
+                                <ArrowRight className="h-4 w-4" />
+                              </button>
+                            </div>
+                            <p className="text-center text-xs text-slate-400">
+                              Recommendation {activeRecommendedBatchIndex + 1} of {batchRecommendations.length}
+                            </p>
+                            <div key={activeRecommendedBatch.topic} className="flex items-start gap-3 rounded-lg border border-slate-700 bg-slate-900/70 p-3">
                             <input
                               type="checkbox"
-                              aria-label={`Mark ${recommendation.topic} as generated`}
-                              checked={completedRecommendedBatches.includes(recommendation.topic)}
+                              aria-label={`Mark ${activeRecommendedBatch.topic} as generated`}
+                              checked={completedRecommendedBatches.includes(activeRecommendedBatch.topic)}
                               onChange={event => setCompletedRecommendedBatches(current =>
                                 event.target.checked
-                                  ? [...current, recommendation.topic]
-                                  : current.filter(topic => topic !== recommendation.topic)
+                                  ? [...current, activeRecommendedBatch.topic]
+                                  : current.filter(topic => topic !== activeRecommendedBatch.topic)
                               )}
                               className="mt-1 accent-purple-400"
                             />
-                            <details className="min-w-0 flex-1">
-                              <summary className="cursor-pointer text-sm font-semibold text-slate-100">{recommendation.topic}</summary>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-sm font-semibold text-slate-100">{activeRecommendedBatch.topic}</h3>
                               <div className="mt-3 space-y-3">
                                 {([
-                                  ["topic", "Batch Description", recommendation.topic],
-                                  ["instructions", "Special Instructions", recommendation.specialInstructions],
-                                  ["constraints", "Temporary Constraints", recommendation.temporaryConstraints],
+                                  ["topic", "Batch Description", activeRecommendedBatch.topic],
+                                  ["instructions", "Special Instructions", activeRecommendedBatch.specialInstructions],
+                                  ["constraints", "Temporary Constraints", activeRecommendedBatch.temporaryConstraints],
                                 ] as const).map(([section, title, text]) => {
-                                  const copyKey = `${recommendation.topic}:${section}`;
+                                  const copyKey = `${activeRecommendedBatch.topic}:${section}`;
                                   return (
                                     <section key={section} className="border-t border-slate-700 pt-2">
                                       <div className="flex items-center justify-between gap-2">
@@ -5080,9 +5118,10 @@ export default function App() {
                                   );
                                 })}
                               </div>
-                            </details>
+                            </div>
                           </div>
-                        ))}
+                          </>
+                        )}
                       </div>
                     </details>
                   )}

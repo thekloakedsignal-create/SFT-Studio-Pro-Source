@@ -428,6 +428,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
   const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
   const [specialSkills, setSpecialSkills] = useState("");
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
+  const [activeRecommendationIndex, setActiveRecommendationIndex] = useState(0);
   const [approvedProjectDefinition, setApprovedProjectDefinition] = useState<ProjectSettings | null>(null);
   const [triadChoice, setTriadChoice] = useState<"yes" | "no" | null>(null);
   const [copiedBatchSection, setCopiedBatchSection] = useState("");
@@ -443,6 +444,8 @@ export function ProjectOnboarding({ onComplete }: Props) {
   const modelNameInstruction = rememberName === "yes" && modelRememberedName.trim()
     ? `Your name is ${modelRememberedName.trim()}.`
     : "";
+
+  const activeRecommendation = batchRecommendations[activeRecommendationIndex];
 
   const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
   const currentStepPosition = stepOrder.indexOf(step);
@@ -593,7 +596,8 @@ export function ProjectOnboarding({ onComplete }: Props) {
       ? "Do not create separate batches for single-turn, multi-turn, or reasoning formats. For every topic, tell the user to generate a balanced mix of single-turn, multi-turn, and reasoning examples."
       : "Do not create separate batches for single-turn, multi-turn, or reasoning formats. For every topic, tell the user to generate a balanced mix of single-turn and multi-turn examples only. Do not recommend reasoning templates or reasoning-focused topics for Llama 3.1 70B.";
     const draft = await askAI(
-      `Analyze this SFT project and recommend at least 20 distinct training batches based on its use case, goal, constraints, and the AI's special skills. ` +
+      `You are the Project Onboarding batch-recommendation assistant. Analyze the approved project and user-stated skills, then return at least 20 relevant batch recommendations for the UI. ` +
+      `This is recommendation-only: do not create training examples, datasets, or actual batches, and do not start or invoke the Batch generator. ` +
       `Every batch must include a topic, detailed special instructions, and temporary constraints. Always include "Red Teaming" and "Adversarial" batches. ` +
       `Treat the curated library as candidate recipes and preserve each selected recipe's topic, special instructions, and temporary constraints exactly. ` +
       `Normally recommend these broadly useful topics across project types, unless a project's goal or constraints make one clearly unsuitable: ${recommendedTopics.join(", ")}. ` +
@@ -615,6 +619,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
       ...item,
       specialInstructions: `${item.specialInstructions}\n\n${mixGuidance}`,
     })));
+    setActiveRecommendationIndex(0);
     setStep("batch-recommendations");
   };
 
@@ -855,29 +860,66 @@ export function ProjectOnboarding({ onComplete }: Props) {
           )}
           {step === "batch-recommendations" && (
             <div className="space-y-3">
-              {batchRecommendations.map(item => (
-                <article key={item.topic} className="space-y-3 border border-slate-600 bg-slate-900 px-4 py-3">
-                  <h2 className="font-semibold text-white">{item.topic}</h2>
-                  {([
-                    ["topic", "Batch Description", item.topic],
-                    ["instructions", "Special Instructions", item.specialInstructions],
-                    ["constraints", "Temporary Constraints", item.temporaryConstraints],
-                  ] as const).map(([section, label, text]) => {
-                    const key = `${item.topic}:${section}`;
-                    return (
-                      <section key={section} className="border-t border-slate-700 pt-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <h3 className="text-sm font-bold text-slate-100">{label}</h3>
-                          <button type="button" className={buttonClass} onClick={() => void copyRecommendationSection(key, text)}>
-                            {copiedBatchSection === key ? "Copied" : "Copy"}
-                          </button>
-                        </div>
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">{text}</p>
-                      </section>
-                    );
-                  })}
-                </article>
-              ))}
+              {batchRecommendations.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label="Previous recommended batch"
+                      className={buttonClass}
+                      disabled={activeRecommendationIndex === 0}
+                      onClick={() => setActiveRecommendationIndex(index => Math.max(0, index - 1))}
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </button>
+                    <select
+                      aria-label="Choose a recommended batch"
+                      className="min-w-0 flex-1 rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+                      value={activeRecommendationIndex}
+                      onChange={event => setActiveRecommendationIndex(Number(event.target.value))}
+                    >
+                      {batchRecommendations.map((item, index) => (
+                        <option key={`${item.topic}-${index}`} value={index}>{index + 1}. {item.topic}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      aria-label="Next recommended batch"
+                      className={buttonClass}
+                      disabled={activeRecommendationIndex >= batchRecommendations.length - 1}
+                      onClick={() => setActiveRecommendationIndex(index => Math.min(batchRecommendations.length - 1, index + 1))}
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="text-center text-xs text-slate-300">
+                    Recommendation {activeRecommendationIndex + 1} of {batchRecommendations.length}
+                  </p>
+                  {activeRecommendation && (
+                    <article className="space-y-3 border border-slate-600 bg-slate-900 px-4 py-3">
+                      <h2 className="font-semibold text-white">{activeRecommendation.topic}</h2>
+                      {([
+                        ["topic", "Batch Description", activeRecommendation.topic],
+                        ["instructions", "Special Instructions", activeRecommendation.specialInstructions],
+                        ["constraints", "Temporary Constraints", activeRecommendation.temporaryConstraints],
+                      ] as const).map(([section, label, text]) => {
+                        const key = `${activeRecommendation.topic}:${section}`;
+                        return (
+                          <section key={section} className="border-t border-slate-700 pt-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-sm font-bold text-slate-100">{label}</h3>
+                              <button type="button" className={buttonClass} onClick={() => void copyRecommendationSection(key, text)}>
+                                {copiedBatchSection === key ? "Copied" : "Copy"}
+                              </button>
+                            </div>
+                            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">{text}</p>
+                          </section>
+                        );
+                      })}
+                    </article>
+                  )}
+                </>
+              )}
             </div>
           )}
           {step === "triad-choice" && (
