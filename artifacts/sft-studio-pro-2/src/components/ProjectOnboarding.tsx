@@ -707,7 +707,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
     const remainingSentenceLimit = modelNameInstruction ? 4 : 5;
     const draft = await askAI(
       `Write a concise system prompt for this SFT project. HARD LIMIT: the complete prompt must have no more than five sentences total. ` +
-      `${modelNameInstruction ? `The first sentence is already supplied and counts toward the five: "${modelNameInstruction}" Do not repeat it; write at most four more sentences. ` : "Write at most five sentences. "}` +
+      `${modelNameInstruction ? `The app will prepend the user's remembered-name sentence, which counts toward the five-sentence maximum. Do not write a name sentence; write at most ${remainingSentenceLimit} additional sentences. ` : "Write at most five sentences. "}` +
       `Count your sentences before responding and shorten the prompt if needed. Never exceed the five-sentence total. ` +
       `This limit applies only to your AI-generated draft, not user-written or user-edited prompts. ` +
       `Target task: ${goal}. Constraints: ${constraints || "none"}. ` +
