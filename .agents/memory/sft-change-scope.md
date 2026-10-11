@@ -27,6 +27,12 @@ Before the batch-skills interview, show the completed project definition and req
 
 **How to apply:** Keep this approval gate and snapshot within Project Onboarding. Do not impose the sentence limit on other fields or add selected base-model data to the handoff payload.
 
+The batch interview only gathers skills and produces recommended batch recipes; it must not create training examples or start the actual batch generator.
+
+**Why:** The user explicitly distinguished onboarding recommendations from generating batches.
+
+**How to apply:** Keep recommendation drafting inside Project Onboarding and leave actual batch generation to the existing app after handoff.
+
 After the golden example, ask whether the user wants the model to remember a name. If yes, prepend the user's exact name in a “Your name is …” sentence to the system prompt.
 
 **Why:** The user explicitly requested this optional onboarding step.
