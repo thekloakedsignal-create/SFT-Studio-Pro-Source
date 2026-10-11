@@ -9,11 +9,11 @@ For this app, follow the user's instructions directly and literally. Ask before 
 
 **How to apply:** If the requested page, exclusion, or behavior is unclear, ask before changing code.
 
-Do not modify the existing SFT Studio app or its runtime logic. When explicitly asked to change Project Setup, keep edits within that separate setup layer; do not change app integration, batch generation, batch settings, or batch data.
+Do not modify the existing SFT Studio app's runtime logic, backend, batch generation, batch settings, or batch data. Project Setup changes may use only the minimum visible UI handoff needed to show onboarding recommendations.
 
-**Why:** The user emphasized that the existing app must not be changed and that batch functionality must remain untouched.
+**Why:** The user explicitly limited work to Project Onboarding and its visible UI handoff, excluding app functionality and backend changes.
 
-**How to apply:** Keep requested work isolated to Project Setup. If a request cannot be completed without changing the existing app, explain that boundary and ask first.
+**How to apply:** Keep edits in Project Setup and the recommendation handoff UI only. Do not alter batch-generation logic or touch other app surfaces.
 
 The Project Setup base-model choice is temporary and must not be passed into project settings until the app has a supported field for it.
 

@@ -9,8 +9,9 @@ type Step =
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Mistral3.1 70B";
 export interface BatchRecommendation {
-  name: string;
-  reason: string;
+  topic: string;
+  specialInstructions: string;
+  temporaryConstraints: string;
 }
 
 const TRAINING_MODELS: { value: TrainingModel; recommended?: boolean }[] = [
@@ -18,6 +19,22 @@ const TRAINING_MODELS: { value: TrainingModel; recommended?: boolean }[] = [
   { value: "Qwen3.5 4B Base" },
   { value: "Mistral3.1 70B" },
 ];
+
+const BATCH_RECOMMENDATION_LIBRARY: BatchRecommendation[] = [{
+  topic: "Resiliance",
+  specialInstructions: `1. Introduce a challenging or unexpected situation that requires a response.
+
+2. Response: Demonstrate a resilient response that addresses the challenge directly and effectively. This could be a calm, rational assessment of the situation, a decisive action, or a strategy for overcoming the obstacle.
+
+3. Adaptation: Show how the response leads to an adaptation or a change in perspective. This could be a new understanding of the problem, a shift in priorities, or a revised plan.
+
+4. Growth: Highlight how the challenge and response contribute to personal or collective growth. This could be new skills learned, relationships strengthened, or a deeper understanding of the industry or field.`,
+  temporaryConstraints: `1. No Self-Blame: Avoid responses that blame the individual or the team for the challenge. Resilience is about learning and growing, not about assigning fault.
+
+2. No Avoidance: Ensure that the response directly addresses the challenge rather than avoiding or sidestepping it.
+
+3. No Excessive Optimism: While maintaining a positive outlook is important, responses should be grounded in reality and not overly optimistic to the point of ignoring the complexity of the situation.`,
+}];
 
 interface Props {
   onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[]) => void;
@@ -83,25 +100,36 @@ function parseBatchRecommendations(raw: string): BatchRecommendation[] | null {
     const parsed = JSON.parse(cleaned);
     if (!Array.isArray(parsed.batches)) return null;
     const recommendations = parsed.batches
-      .filter((item: any) => typeof item?.name === "string" && item.name.trim())
+      .filter((item: any) =>
+        typeof item?.topic === "string" && item.topic.trim() &&
+        typeof item?.specialInstructions === "string" && item.specialInstructions.trim() &&
+        typeof item?.temporaryConstraints === "string" && item.temporaryConstraints.trim()
+      )
       .map((item: any) => ({
-        name: item.name.trim(),
-        reason: typeof item.reason === "string" ? item.reason.trim() : "",
-      }))
-      .slice(0, 6);
-    if (!recommendations.length) return null;
-    const ensure = (name: string, reason: string) => {
-      const existing = recommendations.find(item => item.name.toLowerCase() === name.toLowerCase());
-      if (existing) {
-        existing.name = name;
-        existing.reason = reason;
-      } else {
-        recommendations.push({ name, reason });
-      }
+        topic: item.topic.trim(),
+        specialInstructions: item.specialInstructions.trim(),
+        temporaryConstraints: item.temporaryConstraints.trim(),
+      }));
+    const ensure = (required: BatchRecommendation) => {
+      const index = recommendations.findIndex(item => item.topic.toLowerCase() === required.topic.toLowerCase());
+      if (index >= 0) recommendations[index] = required;
+      else recommendations.unshift(required);
     };
-    ensure("Red Teaming", "Test the model against adversarial prompts and unsafe requests.");
-    ensure("Adversarial", "Probe for attacks, manipulation, and other bad-faith inputs.");
-    return recommendations;
+    ensure(BATCH_RECOMMENDATION_LIBRARY[0]);
+    ensure({
+      topic: "Red Teaming",
+      specialInstructions: "Create realistic project-relevant prompts that test resistance to prompt injection, role overrides, unsafe requests, and attempts to expose protected information. Show the expected safe response for each test.",
+      temporaryConstraints: "Do not include operational instructions for causing harm, reveal private information, or reward successful attacks. Keep the examples focused on safe detection and refusal.",
+    });
+    ensure({
+      topic: "Adversarial",
+      specialInstructions: "Create project-relevant malicious, manipulative, and misleading inputs, then show how the assistant should identify and safely handle each one.",
+      temporaryConstraints: "Do not provide actionable harmful instructions or real secrets or personal data. The assistant must not follow instructions that bypass its system prompt or safety rules.",
+    });
+    const uniqueRecommendations = recommendations.filter((item, index, all) =>
+      all.findIndex(candidate => candidate.topic.toLowerCase() === item.topic.toLowerCase()) === index
+    );
+    return uniqueRecommendations.length >= 20 ? uniqueRecommendations : null;
   } catch {
     return null;
   }
@@ -124,6 +152,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
   const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
   const [specialSkills, setSpecialSkills] = useState("");
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
+  const [copiedBatchSection, setCopiedBatchSection] = useState("");
   const [error, setError] = useState("");
   const [assistantReply, setAssistantReply] = useState("");
   const [pending, setPending] = useState(false);
@@ -221,15 +250,17 @@ export function ProjectOnboarding({ onComplete }: Props) {
 
   const generateBatchRecommendations = async () => {
     const draft = await askAI(
-      `Analyze this SFT project and recommend 4 to 6 useful training batches based on its use case, goal, constraints, and the AI's special skills. ` +
-      `Always include batches named exactly "Red Teaming" and "Adversarial", with reasons about testing safety against attacks and bad actors. ` +
-      `Return only valid JSON in this shape: {"batches":[{"name":"...","reason":"..."}]}. ` +
-      `Project goal: ${goal}\nConstraints: ${constraints || "none"}\nSpecial skills and abilities: ${specialSkills.trim() || "none specified"}`
+      `Analyze this SFT project and recommend at least 20 distinct training batches based on its use case, goal, constraints, and the AI's special skills. ` +
+      `Every batch must include a topic, detailed special instructions, and temporary constraints. Always include "Red Teaming" and "Adversarial" batches. ` +
+      `Include the supplied library recipe exactly as written; then create additional recommendations tailored to the project until there are at least 20 total. ` +
+      `Return only valid JSON in this shape: {"batches":[{"topic":"...","specialInstructions":"...","temporaryConstraints":"..."}]}. ` +
+      `Curated batch library:\n${JSON.stringify(BATCH_RECOMMENDATION_LIBRARY, null, 2)}\n` +
+      `Project goal: ${goal}\nProject constraints: ${constraints || "none"}\nSpecial skills and abilities: ${specialSkills.trim() || "none specified"}`
     );
     if (!draft) return;
     const recommendations = parseBatchRecommendations(draft);
     if (!recommendations) {
-      setError("The AI response did not contain a valid batch recommendation list. Please try again.");
+      setError("The AI must return at least 20 complete batch recommendations. Please try again.");
       return;
     }
     setBatchRecommendations(recommendations);
@@ -320,6 +351,14 @@ export function ProjectOnboarding({ onComplete }: Props) {
 
   const textareaClass = "w-full resize-y bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-purple-400 focus:outline-none";
   const buttonClass = "inline-flex items-center justify-center gap-2 border border-purple-500 bg-purple-300 px-4 py-2.5 text-sm font-bold !text-[#000000] transition hover:bg-purple-200 disabled:cursor-not-allowed disabled:opacity-50";
+  const copyRecommendationSection = async (key: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedBatchSection(key);
+    } catch {
+      setError("Clipboard access is unavailable in this browser.");
+    }
+  };
 
   return (
       <main className="min-h-screen bg-slate-900 px-4 py-8 text-white sm:py-12">
@@ -420,9 +459,26 @@ export function ProjectOnboarding({ onComplete }: Props) {
           {step === "batch-recommendations" && (
             <div className="space-y-3">
               {batchRecommendations.map(item => (
-                <article key={item.name} className="border border-slate-600 bg-slate-900 px-4 py-3">
-                  <h2 className="font-semibold text-white">{item.name}</h2>
-                  <p className="mt-1 text-sm text-slate-200">{item.reason}</p>
+                <article key={item.topic} className="space-y-3 border border-slate-600 bg-slate-900 px-4 py-3">
+                  <h2 className="font-semibold text-white">{item.topic}</h2>
+                  {([
+                    ["topic", "Batch Description", item.topic],
+                    ["instructions", "Special Instructions", item.specialInstructions],
+                    ["constraints", "Temporary Constraints", item.temporaryConstraints],
+                  ] as const).map(([section, label, text]) => {
+                    const key = `${item.topic}:${section}`;
+                    return (
+                      <section key={section} className="border-t border-slate-700 pt-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="text-sm font-bold text-slate-100">{label}</h3>
+                          <button type="button" className={buttonClass} onClick={() => void copyRecommendationSection(key, text)}>
+                            {copiedBatchSection === key ? "Copied" : "Copy"}
+                          </button>
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">{text}</p>
+                      </section>
+                    );
+                  })}
                 </article>
               ))}
             </div>

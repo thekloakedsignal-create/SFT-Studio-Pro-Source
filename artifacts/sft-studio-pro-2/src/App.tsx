@@ -530,6 +530,7 @@ export default function App() {
   const [batchTemplate, setBatchTemplate] = useState<TemplateType>(TemplateType.SINGLE_TURN);
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
   const [completedRecommendedBatches, setCompletedRecommendedBatches] = useState<string[]>([]);
+  const [copiedRecommendedField, setCopiedRecommendedField] = useState("");
   const [batchSize, setBatchSize] = useState<number>(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState<{ current: number; total: number; percent: number } | null>(null);
@@ -5034,22 +5035,53 @@ export default function App() {
                       <div className="space-y-3 border-t border-purple-500/20 px-4 py-4">
                         <p className="text-xs text-slate-300">Check each recommendation after you have generated it.</p>
                         {batchRecommendations.map(recommendation => (
-                          <label key={recommendation.name} className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+                          <div key={recommendation.topic} className="flex items-start gap-3 rounded-lg border border-slate-700 bg-slate-900/70 p-3">
                             <input
                               type="checkbox"
-                              checked={completedRecommendedBatches.includes(recommendation.name)}
+                              aria-label={`Mark ${recommendation.topic} as generated`}
+                              checked={completedRecommendedBatches.includes(recommendation.topic)}
                               onChange={event => setCompletedRecommendedBatches(current =>
                                 event.target.checked
-                                  ? [...current, recommendation.name]
-                                  : current.filter(name => name !== recommendation.name)
+                                  ? [...current, recommendation.topic]
+                                  : current.filter(topic => topic !== recommendation.topic)
                               )}
-                              className="mt-0.5 accent-purple-400"
+                              className="mt-1 accent-purple-400"
                             />
-                            <span>
-                              <span className="block text-sm font-semibold text-slate-100">{recommendation.name}</span>
-                              <span className="mt-1 block text-xs text-slate-300">{recommendation.reason}</span>
-                            </span>
-                          </label>
+                            <details className="min-w-0 flex-1">
+                              <summary className="cursor-pointer text-sm font-semibold text-slate-100">{recommendation.topic}</summary>
+                              <div className="mt-3 space-y-3">
+                                {([
+                                  ["topic", "Batch Description", recommendation.topic],
+                                  ["instructions", "Special Instructions", recommendation.specialInstructions],
+                                  ["constraints", "Temporary Constraints", recommendation.temporaryConstraints],
+                                ] as const).map(([section, title, text]) => {
+                                  const copyKey = `${recommendation.topic}:${section}`;
+                                  return (
+                                    <section key={section} className="border-t border-slate-700 pt-2">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <h3 className="text-xs font-bold text-slate-200">{title}</h3>
+                                        <button
+                                          type="button"
+                                          className="rounded border border-purple-300 bg-purple-300 px-2 py-1 text-xs font-bold !text-[#000000] hover:bg-purple-200"
+                                          onClick={async () => {
+                                            try {
+                                              await navigator.clipboard.writeText(text);
+                                              setCopiedRecommendedField(copyKey);
+                                            } catch {
+                                              setCopiedRecommendedField(`failed:${copyKey}`);
+                                            }
+                                          }}
+                                        >
+                                          {copiedRecommendedField === copyKey ? "Copied" : copiedRecommendedField === `failed:${copyKey}` ? "Copy failed" : "Copy"}
+                                        </button>
+                                      </div>
+                                      <p className="mt-1 whitespace-pre-wrap text-xs text-slate-300">{text}</p>
+                                    </section>
+                                  );
+                                })}
+                              </div>
+                            </details>
+                          </div>
                         ))}
                       </div>
                     </details>
