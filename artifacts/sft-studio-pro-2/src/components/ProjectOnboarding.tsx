@@ -4,9 +4,14 @@ import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateT
 
 type Step =
   | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
-  | "voice-own" | "voice-review" | "golden-review" | "system-choice" | "system-review";
+  | "voice-own" | "voice-review" | "golden-review" | "system-choice" | "system-review"
+  | "batch-skills" | "batch-recommendations";
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Mistral3.1 70B";
+export interface BatchRecommendation {
+  name: string;
+  reason: string;
+}
 
 const TRAINING_MODELS: { value: TrainingModel; recommended?: boolean }[] = [
   { value: "Qwen3.5 9 Base", recommended: true },
@@ -15,7 +20,7 @@ const TRAINING_MODELS: { value: TrainingModel; recommended?: boolean }[] = [
 ];
 
 interface Props {
-  onComplete: (settings: ProjectSettings) => void;
+  onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[]) => void;
 }
 
 const PROMPTS: Record<Step, string> = {
@@ -31,6 +36,8 @@ const PROMPTS: Record<Step, string> = {
   "golden-review": "I created one golden training example using the approved voice. Review and edit both parts; approve it to continue.",
   "system-choice": "The system prompt is included in every generated training example. It sets the model’s role and instructions, so it directly shapes every example. Would you like to write it or have me draft one?",
   "system-review": "Review the full system prompt below. Edit it if you want, then explicitly approve it. It will be saved to the project and included in every generated example.",
+  "batch-skills": "The batch generator creates training examples from your project settings for review. What special skills or abilities should this AI have? I’ll use your answer and project goal to recommend batches. Red Teaming and Adversarial are always included.",
+  "batch-recommendations": "Here are my recommended batches based on your project and the skills you described. Red Teaming and Adversarial are included to help test safety against attacks and bad actors.",
 };
 
 async function requestDraft(instruction: string, appContext: Record<string, unknown>) {
@@ -70,6 +77,36 @@ function countSentences(text: string) {
   return text.trim().match(/[.!?](?=["'”’)\]]*(?:\s|$))/g)?.length ?? (text.trim() ? 1 : 0);
 }
 
+function parseBatchRecommendations(raw: string): BatchRecommendation[] | null {
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (!Array.isArray(parsed.batches)) return null;
+    const recommendations = parsed.batches
+      .filter((item: any) => typeof item?.name === "string" && item.name.trim())
+      .map((item: any) => ({
+        name: item.name.trim(),
+        reason: typeof item.reason === "string" ? item.reason.trim() : "",
+      }))
+      .slice(0, 6);
+    if (!recommendations.length) return null;
+    const ensure = (name: string, reason: string) => {
+      const existing = recommendations.find(item => item.name.toLowerCase() === name.toLowerCase());
+      if (existing) {
+        existing.name = name;
+        existing.reason = reason;
+      } else {
+        recommendations.push({ name, reason });
+      }
+    };
+    ensure("Red Teaming", "Test the model against adversarial prompts and unsafe requests.");
+    ensure("Adversarial", "Probe for attacks, manipulation, and other bad-faith inputs.");
+    return recommendations;
+  } catch {
+    return null;
+  }
+}
+
 export function ProjectOnboarding({ onComplete }: Props) {
   const [step, setStep] = useState<Step>("name");
   const [projectName, setProjectName] = useState("");
@@ -85,16 +122,19 @@ export function ProjectOnboarding({ onComplete }: Props) {
   const [goldenCompletion, setGoldenCompletion] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
+  const [specialSkills, setSpecialSkills] = useState("");
+  const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
   const [error, setError] = useState("");
   const [assistantReply, setAssistantReply] = useState("");
   const [pending, setPending] = useState(false);
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-review", "system-choice", "system-review"];
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-review", "system-choice", "system-review", "batch-skills", "batch-recommendations"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
     { step: "goal" as Step, label: "Target goal", answer: goal },
     { step: "constraints" as Step, label: "Rules and constraints", answer: constraints || "None" },
     ...(currentStepPosition > stepOrder.indexOf("model") ? [{ step: "model" as Step, label: "Base model", answer: trainingModel }] : []),
+    ...(currentStepPosition > stepOrder.indexOf("batch-skills") ? [{ step: "batch-skills" as Step, label: "Special skills and abilities", answer: specialSkills || "None specified" }] : []),
     ...(currentStepPosition > stepOrder.indexOf("voice-review") && voiceSample
       ? [{ step: "voice-review" as Step, label: "Approved voice reference", answer: voiceSample }]
       : []),
@@ -136,7 +176,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
       "voice-choice": "model", "voice-description": "voice-choice",
       "voice-own": "voice-choice", "voice-review": voiceSource === "ai" ? "voice-description" : "voice-own",
       "golden-review": "voice-review", "system-choice": "golden-review",
-      "system-review": "system-choice",
+      "system-review": "system-choice", "batch-skills": "system-review", "batch-recommendations": "batch-skills",
     };
     setError("");
     if (previous[step]) setStep(previous[step]!);
@@ -176,7 +216,24 @@ export function ProjectOnboarding({ onComplete }: Props) {
       customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
       representativePrompt: goldenPrompt.trim(),
       representativeCompletion: goldenCompletion.trim(),
-    });
+    }, batchRecommendations);
+  };
+
+  const generateBatchRecommendations = async () => {
+    const draft = await askAI(
+      `Analyze this SFT project and recommend 4 to 6 useful training batches based on its use case, goal, constraints, and the AI's special skills. ` +
+      `Always include batches named exactly "Red Teaming" and "Adversarial", with reasons about testing safety against attacks and bad actors. ` +
+      `Return only valid JSON in this shape: {"batches":[{"name":"...","reason":"..."}]}. ` +
+      `Project goal: ${goal}\nConstraints: ${constraints || "none"}\nSpecial skills and abilities: ${specialSkills.trim() || "none specified"}`
+    );
+    if (!draft) return;
+    const recommendations = parseBatchRecommendations(draft);
+    if (!recommendations) {
+      setError("The AI response did not contain a valid batch recommendation list. Please try again.");
+      return;
+    }
+    setBatchRecommendations(recommendations);
+    setStep("batch-recommendations");
   };
 
   const skipToProject = () => {
@@ -239,7 +296,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
       setStep("voice-review");
       return;
     }
-    if (step === "system-review" && systemPrompt.trim()) return finish();
+    if (step === "batch-skills") return generateBatchRecommendations();
     setError("Please add an answer before continuing.");
   };
 
@@ -293,7 +350,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
           <div className="flex justify-start">
             <div className="max-w-[90%] border border-slate-600 bg-slate-800 px-4 py-3 text-sm leading-relaxed text-white">
               <p>{step === "goal-followup" ? adaptiveQuestion : PROMPTS[step]}</p>
-              {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own"].includes(step) && (
+              {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "batch-skills"].includes(step) && (
                 <button
                   type="button"
                   className="mt-3 inline-flex items-center gap-2 rounded-md border border-purple-200 bg-purple-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-purple-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-70"
@@ -360,24 +417,35 @@ export function ProjectOnboarding({ onComplete }: Props) {
           {step === "system-review" && (
             <textarea aria-label="System prompt for review" className={textareaClass} rows={7} value={systemPrompt} onChange={e => setSystemPrompt(e.target.value)} placeholder="Write the complete system prompt that should be included in every training example." />
           )}
-          {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own"].includes(step) && (
+          {step === "batch-recommendations" && (
+            <div className="space-y-3">
+              {batchRecommendations.map(item => (
+                <article key={item.name} className="border border-slate-600 bg-slate-900 px-4 py-3">
+                  <h2 className="font-semibold text-white">{item.name}</h2>
+                  <p className="mt-1 text-sm text-slate-200">{item.reason}</p>
+                </article>
+              ))}
+            </div>
+          )}
+          {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "batch-skills"].includes(step) && (
             <div className="flex gap-2">
               <textarea
                 autoFocus
-                aria-label={step === "name" ? "Project name" : "Your answer"}
+                aria-label={step === "name" ? "Project name" : step === "batch-skills" ? "Special skills and abilities" : "Your answer"}
                 className={textareaClass}
                 rows={step === "name" ? 1 : 3}
-                value={step === "name" ? projectName : step === "goal" ? goal : step === "goal-followup" ? goalFollowupAnswer : step === "constraints" ? constraints : step === "voice-description" ? voiceDescription : voiceSample}
+                value={step === "name" ? projectName : step === "goal" ? goal : step === "goal-followup" ? goalFollowupAnswer : step === "constraints" ? constraints : step === "voice-description" ? voiceDescription : step === "batch-skills" ? specialSkills : voiceSample}
                 onChange={e => {
                   if (step === "name") setProjectName(e.target.value);
                   else if (step === "goal") setGoal(e.target.value);
                   else if (step === "goal-followup") setGoalFollowupAnswer(e.target.value);
                   else if (step === "constraints") setConstraints(e.target.value);
                   else if (step === "voice-description") setVoiceDescription(e.target.value);
+                  else if (step === "batch-skills") setSpecialSkills(e.target.value);
                   else setVoiceSample(e.target.value);
                 }}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && step === "name") { e.preventDefault(); void submit(); } }}
-                placeholder={step === "name" ? "Project name" : "Type your answer…"}
+                placeholder={step === "name" ? "Project name" : step === "batch-skills" ? "Describe the AI’s skills, or type “none”" : "Type your answer…"}
               />
               <button type="button" aria-label="Send answer" className={buttonClass} disabled={pending} onClick={() => void submit()}>
                 {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -401,10 +469,11 @@ export function ProjectOnboarding({ onComplete }: Props) {
                 setError("An AI-generated system prompt must be no more than five sentences.");
                 return;
               }
-              finish();
+              setStep("batch-skills");
             }}><Check className="h-4 w-4" /> Approve prompt &amp; continue</button>}
-            {["name", "goal", "constraints"].includes(step) && <button type="button" className={buttonClass} onClick={() => void submit()}><span>Continue</span><ArrowRight className="h-4 w-4" /></button>}
+            {["name", "goal", "constraints", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
+            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={finish}>Continue to batch generator <ArrowRight className="h-4 w-4" /></button>}
           </div>
         </footer>
       </section>

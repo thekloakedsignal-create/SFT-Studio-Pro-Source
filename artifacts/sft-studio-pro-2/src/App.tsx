@@ -56,7 +56,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { AboutModal } from "./components/AboutModal";
-import { ProjectOnboarding } from "./components/ProjectOnboarding";
+import { ProjectOnboarding, type BatchRecommendation } from "./components/ProjectOnboarding";
 import { PricingModal } from "./components/PricingModal";
 import { CustomPackageModal } from "./components/CustomPackageModal";
 import { AccountModal } from "./components/AccountModal";
@@ -528,6 +528,8 @@ export default function App() {
   const [batchInstructions, setBatchInstructions] = useState(PROJECT_PRESETS[PresetType.GENERAL_USE].batchInstructions);
   const [batchTempConstraints, setBatchTempConstraints] = useState(PROJECT_PRESETS[PresetType.GENERAL_USE].batchTempConstraints);
   const [batchTemplate, setBatchTemplate] = useState<TemplateType>(TemplateType.SINGLE_TURN);
+  const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
+  const [completedRecommendedBatches, setCompletedRecommendedBatches] = useState<string[]>([]);
   const [batchSize, setBatchSize] = useState<number>(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState<{ current: number; total: number; percent: number } | null>(null);
@@ -3981,13 +3983,19 @@ export default function App() {
   if (showProjectOnboarding) {
     return (
       <ProjectOnboarding
-        onComplete={(settings) => {
+        onComplete={(settings, recommendations) => {
           setProject(settings);
           setIsFieldsUnlocked(true);
           setBatchTemplate(settings.templateType || TemplateType.SINGLE_TURN);
           setDocTemplate(settings.templateType || TemplateType.SINGLE_TURN);
           setTriadTemplate(settings.templateType || TemplateType.SINGLE_TURN);
-          setActiveTab("define");
+          if (recommendations?.length) {
+            setBatchRecommendations(recommendations);
+            setCompletedRecommendedBatches([]);
+            setActiveTab("synthesizer");
+          } else {
+            setActiveTab("define");
+          }
           setShowProjectOnboarding(false);
         }}
       />
@@ -5017,6 +5025,35 @@ export default function App() {
                       Synthesize training examples modeled against your active project settings. Customize batch modifiers below.
                     </p>
                   </div>
+
+                  {batchRecommendations.length > 0 && (
+                    <details className="mb-6 rounded-xl border border-purple-500/30 bg-purple-950/20">
+                      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-purple-200">
+                        Recommended batches ({completedRecommendedBatches.length}/{batchRecommendations.length} checked)
+                      </summary>
+                      <div className="space-y-3 border-t border-purple-500/20 px-4 py-4">
+                        <p className="text-xs text-slate-300">Check each recommendation after you have generated it.</p>
+                        {batchRecommendations.map(recommendation => (
+                          <label key={recommendation.name} className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+                            <input
+                              type="checkbox"
+                              checked={completedRecommendedBatches.includes(recommendation.name)}
+                              onChange={event => setCompletedRecommendedBatches(current =>
+                                event.target.checked
+                                  ? [...current, recommendation.name]
+                                  : current.filter(name => name !== recommendation.name)
+                              )}
+                              className="mt-0.5 accent-purple-400"
+                            />
+                            <span>
+                              <span className="block text-sm font-semibold text-slate-100">{recommendation.name}</span>
+                              <span className="mt-1 block text-xs text-slate-300">{recommendation.reason}</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </details>
+                  )}
 
                   {/* Batch specific inputs (Temporary constraints) */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
