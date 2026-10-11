@@ -9,8 +9,8 @@ For this app, follow the user's instructions directly and literally. Ask before 
 
 **How to apply:** If the requested page, exclusion, or behavior is unclear, ask before changing code.
 
-For Project Setup corrections, edit only the Project Setup flow. Do not change app integration, batch generation, batch settings, or batch data.
+Do not modify the existing SFT Studio app or its runtime logic. When explicitly asked to change Project Setup, keep edits within that separate setup layer; do not change app integration, batch generation, batch settings, or batch data.
 
-**Why:** The user clarified that the requested corrections belong to Project Setup and explicitly said to leave batches unchanged.
+**Why:** The user emphasized that the existing app must not be changed and that batch functionality must remain untouched.
 
-**How to apply:** Keep edits in the Project Setup component. Preserve all other app behavior and existing batch selections.
+**How to apply:** Keep requested work isolated to Project Setup. If a request cannot be completed without changing the existing app, explain that boundary and ask first.
