@@ -275,11 +275,11 @@ export function ProjectOnboarding({ onComplete }: Props) {
               {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own"].includes(step) && (
                 <button
                   type="button"
-                  className="mt-3 inline-flex items-center gap-1.5 text-xs text-purple-200 underline underline-offset-2 hover:text-white"
+                  className="mt-3 inline-flex items-center gap-2 rounded-md border border-purple-200 bg-purple-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-purple-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-70"
                   disabled={pending}
                   onClick={() => void explainCurrentQuestion()}
                 >
-                  <HelpCircle className="h-3.5 w-3.5" /> I’m not sure
+                  <HelpCircle className="h-4 w-4 text-white" /> I’m not sure
                 </button>
               )}
             </div>
