@@ -27,6 +27,12 @@ Before the batch-skills interview, show the completed project definition and req
 
 **How to apply:** Keep this approval gate and snapshot within Project Onboarding. Do not impose the sentence limit on other fields or add selected base-model data to the handoff payload.
 
+At onboarding entry, ask whether the user wants to skip onboarding. Yes closes it and returns to the SFT Studio Pro menu without creating a placeholder project; no starts project setup. Do not show a persistent skip button.
+
+**Why:** The user requested an explicit choice at entry and a direct return to the menu without running setup.
+
+**How to apply:** Keep the yes path limited to closing onboarding and showing the menu; do not alter project data or training behavior.
+
 The batch interview only gathers skills and produces recommended batch recipes; it must not create training examples or start the actual batch generator.
 
 **Why:** The user explicitly distinguished onboarding recommendations from generating batches.

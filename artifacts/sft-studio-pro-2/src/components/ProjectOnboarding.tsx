@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Check, HelpCircle, LoaderCircle, MessageSquare, 
 import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateType } from "../types";
 
 type Step =
-  | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
+  | "onboarding-choice" | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
   | "voice-own" | "voice-review" | "golden-generation" | "golden-review" | "remember-name-choice" | "remember-model-name" | "system-choice" | "system-review"
   | "definition-review" | "batch-skills" | "batch-recommendations" | "triad-choice" | "quality-analysis";
 
@@ -309,9 +309,11 @@ const GENERAL_RECOMMENDED_BATCH_TOPICS = [
 
 interface Props {
   onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[]) => void;
+  onExit: () => void;
 }
 
 const PROMPTS: Record<Step, string> = {
+  "onboarding-choice": "Would you like to skip Project Onboarding and go directly to the SFT Studio Pro menu? Choose yes to close onboarding, or no to continue setting up your project.",
   name: "What would you like to call this SFT project?",
   goal: "What should the model learn to do? Describe its main task and who it is for.",
   "goal-followup": "A quick follow-up so I can understand the target clearly:",
@@ -392,8 +394,8 @@ function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; a
   }
 }
 
-export function ProjectOnboarding({ onComplete }: Props) {
-  const [step, setStep] = useState<Step>("name");
+export function ProjectOnboarding({ onComplete, onExit }: Props) {
+  const [step, setStep] = useState<Step>("onboarding-choice");
   const [projectName, setProjectName] = useState("");
   const [goal, setGoal] = useState("");
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
@@ -434,7 +436,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
 
   const activeRecommendation = batchRecommendations[activeRecommendationIndex];
 
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
+  const stepOrder: Step[] = ["onboarding-choice", "name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
@@ -488,7 +490,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
 
   const goBack = () => {
     const previous: Partial<Record<Step, Step>> = {
-      goal: "name", "goal-followup": "goal", constraints: "goal", model: "constraints",
+      name: "onboarding-choice", goal: "name", "goal-followup": "goal", constraints: "goal", model: "constraints",
       "voice-choice": "model", "voice-description": "voice-choice",
       "voice-own": "voice-choice", "voice-review": voiceSource === "ai" ? "voice-description" : "voice-own",
       "golden-generation": "voice-review", "golden-review": "voice-review", "remember-name-choice": "golden-review",
@@ -636,22 +638,6 @@ export function ProjectOnboarding({ onComplete }: Props) {
     setBatchRecommendations(uniqueRecommendations);
     setActiveRecommendationIndex(0);
     setStep("batch-recommendations");
-  };
-
-  const skipToProject = () => {
-    onComplete({
-      name: "General Instruction Tuner",
-      systemPrompt: "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
-      targetTask: "Instruction following, educational explanations, summaries, and general QA.",
-      constraints: "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
-      selectedPreset: PresetType.GENERAL_USE,
-      projectFormat: ProjectFormat.CONVERSATION,
-      templateType: TemplateType.SINGLE_TURN,
-      instructTemplate: InstructTemplate.CHATML,
-      customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
-      representativePrompt: "Explain photosynthesis in simple terms.",
-      representativeCompletion: "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar.",
-    });
   };
 
   const submit = async () => {
@@ -940,6 +926,12 @@ export function ProjectOnboarding({ onComplete }: Props) {
               )}
             </div>
           )}
+          {step === "onboarding-choice" && (
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={buttonClass} onClick={onExit}>Yes, go to the SFT Studio Pro menu</button>
+              <button type="button" className={buttonClass} onClick={() => setStep("name")}>No, continue onboarding</button>
+            </div>
+          )}
           {step === "triad-choice" && (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
@@ -991,7 +983,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
         </div>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-5 py-4 sm:px-7">
-          <button type="button" className="inline-flex items-center gap-2 px-2 py-2 text-sm text-slate-200 hover:text-white disabled:opacity-50" onClick={goBack} disabled={step === "name" || pending}>
+          <button type="button" className="inline-flex items-center gap-2 px-2 py-2 text-sm text-slate-200 hover:text-white disabled:opacity-50" onClick={goBack} disabled={step === "onboarding-choice" || pending}>
             <ArrowLeft className="h-4 w-4" /> Previous
           </button>
           <div className="flex flex-wrap gap-2">
@@ -1012,13 +1004,6 @@ export function ProjectOnboarding({ onComplete }: Props) {
           </div>
         </footer>
       </section>
-      <button
-        type="button"
-        onClick={skipToProject}
-        className="fixed bottom-4 right-4 z-[60] rounded-md border border-purple-500 bg-purple-300 px-2.5 py-1.5 text-xs font-bold !text-[#000000] shadow-lg transition-colors hover:bg-purple-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
-      >
-        Skip to project
-      </button>
     </main>
   );
 }

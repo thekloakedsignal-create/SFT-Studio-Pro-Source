@@ -4003,6 +4003,10 @@ export default function App() {
           }
           setShowProjectOnboarding(false);
         }}
+        onExit={() => {
+          setActiveTab("define");
+          setShowProjectOnboarding(false);
+        }}
       />
     );
   }
