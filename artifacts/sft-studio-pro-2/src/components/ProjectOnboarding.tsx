@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, HelpCircle, LoaderCircle, MessageSquare, Send } from "lucide-react";
 import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateType } from "../types";
 
@@ -431,6 +431,12 @@ export function ProjectOnboarding({ onComplete }: Props) {
   const [error, setError] = useState("");
   const [assistantReply, setAssistantReply] = useState("");
   const [pending, setPending] = useState(false);
+  const conversationRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const conversation = conversationRef.current;
+    if (conversation) conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
+  }, [step, assistantReply]);
+
   const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-review", "system-choice", "system-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
@@ -670,7 +676,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
           </div>
         </header>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6 sm:px-7" aria-live="polite">
+        <div ref={conversationRef} className="flex-1 space-y-5 overflow-y-auto px-5 py-6 sm:px-7" aria-live="polite">
           {priorAnswers.map(item => (
             <div key={item.step} className="flex justify-end">
               <div className="max-w-[90%] border border-purple-500 bg-purple-300 px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]">
@@ -837,10 +843,8 @@ export function ProjectOnboarding({ onComplete }: Props) {
             {step === "voice-review" && <button type="button" className={buttonClass} disabled={pending || !voiceSample.trim()} onClick={() => void approveVoice()}>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Approve voice sample</button>}
             {step === "golden-review" && <button type="button" className={buttonClass} disabled={!goldenPrompt.trim() || !goldenCompletion.trim()} onClick={approveGolden}><Check className="h-4 w-4" /> Approve golden example</button>}
             {step === "system-review" && <button type="button" className={buttonClass} disabled={!systemPrompt.trim()} onClick={() => {
-              if (systemPromptSource === "ai" && countSentences(systemPrompt) > 5) {
-                setError("An AI-generated system prompt must be no more than five sentences.");
-                return;
-              }
+              setError("");
+              setAssistantReply("");
               setStep("batch-skills");
             }}><Check className="h-4 w-4" /> Approve prompt &amp; continue</button>}
             {["name", "goal", "constraints", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
