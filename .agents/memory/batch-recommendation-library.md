@@ -14,3 +14,9 @@ Do not ask the AI to reproduce the full curated recipes. Have it choose exact li
 **Why:** Requiring the model to repeat a long recipe library made recommendation parsing brittle and could block the onboarding flow.
 
 **How to apply:** Treat the curated library as the source of truth for recipe text. Keep AI output limited to topic references and genuinely new skill-specific instructions and constraints.
+
+Display selected library recipes verbatim. Keep the single-turn/multi-turn/reasoning reminder separate from the recipe's topic, special instructions, and temporary constraints.
+
+**Why:** The user clarified that library content must remain unchanged and each recipe's three fields have separate copy controls.
+
+**How to apply:** Never append general format guidance to a library recipe field; show that guidance as a separate onboarding note.

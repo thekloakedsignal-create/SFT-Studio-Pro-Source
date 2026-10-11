@@ -428,6 +428,10 @@ export function ProjectOnboarding({ onComplete }: Props) {
     ? `Your name is ${modelRememberedName.trim()}.`
     : "";
 
+  const mixGuidance = trainingModel === "Llama 3.1 70B"
+    ? "For every topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning templates for Llama 3.1 70B."
+    : "For every topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples.";
+
   const activeRecommendation = batchRecommendations[activeRecommendationIndex];
 
   const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
@@ -569,9 +573,6 @@ export function ProjectOnboarding({ onComplete }: Props) {
       return;
     }
     const allowReasoning = trainingModel !== "Llama 3.1 70B";
-    const mixGuidance = allowReasoning
-      ? "Batch mix reminder: For this topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples."
-      : "Batch mix reminder: For this topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning templates for Llama 3.1 70B.";
     const eligibleLibrary = BATCH_RECOMMENDATION_LIBRARY.filter(item =>
       allowReasoning || !/\breasoning\b|chain[- ]of[- ]thought|\bcot\b/i.test(item.topic)
     );
@@ -583,7 +584,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
       `Choose relevant recipe topics from the curated library by topic name only; do not rewrite or return any library recipe instructions or constraints. ` +
       `Return additional recipes only for named skills or abilities that are not already covered by a selected library topic. For every such skill, include a specific topic, special instructions, and temporary constraints. ` +
       `Always include the library topics that fit the project, and recommend these broadly useful topics when suitable: ${recommendedTopics.join(", ")}. ` +
-      `${allowReasoning ? "Recommend balanced single-turn, multi-turn, and reasoning coverage across topics; do not make separate format-only batches." : "For Llama 3.1 70B, do not recommend reasoning topics or templates; recommend balanced single-turn and multi-turn coverage across topics, not separate format-only batches."} ` +
+      `${mixGuidance} Do not make separate format-only batches. ` +
       `Do not create training examples or actual batches. Return only valid JSON: {"libraryTopics":["exact topic name"],"additionalBatches":[{"topic":"...","specialInstructions":"...","temporaryConstraints":"..."}]}. ` +
       `Available curated topic names: ${JSON.stringify(eligibleLibrary.map(item => item.topic))}\n` +
       `Project name: ${approvedProjectDefinition.name}\nProject goal: ${approvedProjectDefinition.targetTask}\nProject constraints: ${approvedProjectDefinition.constraints || "none"}\nSelected base model: ${trainingModel}\nSpecial skills and abilities stated by the user (cover every item): ${specialSkills.trim() || "none specified"}`
@@ -632,10 +633,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
     const uniqueRecommendations = recommendations.filter((item, index, all) =>
       all.findIndex(candidate => candidate.topic.toLowerCase() === item.topic.toLowerCase()) === index
     );
-    setBatchRecommendations(uniqueRecommendations.map(item => ({
-      ...item,
-      specialInstructions: `${item.specialInstructions}\n\n${mixGuidance}`,
-    })));
+    setBatchRecommendations(uniqueRecommendations);
     setActiveRecommendationIndex(0);
     setStep("batch-recommendations");
   };
@@ -877,6 +875,9 @@ export function ProjectOnboarding({ onComplete }: Props) {
           )}
           {step === "batch-recommendations" && (
             <div className="space-y-3">
+              <p className="border border-slate-600 bg-slate-900 px-4 py-3 text-sm text-slate-200">
+                {mixGuidance}
+              </p>
               {batchRecommendations.length > 0 && (
                 <>
                   <div className="flex items-center gap-2">
