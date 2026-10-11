@@ -32,3 +32,9 @@ After the golden example, ask whether the user wants the model to remember a nam
 **Why:** The user explicitly requested this optional onboarding step.
 
 **How to apply:** Keep it in Project Onboarding before system-prompt setup; if declined, leave the prompt unchanged.
+
+Voice approval and golden-example generation must be separate visible stages. A golden-example formatting failure must stay in its own stage and offer retry without making the approved voice sample appear blocked.
+
+**Why:** The user clarified that the separation error appeared in the wrong place and was mistaken for a voice-sample failure.
+
+**How to apply:** Keep the approved voice reference intact while retrying golden-example generation; display golden parsing errors only on the golden-generation step.

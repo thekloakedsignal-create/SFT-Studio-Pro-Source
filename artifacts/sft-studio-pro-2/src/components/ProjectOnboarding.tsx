@@ -4,7 +4,7 @@ import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateT
 
 type Step =
   | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
-  | "voice-own" | "voice-review" | "golden-review" | "remember-name-choice" | "remember-model-name" | "system-choice" | "system-review"
+  | "voice-own" | "voice-review" | "golden-generation" | "golden-review" | "remember-name-choice" | "remember-model-name" | "system-choice" | "system-review"
   | "definition-review" | "batch-skills" | "batch-recommendations" | "triad-choice" | "quality-analysis";
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B";
@@ -321,6 +321,7 @@ const PROMPTS: Record<Step, string> = {
   "voice-description": "Describe the voice you want—such as its tone, vocabulary, and level of formality. I’ll draft a couple of paragraphs for your approval.",
   "voice-own": "Write a couple of paragraphs in the voice you want the model to use.",
   "voice-review": "Review the voice sample below. Edit it if needed, then explicitly approve it before I create the golden example.",
+  "golden-generation": "Your voice sample is approved. I’m creating one golden training example from it. If the example format fails, retry here; that won’t undo your voice approval.",
   "golden-review": "I created one golden training example using the approved voice. Review and edit both parts; approve it to continue.",
   "remember-name-choice": "Do you have a name you want your model to remember? Choose yes or no.",
   "remember-model-name": "What name should your model remember? I’ll add “Your name is [name].” to the beginning of the system prompt.",
@@ -437,13 +438,13 @@ export function ProjectOnboarding({ onComplete }: Props) {
   useEffect(() => {
     const conversation = conversationRef.current;
     if (conversation) conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
-  }, [step, assistantReply]);
+  }, [step, assistantReply, error]);
 
   const modelNameInstruction = rememberName === "yes" && modelRememberedName.trim()
     ? `Your name is ${modelRememberedName.trim()}.`
     : "";
 
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
@@ -500,7 +501,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
       goal: "name", "goal-followup": "goal", constraints: "goal", model: "constraints",
       "voice-choice": "model", "voice-description": "voice-choice",
       "voice-own": "voice-choice", "voice-review": voiceSource === "ai" ? "voice-description" : "voice-own",
-      "golden-review": "voice-review", "remember-name-choice": "golden-review",
+      "golden-generation": "voice-review", "golden-review": "voice-review", "remember-name-choice": "golden-review",
       "remember-model-name": "remember-name-choice",
       "system-choice": rememberName === "yes" ? "remember-model-name" : "remember-name-choice",
       "system-review": "system-choice", "definition-review": "system-review",
@@ -515,7 +516,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
     if (previous[step]) setStep(previous[step]!);
   };
 
-  const approveVoice = async () => {
+  const generateGoldenExample = async () => {
     const draft = await askAI(
       `Create exactly one high-quality SFT example as valid JSON with only these two string keys: "userPrompt" and "assistantResponse". ` +
       `The example must serve this model goal: ${goal}. Follow this approved voice reference closely:\n${voiceSample}\n` +
@@ -524,12 +525,18 @@ export function ProjectOnboarding({ onComplete }: Props) {
     if (!draft) return;
     const example = parseGoldenExample(draft);
     if (!example?.prompt.trim() || !example.completion.trim()) {
-      setError("The AI response did not separate the user prompt and assistant response. Please try generating the golden example again.");
+      setError("The golden-example draft did not separate the user prompt and assistant response. Your voice sample is approved; retry the golden example.");
       return;
     }
     setGoldenPrompt(example.prompt);
     setGoldenCompletion(example.completion);
     setStep("golden-review");
+  };
+
+  const approveVoice = async () => {
+    setError("");
+    setStep("golden-generation");
+    await generateGoldenExample();
   };
 
   const approveGolden = () => setStep("remember-name-choice");
@@ -929,6 +936,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
           </button>
           <div className="flex flex-wrap gap-2">
             {step === "voice-review" && <button type="button" className={buttonClass} disabled={pending || !voiceSample.trim()} onClick={() => void approveVoice()}>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Approve voice sample</button>}
+            {step === "golden-generation" && <button type="button" className={buttonClass} disabled={pending} onClick={() => void generateGoldenExample()}>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} {pending ? "Generating golden example" : "Retry golden example"}</button>}
             {step === "golden-review" && <button type="button" className={buttonClass} disabled={!goldenPrompt.trim() || !goldenCompletion.trim()} onClick={approveGolden}><Check className="h-4 w-4" /> Approve golden example</button>}
             {step === "system-review" && <button type="button" className={buttonClass} disabled={!systemPrompt.trim()} onClick={() => {
               setError("");
