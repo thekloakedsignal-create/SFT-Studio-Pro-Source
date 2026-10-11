@@ -9,11 +9,11 @@ For this app, follow the user's instructions directly and literally. Ask before 
 
 **How to apply:** If the requested page, exclusion, or behavior is unclear, ask before changing code.
 
-Do not modify the existing SFT Studio app's runtime logic, backend, batch generation, batch settings, or batch data. Project Setup changes may use only the minimum visible UI handoff needed to show onboarding recommendations.
+Keep these requests within Project Onboarding. Never modify the main app, backend, batch generation, batch settings, or batch data. For curated-recipe requests, update the onboarding recommendation library only.
 
-**Why:** The user explicitly limited work to Project Onboarding and its visible UI handoff, excluding app functionality and backend changes.
+**Why:** The user clarified that the recommendations are for Project Onboarding only and the app must never be changed.
 
-**How to apply:** Keep edits in Project Setup and the recommendation handoff UI only. Do not alter batch-generation logic or touch other app surfaces.
+**How to apply:** Keep recipe edits in ProjectOnboarding only. Do not change App.tsx, app surfaces, or generation behavior.
 
 The Project Setup base-model choice is temporary and must not be passed into project settings until the app has a supported field for it.
 
