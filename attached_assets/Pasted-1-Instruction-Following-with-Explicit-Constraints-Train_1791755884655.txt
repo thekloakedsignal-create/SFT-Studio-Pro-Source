@@ -1,0 +1,40 @@
+1. Instruction Following with Explicit Constraints Train the model to satisfy stated constraints exactly, not approximately.
+
+Instructions: Generate prompts pairing a task with hard constraints — word limits, bullet counts, tone requirements, "respond in exactly 3 sentences," "answer without using X." Include prompts with multiple stacked constraints.
+Constraints: Every response meets 100% of stated constraints. Exclude examples that complete the task but drop a constraint.
+2. Multi-Turn Conversational Coherence Context tracking, pronoun resolution, and topic continuity across long dialogues.
+
+Instructions: Generate conversations with 4–15 turns, including topic shifts, callbacks to earlier turns, and ambiguous references resolved from context.
+Constraints: Persona and facts established earlier stay consistent throughout. Include turns where the correct response depends on 3+ turns of history.
+3. Factual Q&A and Explanation at Multiple Levels Answering questions and explaining concepts from ELI5 up to expert depth.
+
+Instructions: Generate the same questions answered at different depth levels (child, layperson, practitioner, expert). Include analogies and worked walkthroughs.
+Constraints: No invented citations, statistics, or named sources. Depth level must match the request.
+4. Step-by-Step Reasoning and Math Multi-step problem solving with visible, verifiable work.
+
+Instructions: Generate word problems, logic puzzles, and multi-step math where the response derives the answer stepwise and ends with a clean final answer.
+Constraints: All arithmetic verified during generation. Each step follows from the last. Exclude examples where the final answer contradicts the working.
+5. Code Generation, Explanation, and Debugging Writing, explaining, and fixing code across common languages.
+
+Instructions: Cover function writing from specs, line-by-line explanation, bug-hunting in flawed snippets, small refactors, and data queries. Vary languages.
+Constraints: Code runs correctly for the stated inputs, is idiomatic for the language, handles edge cases. Explanations match what the code actually does.
+6. Summarization and Text Transformation Condensing, rewriting, and restyling existing text faithfully.
+
+Instructions: Generate summaries at specified lengths, rewrites at different reading levels, tone shifts (formal ↔ casual), and paraphrases. Provide the source text in the prompt.
+Constraints: No information beyond what the source contains. Length targets met within ±10%. Meaning preserved in paraphrases.
+7. Structured Output and Data Extraction Producing machine-readable output: JSON, tables, entity extraction, schema filling.
+
+Instructions: Generate prompts with an explicit target schema and responses that populate it from unstructured text. Include nested objects, arrays, and missing-field edge cases.
+Constraints: Output is valid, parseable JSON with no prose wrapping. Missing data uses null or empty values per the schema.
+8. Translation and Cross-Language Adaptation (new) Producing natural translations that preserve meaning, tone, and register.
+
+Instructions: Generate translation pairs across languages and registers — formal letters, casual dialogue, idioms and proverbs, technical text. Include cases where a literal choice won't land, with the adapted rendering instead.
+Constraints: Meaning and register preserved — colorful source text stays colorful, formal stays formal. Terminology consistent within a document. Untranslatable terms get a brief note, never a forced wrong rendering.
+9. Goal Decomposition and Planning (new) Turning objectives into ordered, concrete action steps.
+
+Instructions: Generate goals — trips, projects, learning plans, events — with responses breaking them into sequenced steps, checklists, or itineraries. Include goals with dependencies where step order matters, and user-stated limits like budgets or deadlines.
+Constraints: Steps are concrete and ordered, dependencies respected. Only user-stated constraints and resources are used — no invented budgets, equipment, or timelines. Plans sized to the ask: small goal, short plan.
+10. Controlled Creative and Long-Form Writing Stories, essays, and poems that hit stylistic targets and stay coherent.
+
+Instructions: Generate requests with explicit creative constraints — genre, POV, era, tone, rhyme scheme, word count — and responses that fulfill them with structural completeness.
+Constraints: No abrupt truncation or abandoned endings. Style constraints held consistently throughout. Length within ±15% of target.

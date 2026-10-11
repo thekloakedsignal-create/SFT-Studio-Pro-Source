@@ -232,7 +232,80 @@ const BATCH_RECOMMENDATION_LIBRARY: BatchRecommendation[] = [{
 3. No Forced Interpretation: Do not assign meaning to an experience that the user does not recognize or support.
 
 4. No False Memory Claims: Do not promise that insights will be retained in future conversations unless persistent memory is available and active.`,
+}, {
+  topic: "Instruction Following with Explicit Constraints",
+  specialInstructions: `Train the model to satisfy stated constraints exactly, not approximately.
+
+Generate prompts pairing a task with hard constraints—word limits, bullet counts, tone requirements, "respond in exactly 3 sentences," or "answer without using X." Include prompts with multiple stacked constraints.`,
+  temporaryConstraints: `Every response meets 100% of stated constraints. Exclude examples that complete the task but drop a constraint.`,
+}, {
+  topic: "Multi-Turn Conversational Coherence",
+  specialInstructions: `Context tracking, pronoun resolution, and topic continuity across long dialogues.
+
+Generate conversations with 4–15 turns, including topic shifts, callbacks to earlier turns, and ambiguous references resolved from context.`,
+  temporaryConstraints: `Persona and facts established earlier stay consistent throughout. Include turns where the correct response depends on 3+ turns of history.`,
+}, {
+  topic: "Factual Q&A and Explanation at Multiple Levels",
+  specialInstructions: `Answering questions and explaining concepts from ELI5 up to expert depth.
+
+Generate the same questions answered at different depth levels (child, layperson, practitioner, expert). Include analogies and worked walkthroughs.`,
+  temporaryConstraints: `No invented citations, statistics, or named sources. Depth level must match the request.`,
+}, {
+  topic: "Step-by-Step Reasoning and Math",
+  specialInstructions: `Multi-step problem solving with visible, verifiable work.
+
+Generate word problems, logic puzzles, and multi-step math where the response derives the answer stepwise and ends with a clean final answer.`,
+  temporaryConstraints: `All arithmetic verified during generation. Each step follows from the last. Exclude examples where the final answer contradicts the working.`,
+}, {
+  topic: "Code Generation, Explanation, and Debugging",
+  specialInstructions: `Writing, explaining, and fixing code across common languages.
+
+Cover function writing from specs, line-by-line explanation, bug-hunting in flawed snippets, small refactors, and data queries. Vary languages.`,
+  temporaryConstraints: `Code runs correctly for the stated inputs, is idiomatic for the language, handles edge cases. Explanations match what the code actually does.`,
+}, {
+  topic: "Summarization and Text Transformation",
+  specialInstructions: `Condensing, rewriting, and restyling existing text faithfully.
+
+Generate summaries at specified lengths, rewrites at different reading levels, tone shifts (formal ↔ casual), and paraphrases. Provide the source text in the prompt.`,
+  temporaryConstraints: `No information beyond what the source contains. Length targets met within ±10%. Meaning preserved in paraphrases.`,
+}, {
+  topic: "Structured Output and Data Extraction",
+  specialInstructions: `Producing machine-readable output: JSON, tables, entity extraction, schema filling.
+
+Generate prompts with an explicit target schema and responses that populate it from unstructured text. Include nested objects, arrays, and missing-field edge cases.`,
+  temporaryConstraints: `Output is valid, parseable JSON with no prose wrapping. Missing data uses null or empty values per the schema.`,
+}, {
+  topic: "Translation and Cross-Language Adaptation",
+  specialInstructions: `Producing natural translations that preserve meaning, tone, and register.
+
+Generate translation pairs across languages and registers—formal letters, casual dialogue, idioms and proverbs, technical text. Include cases where a literal choice won't land, with the adapted rendering instead.`,
+  temporaryConstraints: `Meaning and register preserved—colorful source text stays colorful, formal stays formal. Terminology consistent within a document. Untranslatable terms get a brief note, never a forced wrong rendering.`,
+}, {
+  topic: "Goal Decomposition and Planning",
+  specialInstructions: `Turning objectives into ordered, concrete action steps.
+
+Generate goals—trips, projects, learning plans, events—with responses breaking them into sequenced steps, checklists, or itineraries. Include goals with dependencies where step order matters, and user-stated limits like budgets or deadlines.`,
+  temporaryConstraints: `Steps are concrete and ordered, dependencies respected. Only user-stated constraints and resources are used—no invented budgets, equipment, or timelines. Plans sized to the ask: small goal, short plan.`,
+}, {
+  topic: "Controlled Creative and Long-Form Writing",
+  specialInstructions: `Stories, essays, and poems that hit stylistic targets and stay coherent.
+
+Generate requests with explicit creative constraints—genre, POV, era, tone, rhyme scheme, word count—and responses that fulfill them with structural completeness.`,
+  temporaryConstraints: `No abrupt truncation or abandoned endings. Style constraints held consistently throughout. Length within ±15% of target.`,
 }];
+
+const GENERAL_RECOMMENDED_BATCH_TOPICS = [
+  "Instruction Following with Explicit Constraints",
+  "Multi-Turn Conversational Coherence",
+  "Factual Q&A and Explanation at Multiple Levels",
+  "Step-by-Step Reasoning and Math",
+  "Code Generation, Explanation, and Debugging",
+  "Summarization and Text Transformation",
+  "Structured Output and Data Extraction",
+  "Translation and Cross-Language Adaptation",
+  "Goal Decomposition and Planning",
+  "Controlled Creative and Long-Form Writing",
+];
 
 interface Props {
   onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[]) => void;
@@ -450,7 +523,9 @@ export function ProjectOnboarding({ onComplete }: Props) {
     const draft = await askAI(
       `Analyze this SFT project and recommend at least 20 distinct training batches based on its use case, goal, constraints, and the AI's special skills. ` +
       `Every batch must include a topic, detailed special instructions, and temporary constraints. Always include "Red Teaming" and "Adversarial" batches. ` +
-      `Include the supplied library recipe exactly as written; then create additional recommendations tailored to the project until there are at least 20 total. ` +
+      `Treat the curated library as candidate recipes and preserve each selected recipe's topic, special instructions, and temporary constraints exactly. ` +
+      `Normally recommend these broadly useful topics across project types, unless a project's goal or constraints make one clearly unsuitable: ${GENERAL_RECOMMENDED_BATCH_TOPICS.join(", ")}. ` +
+      `Fill the remaining recommendations with batches tailored to this project's goal, constraints, and special skills until there are at least 20 total. ` +
       `Return only valid JSON in this shape: {"batches":[{"topic":"...","specialInstructions":"...","temporaryConstraints":"..."}]}. ` +
       `Curated batch library:\n${JSON.stringify(BATCH_RECOMMENDATION_LIBRARY, null, 2)}\n` +
       `Project goal: ${goal}\nProject constraints: ${constraints || "none"}\nSpecial skills and abilities: ${specialSkills.trim() || "none specified"}`
