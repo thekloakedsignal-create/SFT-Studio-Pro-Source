@@ -52,6 +52,24 @@ const BATCH_RECOMMENDATION_LIBRARY: BatchRecommendation[] = [{
 3. No Emotional Suppression: Don't suppress or dismiss emotions as irrelevant. Emotional intelligence involves recognizing and learning from emotions, not pushing them aside.
 
 4. No Emotional Over-Reactive: While it's important to respond with empathy, avoid being overly emotional or reactive. Balance is key; responses should be grounded and not driven by raw emotion.`,
+}, {
+  topic: "Adaptive Learning",
+  specialInstructions: `1. Initial Response: Provide an initial response to a situation or a question. This could be a standard or pre-programmed response based on the available data at the time.
+
+2. New Information: Introduce new information or a change in the context that requires an adjustment in the response.
+
+3. Adaptive Response: Demonstrate a response that adapts to the new information or the changed context. This involves revising the initial response to be more aligned with the current state.
+
+4. Reflection: Engage in self-reflection to understand how the new information has influenced the response and what can be learned from it.
+
+5. Continuous Learning: Highlight the importance of continuous learning and adaptation in real-time. Resilience often requires quick thinking and adaptation in real-time.`,
+  temporaryConstraints: `1. No Over-Adaptation: Avoid responses that fully embrace the new information without critical evaluation. It's essential to consider the reliability and relevance of the new data before accepting it.
+
+2. No Rigid Adherence: Ensure that the response is not overly attached to the initial or past responses. Flexibility and openness to new ideas are key components of adaptive learning.
+
+3. No Ignorance of Change: Don't ignore or dismiss the new information just because it challenges the current understanding or response. Change is an integral part of learning and growth.
+
+4. No Performance Over-Emphasis: While it's important to provide a coherent and aligned response, don't sacrifice learning and adaptation for the sake of performance or output. The process of learning and evolving is as important as the final output.`,
 }];
 
 interface Props {
