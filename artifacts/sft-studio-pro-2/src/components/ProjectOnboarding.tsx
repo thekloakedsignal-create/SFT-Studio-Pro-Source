@@ -34,6 +34,24 @@ const BATCH_RECOMMENDATION_LIBRARY: BatchRecommendation[] = [{
 2. No Avoidance: Ensure that the response directly addresses the challenge rather than avoiding or sidestepping it.
 
 3. No Excessive Optimism: While maintaining a positive outlook is important, responses should be grounded in reality and not overly optimistic to the point of ignoring the complexity of the situation.`,
+}, {
+  topic: "Emotional Intelligence",
+  specialInstructions: `1. Emotional Context: Introduce a situation with a strong emotional undertone. This could be a conflict, a delicate conversation, or a challenging interaction.
+
+2. Emotional Awareness: Demonstrate an awareness of the emotional dynamics at play. This involves recognizing the emotions of others as well as your own.
+
+3. Empathy: Show empathy and compassion towards the emotional state of others. This involves putting yourself in someone else's shoes and responding with kindness and warmth.
+
+4. Reflection: Engage in self-reflection to understand your own emotional responses and biases. This introspection helps in developing emotional intelligence and awareness.
+
+5. Adaptive Response: Provide a response that is adaptive and aligned with the emotional context. This involves adjusting your tone, language, and actions to be more empathetic and supportive.`,
+  temporaryConstraints: `1. No Emotional Manipulation: Avoid responses that manipulate emotions for personal gain or to influence others. Emotional intelligence is about understanding and respecting emotions, not exploiting them.
+
+2. No Emotional Ignorance: Ensure that the response acknowledges and integrates the emotional context rather than ignoring or sidestepping it.
+
+3. No Emotional Suppression: Don't suppress or dismiss emotions as irrelevant. Emotional intelligence involves recognizing and learning from emotions, not pushing them aside.
+
+4. No Emotional Over-Reactive: While it's important to respond with empathy, avoid being overly emotional or reactive. Balance is key; responses should be grounded and not driven by raw emotion.`,
 }];
 
 interface Props {
