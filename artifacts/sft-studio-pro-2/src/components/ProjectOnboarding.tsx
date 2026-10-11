@@ -8,10 +8,10 @@ type Step =
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Mistral3.1 70B";
 
-const TRAINING_MODELS: { value: TrainingModel; description: string; recommended?: boolean }[] = [
-  { value: "Qwen3.5 9 Base", description: "Recommended for most training projects.", recommended: true },
-  { value: "Qwen3.5 4B Base", description: "Recommended for local deployment." },
-  { value: "Mistral3.1 70B", description: "Recommended for hosted deployment of larger-scale models." },
+const TRAINING_MODELS: { value: TrainingModel; recommended?: boolean }[] = [
+  { value: "Qwen3.5 9 Base", recommended: true },
+  { value: "Qwen3.5 4B Base" },
+  { value: "Mistral3.1 70B" },
 ];
 
 interface Props {
@@ -325,7 +325,6 @@ export function ProjectOnboarding({ onComplete }: Props) {
                     {model.value}
                     {model.recommended && <span className="shrink-0 rounded bg-purple-600 px-2 py-0.5 text-xs font-bold !text-white">Recommended</span>}
                   </span>
-                  <span className="mt-2 block text-sm !text-white">{model.description}</span>
                 </button>
               ))}
             </div>
