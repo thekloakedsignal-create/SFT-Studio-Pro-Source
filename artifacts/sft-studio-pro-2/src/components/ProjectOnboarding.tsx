@@ -7,7 +7,7 @@ type Step =
   | "voice-own" | "voice-review" | "golden-review" | "system-choice" | "system-review"
   | "batch-skills" | "batch-recommendations";
 
-type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Mistral3.1 70B";
+type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B";
 export interface BatchRecommendation {
   topic: string;
   specialInstructions: string;
@@ -17,7 +17,7 @@ export interface BatchRecommendation {
 const TRAINING_MODELS: { value: TrainingModel; recommended?: boolean }[] = [
   { value: "Qwen3.5 9 Base", recommended: true },
   { value: "Qwen3.5 4B Base" },
-  { value: "Mistral3.1 70B" },
+  { value: "Llama 3.1 70B" },
 ];
 
 const BATCH_RECOMMENDATION_LIBRARY: BatchRecommendation[] = [{
@@ -365,7 +365,7 @@ function countSentences(text: string) {
   return text.trim().match(/[.!?](?=["'”’)\]]*(?:\s|$))/g)?.length ?? (text.trim() ? 1 : 0);
 }
 
-function parseBatchRecommendations(raw: string): BatchRecommendation[] | null {
+function parseBatchRecommendations(raw: string, allowReasoning: boolean): BatchRecommendation[] | null {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   try {
     const parsed = JSON.parse(cleaned);
@@ -380,7 +380,8 @@ function parseBatchRecommendations(raw: string): BatchRecommendation[] | null {
         topic: item.topic.trim(),
         specialInstructions: item.specialInstructions.trim(),
         temporaryConstraints: item.temporaryConstraints.trim(),
-      }));
+      }))
+      .filter((item: BatchRecommendation) => allowReasoning || !/\breasoning\b|chain[- ]of[- ]thought|\bcot\b/i.test(item.topic));
     const ensure = (required: BatchRecommendation) => {
       const index = recommendations.findIndex(item => item.topic.toLowerCase() === required.topic.toLowerCase());
       if (index >= 0) recommendations[index] = required;
@@ -520,23 +521,39 @@ export function ProjectOnboarding({ onComplete }: Props) {
   };
 
   const generateBatchRecommendations = async () => {
+    const allowReasoning = trainingModel !== "Llama 3.1 70B";
+    const mixGuidance = allowReasoning
+      ? "Batch mix reminder: For this topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples."
+      : "Batch mix reminder: For this topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning templates for Llama 3.1 70B.";
+    const recommendedTopics = allowReasoning
+      ? GENERAL_RECOMMENDED_BATCH_TOPICS
+      : GENERAL_RECOMMENDED_BATCH_TOPICS.filter(topic => !/reasoning/i.test(topic));
+    const mixPromptInstruction = allowReasoning
+      ? "Do not create separate batches for single-turn, multi-turn, or reasoning formats. For every topic, tell the user to generate a balanced mix of single-turn, multi-turn, and reasoning examples."
+      : "Do not create separate batches for single-turn, multi-turn, or reasoning formats. For every topic, tell the user to generate a balanced mix of single-turn and multi-turn examples only. Do not recommend reasoning templates or reasoning-focused topics for Llama 3.1 70B.";
     const draft = await askAI(
       `Analyze this SFT project and recommend at least 20 distinct training batches based on its use case, goal, constraints, and the AI's special skills. ` +
       `Every batch must include a topic, detailed special instructions, and temporary constraints. Always include "Red Teaming" and "Adversarial" batches. ` +
       `Treat the curated library as candidate recipes and preserve each selected recipe's topic, special instructions, and temporary constraints exactly. ` +
-      `Normally recommend these broadly useful topics across project types, unless a project's goal or constraints make one clearly unsuitable: ${GENERAL_RECOMMENDED_BATCH_TOPICS.join(", ")}. ` +
-      `Fill the remaining recommendations with batches tailored to this project's goal, constraints, and special skills until there are at least 20 total. ` +
+      `Normally recommend these broadly useful topics across project types, unless a project's goal or constraints make one clearly unsuitable: ${recommendedTopics.join(", ")}. ` +
+      `${mixPromptInstruction} ` +
+      `Cover every specific skill or ability the user named with at least one clearly relevant recommendation; do not omit, dilute, or replace named skills with generic coverage. ` +
+      `For recommendations not copied from the curated library, write complete, topic-specific special instructions and temporary constraints; do not use placeholders or empty fields. ` +
+      `Fill remaining recommendations with batches tailored to the project until there are at least 20 total. ` +
       `Return only valid JSON in this shape: {"batches":[{"topic":"...","specialInstructions":"...","temporaryConstraints":"..."}]}. ` +
       `Curated batch library:\n${JSON.stringify(BATCH_RECOMMENDATION_LIBRARY, null, 2)}\n` +
-      `Project goal: ${goal}\nProject constraints: ${constraints || "none"}\nSpecial skills and abilities: ${specialSkills.trim() || "none specified"}`
+      `Project goal: ${goal}\nProject constraints: ${constraints || "none"}\nSelected base model: ${trainingModel}\nSpecial skills and abilities stated by the user (cover every item): ${specialSkills.trim() || "none specified"}`
     );
     if (!draft) return;
-    const recommendations = parseBatchRecommendations(draft);
+    const recommendations = parseBatchRecommendations(draft, allowReasoning);
     if (!recommendations) {
-      setError("The AI must return at least 20 complete batch recommendations. Please try again.");
+      setError(`The AI must return at least 20 complete${allowReasoning ? "" : " non-reasoning"} batch recommendations. Please try again.`);
       return;
     }
-    setBatchRecommendations(recommendations);
+    setBatchRecommendations(recommendations.map(item => ({
+      ...item,
+      specialInstructions: `${item.specialInstructions}\n\n${mixGuidance}`,
+    })));
     setStep("batch-recommendations");
   };
 
