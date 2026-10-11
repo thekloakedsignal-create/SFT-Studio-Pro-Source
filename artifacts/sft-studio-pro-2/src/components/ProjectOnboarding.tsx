@@ -668,7 +668,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
 
   const generateSystemPrompt = async () => {
     const draft = await askAI(
-      `Draft a clear system prompt for this SFT project in no more than five sentences. Target task: ${goal}. Constraints: ${constraints || "none"}. ` +
+      `Draft a clear system prompt for this SFT project in no more than five sentences. This limit applies only to your AI-generated draft; do not shorten or impose it on any user-written or user-edited prompt. Target task: ${goal}. Constraints: ${constraints || "none"}. ` +
       `Use this approved voice reference:\n${voiceSample}\n` +
       `Example user prompt: ${goldenPrompt}\nExample assistant response: ${goldenCompletion}\n` +
       `Return only the complete system prompt, with no introduction or commentary. It must contain at most five sentences.`
