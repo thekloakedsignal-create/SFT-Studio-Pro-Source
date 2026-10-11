@@ -5,7 +5,7 @@ import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateT
 type Step =
   | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
   | "voice-own" | "voice-review" | "golden-review" | "system-choice" | "system-review"
-  | "batch-skills" | "batch-recommendations" | "triad-choice" | "quality-analysis";
+  | "definition-review" | "batch-skills" | "batch-recommendations" | "triad-choice" | "quality-analysis";
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B";
 export interface BatchRecommendation {
@@ -324,6 +324,7 @@ const PROMPTS: Record<Step, string> = {
   "golden-review": "I created one golden training example using the approved voice. Review and edit both parts; approve it to continue.",
   "system-choice": "The system prompt is included in every generated training example. It sets the model’s role and instructions, so it directly shapes every example. Would you like to write it or have me draft one?",
   "system-review": "Review the full system prompt below. Edit it if you want, then explicitly approve it. It will be saved to the project and included in every generated example.",
+  "definition-review": "Your project definition is complete. Review the summary and give final approval. Approval locks these settings for batch generation; use Edit answer if anything needs changing.",
   "batch-skills": "The batch generator creates training examples from your project settings for review. What special skills or abilities should this AI have? I’ll use your answer and project goal to recommend batches. Red Teaming and Adversarial are always included.",
   "batch-recommendations": "Here are my recommended batches based on your project and the skills you described. Red Teaming and Adversarial are included to help test safety against attacks and bad actors.",
   "triad-choice": "Would you like to include TRiAD moral alignment in your project? You can open the explanation below for details.",
@@ -426,6 +427,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
   const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
   const [specialSkills, setSpecialSkills] = useState("");
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
+  const [approvedProjectDefinition, setApprovedProjectDefinition] = useState<ProjectSettings | null>(null);
   const [triadChoice, setTriadChoice] = useState<"yes" | "no" | null>(null);
   const [copiedBatchSection, setCopiedBatchSection] = useState("");
   const [error, setError] = useState("");
@@ -437,7 +439,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
     if (conversation) conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
   }, [step, assistantReply]);
 
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-review", "system-choice", "system-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-review", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
@@ -450,6 +452,9 @@ export function ProjectOnboarding({ onComplete }: Props) {
       : []),
     ...(currentStepPosition > stepOrder.indexOf("golden-review") && goldenPrompt && goldenCompletion
       ? [{ step: "golden-review" as Step, label: "Approved golden example", answer: `${goldenPrompt}\n\n${goldenCompletion}` }]
+      : []),
+    ...(currentStepPosition > stepOrder.indexOf("system-review") && systemPrompt
+      ? [{ step: "system-review" as Step, label: "System prompt", answer: systemPrompt }]
       : []),
     ...(currentStepPosition > stepOrder.indexOf("triad-choice") && triadChoice
       ? [{ step: "triad-choice" as Step, label: "TRiAD moral alignment", answer: triadChoice === "yes" ? "Yes — remember to add it from the TRiAD tab" : "No" }]
@@ -489,10 +494,15 @@ export function ProjectOnboarding({ onComplete }: Props) {
       "voice-choice": "model", "voice-description": "voice-choice",
       "voice-own": "voice-choice", "voice-review": voiceSource === "ai" ? "voice-description" : "voice-own",
       "golden-review": "voice-review", "system-choice": "golden-review",
-      "system-review": "system-choice", "batch-skills": "system-review", "batch-recommendations": "batch-skills",
+      "system-review": "system-choice", "definition-review": "system-review",
+      "batch-skills": "definition-review", "batch-recommendations": "batch-skills",
       "triad-choice": "batch-recommendations", "quality-analysis": "triad-choice",
     };
     setError("");
+    if (step === "definition-review" && approvedProjectDefinition) {
+      setApprovedProjectDefinition(null);
+      setBatchRecommendations([]);
+    }
     if (previous[step]) setStep(previous[step]!);
   };
 
@@ -515,10 +525,10 @@ export function ProjectOnboarding({ onComplete }: Props) {
 
   const approveGolden = () => setStep("system-choice");
 
-  const finish = () => {
+  const buildProjectDefinition = (): ProjectSettings => {
     const voiceConstraint = `Approved voice reference (${voiceSource === "ai" ? "AI draft approved by user" : "user supplied"}):\n${voiceSample}`;
     const mergedConstraints = [constraints.trim(), voiceConstraint].filter(Boolean).join("\n\n");
-    onComplete({
+    return {
       name: projectName.trim(),
       systemPrompt: systemPrompt.trim(),
       targetTask: goal.trim(),
@@ -530,10 +540,32 @@ export function ProjectOnboarding({ onComplete }: Props) {
       customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
       representativePrompt: goldenPrompt.trim(),
       representativeCompletion: goldenCompletion.trim(),
-    }, batchRecommendations);
+    };
+  };
+
+  const approveProjectDefinition = () => {
+    setApprovedProjectDefinition(buildProjectDefinition());
+    setBatchRecommendations([]);
+    setError("");
+    setAssistantReply("");
+    setStep("batch-skills");
+  };
+
+  const finish = () => {
+    if (!approvedProjectDefinition) {
+      setError("Approve the completed project definition before continuing to the Batch generator.");
+      setStep("definition-review");
+      return;
+    }
+    onComplete(approvedProjectDefinition, batchRecommendations);
   };
 
   const generateBatchRecommendations = async () => {
+    if (!approvedProjectDefinition) {
+      setError("Approve the completed project definition before generating batch recommendations.");
+      setStep("definition-review");
+      return;
+    }
     const allowReasoning = trainingModel !== "Llama 3.1 70B";
     const mixGuidance = allowReasoning
       ? "Batch mix reminder: For this topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples."
@@ -555,7 +587,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
       `Fill remaining recommendations with batches tailored to the project until there are at least 20 total. ` +
       `Return only valid JSON in this shape: {"batches":[{"topic":"...","specialInstructions":"...","temporaryConstraints":"..."}]}. ` +
       `Curated batch library:\n${JSON.stringify(BATCH_RECOMMENDATION_LIBRARY, null, 2)}\n` +
-      `Project goal: ${goal}\nProject constraints: ${constraints || "none"}\nSelected base model: ${trainingModel}\nSpecial skills and abilities stated by the user (cover every item): ${specialSkills.trim() || "none specified"}`
+      `Project name: ${approvedProjectDefinition.name}\nProject goal: ${approvedProjectDefinition.targetTask}\nProject constraints: ${approvedProjectDefinition.constraints || "none"}\nSelected base model: ${trainingModel}\nSpecial skills and abilities stated by the user (cover every item): ${specialSkills.trim() || "none specified"}`
     );
     if (!draft) return;
     const recommendations = parseBatchRecommendations(draft, allowReasoning);
@@ -682,7 +714,11 @@ export function ProjectOnboarding({ onComplete }: Props) {
               <div className="max-w-[90%] border border-purple-500 bg-purple-300 px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]">
                 <p className="mb-1 text-xs font-bold !text-[#000000]">{item.label}</p>
                 <p className="whitespace-pre-wrap">{item.answer}</p>
-              <button type="button" className="mt-2 text-xs font-bold !text-[#000000] underline underline-offset-2 hover:!text-[#222222]" onClick={() => setStep(item.step)}>
+                <button type="button" className="mt-2 text-xs font-bold !text-[#000000] underline underline-offset-2 hover:!text-[#222222]" onClick={() => {
+                  setApprovedProjectDefinition(null);
+                  setBatchRecommendations([]);
+                  setStep(item.step);
+                }}>
                   Edit answer
                 </button>
               </div>
@@ -758,6 +794,29 @@ export function ProjectOnboarding({ onComplete }: Props) {
           )}
           {step === "system-review" && (
             <textarea aria-label="System prompt for review" className={textareaClass} rows={7} value={systemPrompt} onChange={e => setSystemPrompt(e.target.value)} placeholder="Write the complete system prompt that should be included in every training example." />
+          )}
+          {step === "definition-review" && (
+            <div className="space-y-3">
+              <p className="border border-purple-500 bg-purple-300 px-4 py-3 text-sm font-bold !text-[#000000]">
+                {approvedProjectDefinition ? "This project definition is approved and locked." : "Review the completed project definition, then approve it to lock these settings."}
+              </p>
+              {[
+                ["Project name", approvedProjectDefinition?.name ?? projectName],
+                ["Target goal", approvedProjectDefinition?.targetTask ?? goal],
+                ["Rules and constraints", constraints || "None"],
+                ["Base model", trainingModel],
+                ["Training format", "Instruct ChatML"],
+                ["Approved voice reference", voiceSample],
+                ["Golden example — user prompt", approvedProjectDefinition?.representativePrompt ?? goldenPrompt],
+                ["Golden example — assistant response", approvedProjectDefinition?.representativeCompletion ?? goldenCompletion],
+                ["System prompt included in every example", approvedProjectDefinition?.systemPrompt ?? systemPrompt],
+              ].map(([label, value]) => (
+                <section key={label} className="border border-slate-600 bg-slate-900 px-4 py-3">
+                  <h2 className="text-sm font-bold text-slate-100">{label}</h2>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">{value || "None"}</p>
+                </section>
+              ))}
+            </div>
           )}
           {step === "batch-recommendations" && (
             <div className="space-y-3">
@@ -845,8 +904,9 @@ export function ProjectOnboarding({ onComplete }: Props) {
             {step === "system-review" && <button type="button" className={buttonClass} disabled={!systemPrompt.trim()} onClick={() => {
               setError("");
               setAssistantReply("");
-              setStep("batch-skills");
+              setStep("definition-review");
             }}><Check className="h-4 w-4" /> Approve prompt &amp; continue</button>}
+            {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm project definition & continue" : "Approve project definition & continue"}</button>}
             {["name", "goal", "constraints", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
             {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("triad-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
