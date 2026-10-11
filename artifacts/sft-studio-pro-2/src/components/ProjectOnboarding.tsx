@@ -3,8 +3,16 @@ import { ArrowLeft, ArrowRight, Check, HelpCircle, LoaderCircle, MessageSquare, 
 import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateType } from "../types";
 
 type Step =
-  | "name" | "goal" | "goal-followup" | "constraints" | "format" | "template" | "voice-choice" | "voice-description"
+  | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
   | "voice-own" | "voice-review" | "golden-review" | "system-choice" | "system-review";
+
+type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Mistral3.1 70B";
+
+const TRAINING_MODELS: { value: TrainingModel; description: string; recommended?: boolean }[] = [
+  { value: "Qwen3.5 9 Base", description: "Recommended for most training projects.", recommended: true },
+  { value: "Qwen3.5 4B Base", description: "Recommended for local deployment." },
+  { value: "Mistral3.1 70B", description: "Recommended for hosted deployment of larger-scale models." },
+];
 
 interface Props {
   onComplete: (settings: ProjectSettings) => void;
@@ -15,8 +23,7 @@ const PROMPTS: Record<Step, string> = {
   goal: "What should the model learn to do? Describe its main task and who it is for.",
   "goal-followup": "A quick follow-up so I can understand the target clearly:",
   constraints: "What rules should the model always follow, or what should it avoid? You can say “none.”",
-  format: "Which training format do you want? Conversation is standard chat messages; Instruction uses a prompt/response template.",
-  template: "Which instruction template should the project use: ChatML, Alpaca, or Mistral?",
+  model: "Which base model will you train? I’ll automatically choose Instruct ChatML for any of these models, so there is no separate format or template question.",
   "voice-choice": "Next, let's define the desired voice. Would you like to write a couple of paragraphs yourself, or have me draft a sample for you to review?",
   "voice-description": "Describe the voice you want—such as its tone, vocabulary, and level of formality. I’ll draft a couple of paragraphs for your approval.",
   "voice-own": "Write a couple of paragraphs in the voice you want the model to use.",
@@ -70,8 +77,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
   const [adaptiveQuestion, setAdaptiveQuestion] = useState("");
   const [constraints, setConstraints] = useState("");
-  const [format, setFormat] = useState<ProjectFormat>(ProjectFormat.CONVERSATION);
-  const [instructionTemplate, setInstructionTemplate] = useState<InstructTemplate>(InstructTemplate.CHATML);
+  const [trainingModel, setTrainingModel] = useState<TrainingModel>("Qwen3.5 9 Base");
   const [voiceDescription, setVoiceDescription] = useState("");
   const [voiceSample, setVoiceSample] = useState("");
   const [voiceSource, setVoiceSource] = useState<"own" | "ai">("own");
@@ -82,14 +88,13 @@ export function ProjectOnboarding({ onComplete }: Props) {
   const [error, setError] = useState("");
   const [assistantReply, setAssistantReply] = useState("");
   const [pending, setPending] = useState(false);
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "format", "template", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-review", "system-choice", "system-review"];
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-review", "system-choice", "system-review"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
     { step: "goal" as Step, label: "Target goal", answer: goal },
     { step: "constraints" as Step, label: "Rules and constraints", answer: constraints || "None" },
-    { step: "format" as Step, label: "Dataset format", answer: format },
-    ...(format === ProjectFormat.INSTRUCTION ? [{ step: "template" as Step, label: "Instruction template", answer: instructionTemplate }] : []),
+    ...(currentStepPosition > stepOrder.indexOf("model") ? [{ step: "model" as Step, label: "Base model", answer: trainingModel }] : []),
     ...(currentStepPosition > stepOrder.indexOf("voice-review") && voiceSample
       ? [{ step: "voice-review" as Step, label: "Approved voice reference", answer: voiceSample }]
       : []),
@@ -127,8 +132,8 @@ export function ProjectOnboarding({ onComplete }: Props) {
 
   const goBack = () => {
     const previous: Partial<Record<Step, Step>> = {
-      goal: "name", "goal-followup": "goal", constraints: "goal", format: "constraints",
-      template: "format", "voice-choice": format === ProjectFormat.INSTRUCTION ? "template" : "format", "voice-description": "voice-choice",
+      goal: "name", "goal-followup": "goal", constraints: "goal", model: "constraints",
+      "voice-choice": "model", "voice-description": "voice-choice",
       "voice-own": "voice-choice", "voice-review": voiceSource === "ai" ? "voice-description" : "voice-own",
       "golden-review": "voice-review", "system-choice": "golden-review",
       "system-review": "system-choice",
@@ -165,12 +170,28 @@ export function ProjectOnboarding({ onComplete }: Props) {
       targetTask: goal.trim(),
       constraints: mergedConstraints,
       selectedPreset: PresetType.CUSTOM,
-      projectFormat: format,
-      templateType: format === ProjectFormat.INSTRUCTION ? TemplateType.INSTRUCTION_TEMPLATE : TemplateType.SINGLE_TURN,
-      instructTemplate: instructionTemplate,
+      projectFormat: ProjectFormat.INSTRUCTION,
+      templateType: TemplateType.INSTRUCTION_TEMPLATE,
+      instructTemplate: InstructTemplate.CHATML,
       customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
       representativePrompt: goldenPrompt.trim(),
       representativeCompletion: goldenCompletion.trim(),
+    });
+  };
+
+  const skipToProject = () => {
+    onComplete({
+      name: "General Instruction Tuner",
+      systemPrompt: "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+      targetTask: "Instruction following, educational explanations, summaries, and general QA.",
+      constraints: "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+      selectedPreset: PresetType.GENERAL_USE,
+      projectFormat: ProjectFormat.CONVERSATION,
+      templateType: TemplateType.SINGLE_TURN,
+      instructTemplate: InstructTemplate.CHATML,
+      customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      representativePrompt: "Explain photosynthesis in simple terms.",
+      representativeCompletion: "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar.",
     });
   };
 
@@ -196,7 +217,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
       setStep("constraints");
       return;
     }
-    if (step === "constraints") return setStep("format");
+    if (step === "constraints") return setStep("model");
     if (step === "voice-description" && voiceDescription.trim()) {
       const sample = await askAI(
         `Write exactly two short paragraphs as a sample of the desired assistant voice. Voice description: ${voiceDescription}. ` +
@@ -241,7 +262,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
   };
 
   const textareaClass = "w-full resize-y bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-purple-400 focus:outline-none";
-  const buttonClass = "inline-flex items-center justify-center gap-2 border border-purple-300 bg-purple-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50";
+  const buttonClass = "inline-flex items-center justify-center gap-2 border border-purple-300 bg-purple-800 px-4 py-2.5 text-sm font-semibold !text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
       <main className="min-h-screen bg-slate-900 px-4 py-8 text-white sm:py-12">
@@ -259,8 +280,8 @@ export function ProjectOnboarding({ onComplete }: Props) {
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6 sm:px-7" aria-live="polite">
           {priorAnswers.map(item => (
             <div key={item.step} className="flex justify-end">
-              <div className="max-w-[90%] border border-purple-300 bg-purple-950 px-4 py-3 text-sm leading-relaxed text-white">
-                <p className="mb-1 text-xs font-semibold text-purple-300">{item.label}</p>
+              <div className="max-w-[90%] border border-purple-300 bg-purple-950 px-4 py-3 text-sm leading-relaxed !text-white">
+                <p className="mb-1 text-xs font-semibold !text-purple-200">{item.label}</p>
                 <p className="whitespace-pre-wrap">{item.answer}</p>
               <button type="button" className="mt-2 text-xs text-purple-200 underline underline-offset-2 hover:text-white" onClick={() => setStep(item.step)}>
                   Edit answer
@@ -285,21 +306,26 @@ export function ProjectOnboarding({ onComplete }: Props) {
             </div>
           </div>
 
-          {step === "format" && (
-            <div className="flex flex-wrap gap-2">
-              {[ProjectFormat.CONVERSATION, ProjectFormat.INSTRUCTION].map(option => (
-                <button key={option} type="button" onClick={() => setFormat(option)} className={`${buttonClass} ${format === option ? "border-purple-200 bg-purple-600 text-white" : ""}`}>
-                  {format === option && <Check className="h-4 w-4" />}{option}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {step === "template" && (
-            <div className="flex flex-wrap gap-2">
-              {[InstructTemplate.CHATML, InstructTemplate.ALPACA, InstructTemplate.MISTRAL].map(option => (
-                <button key={option} type="button" onClick={() => setInstructionTemplate(option)} className={`${buttonClass} ${instructionTemplate === option ? "border-purple-200 bg-purple-600 text-white" : ""}`}>
-                  {instructionTemplate === option && <Check className="h-4 w-4" />}{option}
+          {step === "model" && (
+            <div role="radiogroup" aria-label="Base model to train" className="grid gap-3 sm:grid-cols-3">
+              {TRAINING_MODELS.map(model => (
+                <button
+                  key={model.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={trainingModel === model.value}
+                  onClick={() => setTrainingModel(model.value)}
+                  className={`rounded-md border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 ${
+                    trainingModel === model.value
+                    ? "border-purple-200 bg-purple-800 !text-white"
+                      : "border-slate-500 bg-slate-900 !text-white hover:border-purple-300 hover:bg-slate-800"
+                  }`}
+                >
+                  <span className="flex items-start justify-between gap-2 font-semibold !text-white">
+                    {model.value}
+                    {model.recommended && <span className="shrink-0 rounded bg-purple-600 px-2 py-0.5 text-xs font-bold !text-white">Recommended</span>}
+                  </span>
+                  <span className="mt-2 block text-sm !text-white">{model.description}</span>
                 </button>
               ))}
             </div>
@@ -360,8 +386,8 @@ export function ProjectOnboarding({ onComplete }: Props) {
             </div>
           )}
 
-          {error && <p role="alert" className="border border-purple-300 bg-purple-950 px-3 py-2 text-sm text-white">{error}</p>}
-          {assistantReply && <div className="flex justify-start"><div className="max-w-[90%] border border-purple-300 bg-purple-950 px-4 py-3 text-sm leading-relaxed text-white whitespace-pre-wrap">{assistantReply}</div></div>}
+          {error && <p role="alert" className="border border-purple-300 bg-purple-950 px-3 py-2 text-sm !text-white">{error}</p>}
+          {assistantReply && <div className="flex justify-start"><div className="max-w-[90%] border border-purple-300 bg-purple-950 px-4 py-3 text-sm leading-relaxed !text-white whitespace-pre-wrap">{assistantReply}</div></div>}
         </div>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-5 py-4 sm:px-7">
@@ -379,11 +405,17 @@ export function ProjectOnboarding({ onComplete }: Props) {
               finish();
             }}><Check className="h-4 w-4" /> Approve prompt &amp; continue</button>}
             {["name", "goal", "constraints"].includes(step) && <button type="button" className={buttonClass} onClick={() => void submit()}><span>Continue</span><ArrowRight className="h-4 w-4" /></button>}
-            {step === "format" && <button type="button" className={buttonClass} onClick={() => setStep(format === ProjectFormat.INSTRUCTION ? "template" : "voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
-            {step === "template" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
+            {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
           </div>
         </footer>
       </section>
+      <button
+        type="button"
+        onClick={skipToProject}
+        className="fixed bottom-4 right-4 z-[60] rounded-md border border-purple-200 bg-purple-700 px-4 py-3 text-sm font-bold text-white shadow-xl transition-colors hover:bg-purple-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+      >
+        Skip to project
+      </button>
     </main>
   );
 }
