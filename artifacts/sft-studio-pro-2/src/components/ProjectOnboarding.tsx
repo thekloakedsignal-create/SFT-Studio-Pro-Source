@@ -319,7 +319,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
   };
 
   const textareaClass = "w-full resize-y bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-purple-400 focus:outline-none";
-  const buttonClass = "inline-flex items-center justify-center gap-2 border border-purple-300 bg-purple-800 px-4 py-2.5 text-sm font-semibold !text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50";
+  const buttonClass = "inline-flex items-center justify-center gap-2 border border-purple-500 bg-purple-300 px-4 py-2.5 text-sm font-bold !text-slate-950 transition hover:bg-purple-200 disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
       <main className="min-h-screen bg-slate-900 px-4 py-8 text-white sm:py-12">
@@ -337,10 +337,10 @@ export function ProjectOnboarding({ onComplete }: Props) {
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6 sm:px-7" aria-live="polite">
           {priorAnswers.map(item => (
             <div key={item.step} className="flex justify-end">
-              <div className="max-w-[90%] border border-purple-300 bg-purple-950 px-4 py-3 text-sm leading-relaxed !text-white">
-                <p className="mb-1 text-xs font-semibold !text-purple-200">{item.label}</p>
+              <div className="max-w-[90%] border border-purple-500 bg-purple-300 px-4 py-3 text-sm leading-relaxed font-bold !text-slate-950">
+                <p className="mb-1 text-xs font-bold !text-slate-950">{item.label}</p>
                 <p className="whitespace-pre-wrap">{item.answer}</p>
-              <button type="button" className="mt-2 text-xs text-purple-200 underline underline-offset-2 hover:text-white" onClick={() => setStep(item.step)}>
+              <button type="button" className="mt-2 text-xs font-bold text-slate-950 underline underline-offset-2 hover:text-slate-700" onClick={() => setStep(item.step)}>
                   Edit answer
                 </button>
               </div>
@@ -353,7 +353,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
               {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "batch-skills"].includes(step) && (
                 <button
                   type="button"
-                  className="mt-3 inline-flex items-center gap-2 rounded-md border border-purple-200 bg-purple-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-purple-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-70"
+                  className="mt-3 inline-flex items-center gap-2 rounded-md border border-purple-500 bg-purple-300 px-3 py-2 text-sm font-bold !text-slate-950 shadow-sm transition-colors hover:bg-purple-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-70"
                   disabled={pending}
                   onClick={() => void explainCurrentQuestion()}
                 >
@@ -374,13 +374,13 @@ export function ProjectOnboarding({ onComplete }: Props) {
                   onClick={() => setTrainingModel(model.value)}
                   className={`rounded-md border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 ${
                     trainingModel === model.value
-                    ? "border-purple-200 bg-purple-800 !text-white"
+                    ? "border-purple-500 bg-purple-300 !text-slate-950 font-bold"
                       : "border-slate-500 bg-slate-900 !text-white hover:border-purple-300 hover:bg-slate-800"
                   }`}
                 >
-                  <span className="flex items-start justify-between gap-2 font-semibold !text-white">
+                  <span className="flex items-start justify-between gap-2 font-bold !text-slate-950">
                     {model.value}
-                    {model.recommended && <span className="shrink-0 rounded bg-purple-600 px-2 py-0.5 text-xs font-bold !text-white">Recommended</span>}
+                    {model.recommended && <span className="shrink-0 rounded bg-purple-200 px-2 py-0.5 text-xs font-bold !text-slate-950">Recommended</span>}
                   </span>
                 </button>
               ))}
@@ -453,8 +453,8 @@ export function ProjectOnboarding({ onComplete }: Props) {
             </div>
           )}
 
-          {error && <p role="alert" className="border border-purple-300 bg-purple-950 px-3 py-2 text-sm !text-white">{error}</p>}
-          {assistantReply && <div className="flex justify-start"><div className="max-w-[90%] border border-purple-300 bg-purple-950 px-4 py-3 text-sm leading-relaxed !text-white whitespace-pre-wrap">{assistantReply}</div></div>}
+          {error && <p role="alert" className="border border-purple-500 bg-purple-300 px-3 py-2 text-sm font-bold !text-slate-950">{error}</p>}
+          {assistantReply && <div className="flex justify-start"><div className="max-w-[90%] border border-purple-500 bg-purple-300 px-4 py-3 text-sm leading-relaxed font-bold !text-slate-950 whitespace-pre-wrap">{assistantReply}</div></div>}
         </div>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-5 py-4 sm:px-7">
@@ -480,7 +480,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
       <button
         type="button"
         onClick={skipToProject}
-        className="fixed bottom-4 right-4 z-[60] rounded-md border border-purple-200 bg-purple-700 px-4 py-3 text-sm font-bold text-white shadow-xl transition-colors hover:bg-purple-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+        className="fixed bottom-4 right-4 z-[60] rounded-md border border-purple-500 bg-purple-300 px-2.5 py-1.5 text-xs font-bold !text-slate-950 shadow-lg transition-colors hover:bg-purple-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
       >
         Skip to project
       </button>
