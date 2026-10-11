@@ -47,8 +47,20 @@ function parseGoldenExample(raw: string) {
     if (parsed.userPrompt && parsed.assistantResponse) {
       return { prompt: String(parsed.userPrompt), completion: String(parsed.assistantResponse) };
     }
-  } catch { /* Use a readable fallback if the assistant did not return JSON. */ }
-  return { prompt: "", completion: raw.trim() };
+    const messages = parsed.examples?.[0]?.messages ?? parsed.messages;
+    if (Array.isArray(messages)) {
+      const user = messages.find((message: { role?: string }) => message.role === "user");
+      const assistant = messages.find((message: { role?: string }) => message.role === "assistant");
+      if (typeof user?.content === "string" && typeof assistant?.content === "string") {
+        return { prompt: user.content, completion: assistant.content };
+      }
+    }
+  } catch { /* Reject non-JSON drafts rather than placing the whole response in one field. */ }
+  return null;
+}
+
+function countSentences(text: string) {
+  return text.trim().match(/[.!?](?=["'”’)\]]*(?:\s|$))/g)?.length ?? (text.trim() ? 1 : 0);
 }
 
 export function ProjectOnboarding({ onComplete }: Props) {
@@ -66,6 +78,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
   const [goldenPrompt, setGoldenPrompt] = useState("");
   const [goldenCompletion, setGoldenCompletion] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
+  const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
   const [error, setError] = useState("");
   const [assistantReply, setAssistantReply] = useState("");
   const [pending, setPending] = useState(false);
@@ -132,7 +145,11 @@ export function ProjectOnboarding({ onComplete }: Props) {
     );
     if (!draft) return;
     const example = parseGoldenExample(draft);
-    setGoldenPrompt(example.prompt || "A realistic user request that demonstrates the project's target task.");
+    if (!example?.prompt.trim() || !example.completion.trim()) {
+      setError("The AI response did not separate the user prompt and assistant response. Please try generating the golden example again.");
+      return;
+    }
+    setGoldenPrompt(example.prompt);
     setGoldenCompletion(example.completion);
     setStep("golden-review");
   };
@@ -207,29 +224,34 @@ export function ProjectOnboarding({ onComplete }: Props) {
 
   const generateSystemPrompt = async () => {
     const draft = await askAI(
-      `Draft a clear, concise system prompt for this SFT project. Target task: ${goal}. Constraints: ${constraints || "none"}. ` +
+      `Draft a clear system prompt for this SFT project in no more than five sentences. Target task: ${goal}. Constraints: ${constraints || "none"}. ` +
       `Use this approved voice reference:\n${voiceSample}\n` +
       `Example user prompt: ${goldenPrompt}\nExample assistant response: ${goldenCompletion}\n` +
-      `Return only the complete system prompt, with no introduction or commentary.`
+      `Return only the complete system prompt, with no introduction or commentary. It must contain at most five sentences.`
     );
     if (draft) {
+      if (countSentences(draft) > 5) {
+        setError("The generated system prompt exceeded five sentences. Please generate it again.");
+        return;
+      }
       setSystemPrompt(draft);
+      setSystemPromptSource("ai");
       setStep("system-review");
     }
   };
 
   const textareaClass = "w-full resize-y bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-purple-400 focus:outline-none";
-  const buttonClass = "inline-flex items-center justify-center gap-2 border border-purple-400/40 bg-purple-900/40 px-4 py-2.5 text-sm font-semibold text-purple-200 transition hover:bg-purple-800/60 disabled:cursor-not-allowed disabled:opacity-50";
+  const buttonClass = "inline-flex items-center justify-center gap-2 border border-purple-300 bg-purple-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
-    <main className="min-h-screen bg-slate-900 px-4 py-8 text-slate-100 sm:py-12">
+      <main className="min-h-screen bg-slate-900 px-4 py-8 text-white sm:py-12">
       <section className="mx-auto flex min-h-[min(760px,calc(100vh-4rem))] w-full max-w-3xl flex-col border border-slate-700 bg-slate-950 shadow-2xl">
-        <header className="border-b border-slate-700 bg-slate-900/80 px-5 py-4 sm:px-7">
+        <header className="border-b border-slate-700 bg-slate-900 px-5 py-4 sm:px-7">
           <div className="flex items-center gap-3">
             <MessageSquare className="h-5 w-5 text-purple-300" />
             <div>
               <h1 className="text-lg font-bold text-slate-100">SFT Studio Pro</h1>
-              <p className="text-sm text-slate-400">Project setup</p>
+              <p className="text-sm text-slate-200">Project setup</p>
             </div>
           </div>
         </header>
@@ -237,10 +259,10 @@ export function ProjectOnboarding({ onComplete }: Props) {
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6 sm:px-7" aria-live="polite">
           {priorAnswers.map(item => (
             <div key={item.step} className="flex justify-end">
-              <div className="max-w-[90%] border border-purple-500/40 bg-purple-950/30 px-4 py-3 text-sm leading-relaxed text-purple-100">
+              <div className="max-w-[90%] border border-purple-300 bg-purple-950 px-4 py-3 text-sm leading-relaxed text-white">
                 <p className="mb-1 text-xs font-semibold text-purple-300">{item.label}</p>
                 <p className="whitespace-pre-wrap">{item.answer}</p>
-                <button type="button" className="mt-2 text-xs text-purple-300 underline underline-offset-2 hover:text-white" onClick={() => setStep(item.step)}>
+              <button type="button" className="mt-2 text-xs text-purple-200 underline underline-offset-2 hover:text-white" onClick={() => setStep(item.step)}>
                   Edit answer
                 </button>
               </div>
@@ -248,12 +270,12 @@ export function ProjectOnboarding({ onComplete }: Props) {
           ))}
 
           <div className="flex justify-start">
-            <div className="max-w-[90%] border border-slate-700 bg-slate-900 px-4 py-3 text-sm leading-relaxed text-slate-200">
+            <div className="max-w-[90%] border border-slate-600 bg-slate-800 px-4 py-3 text-sm leading-relaxed text-white">
               <p>{step === "goal-followup" ? adaptiveQuestion : PROMPTS[step]}</p>
               {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own"].includes(step) && (
                 <button
                   type="button"
-                  className="mt-3 inline-flex items-center gap-1.5 text-xs text-purple-300 underline underline-offset-2 hover:text-purple-200"
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs text-purple-200 underline underline-offset-2 hover:text-white"
                   disabled={pending}
                   onClick={() => void explainCurrentQuestion()}
                 >
@@ -266,7 +288,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
           {step === "format" && (
             <div className="flex flex-wrap gap-2">
               {[ProjectFormat.CONVERSATION, ProjectFormat.INSTRUCTION].map(option => (
-                <button key={option} type="button" onClick={() => setFormat(option)} className={`${buttonClass} ${format === option ? "border-purple-300 bg-purple-700/50 text-white" : ""}`}>
+                <button key={option} type="button" onClick={() => setFormat(option)} className={`${buttonClass} ${format === option ? "border-purple-200 bg-purple-600 text-white" : ""}`}>
                   {format === option && <Check className="h-4 w-4" />}{option}
                 </button>
               ))}
@@ -276,7 +298,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
           {step === "template" && (
             <div className="flex flex-wrap gap-2">
               {[InstructTemplate.CHATML, InstructTemplate.ALPACA, InstructTemplate.MISTRAL].map(option => (
-                <button key={option} type="button" onClick={() => setInstructionTemplate(option)} className={`${buttonClass} ${instructionTemplate === option ? "border-purple-300 bg-purple-700/50 text-white" : ""}`}>
+                <button key={option} type="button" onClick={() => setInstructionTemplate(option)} className={`${buttonClass} ${instructionTemplate === option ? "border-purple-200 bg-purple-600 text-white" : ""}`}>
                   {instructionTemplate === option && <Check className="h-4 w-4" />}{option}
                 </button>
               ))}
@@ -292,7 +314,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
 
           {step === "system-choice" && (
             <div className="flex flex-wrap gap-2">
-              <button type="button" className={buttonClass} onClick={() => { setSystemPrompt(""); setStep("system-review"); }}>I’ll write the prompt</button>
+              <button type="button" className={buttonClass} onClick={() => { setSystemPromptSource("own"); setSystemPrompt(""); setStep("system-review"); }}>I’ll write the prompt</button>
               <button type="button" className={buttonClass} disabled={pending} onClick={generateSystemPrompt}>Draft a prompt for me</button>
             </div>
           )}
@@ -338,18 +360,24 @@ export function ProjectOnboarding({ onComplete }: Props) {
             </div>
           )}
 
-          {error && <p role="alert" className="border border-purple-500/30 bg-purple-950/30 px-3 py-2 text-sm text-purple-200">{error}</p>}
-          {assistantReply && <div className="flex justify-start"><div className="max-w-[90%] border border-purple-500/30 bg-purple-950/20 px-4 py-3 text-sm leading-relaxed text-purple-100 whitespace-pre-wrap">{assistantReply}</div></div>}
+          {error && <p role="alert" className="border border-purple-300 bg-purple-950 px-3 py-2 text-sm text-white">{error}</p>}
+          {assistantReply && <div className="flex justify-start"><div className="max-w-[90%] border border-purple-300 bg-purple-950 px-4 py-3 text-sm leading-relaxed text-white whitespace-pre-wrap">{assistantReply}</div></div>}
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-slate-900/70 px-5 py-4 sm:px-7">
-          <button type="button" className="inline-flex items-center gap-2 px-2 py-2 text-sm text-slate-400 hover:text-slate-100 disabled:opacity-30" onClick={goBack} disabled={step === "name" || pending}>
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-5 py-4 sm:px-7">
+          <button type="button" className="inline-flex items-center gap-2 px-2 py-2 text-sm text-slate-200 hover:text-white disabled:opacity-50" onClick={goBack} disabled={step === "name" || pending}>
             <ArrowLeft className="h-4 w-4" /> Previous
           </button>
           <div className="flex flex-wrap gap-2">
             {step === "voice-review" && <button type="button" className={buttonClass} disabled={pending || !voiceSample.trim()} onClick={() => void approveVoice()}>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Approve voice sample</button>}
             {step === "golden-review" && <button type="button" className={buttonClass} disabled={!goldenPrompt.trim() || !goldenCompletion.trim()} onClick={approveGolden}><Check className="h-4 w-4" /> Approve golden example</button>}
-            {step === "system-review" && <button type="button" className={buttonClass} disabled={!systemPrompt.trim()} onClick={finish}><Check className="h-4 w-4" /> Approve prompt &amp; continue</button>}
+            {step === "system-review" && <button type="button" className={buttonClass} disabled={!systemPrompt.trim()} onClick={() => {
+              if (systemPromptSource === "ai" && countSentences(systemPrompt) > 5) {
+                setError("An AI-generated system prompt must be no more than five sentences.");
+                return;
+              }
+              finish();
+            }}><Check className="h-4 w-4" /> Approve prompt &amp; continue</button>}
             {["name", "goal", "constraints"].includes(step) && <button type="button" className={buttonClass} onClick={() => void submit()}><span>Continue</span><ArrowRight className="h-4 w-4" /></button>}
             {step === "format" && <button type="button" className={buttonClass} onClick={() => setStep(format === ProjectFormat.INSTRUCTION ? "template" : "voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
             {step === "template" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}

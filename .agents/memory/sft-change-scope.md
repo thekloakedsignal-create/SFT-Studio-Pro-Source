@@ -9,8 +9,8 @@ For this app, follow the user's instructions directly and literally. Ask before 
 
 **How to apply:** If the requested page, exclusion, or behavior is unclear, ask before changing code.
 
-When the user says a request is about the automation script, edit only that script; do not change the app UI or runtime logic.
+For Project Setup corrections, edit only the Project Setup flow. Do not change app integration, batch generation, batch settings, or batch data.
 
-**Why:** The user explicitly clarified that automation-script work must not modify the actual app or its logic.
+**Why:** The user clarified that the requested corrections belong to Project Setup and explicitly said to leave batches unchanged.
 
-**How to apply:** Locate the specific automation script first. If it is not present or cannot address the requested behavior, ask where it lives before editing.
+**How to apply:** Keep edits in the Project Setup component. Preserve all other app behavior and existing batch selections.
