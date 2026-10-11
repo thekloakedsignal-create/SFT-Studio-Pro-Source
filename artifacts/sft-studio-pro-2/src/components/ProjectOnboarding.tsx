@@ -366,10 +366,6 @@ function parseGoldenExample(raw: string) {
   return null;
 }
 
-function countSentences(text: string) {
-  return text.trim().match(/[.!?](?=["'”’)\]]*(?:\s|$))/g)?.length ?? (text.trim() ? 1 : 0);
-}
-
 function parseBatchRecommendations(raw: string, allowReasoning: boolean): BatchRecommendation[] | null {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   try {
@@ -683,18 +679,16 @@ export function ProjectOnboarding({ onComplete }: Props) {
   const generateSystemPrompt = async () => {
     const remainingSentenceLimit = modelNameInstruction ? 4 : 5;
     const draft = await askAI(
-      `Draft a clear system prompt for this SFT project in no more than ${remainingSentenceLimit} sentences. This limit applies only to your AI-generated draft; do not shorten or impose it on any user-written or user-edited prompt. ` +
-      `${modelNameInstruction ? `Do not repeat the required first sentence; it will be prepended exactly as: "${modelNameInstruction}" ` : ""}` +
+      `Write a concise system prompt for this SFT project. HARD LIMIT: the complete prompt must have no more than five sentences total. ` +
+      `${modelNameInstruction ? `The first sentence is already supplied and counts toward the five: "${modelNameInstruction}" Do not repeat it; write at most four more sentences. ` : "Write at most five sentences. "}` +
+      `Count your sentences before responding and shorten the prompt if needed. Never exceed the five-sentence total. ` +
+      `This limit applies only to your AI-generated draft, not user-written or user-edited prompts. ` +
       `Target task: ${goal}. Constraints: ${constraints || "none"}. ` +
       `Use this approved voice reference:\n${voiceSample}\n` +
       `Example user prompt: ${goldenPrompt}\nExample assistant response: ${goldenCompletion}\n` +
-      `Return only the system prompt text, with no introduction or commentary.`
+      `Return only the system prompt text, with no heading, preamble, bullets, or commentary.`
     );
     if (draft) {
-      if (countSentences(draft) > remainingSentenceLimit) {
-        setError(`The generated system prompt must be no more than five sentences total${modelNameInstruction ? ", including the required name sentence" : ""}. Please generate it again.`);
-        return;
-      }
       setSystemPrompt(modelNameInstruction ? `${modelNameInstruction}\n${draft.trim()}` : draft.trim());
       setSystemPromptSource("ai");
       setStep("system-review");

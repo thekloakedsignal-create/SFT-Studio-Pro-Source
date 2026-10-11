@@ -21,9 +21,9 @@ The Project Setup base-model choice is temporary and must not be passed into pro
 
 **How to apply:** Keep the choice in onboarding state only; do not add it to the completion payload, project data, or batch settings.
 
-Before the batch-skills interview, show the completed project definition and require final user approval. Freeze that approved project-settings snapshot for recommendations and handoff; any edits require approval again. The five-sentence limit applies only to the system prompt.
+Before the batch-skills interview, show the completed project definition and require final user approval. Freeze that approved project-settings snapshot for recommendations and handoff; any edits require approval again. The AI-generated system prompt should be instructed to stay within five sentences, but never block it with a sentence-count gate; leave longer user-written prompts unchanged.
 
-**Why:** The user explicitly requested a final approval and locked project definition before batch setup, and clarified that the sentence limit is system-prompt-specific.
+**Why:** The user explicitly requested a final approval and locked project definition before batch setup, clarified that the sentence limit is system-prompt-specific, and said to instruct the AI rather than block its output.
 
 **How to apply:** Keep this approval gate and snapshot within Project Onboarding. Do not impose the sentence limit on other fields or add selected base-model data to the handoff payload.
 
