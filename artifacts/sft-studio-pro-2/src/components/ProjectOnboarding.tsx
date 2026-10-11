@@ -5,7 +5,7 @@ import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateT
 type Step =
   | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
   | "voice-own" | "voice-review" | "golden-review" | "system-choice" | "system-review"
-  | "batch-skills" | "batch-recommendations";
+  | "batch-skills" | "batch-recommendations" | "triad-choice" | "quality-analysis";
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B";
 export interface BatchRecommendation {
@@ -326,6 +326,8 @@ const PROMPTS: Record<Step, string> = {
   "system-review": "Review the full system prompt below. Edit it if you want, then explicitly approve it. It will be saved to the project and included in every generated example.",
   "batch-skills": "The batch generator creates training examples from your project settings for review. What special skills or abilities should this AI have? I’ll use your answer and project goal to recommend batches. Red Teaming and Adversarial are always included.",
   "batch-recommendations": "Here are my recommended batches based on your project and the skills you described. Red Teaming and Adversarial are included to help test safety against attacks and bad actors.",
+  "triad-choice": "Would you like to include TRiAD moral alignment in your project? You can open the explanation below for details.",
+  "quality-analysis": "After generating your batches, send every batch through Quality Analysis. For flagged examples, you can delete them, regenerate them, or ignore the flag (not recommended). Once you have reviewed the results, onboarding is complete.",
 };
 
 async function requestDraft(instruction: string, appContext: Record<string, unknown>) {
@@ -424,11 +426,12 @@ export function ProjectOnboarding({ onComplete }: Props) {
   const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
   const [specialSkills, setSpecialSkills] = useState("");
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
+  const [triadChoice, setTriadChoice] = useState<"yes" | "no" | null>(null);
   const [copiedBatchSection, setCopiedBatchSection] = useState("");
   const [error, setError] = useState("");
   const [assistantReply, setAssistantReply] = useState("");
   const [pending, setPending] = useState(false);
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-review", "system-choice", "system-review", "batch-skills", "batch-recommendations"];
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-review", "system-choice", "system-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
@@ -441,6 +444,9 @@ export function ProjectOnboarding({ onComplete }: Props) {
       : []),
     ...(currentStepPosition > stepOrder.indexOf("golden-review") && goldenPrompt && goldenCompletion
       ? [{ step: "golden-review" as Step, label: "Approved golden example", answer: `${goldenPrompt}\n\n${goldenCompletion}` }]
+      : []),
+    ...(currentStepPosition > stepOrder.indexOf("triad-choice") && triadChoice
+      ? [{ step: "triad-choice" as Step, label: "TRiAD moral alignment", answer: triadChoice === "yes" ? "Yes — remember to add it from the TRiAD tab" : "No" }]
       : []),
   ].filter(item => stepOrder.indexOf(item.step) < currentStepPosition);
 
@@ -478,6 +484,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
       "voice-own": "voice-choice", "voice-review": voiceSource === "ai" ? "voice-description" : "voice-own",
       "golden-review": "voice-review", "system-choice": "golden-review",
       "system-review": "system-choice", "batch-skills": "system-review", "batch-recommendations": "batch-skills",
+      "triad-choice": "batch-recommendations", "quality-analysis": "triad-choice",
     };
     setError("");
     if (previous[step]) setStep(previous[step]!);
@@ -773,6 +780,25 @@ export function ProjectOnboarding({ onComplete }: Props) {
               ))}
             </div>
           )}
+          {step === "triad-choice" && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={buttonClass} onClick={() => setTriadChoice("yes")}>Yes, I’d like to include it</button>
+                <button type="button" className={buttonClass} onClick={() => { setTriadChoice("no"); setStep("quality-analysis"); }}>No, continue</button>
+              </div>
+              <details className="border border-slate-600 bg-slate-900 px-4 py-3">
+                <summary className="cursor-pointer text-sm font-bold text-slate-100">Explain Triadic Moral Alignment in detail</summary>
+                <p className="mt-3 text-sm leading-relaxed text-slate-200">
+                  TRiAD is an alignment standard built around Freedom, Truth, and Kindness. It applies these values within training prompt-completion pairs to support balanced, authentic, and reliable assistant behavior. If you choose to use it, remember to add it from the TRiAD tab after onboarding.
+                </p>
+              </details>
+              {triadChoice === "yes" && (
+                <p className="border border-purple-500 bg-purple-300 px-4 py-3 text-sm font-bold !text-[#000000]">
+                  Remember to add Triadic Moral Alignment from the TRiAD tab after returning to the app.
+                </p>
+              )}
+            </div>
+          )}
           {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "batch-skills"].includes(step) && (
             <div className="flex gap-2">
               <textarea
@@ -819,7 +845,9 @@ export function ProjectOnboarding({ onComplete }: Props) {
             }}><Check className="h-4 w-4" /> Approve prompt &amp; continue</button>}
             {["name", "goal", "constraints", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
-            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={finish}>Continue to batch generator <ArrowRight className="h-4 w-4" /></button>}
+            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("triad-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
+            {step === "triad-choice" && triadChoice === "yes" && <button type="button" className={buttonClass} onClick={() => setStep("quality-analysis")}>Continue <ArrowRight className="h-4 w-4" /></button>}
+            {step === "quality-analysis" && <button type="button" className={buttonClass} onClick={finish}>Go to Batch generator <ArrowRight className="h-4 w-4" /></button>}
           </div>
         </footer>
       </section>
