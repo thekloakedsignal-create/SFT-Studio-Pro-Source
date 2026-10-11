@@ -4,7 +4,7 @@ import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateT
 
 type Step =
   | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
-  | "voice-own" | "voice-review" | "golden-review" | "system-choice" | "system-review"
+  | "voice-own" | "voice-review" | "golden-review" | "remember-name-choice" | "remember-model-name" | "system-choice" | "system-review"
   | "definition-review" | "batch-skills" | "batch-recommendations" | "triad-choice" | "quality-analysis";
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B";
@@ -322,6 +322,8 @@ const PROMPTS: Record<Step, string> = {
   "voice-own": "Write a couple of paragraphs in the voice you want the model to use.",
   "voice-review": "Review the voice sample below. Edit it if needed, then explicitly approve it before I create the golden example.",
   "golden-review": "I created one golden training example using the approved voice. Review and edit both parts; approve it to continue.",
+  "remember-name-choice": "Do you have a name you want your model to remember? Choose yes or no.",
+  "remember-model-name": "What name should your model remember? I’ll add “Your name is [name].” to the beginning of the system prompt.",
   "system-choice": "The system prompt is included in every generated training example. It sets the model’s role and instructions, so it directly shapes every example. Would you like to write it or have me draft one?",
   "system-review": "Review the full system prompt below. Edit it if you want, then explicitly approve it. It will be saved to the project and included in every generated example.",
   "definition-review": "Your project definition is complete. Review the summary and give final approval. Approval locks these settings for batch generation; use Edit answer if anything needs changing.",
@@ -423,6 +425,8 @@ export function ProjectOnboarding({ onComplete }: Props) {
   const [voiceSource, setVoiceSource] = useState<"own" | "ai">("own");
   const [goldenPrompt, setGoldenPrompt] = useState("");
   const [goldenCompletion, setGoldenCompletion] = useState("");
+  const [rememberName, setRememberName] = useState<"yes" | "no" | null>(null);
+  const [modelRememberedName, setModelRememberedName] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
   const [specialSkills, setSpecialSkills] = useState("");
@@ -439,7 +443,11 @@ export function ProjectOnboarding({ onComplete }: Props) {
     if (conversation) conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
   }, [step, assistantReply]);
 
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-review", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
+  const modelNameInstruction = rememberName === "yes" && modelRememberedName.trim()
+    ? `Your name is ${modelRememberedName.trim()}.`
+    : "";
+
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
@@ -452,6 +460,9 @@ export function ProjectOnboarding({ onComplete }: Props) {
       : []),
     ...(currentStepPosition > stepOrder.indexOf("golden-review") && goldenPrompt && goldenCompletion
       ? [{ step: "golden-review" as Step, label: "Approved golden example", answer: `${goldenPrompt}\n\n${goldenCompletion}` }]
+      : []),
+    ...(currentStepPosition > stepOrder.indexOf("remember-name-choice") && rememberName
+      ? [{ step: "remember-name-choice" as Step, label: "Name for the model to remember", answer: rememberName === "yes" ? `Yes — ${modelRememberedName}` : "No" }]
       : []),
     ...(currentStepPosition > stepOrder.indexOf("system-review") && systemPrompt
       ? [{ step: "system-review" as Step, label: "System prompt", answer: systemPrompt }]
@@ -493,7 +504,9 @@ export function ProjectOnboarding({ onComplete }: Props) {
       goal: "name", "goal-followup": "goal", constraints: "goal", model: "constraints",
       "voice-choice": "model", "voice-description": "voice-choice",
       "voice-own": "voice-choice", "voice-review": voiceSource === "ai" ? "voice-description" : "voice-own",
-      "golden-review": "voice-review", "system-choice": "golden-review",
+      "golden-review": "voice-review", "remember-name-choice": "golden-review",
+      "remember-model-name": "remember-name-choice",
+      "system-choice": rememberName === "yes" ? "remember-model-name" : "remember-name-choice",
       "system-review": "system-choice", "definition-review": "system-review",
       "batch-skills": "definition-review", "batch-recommendations": "batch-skills",
       "triad-choice": "batch-recommendations", "quality-analysis": "triad-choice",
@@ -523,7 +536,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
     setStep("golden-review");
   };
 
-  const approveGolden = () => setStep("system-choice");
+  const approveGolden = () => setStep("remember-name-choice");
 
   const buildProjectDefinition = (): ProjectSettings => {
     const voiceConstraint = `Approved voice reference (${voiceSource === "ai" ? "AI draft approved by user" : "user supplied"}):\n${voiceSample}`;
@@ -641,6 +654,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
       return;
     }
     if (step === "constraints") return setStep("model");
+    if (step === "remember-model-name" && modelRememberedName.trim()) return setStep("system-choice");
     if (step === "voice-description" && voiceDescription.trim()) {
       const sample = await askAI(
         `Write exactly two short paragraphs as a sample of the desired assistant voice. Voice description: ${voiceDescription}. ` +
@@ -667,18 +681,21 @@ export function ProjectOnboarding({ onComplete }: Props) {
   };
 
   const generateSystemPrompt = async () => {
+    const remainingSentenceLimit = modelNameInstruction ? 4 : 5;
     const draft = await askAI(
-      `Draft a clear system prompt for this SFT project in no more than five sentences. This limit applies only to your AI-generated draft; do not shorten or impose it on any user-written or user-edited prompt. Target task: ${goal}. Constraints: ${constraints || "none"}. ` +
+      `Draft a clear system prompt for this SFT project in no more than ${remainingSentenceLimit} sentences. This limit applies only to your AI-generated draft; do not shorten or impose it on any user-written or user-edited prompt. ` +
+      `${modelNameInstruction ? `Do not repeat the required first sentence; it will be prepended exactly as: "${modelNameInstruction}" ` : ""}` +
+      `Target task: ${goal}. Constraints: ${constraints || "none"}. ` +
       `Use this approved voice reference:\n${voiceSample}\n` +
       `Example user prompt: ${goldenPrompt}\nExample assistant response: ${goldenCompletion}\n` +
-      `Return only the complete system prompt, with no introduction or commentary. It must contain at most five sentences.`
+      `Return only the system prompt text, with no introduction or commentary.`
     );
     if (draft) {
-      if (countSentences(draft) > 5) {
-        setError("The generated system prompt exceeded five sentences. Please generate it again.");
+      if (countSentences(draft) > remainingSentenceLimit) {
+        setError(`The generated system prompt must be no more than five sentences total${modelNameInstruction ? ", including the required name sentence" : ""}. Please generate it again.`);
         return;
       }
-      setSystemPrompt(draft);
+      setSystemPrompt(modelNameInstruction ? `${modelNameInstruction}\n${draft.trim()}` : draft.trim());
       setSystemPromptSource("ai");
       setStep("system-review");
     }
@@ -772,9 +789,26 @@ export function ProjectOnboarding({ onComplete }: Props) {
             </div>
           )}
 
+          {step === "remember-name-choice" && (
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={buttonClass} onClick={() => {
+                setRememberName("yes");
+                setStep("remember-model-name");
+              }}>Yes</button>
+              <button type="button" className={buttonClass} onClick={() => {
+                setRememberName("no");
+                setModelRememberedName("");
+                setStep("system-choice");
+              }}>No</button>
+            </div>
+          )}
           {step === "system-choice" && (
             <div className="flex flex-wrap gap-2">
-              <button type="button" className={buttonClass} onClick={() => { setSystemPromptSource("own"); setSystemPrompt(""); setStep("system-review"); }}>I’ll write the prompt</button>
+              <button type="button" className={buttonClass} onClick={() => {
+                setSystemPromptSource("own");
+                setSystemPrompt(modelNameInstruction ? `${modelNameInstruction}\n\n` : "");
+                setStep("system-review");
+              }}>I’ll write the prompt</button>
               <button type="button" className={buttonClass} disabled={pending} onClick={generateSystemPrompt}>Draft a prompt for me</button>
             </div>
           )}
@@ -864,25 +898,26 @@ export function ProjectOnboarding({ onComplete }: Props) {
               )}
             </div>
           )}
-          {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "batch-skills"].includes(step) && (
+          {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "remember-model-name", "batch-skills"].includes(step) && (
             <div className="flex gap-2">
               <textarea
                 autoFocus
-                aria-label={step === "name" ? "Project name" : step === "batch-skills" ? "Special skills and abilities" : "Your answer"}
+                aria-label={step === "name" ? "Project name" : step === "remember-model-name" ? "Name for the model to remember" : step === "batch-skills" ? "Special skills and abilities" : "Your answer"}
                 className={textareaClass}
-                rows={step === "name" ? 1 : 3}
-                value={step === "name" ? projectName : step === "goal" ? goal : step === "goal-followup" ? goalFollowupAnswer : step === "constraints" ? constraints : step === "voice-description" ? voiceDescription : step === "batch-skills" ? specialSkills : voiceSample}
+                rows={step === "name" || step === "remember-model-name" ? 1 : 3}
+                value={step === "name" ? projectName : step === "goal" ? goal : step === "goal-followup" ? goalFollowupAnswer : step === "constraints" ? constraints : step === "voice-description" ? voiceDescription : step === "remember-model-name" ? modelRememberedName : step === "batch-skills" ? specialSkills : voiceSample}
                 onChange={e => {
                   if (step === "name") setProjectName(e.target.value);
                   else if (step === "goal") setGoal(e.target.value);
                   else if (step === "goal-followup") setGoalFollowupAnswer(e.target.value);
                   else if (step === "constraints") setConstraints(e.target.value);
                   else if (step === "voice-description") setVoiceDescription(e.target.value);
+                  else if (step === "remember-model-name") setModelRememberedName(e.target.value);
                   else if (step === "batch-skills") setSpecialSkills(e.target.value);
                   else setVoiceSample(e.target.value);
                 }}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && step === "name") { e.preventDefault(); void submit(); } }}
-                placeholder={step === "name" ? "Project name" : step === "batch-skills" ? "Describe the AI’s skills, or type “none”" : "Type your answer…"}
+                placeholder={step === "name" ? "Project name" : step === "remember-model-name" ? "Name to remember" : step === "batch-skills" ? "Describe the AI’s skills, or type “none”" : "Type your answer…"}
               />
               <button type="button" aria-label="Send answer" className={buttonClass} disabled={pending} onClick={() => void submit()}>
                 {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -907,7 +942,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
               setStep("definition-review");
             }}><Check className="h-4 w-4" /> Approve prompt &amp; continue</button>}
             {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm project definition & continue" : "Approve project definition & continue"}</button>}
-            {["name", "goal", "constraints", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
+            {["name", "goal", "constraints", "remember-model-name", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
             {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("triad-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
             {step === "triad-choice" && triadChoice === "yes" && <button type="button" className={buttonClass} onClick={() => setStep("quality-analysis")}>Continue <ArrowRight className="h-4 w-4" /></button>}

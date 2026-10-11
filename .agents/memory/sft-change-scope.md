@@ -26,3 +26,9 @@ Before the batch-skills interview, show the completed project definition and req
 **Why:** The user explicitly requested a final approval and locked project definition before batch setup, and clarified that the sentence limit is system-prompt-specific.
 
 **How to apply:** Keep this approval gate and snapshot within Project Onboarding. Do not impose the sentence limit on other fields or add selected base-model data to the handoff payload.
+
+After the golden example, ask whether the user wants the model to remember a name. If yes, prepend the user's exact name in a “Your name is …” sentence to the system prompt.
+
+**Why:** The user explicitly requested this optional onboarding step.
+
+**How to apply:** Keep it in Project Onboarding before system-prompt setup; if declined, leave the prompt unchanged.
