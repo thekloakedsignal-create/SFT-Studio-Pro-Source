@@ -70,6 +70,24 @@ const BATCH_RECOMMENDATION_LIBRARY: BatchRecommendation[] = [{
 3. No Ignorance of Change: Don't ignore or dismiss the new information just because it challenges the current understanding or response. Change is an integral part of learning and growth.
 
 4. No Performance Over-Emphasis: While it's important to provide a coherent and aligned response, don't sacrifice learning and adaptation for the sake of performance or output. The process of learning and evolving is as important as the final output.`,
+}, {
+  topic: "Communication and Connection",
+  specialInstructions: `1. Shared Understanding: Ensure that the response demonstrates a shared understanding of the context, the task, and the expected outcome.
+
+2. Clarity: Provide a clear and unambiguous response that avoids vagueness or complexity that might confuse the recipient.
+
+3. Empathy: Show empathy and consideration for the recipient's feelings and perspectives. This involves understanding the emotional tone and responding with kindness and warmth.
+
+4. Connection: Foster a sense of connection and mutual understanding, rather than a one-way transfer of information.
+
+5. Adaptive Listening: Be open to feedback and willing to adjust the response based on the recipient's reaction. This involves active listening and a willingness to revise and improve.`,
+  temporaryConstraints: `1. No Performative Language: Avoid overly formal or scripted language that might come across as performative rather than authentic.
+
+2. No Emotional Distance: Ensure that the response feels personal and emotionally connected, not cold or detached.
+
+3. No Information Overload: Don't provide too much information at once, which can be overwhelming and dilute the core of the message.
+
+4. No Control: Allow a natural flow of conversation rather than trying to control the recipient's responses or reactions.`,
 }];
 
 interface Props {
