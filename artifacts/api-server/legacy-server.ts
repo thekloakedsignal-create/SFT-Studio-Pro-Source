@@ -745,6 +745,13 @@ function normalizeModel(modelName?: string): string {
   return process.env.DO_MODEL || "glm-5.3";
 }
 
+function isTemporaryInferenceOverload(err: any): boolean {
+  const status = Number(err?.status ?? err?.statusCode ?? err?.response?.status);
+  const message = String(err?.message || err || "");
+  return status === 529 || status === 503 ||
+    /platform overloaded|prefill queue overloaded|high traffic|high demand|spikes in demand/i.test(message);
+}
+
 // Clean human-readable error formatting for DigitalOcean inference errors
 function formatAIErrorMessage(err: any): string {
   if (!err) return "An unknown AI generation error occurred.";
@@ -4774,13 +4781,27 @@ GUIDELINES:
       ? `You are generating reviewable drafts for SFT Studio Pro project onboarding. Follow the user's requested output format exactly. When asked for a voice sample, write the requested sample only. When asked for a training example, provide only the requested JSON object. When asked for a system prompt, return only the complete prompt. Never claim that a draft is approved; only the user can approve or edit it. Keep drafts aligned with the supplied project goal, constraints, and voice reference.`
       : supportSystemInstruction;
 
-    const response = await callDigitalOceanAI(client, {
+    const requestParams = {
       model: normalizeModel(),
       contents: formattedContents,
       config: {
         systemInstruction
       }
-    });
+    };
+    let response;
+    try {
+      response = await callDigitalOceanAI(client, requestParams);
+    } catch (error) {
+      const fallbackModel = "qwen3.8-max";
+      if (
+        appContext?.mode !== "project-onboarding" ||
+        !isTemporaryInferenceOverload(error) ||
+        requestParams.model.toLowerCase() === fallbackModel
+      ) {
+        throw error;
+      }
+      response = await callDigitalOceanAI(client, { ...requestParams, model: fallbackModel });
+    }
 
     return res.json({ success: true, text: extractResponseText(response) });
   } catch (error: any) {
