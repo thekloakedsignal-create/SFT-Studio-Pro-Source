@@ -50,3 +50,15 @@ Voice approval and golden-example generation must be separate visible stages. A 
 **Why:** The user clarified that the separation error appeared in the wrong place and was mistaken for a voice-sample failure.
 
 **How to apply:** Keep the approved voice reference intact while retrying golden-example generation; display golden parsing errors only on the golden-generation step.
+
+For Project Onboarding, place the approved voice sample in the Target Task & Model Persona instructions, not in project constraints; keep constraints limited to the user's stated rules.
+
+**Why:** The user clarified that placing the voice sample among constraints sends the wrong message.
+
+**How to apply:** Build the target/persona text with the approved voice reference and pass only user-entered constraints through the constraints field.
+
+For generated examples, the approved golden exemplar is the primary guide for tone and diction; batch instructions determine topic and task.
+
+**Why:** The user explicitly said the golden example should be the most emphasized guide for tone and diction.
+
+**How to apply:** State this priority in every generation prompt while preserving required system, safety, batch, and template instructions.

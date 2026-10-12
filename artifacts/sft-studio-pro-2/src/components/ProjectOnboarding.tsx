@@ -563,13 +563,15 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const approveGolden = () => setStep("remember-name-choice");
 
   const buildProjectDefinition = (): ProjectSettings => {
-    const voiceConstraint = `Approved voice reference (${voiceSource === "ai" ? "AI draft approved by user" : "user supplied"}):\n${voiceSample}`;
-    const mergedConstraints = [constraints.trim(), voiceConstraint].filter(Boolean).join("\n\n");
+    const targetPersona = [
+      goal.trim(),
+      `Approved target voice (${voiceSource === "ai" ? "AI draft approved by user" : "user supplied"}; follow this voice in generated responses):\n${voiceSample}`,
+    ].filter(Boolean).join("\n\n");
     return {
       name: projectName.trim(),
       systemPrompt: systemPrompt.trim(),
-      targetTask: goal.trim(),
-      constraints: mergedConstraints,
+      targetTask: targetPersona,
+      constraints: constraints.trim(),
       selectedPreset: PresetType.CUSTOM,
       projectFormat: ProjectFormat.INSTRUCTION,
       templateType: TemplateType.INSTRUCTION_TEMPLATE,
