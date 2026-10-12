@@ -5127,7 +5127,7 @@ export default function App() {
 
                   {batchRecommendations.length > 0 && (
                     <details id="batch-recommendations" className="mb-6 rounded-xl border border-purple-500/30 bg-purple-950/20">
-                      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-purple-200">
+                      <summary className="cursor-pointer rounded-t-xl bg-purple-300 px-4 py-3 text-sm font-bold text-black">
                         Recommended batches ({completedRecommendedBatches.length}/{batchRecommendations.length} checked)
                       </summary>
                       <div className="space-y-3 border-t border-purple-500/20 px-4 py-4">
