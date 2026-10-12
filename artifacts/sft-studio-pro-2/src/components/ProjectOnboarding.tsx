@@ -13,6 +13,13 @@ export interface BatchRecommendation {
   specialInstructions: string;
   temporaryConstraints: string;
 }
+type SkillCoverage = {
+  skill: string;
+  libraryTopic: string;
+  topic: string;
+  specialInstructions: string;
+  temporaryConstraints: string;
+};
 
 const TRAINING_MODELS: { value: TrainingModel; recommended?: boolean }[] = [
   { value: "Qwen3.5 9 Base", recommended: true },
@@ -368,25 +375,29 @@ function parseGoldenExample(raw: string) {
   return null;
 }
 
-function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; additionalBatches: BatchRecommendation[] } | null {
+function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; skillCoverage: SkillCoverage[] } | null {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   try {
     const parsed = JSON.parse(cleaned);
-    if (!Array.isArray(parsed.libraryTopics) || !Array.isArray(parsed.additionalBatches)) return null;
-    const additionalBatches = parsed.additionalBatches
+    if (!Array.isArray(parsed.libraryTopics) || !Array.isArray(parsed.skillCoverage)) return null;
+    const skillCoverage = parsed.skillCoverage
       .filter((item: any) =>
-        typeof item?.topic === "string" && item.topic.trim() &&
-        typeof item?.specialInstructions === "string" && item.specialInstructions.trim() &&
-        typeof item?.temporaryConstraints === "string" && item.temporaryConstraints.trim()
+        typeof item?.skill === "string" && item.skill.trim() &&
+        typeof item?.libraryTopic === "string" &&
+        typeof item?.topic === "string" &&
+        typeof item?.specialInstructions === "string" &&
+        typeof item?.temporaryConstraints === "string"
       )
       .map((item: any) => ({
+        skill: item.skill.trim(),
+        libraryTopic: item.libraryTopic.trim(),
         topic: item.topic.trim(),
         specialInstructions: item.specialInstructions.trim(),
         temporaryConstraints: item.temporaryConstraints.trim(),
       }));
     return {
       libraryTopics: parsed.libraryTopics.filter((topic: unknown): topic is string => typeof topic === "string"),
-      additionalBatches,
+      skillCoverage,
     };
   } catch {
     return null;
