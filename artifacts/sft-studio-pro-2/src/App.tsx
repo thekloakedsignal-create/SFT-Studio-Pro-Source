@@ -4266,7 +4266,7 @@ export default function App() {
       </AnimatePresence>
 
       <main className={`flex-1 ${["define", "convert", "assess"].includes(activeTab) ? "max-w-[1920px]" : "max-w-[1720px]"} mx-auto w-full px-4 sm:px-6 lg:px-8 py-5`}>
-        {activeTab !== "define" && activeTab !== "expert" && activeTab !== "registry" && (
+        {activeTab !== "define" && activeTab !== "expert" && activeTab !== "registry" && activeTab !== "synthesizer" && (
           <div className="mb-3 flex justify-end">
             <button
               type="button"
@@ -5105,6 +5105,13 @@ export default function App() {
                         <Sparkles className="h-5 w-5 text-green-400" />
                         Synthetic SFT Batch Generator
                       </h2>
+                      <button
+                        type="button"
+                        onClick={() => setShowBatchRecommendationInterview(true)}
+                        className="rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
+                      >
+                        AI Guide
+                      </button>
                     </div>
                     <p className="mt-2 text-xs text-slate-400">
                       Synthesize training examples modeled against your active project settings. Customize batch modifiers below.
