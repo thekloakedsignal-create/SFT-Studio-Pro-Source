@@ -5204,7 +5204,7 @@ export default function App() {
                                   setBatchTempConstraints(activeRecommendedBatch.temporaryConstraints);
                                 }}
                               >
-                                Copy All
+                                Copy to batch generator
                               </button>
                             </div>
                           </div>
