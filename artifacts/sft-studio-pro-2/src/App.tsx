@@ -4025,6 +4025,10 @@ export default function App() {
   if (showProjectOnboarding) {
     return (
       <ProjectOnboarding
+        onSkip={() => {
+          setActiveTab("define");
+          setShowProjectOnboarding(false);
+        }}
         onComplete={(settings, recommendations) => {
           setProject(settings);
           setIsFieldsUnlocked(true);

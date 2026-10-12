@@ -309,6 +309,7 @@ const GENERAL_RECOMMENDED_BATCH_TOPICS = [
 
 interface Props {
   onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[]) => void;
+  onSkip: () => void;
 }
 
 const PROMPTS: Record<Step, string> = {
@@ -392,7 +393,8 @@ function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; a
   }
 }
 
-export function ProjectOnboarding({ onComplete }: Props) {
+export function ProjectOnboarding({ onComplete, onSkip }: Props) {
+  const [showWorkshopChoice, setShowWorkshopChoice] = useState(true);
   const [step, setStep] = useState<Step>("name");
   const [projectName, setProjectName] = useState("");
   const [goal, setGoal] = useState("");
@@ -731,6 +733,48 @@ export function ProjectOnboarding({ onComplete }: Props) {
       setError("Clipboard access is unavailable in this browser.");
     }
   };
+
+  if (showWorkshopChoice) {
+    return (
+      <main className="min-h-screen bg-slate-900 px-4 py-8 text-white sm:py-12">
+        <section className="mx-auto flex min-h-[min(760px,calc(100vh-4rem))] w-full max-w-3xl flex-col border border-slate-700 bg-slate-950 shadow-2xl">
+          <header className="border-b border-slate-700 bg-slate-900 px-5 py-4 sm:px-7">
+            <div className="flex items-center gap-3">
+              <MessageSquare className="h-5 w-5 text-purple-300" />
+              <div>
+                <h1 className="text-lg font-bold text-slate-100">SFT Studio Pro</h1>
+                <p className="text-sm text-slate-200">Project setup</p>
+              </div>
+            </div>
+          </header>
+          <div className="flex-1 space-y-5 px-5 py-6 sm:px-7" aria-live="polite">
+            <div className="flex justify-start">
+              <div className="max-w-[90%] border border-[#c4c4c4] bg-[#e5e5e5] px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]">
+                Would you like an AI-guided workshop, or would you like to jump straight into the Studio?
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-3">
+              <button
+                type="button"
+                className={buttonClass}
+                onClick={() => setShowWorkshopChoice(false)}
+              >
+                Guided Tour — Continue Project Onboarding
+                <span className="ml-2 text-xs font-medium">(recommended for new users)</span>
+              </button>
+              <button
+                type="button"
+                className={buttonClass}
+                onClick={onSkip}
+              >
+                Skip Guide — Close Project Onboarding and open the new project screen in the app
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
       <main className="min-h-screen bg-slate-900 px-4 py-8 text-white sm:py-12">
