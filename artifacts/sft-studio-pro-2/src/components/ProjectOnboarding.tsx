@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Check, HelpCircle, LoaderCircle, MessageSquare, 
 import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateType } from "../types";
 
 type Step =
-  | "onboarding-choice" | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
+  | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
   | "voice-own" | "voice-review" | "golden-generation" | "golden-review" | "remember-name-choice" | "remember-model-name" | "system-choice" | "system-review"
   | "definition-review" | "batch-skills" | "batch-recommendations" | "triad-choice" | "quality-analysis";
 
@@ -309,12 +309,9 @@ const GENERAL_RECOMMENDED_BATCH_TOPICS = [
 
 interface Props {
   onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[]) => void;
-  onExit: () => void;
-  onSaveProjectDefinition: (settings: ProjectSettings) => Promise<boolean>;
 }
 
 const PROMPTS: Record<Step, string> = {
-  "onboarding-choice": "Would you like to skip Project Onboarding and go directly to the SFT Studio Pro menu? Choose yes to close onboarding, or no to continue setting up your project.",
   name: "What would you like to call this SFT project?",
   goal: "What should the model learn to do? Describe its main task and who it is for.",
   "goal-followup": "A quick follow-up so I can understand the target clearly:",
@@ -330,7 +327,7 @@ const PROMPTS: Record<Step, string> = {
   "remember-model-name": "What name should your model remember? I’ll add “Your name is [name].” to the beginning of the system prompt.",
   "system-choice": "The system prompt is included in every generated training example. It sets the model’s role and instructions, so it directly shapes every example. Would you like to write it or have me draft one?",
   "system-review": "Review the full system prompt below. Edit it if you want, then explicitly approve it. It will be saved to the project and included in every generated example.",
-  "definition-review": "Your project definition is complete. Review the summary and approve it to save and lock it before the batch interview.",
+  "definition-review": "Your project definition is complete. Review the summary and give final approval. Approval locks these settings for batch generation; use Edit answer if anything needs changing.",
   "batch-skills": "The batch generator creates training examples from your project settings for review. What special skills or abilities should this AI have? I’ll use your answer and project goal to recommend batches. Red Teaming and Adversarial are always included.",
   "batch-recommendations": "Here are my recommended batches based on your project and the skills you described. Red Teaming and Adversarial are included to help test safety against attacks and bad actors.",
   "triad-choice": "Would you like to include TRiAD moral alignment in your project? You can open the explanation below for details.",
@@ -395,8 +392,8 @@ function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; a
   }
 }
 
-export function ProjectOnboarding({ onComplete, onExit, onSaveProjectDefinition }: Props) {
-  const [step, setStep] = useState<Step>("onboarding-choice");
+export function ProjectOnboarding({ onComplete }: Props) {
+  const [step, setStep] = useState<Step>("name");
   const [projectName, setProjectName] = useState("");
   const [goal, setGoal] = useState("");
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
@@ -437,7 +434,7 @@ export function ProjectOnboarding({ onComplete, onExit, onSaveProjectDefinition 
 
   const activeRecommendation = batchRecommendations[activeRecommendationIndex];
 
-  const stepOrder: Step[] = ["onboarding-choice", "name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
@@ -491,7 +488,7 @@ export function ProjectOnboarding({ onComplete, onExit, onSaveProjectDefinition 
 
   const goBack = () => {
     const previous: Partial<Record<Step, Step>> = {
-      name: "onboarding-choice", goal: "name", "goal-followup": "goal", constraints: "goal", model: "constraints",
+      goal: "name", "goal-followup": "goal", constraints: "goal", model: "constraints",
       "voice-choice": "model", "voice-description": "voice-choice",
       "voice-own": "voice-choice", "voice-review": voiceSource === "ai" ? "voice-description" : "voice-own",
       "golden-generation": "voice-review", "golden-review": "voice-review", "remember-name-choice": "golden-review",
@@ -552,22 +549,11 @@ export function ProjectOnboarding({ onComplete, onExit, onSaveProjectDefinition 
     };
   };
 
-  const approveProjectDefinition = async () => {
-    const definition = buildProjectDefinition();
+  const approveProjectDefinition = () => {
+    setApprovedProjectDefinition(buildProjectDefinition());
+    setBatchRecommendations([]);
     setError("");
     setAssistantReply("");
-    setPending(true);
-    let saved = false;
-    try {
-      saved = await onSaveProjectDefinition(definition);
-    } catch {
-      setError("The project could not be saved and locked. Please try again.");
-    } finally {
-      setPending(false);
-    }
-    if (!saved) return;
-    setApprovedProjectDefinition(definition);
-    setBatchRecommendations([]);
     setStep("batch-skills");
   };
 
@@ -650,6 +636,22 @@ export function ProjectOnboarding({ onComplete, onExit, onSaveProjectDefinition 
     setBatchRecommendations(uniqueRecommendations);
     setActiveRecommendationIndex(0);
     setStep("batch-recommendations");
+  };
+
+  const skipToProject = () => {
+    onComplete({
+      name: "General Instruction Tuner",
+      systemPrompt: "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+      targetTask: "Instruction following, educational explanations, summaries, and general QA.",
+      constraints: "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+      selectedPreset: PresetType.GENERAL_USE,
+      projectFormat: ProjectFormat.CONVERSATION,
+      templateType: TemplateType.SINGLE_TURN,
+      instructTemplate: InstructTemplate.CHATML,
+      customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      representativePrompt: "Explain photosynthesis in simple terms.",
+      representativeCompletion: "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar.",
+    });
   };
 
   const submit = async () => {
@@ -851,7 +853,7 @@ export function ProjectOnboarding({ onComplete, onExit, onSaveProjectDefinition 
           {step === "definition-review" && (
             <div className="space-y-3">
               <p className="border border-purple-500 bg-purple-300 px-4 py-3 text-sm font-bold !text-[#000000]">
-                {approvedProjectDefinition ? "This project definition is approved and locked." : "Review the completed project definition, then approve it to save and lock these settings."}
+                {approvedProjectDefinition ? "This project definition is approved and locked." : "Review the completed project definition, then approve it to lock these settings."}
               </p>
               {[
                 ["Project name", approvedProjectDefinition?.name ?? projectName],
@@ -938,12 +940,6 @@ export function ProjectOnboarding({ onComplete, onExit, onSaveProjectDefinition 
               )}
             </div>
           )}
-          {step === "onboarding-choice" && (
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className={buttonClass} onClick={onExit}>Yes, go to the SFT Studio Pro menu</button>
-              <button type="button" className={buttonClass} onClick={() => setStep("name")}>No, continue onboarding</button>
-            </div>
-          )}
           {step === "triad-choice" && (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
@@ -995,7 +991,7 @@ export function ProjectOnboarding({ onComplete, onExit, onSaveProjectDefinition 
         </div>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-5 py-4 sm:px-7">
-          <button type="button" className="inline-flex items-center gap-2 px-2 py-2 text-sm text-slate-200 hover:text-white disabled:opacity-50" onClick={goBack} disabled={step === "onboarding-choice" || pending}>
+          <button type="button" className="inline-flex items-center gap-2 px-2 py-2 text-sm text-slate-200 hover:text-white disabled:opacity-50" onClick={goBack} disabled={step === "name" || pending}>
             <ArrowLeft className="h-4 w-4" /> Previous
           </button>
           <div className="flex flex-wrap gap-2">
@@ -1007,7 +1003,7 @@ export function ProjectOnboarding({ onComplete, onExit, onSaveProjectDefinition 
               setAssistantReply("");
               setStep("definition-review");
             }}><Check className="h-4 w-4" /> Approve prompt &amp; continue</button>}
-            {step === "definition-review" && <button type="button" className={buttonClass} disabled={pending} onClick={() => void approveProjectDefinition()}>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {pending ? "Saving & locking..." : "Approve project definition & continue"}</button>}
+            {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm project definition & continue" : "Approve project definition & continue"}</button>}
             {["name", "goal", "constraints", "remember-model-name", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
             {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("triad-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
@@ -1016,6 +1012,13 @@ export function ProjectOnboarding({ onComplete, onExit, onSaveProjectDefinition 
           </div>
         </footer>
       </section>
+      <button
+        type="button"
+        onClick={skipToProject}
+        className="fixed bottom-4 right-4 z-[60] rounded-md border border-purple-500 bg-purple-300 px-2.5 py-1.5 text-xs font-bold !text-[#000000] shadow-lg transition-colors hover:bg-purple-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+      >
+        Skip to project
+      </button>
     </main>
   );
 }

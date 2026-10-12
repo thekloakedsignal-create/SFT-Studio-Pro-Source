@@ -1178,26 +1178,25 @@ export default function App() {
   };
 
   // Save the SFT project to Firestore directly (incremental delta saving)
-  const handleSaveProject = async (projId: string | null = null, settingsOverride?: ProjectSettings): Promise<boolean> => {
+  const handleSaveProject = async (projId: string | null = null) => {
     const user = auth.currentUser;
     const userIdToUse = user ? user.uid : getDeviceId();
-    const projectToSave = settingsOverride ?? project;
 
     const idToSave = (projId && projId !== "NEW_PROJECT") ? projId : (selectedProjectId || `project-${Date.now()}`);
     setIsSaving(true);
     
     const settingsPayload = {
-      name: projectToSave.name,
-      systemPrompt: projectToSave.systemPrompt,
-      targetTask: projectToSave.targetTask,
-      constraints: projectToSave.constraints,
-      selectedPreset: projectToSave.selectedPreset,
-      projectFormat: projectToSave.projectFormat || ProjectFormat.CONVERSATION,
-      templateType: projectToSave.templateType || TemplateType.SINGLE_TURN,
-      instructTemplate: projectToSave.instructTemplate || InstructTemplate.CHATML,
-      customInstructionFormat: projectToSave.customInstructionFormat || "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
-      representativePrompt: projectToSave.representativePrompt || "",
-      representativeCompletion: projectToSave.representativeCompletion || ""
+      name: project.name,
+      systemPrompt: project.systemPrompt,
+      targetTask: project.targetTask,
+      constraints: project.constraints,
+      selectedPreset: project.selectedPreset,
+      projectFormat: project.projectFormat || ProjectFormat.CONVERSATION,
+      templateType: project.templateType || TemplateType.SINGLE_TURN,
+      instructTemplate: project.instructTemplate || InstructTemplate.CHATML,
+      customInstructionFormat: project.customInstructionFormat || "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      representativePrompt: project.representativePrompt || "",
+      representativeCompletion: project.representativeCompletion || ""
     };
 
     setSelectedProjectId(idToSave);
@@ -1218,7 +1217,7 @@ export default function App() {
     const projectMetadataPayload = {
       id: idToSave,
       userId: userIdToUse,
-      name: projectToSave.name || "My SFT Custom Assistant",
+      name: project.name || "My SFT Custom Assistant",
       settings: settingsPayload,
       batchCount: batches.length,
       totalExamples: batches.reduce((acc, b) => acc + (b.examplesCount || (b.examples ? b.examples.length : 0)), 0),
@@ -1249,17 +1248,15 @@ export default function App() {
       } catch (e) {}
 
       setNotification({ 
-        text: `Project "${projectToSave.name || "SFT Project"}" saved and locked!`, 
+        text: `Project "${project.name || "SFT Project"}" saved and locked!`, 
         type: "success" 
       });
-      return true;
     } catch (error: any) {
       console.warn("Postgres save notice:", error?.message);
       setNotification({ 
         text: `Project save failed: ${error?.message || "Please retry."}`,
         type: "error"
       });
-      return false;
     } finally {
       setIsSaving(false);
     }
@@ -3991,27 +3988,19 @@ export default function App() {
     return (
       <ProjectOnboarding
         onComplete={(settings, recommendations) => {
+          setProject(settings);
+          setIsFieldsUnlocked(true);
+          setBatchTemplate(settings.templateType || TemplateType.SINGLE_TURN);
+          setDocTemplate(settings.templateType || TemplateType.SINGLE_TURN);
+          setTriadTemplate(settings.templateType || TemplateType.SINGLE_TURN);
           if (recommendations?.length) {
             setBatchRecommendations(recommendations);
             setCompletedRecommendedBatches([]);
             setActiveRecommendedBatchIndex(0);
             setActiveTab("synthesizer");
           } else {
-            setProject(settings);
-            setIsFieldsUnlocked(true);
-            setBatchTemplate(settings.templateType || TemplateType.SINGLE_TURN);
-            setDocTemplate(settings.templateType || TemplateType.SINGLE_TURN);
-            setTriadTemplate(settings.templateType || TemplateType.SINGLE_TURN);
             setActiveTab("define");
           }
-          setShowProjectOnboarding(false);
-        }}
-        onSaveProjectDefinition={async settings => {
-          setProject(settings);
-          return handleSaveProject(null, settings);
-        }}
-        onExit={() => {
-          setActiveTab("define");
           setShowProjectOnboarding(false);
         }}
       />
