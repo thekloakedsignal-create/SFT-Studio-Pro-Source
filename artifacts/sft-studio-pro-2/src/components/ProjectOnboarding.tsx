@@ -705,13 +705,14 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const generateSystemPrompt = async () => {
     const remainingSentenceLimit = modelNameInstruction ? 4 : 5;
     const draft = await askAI(
-      `Write a concise system prompt for this SFT project. HARD LIMIT: the complete prompt must have no more than five sentences total. ` +
+      `Write a concise identity/persona-only system prompt for this SFT project. It must identify the model's name, persona, and purpose based on the project goal. ` +
+      `Do not include task-specific instructions, rules, constraints, policies, examples, formatting requirements, or other behavioral directions. ` +
+      `${modelNameInstruction ? "The app will prepend the model's remembered name; do not repeat or invent a name. " : "Do not invent a model name. "}` +
+      `HARD LIMIT: the complete prompt must have no more than five sentences total. ` +
       `${modelNameInstruction ? `The app will prepend the user's remembered-name sentence, which counts toward the five-sentence maximum. Do not write a name sentence; write at most ${remainingSentenceLimit} additional sentences. ` : "Write at most five sentences. "}` +
       `Count your sentences before responding and shorten the prompt if needed. Never exceed the five-sentence total. ` +
       `This limit applies only to your AI-generated draft, not user-written or user-edited prompts. ` +
-      `Target task: ${goal}. Constraints: ${constraints || "none"}. ` +
-      `Use this approved voice reference:\n${voiceSample}\n` +
-      `Example user prompt: ${goldenPrompt}\nExample assistant response: ${goldenCompletion}\n` +
+      `Project purpose: ${goal}. ` +
       `Return only the system prompt text, with no heading, preamble, bullets, or commentary.`
     );
     if (draft) {
