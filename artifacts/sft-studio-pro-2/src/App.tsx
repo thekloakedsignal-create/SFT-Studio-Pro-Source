@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { AboutModal } from "./components/AboutModal";
+import { RunTrainingModal } from "./components/RunTrainingModal";
 import { ProjectOnboarding, type BatchRecommendation } from "./components/ProjectOnboarding";
 import { PricingModal } from "./components/PricingModal";
 import { CustomPackageModal } from "./components/CustomPackageModal";
@@ -663,6 +664,7 @@ export default function App() {
   } | null>(null);
   const [showBillingModal, setShowBillingModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showRunTrainingModal, setShowRunTrainingModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showCustomPackageModal, setShowCustomPackageModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -7373,6 +7375,23 @@ export default function App() {
                           <span>Copy Validation JSONL to Clipboard</span>
                         </button>
                       </div>
+
+                      {/* Automated Full Fine-Tune (Together AI) */}
+                      <div className="space-y-2 pt-3 border-t border-slate-800/60">
+                        <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase block">3. Automated Full Fine-Tune (Together AI)</span>
+                        <p className="text-[10px] text-slate-500 leading-relaxed">
+                          Uploads the selected, QA-checked dataset and validator split to Together AI and runs a full fine-tune of Qwen/Qwen3.5-9B (from Qwen/Qwen3.5-9B-Base) with Hugging Face export. You approve the upload and the billable job separately before either happens.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowRunTrainingModal(true)}
+                          disabled={(compiledDataset.trainingSet.length + compiledDataset.validationSet.length) === 0}
+                          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-500/15 to-indigo-600/15 hover:from-blue-500/25 hover:to-indigo-600/25 border border-blue-500/40 text-slate-100 text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-40 transition cursor-pointer"
+                        >
+                          <Cpu className="h-4 w-4 text-blue-400" />
+                          <span>Run Training</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -8020,6 +8039,17 @@ export default function App() {
 
       {/* Supporting Modals */}
       <AboutModal isOpen={showAboutModal} onClose={() => setShowAboutModal(false)} />
+      <RunTrainingModal
+        open={showRunTrainingModal}
+        onClose={() => setShowRunTrainingModal(false)}
+        exportFormat={exportTemplateFormat}
+        getSerializedSplits={() => ({
+          training: compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, exportTemplateFormat)),
+          validation: compiledDataset.validationSet.map(ex => formatExampleForExport(ex, exportTemplateFormat)),
+        })}
+        apiFetch={projectApiFetch}
+        notify={(text, type) => setNotification({ text, type })}
+      />
       <CustomPackageModal
         isOpen={showCustomPackageModal}
         onClose={() => setShowCustomPackageModal(false)}
