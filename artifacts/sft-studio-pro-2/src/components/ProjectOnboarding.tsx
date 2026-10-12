@@ -5,7 +5,7 @@ import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateT
 type Step =
   | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
   | "voice-own" | "voice-review" | "golden-generation" | "golden-review" | "remember-name-choice" | "remember-model-name" | "system-choice" | "system-review"
-  | "definition-review" | "batch-skills" | "batch-recommendations";
+  | "definition-review" | "batch-skills" | "batch-recommendations" | "triad-choice" | "quality-analysis";
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B";
 export interface BatchRecommendation {
@@ -332,7 +332,9 @@ const PROMPTS: Record<Step, string> = {
   "system-review": "Review the full system prompt below. Edit it if you want, then explicitly approve it. It will be saved to the project and included in every generated example.",
   "definition-review": "Your project definition is complete. Review the summary and give final approval. Approval locks these settings for batch generation; use Edit answer if anything needs changing.",
   "batch-skills": "The batch generator creates training examples from your project settings for review. What special skills or abilities should this AI have? I’ll use your answer and project goal to recommend batches. Red Teaming and Adversarial are always included.",
-  "batch-recommendations": "Your recommendations are ready. Follow these steps:\n1. For each recommendation, click the Copy to Batch Generator button at the bottom of the page to copy its topic, special instructions, and constraints into the Batch Synthesizer.\n2. Generate one batch at a time. Wait for it to finish before starting another.\n3. Review each generated batch and approve or reject it before generating the next one.\n4. Repeat for each recommended topic.\n\nFor Llama models, generate a balanced mix of single-turn and multi-turn examples for each topic. Do not generate reasoning templates for Llama 3.1 70B.",
+  "batch-recommendations": "Here are my recommended batches based on your project and the skills you described. Red Teaming and Adversarial are included to help test safety against attacks and bad actors.",
+  "triad-choice": "Would you like to include TRiAD moral alignment in your project? You can open the explanation below for details.",
+  "quality-analysis": "After generating your batches, send every batch through Quality Analysis. For flagged examples, you can delete them, regenerate them, or ignore the flag (not recommended). Once you have reviewed the results, onboarding is complete.",
 };
 
 async function requestDraft(instruction: string, appContext: Record<string, unknown>) {
@@ -397,7 +399,6 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [showWorkshopChoice, setShowWorkshopChoice] = useState(!startAtBatchInterview);
   const [step, setStep] = useState<Step>(startAtBatchInterview ? "batch-skills" : "name");
   const [projectName, setProjectName] = useState(initialProjectSettings?.name || "");
-  const [goal, setGoal] = useState(initialProjectSettings?.targetTask || "");
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
   const [adaptiveQuestion, setAdaptiveQuestion] = useState("");
   const [constraints, setConstraints] = useState(initialProjectSettings?.constraints || "");
@@ -415,6 +416,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
   const [activeRecommendationIndex, setActiveRecommendationIndex] = useState(0);
   const [approvedProjectDefinition, setApprovedProjectDefinition] = useState<ProjectSettings | null>(initialProjectSettings || null);
+  const [triadChoice, setTriadChoice] = useState<"yes" | "no" | null>(null);
   const [copiedBatchSection, setCopiedBatchSection] = useState("");
   const [error, setError] = useState("");
   const [assistantReply, setAssistantReply] = useState("");
@@ -435,7 +437,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
 
   const activeRecommendation = batchRecommendations[activeRecommendationIndex];
 
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations"];
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "triad-choice", "quality-analysis"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
@@ -454,6 +456,9 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       : []),
     ...(currentStepPosition > stepOrder.indexOf("system-review") && systemPrompt
       ? [{ step: "system-review" as Step, label: "System prompt", answer: systemPrompt }]
+      : []),
+    ...(currentStepPosition > stepOrder.indexOf("triad-choice") && triadChoice
+      ? [{ step: "triad-choice" as Step, label: "TRiAD moral alignment", answer: triadChoice === "yes" ? "Yes — remember to add it from the TRiAD tab" : "No" }]
       : []),
   ].filter(item => stepOrder.indexOf(item.step) < currentStepPosition);
 
@@ -494,6 +499,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       "system-choice": rememberName === "yes" ? "remember-model-name" : "remember-name-choice",
       "system-review": "system-choice", "definition-review": "system-review",
       "batch-skills": "definition-review", "batch-recommendations": "batch-skills",
+      "triad-choice": "batch-skills", "quality-analysis": "triad-choice",
     };
     setError("");
     if (step === "definition-review" && approvedProjectDefinition) {
@@ -631,14 +637,10 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     );
     setBatchRecommendations(uniqueRecommendations);
     setActiveRecommendationIndex(0);
-    setStep("batch-recommendations");
+    setStep("triad-choice");
   };
 
   const skipToProject = () => {
-    if (startAtBatchInterview) {
-      onSkip();
-      return;
-    }
     onComplete({
       name: "General Instruction Tuner",
       systemPrompt: "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
@@ -806,9 +808,16 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
 
           <div className="flex justify-start">
             <div className="max-w-[90%] border border-[#c4c4c4] bg-[#e5e5e5] px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]">
-              <p className={step === "batch-recommendations" ? "whitespace-pre-wrap" : undefined}>
-                {step === "goal-followup" ? adaptiveQuestion : PROMPTS[step]}
-              </p>
+              {step === "triad-choice" && (
+                <div className="mb-3 space-y-2">
+                  <p>Alright. I’ve added recommendations to the batch synthesizer.</p>
+                  <p>If you are training a Qwen model, make sure to generate a mix of reasoning, single-turn, and multi-turn batches to add to your data set.</p>
+                  <p>You should aim for a total of 3000-5000 examples for personal-use AI, and 10,000 to 20,000 for more rigorous enterprise tasks.</p>
+                  <p>You can generate as many batches as you want on as many topics as you choose.</p>
+                  <p>Your recommendations are ready. Send them to the batch generator as before.</p>
+                </div>
+              )}
+              <p>{step === "goal-followup" ? adaptiveQuestion : PROMPTS[step]}</p>
               {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "batch-skills"].includes(step) && (
                 <button
                   type="button"
@@ -983,6 +992,25 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
               )}
             </div>
           )}
+          {step === "triad-choice" && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={buttonClass} onClick={() => setTriadChoice("yes")}>Yes, I’d like to include it</button>
+                <button type="button" className={buttonClass} onClick={() => { setTriadChoice("no"); setStep("quality-analysis"); }}>No, continue</button>
+              </div>
+              <details className="border border-slate-600 bg-slate-900 px-4 py-3">
+                <summary className="cursor-pointer text-sm font-bold text-slate-100">Explain Triadic Moral Alignment in detail</summary>
+                <p className="mt-3 text-sm leading-relaxed text-slate-200">
+                  TRiAD is an alignment standard built around Freedom, Truth, and Kindness. It applies these values within training prompt-completion pairs to support balanced, authentic, and reliable assistant behavior. If you choose to use it, remember to add it from the TRiAD tab after onboarding.
+                </p>
+              </details>
+              {triadChoice === "yes" && (
+                <p className="border border-purple-500 bg-purple-300 px-4 py-3 text-sm font-bold !text-[#000000]">
+                  Remember to add Triadic Moral Alignment from the TRiAD tab after returning to the app.
+                </p>
+              )}
+            </div>
+          )}
           {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "remember-model-name", "batch-skills"].includes(step) && (
             <div className="flex gap-2">
               <textarea
@@ -1015,7 +1043,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
         </div>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-5 py-4 sm:px-7">
-          <button type="button" className="inline-flex items-center gap-2 px-2 py-2 text-sm text-slate-200 hover:text-white disabled:opacity-50" onClick={goBack} disabled={step === "name" || (startAtBatchInterview && step === "batch-skills") || pending}>
+          <button type="button" className="inline-flex items-center gap-2 px-2 py-2 text-sm text-slate-200 hover:text-white disabled:opacity-50" onClick={goBack} disabled={step === "name" || pending}>
             <ArrowLeft className="h-4 w-4" /> Previous
           </button>
           <div className="flex flex-wrap gap-2">
@@ -1030,7 +1058,9 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm & finish Project Definition" : "Approve & finish Project Definition"}</button>}
             {["name", "goal", "constraints", "remember-model-name", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
-            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={finish}>Go to Batch generator <ArrowRight className="h-4 w-4" /></button>}
+            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("triad-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
+            {step === "triad-choice" && triadChoice === "yes" && <button type="button" className={buttonClass} onClick={() => setStep("quality-analysis")}>Continue <ArrowRight className="h-4 w-4" /></button>}
+            {step === "quality-analysis" && <button type="button" className={buttonClass} onClick={finish}>Go to Batch generator <ArrowRight className="h-4 w-4" /></button>}
           </div>
         </footer>
       </section>
