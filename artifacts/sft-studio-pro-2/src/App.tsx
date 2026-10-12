@@ -5089,17 +5089,34 @@ export default function App() {
                 {/* Batch Generator Settings Card */}
                 <div className="kk-synthetic-generator-card bg-slate-950/40 border border-slate-800/80 p-6 rounded-2xl relative overflow-hidden">
                   <div className="border-b border-slate-800 pb-4 mb-6">
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-green-400" />
-                      Synthetic SFT Batch Generator
-                    </h2>
-                    <p className="text-xs text-slate-400">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-green-400" />
+                        Synthetic SFT Batch Generator
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const recommendations = document.getElementById("batch-recommendations") as HTMLDetailsElement | null;
+                          if (recommendations) {
+                            recommendations.open = true;
+                            recommendations.scrollIntoView({ behavior: "smooth", block: "start" });
+                          } else {
+                            openAiGuide("synthesizer");
+                          }
+                        }}
+                        className="rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
+                      >
+                        Batch Recommendations
+                      </button>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-400">
                       Synthesize training examples modeled against your active project settings. Customize batch modifiers below.
                     </p>
                   </div>
 
                   {batchRecommendations.length > 0 && (
-                    <details className="mb-6 rounded-xl border border-purple-500/30 bg-purple-950/20">
+                    <details id="batch-recommendations" className="mb-6 rounded-xl border border-purple-500/30 bg-purple-950/20">
                       <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-purple-200">
                         Recommended batches ({completedRecommendedBatches.length}/{batchRecommendations.length} checked)
                       </summary>

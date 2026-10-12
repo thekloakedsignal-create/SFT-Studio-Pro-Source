@@ -8,7 +8,7 @@
 - [Visual reference](visual-reference.md) — Follow the supplied palette and keep SFT Studio changes cosmetic only; do not alter behavior.
 - [Sign-in workspace](sign-in-workspace.md) — New sign-ins and accounts start with a fresh unlocked draft, not an automatically reopened saved project.
 - [Interface naming](interface-naming.md) — Hide generation model/backend labels; preserve batch names.
-- [SFT change scope](sft-change-scope.md) — Project Definition approval exits onboarding; AI Guide excludes Project Definition and Data Registry; keep guide data in separate localStorage.
+- [SFT change scope](sft-change-scope.md) — Project Definition exits onboarding; Batch Recommendations belongs on Synthesizer; AI Guide excludes Data Registry.
 - [Batch recommendation library](batch-recommendation-library.md) — Add user-supplied recipes one at a time; preserve each field and its separate copy control.
 - [Registry QA gate](registry-qa-gate.md) — Registry inclusion requires a completed QA check, not a perfect score; final serialized output gets a format-only check.
 - [Storage and generation](local-project-storage.md) — Preserve deliberate saved-project loading; never automatically reopen cached projects or reuse cached batches for generation.

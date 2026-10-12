@@ -27,9 +27,9 @@ Before the batch-skills interview, show the completed project definition and req
 
 **How to apply:** Keep this approval gate and snapshot within Project Onboarding. Do not impose the sentence limit on other fields or add selected base-model data to the handoff payload.
 
-After the user approves Project Definition, close onboarding and return to the prefilled Project Definition page. Tell the user to review and Save & Lock it, then navigate to the Batch Synthesizer and open AI Guide for Section 2. Keep the existing Batch Synthesizer and recommendations unchanged. Show AI Guide buttons on app pages except Project Definition and Data Registry. Persist guide conversations and recommendations in project-keyed localStorage, separate from saved-project data; do not alter Data Registry content or behavior.
+After the user approves Project Definition, close onboarding and return to the prefilled Project Definition page. Tell the user to review and Save & Lock it, then navigate to the Batch Synthesizer and open AI Guide for Section 2. Place the Batch Recommendations button on the Synthesizer page, not Project Definition. Keep the existing Batch Synthesizer and recommendations unchanged. Show AI Guide buttons on app pages except Project Definition and Data Registry. Persist guide conversations and recommendations in project-keyed localStorage, separate from saved-project data; do not alter Data Registry content or behavior.
 
-**Why:** The user clarified that Section 1 must end at Project Definition approval, Section 2 is already in the app, localStorage is acceptable, and Data Registry is excluded.
+**Why:** The user clarified that Section 1 must end at Project Definition approval, Section 2 is already in the app, the Batch Recommendations button belongs on the Synthesizer page, localStorage is acceptable, and Data Registry is excluded.
 
 **How to apply:** Limit related edits to the Project Definition exit message, AI Guide entry points, and separate localStorage state. Leave batch-generation logic, recommendation content, saved-project records, and Data Registry untouched.
 
