@@ -332,7 +332,7 @@ const PROMPTS: Record<Step, string> = {
   "system-review": "Review the full system prompt below. Edit it if you want, then explicitly approve it. It will be saved to the project and included in every generated example.",
   "definition-review": "Your project definition is complete. Review the summary and give final approval. Approval locks these settings for batch generation; use Edit answer if anything needs changing.",
   "batch-skills": "The batch generator creates training examples from your project settings for review. What special skills or abilities should this AI have? I’ll use your answer and project goal to recommend batches. Red Teaming and Adversarial are always included.",
-  "batch-recommendations": "Here are my recommended batches based on your project and the skills you described. Red Teaming and Adversarial are included to help test safety against attacks and bad actors.",
+  "batch-recommendations": "Your recommendations will be sent to the project UI when you continue.",
 };
 
 async function requestDraft(instruction: string, appContext: Record<string, unknown>) {
@@ -413,9 +413,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
   const [specialSkills, setSpecialSkills] = useState("");
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
-  const [activeRecommendationIndex, setActiveRecommendationIndex] = useState(0);
   const [approvedProjectDefinition, setApprovedProjectDefinition] = useState<ProjectSettings | null>(initialProjectSettings || null);
-  const [copiedBatchSection, setCopiedBatchSection] = useState("");
   const [error, setError] = useState("");
   const [assistantReply, setAssistantReply] = useState("");
   const [pending, setPending] = useState(false);
@@ -432,8 +430,6 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const mixGuidance = trainingModel === "Llama 3.1 70B"
     ? "For every topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning templates for Llama 3.1 70B."
     : "For every topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples.";
-
-  const activeRecommendation = batchRecommendations[activeRecommendationIndex];
 
   const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations"];
   const currentStepPosition = stepOrder.indexOf(step);
@@ -630,7 +626,6 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       all.findIndex(candidate => candidate.topic.toLowerCase() === item.topic.toLowerCase()) === index
     );
     setBatchRecommendations(uniqueRecommendations);
-    setActiveRecommendationIndex(0);
     setStep("batch-recommendations");
   };
 
@@ -724,15 +719,6 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
 
   const textareaClass = "w-full resize-y bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-purple-400 focus:outline-none";
   const buttonClass = "inline-flex items-center justify-center gap-2 border border-purple-500 bg-purple-300 px-4 py-2.5 text-sm font-bold !text-[#000000] transition hover:bg-purple-200 disabled:cursor-not-allowed disabled:opacity-50";
-  const copyRecommendationSection = async (key: string, text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedBatchSection(key);
-    } catch {
-      setError("Clipboard access is unavailable in this browser.");
-    }
-  };
-
   if (showWorkshopChoice) {
     return (
       <main className="min-h-screen bg-slate-900 px-4 py-8 text-white sm:py-12">
@@ -919,66 +905,11 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
               <p className="border border-slate-600 bg-slate-900 px-4 py-3 text-sm text-slate-200">
                 {mixGuidance}
               </p>
-              {batchRecommendations.length > 0 && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      aria-label="Previous recommended batch"
-                      className={buttonClass}
-                      disabled={activeRecommendationIndex === 0}
-                      onClick={() => setActiveRecommendationIndex(index => Math.max(0, index - 1))}
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                    </button>
-                    <select
-                      aria-label="Choose a recommended batch"
-                      className="min-w-0 flex-1 rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-                      value={activeRecommendationIndex}
-                      onChange={event => setActiveRecommendationIndex(Number(event.target.value))}
-                    >
-                      {batchRecommendations.map((item, index) => (
-                        <option key={`${item.topic}-${index}`} value={index}>{index + 1}. {item.topic}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      aria-label="Next recommended batch"
-                      className={buttonClass}
-                      disabled={activeRecommendationIndex >= batchRecommendations.length - 1}
-                      onClick={() => setActiveRecommendationIndex(index => Math.min(batchRecommendations.length - 1, index + 1))}
-                    >
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <p className="text-center text-xs text-slate-300">
-                    Recommendation {activeRecommendationIndex + 1} of {batchRecommendations.length}
-                  </p>
-                  {activeRecommendation && (
-                    <article className="space-y-3 border border-slate-600 bg-slate-900 px-4 py-3">
-                      <h2 className="font-semibold text-white">{activeRecommendation.topic}</h2>
-                      {([
-                        ["topic", "Batch Description", activeRecommendation.topic],
-                        ["instructions", "Special Instructions", activeRecommendation.specialInstructions],
-                        ["constraints", "Temporary Constraints", activeRecommendation.temporaryConstraints],
-                      ] as const).map(([section, label, text]) => {
-                        const key = `${activeRecommendation.topic}:${section}`;
-                        return (
-                          <section key={section} className="border-t border-slate-700 pt-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <h3 className="text-sm font-bold text-slate-100">{label}</h3>
-                              <button type="button" className={buttonClass} onClick={() => void copyRecommendationSection(key, text)}>
-                                {copiedBatchSection === key ? "Copied" : "Copy"}
-                              </button>
-                            </div>
-                            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">{text}</p>
-                          </section>
-                        );
-                      })}
-                    </article>
-                  )}
-                </>
-              )}
+              <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200">
+                <li>In the Synthesizer, open a recommended topic and use the Copy button at the bottom of the topic to copy it into the synthesizer fields.</li>
+                <li>Generate one batch at a time.</li>
+                <li>Review each generated batch and approve or reject it before generating another.</li>
+              </ol>
             </div>
           )}
           {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "remember-model-name", "batch-skills"].includes(step) && (
