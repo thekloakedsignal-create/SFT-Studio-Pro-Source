@@ -13,8 +13,12 @@ export interface BatchRecommendation {
   specialInstructions: string;
   temporaryConstraints: string;
 }
-type SkillBatchDraft = BatchRecommendation & {
+type SkillCoverage = {
   skill: string;
+  libraryTopic: string;
+  topic: string;
+  specialInstructions: string;
+  temporaryConstraints: string;
 };
 
 const TRAINING_MODELS: { value: TrainingModel; recommended?: boolean }[] = [
@@ -242,12 +246,6 @@ const BATCH_RECOMMENDATION_LIBRARY: BatchRecommendation[] = [{
 Generate prompts pairing a task with hard constraints—word limits, bullet counts, tone requirements, "respond in exactly 3 sentences," or "answer without using X." Include prompts with multiple stacked constraints.`,
   temporaryConstraints: `Every response meets 100% of stated constraints. Exclude examples that complete the task but drop a constraint.`,
 }, {
-  topic: "Multi-Turn Conversational Coherence",
-  specialInstructions: `Context tracking, pronoun resolution, and topic continuity across long dialogues.
-
-Generate conversations with 4–15 turns, including topic shifts, callbacks to earlier turns, and ambiguous references resolved from context.`,
-  temporaryConstraints: `Persona and facts established earlier stay consistent throughout. Include turns where the correct response depends on 3+ turns of history.`,
-}, {
   topic: "Factual Q&A and Explanation at Multiple Levels",
   specialInstructions: `Answering questions and explaining concepts from ELI5 up to expert depth.
 
@@ -371,30 +369,29 @@ function parseGoldenExample(raw: string) {
   return null;
 }
 
-function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; additionalBatches: SkillBatchDraft[] } | null {
+function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; skillCoverage: SkillCoverage[] } | null {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   try {
     const parsed = JSON.parse(cleaned);
-    if (!Array.isArray(parsed.libraryTopics) || !Array.isArray(parsed.additionalBatches)) return null;
-    const additionalBatches = parsed.additionalBatches
+    if (!Array.isArray(parsed.libraryTopics) || !Array.isArray(parsed.skillCoverage)) return null;
+    const skillCoverage = parsed.skillCoverage
       .filter((item: any) =>
         typeof item?.skill === "string" && item.skill.trim() &&
+        typeof item?.libraryTopic === "string" &&
         typeof item?.topic === "string" &&
-        item.topic.trim() &&
         typeof item?.specialInstructions === "string" &&
-        item.specialInstructions.trim() &&
-        typeof item?.temporaryConstraints === "string" &&
-        item.temporaryConstraints.trim()
+        typeof item?.temporaryConstraints === "string"
       )
       .map((item: any) => ({
         skill: item.skill.trim(),
+        libraryTopic: item.libraryTopic.trim(),
         topic: item.topic.trim(),
         specialInstructions: item.specialInstructions.trim(),
         temporaryConstraints: item.temporaryConstraints.trim(),
       }));
     return {
       libraryTopics: parsed.libraryTopics.filter((topic: unknown): topic is string => typeof topic === "string"),
-      additionalBatches,
+      skillCoverage,
     };
   } catch {
     return null;
@@ -586,18 +583,16 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       .filter((item, index, all) => all.findIndex(candidate => candidate.toLowerCase() === item.toLowerCase()) === index);
     const draft = await askAI(
       `You are the Project Onboarding batch-recommendation assistant. Analyze the approved project goal, constraints, selected model, and every skill the user named. ` +
-      `Choose relevant recipe topics from the curated library by topic name only; do not rewrite or return any library recipe instructions or constraints. ` +
-      `For every separate item in the required user-skill list, provide one matching additional batch, unless a selected library recipe directly covers it. For each additional batch, copy that exact skill item into "skill" and provide a specific topic, special instructions, and temporary constraints that make the skill observable in examples for this project. Never omit a listed skill. Do not use generic instructions. ` +
+      `Review each curated recipe's topic, special instructions, and constraints when deciding whether it directly covers a user skill. Choose relevant recipes by their exact topic names only; never rewrite their contents because the original library recipes will be passed through unchanged. ` +
+      `Use this consistent coverage rule: a skill is covered only when a recipe explicitly trains the requested capability, not merely a related theme. If multiple recipes directly cover it, choose the most specific; break ties by choosing the first listed recipe. ` +
+      `For every separate item in the required user-skill list, return exactly one skillCoverage mapping. If a library recipe explicitly teaches that skill, set libraryTopic to its exact title and leave the three custom fields empty. Otherwise leave libraryTopic empty and generate a distinct batch topic, specific special instructions, and temporary constraints that make that skill observable in project-relevant examples. Never claim a loose similarity is coverage and never omit a listed skill. ` +
       `Always include the library topics that fit the project, and recommend these broadly useful topics when suitable: ${recommendedTopics.join(", ")}. ` +
       `${mixGuidance} Do not make separate format-only batches. ` +
-      `Do not create training examples or actual batches. Return only valid JSON: {"libraryTopics":["exact topic name"],"additionalBatches":[{"skill":"exact user skill item","topic":"...","specialInstructions":"...","temporaryConstraints":"..."}]}. ` +
-      `Available curated topic names: ${JSON.stringify(eligibleLibrary.map(item => item.topic))}\n` +
+      `Do not create training examples or actual batches. Return only valid JSON: {"libraryTopics":["exact topic name"],"skillCoverage":[{"skill":"exact user skill item","libraryTopic":"exact library topic or empty string","topic":"custom topic or empty string","specialInstructions":"custom instructions or empty string","temporaryConstraints":"custom constraints or empty string"}]}. ` +
+      `Available curated recipes for analysis: ${JSON.stringify(eligibleLibrary)}\n` +
       `Project name: ${approvedProjectDefinition.name}\nProject goal: ${approvedProjectDefinition.targetTask}\nProject constraints: ${approvedProjectDefinition.constraints || "none"}\nSelected base model: ${trainingModel}\nExact user-skill items to cover: ${JSON.stringify(skillItems)}`
     );
     const plan = draft ? parseBatchRecommendationPlan(draft) : null;
-    if (draft && !plan) {
-      setError("I couldn’t read the AI’s recommendation plan, so curated recommendations will be sent to the batch generator.");
-    }
     const findLibraryRecipe = (topic: string) =>
       eligibleLibrary.find(item => item.topic.toLowerCase() === topic.trim().toLowerCase());
     const selectedLibrary: BatchRecommendation[] = [];
@@ -607,23 +602,29 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
         selectedLibrary.push(recipe);
       }
     }
-    const userSpecificBatches = skillItems.map(skill => {
-      const generated = plan?.additionalBatches.find(item => item.skill.toLowerCase() === skill.toLowerCase());
-      return generated
-        ? {
-            topic: generated.topic,
-            specialInstructions: generated.specialInstructions,
-            temporaryConstraints: generated.temporaryConstraints,
-          }
-        : {
-            topic: `Skill: ${skill}`,
-            specialInstructions: `Create project-relevant training examples where the assistant clearly demonstrates this requested skill: ${skill}. Each example must make the skill visible in the assistant's response and align with the project goal: ${approvedProjectDefinition.targetTask}.`,
-            temporaryConstraints: `Do not omit or dilute the requested skill: ${skill}. Follow the project constraints: ${approvedProjectDefinition.constraints || "none"}. Do not invent facts or capabilities.`,
-          };
-    }).filter((item, index, all) =>
-      !["red teaming", "adversarial"].includes(item.topic.toLowerCase()) &&
-      all.findIndex(candidate => candidate.topic.toLowerCase() === item.topic.toLowerCase()) === index
-    );
+    const userSpecificBatches: BatchRecommendation[] = [];
+    for (const skill of skillItems) {
+      const coverage = plan?.skillCoverage.find(item => item.skill.toLowerCase() === skill.toLowerCase());
+      const recipe = coverage?.libraryTopic ? findLibraryRecipe(coverage.libraryTopic) : undefined;
+      if (recipe) {
+        if (!selectedLibrary.some(item => item.topic.toLowerCase() === recipe.topic.toLowerCase())) {
+          selectedLibrary.push(recipe);
+        }
+        continue;
+      }
+      let topic = coverage?.topic || `Skill: ${skill}`;
+      if (selectedLibrary.some(item => item.topic.toLowerCase() === topic.toLowerCase()) ||
+          userSpecificBatches.some(item => item.topic.toLowerCase() === topic.toLowerCase())) {
+        topic = `Skill: ${skill}`;
+      }
+      userSpecificBatches.push({
+        topic,
+        specialInstructions: coverage?.specialInstructions ||
+          `Create project-relevant training examples where the assistant clearly demonstrates this requested skill: ${skill}. Each example must make the skill visible in the assistant's response and align with the project goal: ${approvedProjectDefinition.targetTask}.`,
+        temporaryConstraints: coverage?.temporaryConstraints ||
+          `Do not omit or dilute the requested skill: ${skill}. Follow the project constraints: ${approvedProjectDefinition.constraints || "none"}. Do not invent facts or capabilities.`,
+      });
+    }
     const requiredSafetyBatches: BatchRecommendation[] = [
       {
         topic: "Red Teaming",

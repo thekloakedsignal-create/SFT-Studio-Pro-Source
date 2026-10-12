@@ -9,6 +9,12 @@ For this app, follow the user's instructions directly and literally. Ask before 
 
 **How to apply:** If the requested page, exclusion, or behavior is unclear, ask before changing code.
 
+Do not add user-facing error messages to the onboarding UI.
+
+**Why:** The user explicitly prohibited adding error messages.
+
+**How to apply:** Do not introduce visible error text as part of an onboarding change.
+
 Keep requests within Project Onboarding, except that onboarding recommendations may be passed to the existing main app for UI display. Never modify backend behavior, batch generation, batch settings, or batch data.
 
 **Why:** The user permits only a display-only main-app handoff for the recommendations and prohibits changes to the app's actual functions.
