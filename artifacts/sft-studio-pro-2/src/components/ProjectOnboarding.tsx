@@ -1,6 +1,50 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check, HelpCircle, LoaderCircle, MessageSquare, Send } from "lucide-react";
 import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateType } from "../types";
+
+function renderInlineMarkdown(text: string): ReactNode[] {
+  const pattern = /(\*\*[^*]+\*\*|__[^_]+__|(?<!\*)\*[^*\n]+\*(?!\*)|(?<!_)_[^_\n]+_(?!_)|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
+  return text.split(pattern).filter(Boolean).map((part, index) => {
+    if (/^\*\*.+\*\*$|^__.+__$/.test(part)) return <strong key={index}>{part.slice(2, -2)}</strong>;
+    if (/^(?<!\*)\*.+\*(?!\*)$|^(?<!_)_.+_(?!_)$/.test(part)) return <em key={index}>{part.slice(1, -1)}</em>;
+    if (/^`.+`$/.test(part)) return <code key={index} className="rounded bg-black/10 px-1">{part.slice(1, -1)}</code>;
+    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (link) {
+      const safeUrl = /^(https?:|mailto:)/i.test(link[2]) ? link[2] : undefined;
+      return safeUrl
+        ? <a key={index} href={safeUrl} target="_blank" rel="noreferrer" className="underline">{link[1]}</a>
+        : link[1];
+    }
+    return part;
+  });
+}
+
+function MarkdownText({ children }: { children: string }) {
+  const blocks = children.trim().split(/\n\s*\n/).filter(Boolean);
+  return <div className="space-y-2">
+    {blocks.map((block, index) => {
+      const lines = block.split("\n");
+      const heading = lines.length === 1 && lines[0].match(/^(#{1,6})\s+(.+)$/);
+      if (heading) {
+        const Heading = heading[1].length <= 2 ? "h3" : "h4";
+        return <Heading key={index} className="font-bold">{renderInlineMarkdown(heading[2])}</Heading>;
+      }
+      const ordered = lines.every(line => /^\s*\d+[.)]\s+/.test(line));
+      const unordered = lines.every(line => /^\s*[-*+]\s+/.test(line));
+      if (ordered || unordered) {
+        const List = ordered ? "ol" : "ul";
+        return <List key={index} className={`${ordered ? "list-decimal" : "list-disc"} space-y-1 pl-5`}>
+          {lines.map((line, lineIndex) => (
+            <li key={lineIndex}>{renderInlineMarkdown(line.replace(/^\s*(?:\d+[.)]|[-*+])\s+/, ""))}</li>
+          ))}
+        </List>;
+      }
+      return <p key={index} className="whitespace-pre-wrap">{lines.map((line, lineIndex) => (
+        <span key={lineIndex}>{lineIndex > 0 && <br />}{renderInlineMarkdown(line)}</span>
+      ))}</p>;
+    })}
+  </div>;
+}
 
 type Step =
   | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
@@ -783,7 +827,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             <div key={item.step} className="flex justify-end">
               <div className="max-w-[90%] border border-purple-500 bg-purple-300 px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]">
                 <p className="mb-1 text-xs font-bold !text-[#000000]">{item.label}</p>
-                <p className="whitespace-pre-wrap">{item.answer}</p>
+                <MarkdownText>{item.answer}</MarkdownText>
                 <button type="button" className="mt-2 text-xs font-bold !text-[#000000] underline underline-offset-2 hover:!text-[#222222]" onClick={() => {
                   setApprovedProjectDefinition(null);
                   setBatchRecommendations([]);
@@ -797,7 +841,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
 
           <div className="flex justify-start">
             <div className="max-w-[90%] border border-[#c4c4c4] bg-[#e5e5e5] px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]">
-              <p>{step === "goal-followup" ? adaptiveQuestion : PROMPTS[step]}</p>
+              <MarkdownText>{step === "goal-followup" ? adaptiveQuestion : PROMPTS[step]}</MarkdownText>
               {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "batch-skills"].includes(step) && (
                 <button
                   type="button"
@@ -900,7 +944,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
               ].map(([label, value]) => (
                 <section key={label} className="border border-slate-600 bg-slate-900 px-4 py-3">
                   <h2 className="text-sm font-bold text-slate-100">{label}</h2>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">{value || "None"}</p>
+                  <div className="mt-1 text-sm text-slate-200"><MarkdownText>{value || "None"}</MarkdownText></div>
                 </section>
               ))}
             </div>
@@ -946,7 +990,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
           )}
 
           {error && <p role="alert" className="border border-[#c4c4c4] bg-[#e5e5e5] px-3 py-2 text-sm font-bold !text-[#000000]">{error}</p>}
-          {assistantReply && <div className="flex justify-start"><div className="max-w-[90%] border border-[#c4c4c4] bg-[#e5e5e5] px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000] whitespace-pre-wrap">{assistantReply}</div></div>}
+          {assistantReply && <div className="flex justify-start"><div className="max-w-[90%] border border-[#c4c4c4] bg-[#e5e5e5] px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]"><MarkdownText>{assistantReply}</MarkdownText></div></div>}
         </div>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-5 py-4 sm:px-7">
