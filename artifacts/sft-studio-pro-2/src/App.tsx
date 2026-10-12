@@ -532,7 +532,19 @@ export default function App() {
   const openAiGuide = (page: "synthesizer" | "convert" | "triad" | "assess") => {
     setGuidePage(page);
     const saved = readGuideState(selectedProjectId || "");
-    setExpertMessages(saved.conversations?.[page] || []);
+    const savedMessages = saved.conversations?.[page] || [];
+    const openingGuide = page === "convert"
+      ? "Document Converter turns source documents into editable training examples.\n\n1. Save and lock Project Definition first.\n2. Upload a DOCX, PDF, or image, or enter supported text.\n3. Choose the document type and output template. Add conversion instructions if needed.\n4. Click Convert Document to SFT, then review the converted examples."
+      : page === "triad"
+        ? "TRiAD Alignment imports pre-generated alignment examples into your project. It is for alignment data, not document uploads.\n\n1. Save and lock Project Definition first.\n2. Choose the batch size and template.\n3. Enter a Google Drive share link or a direct CSV, JSON, or JSONL download URL.\n4. Click Run Script & Import, then review the imported examples."
+        : page === "assess"
+          ? "AI Quality Assessment checks a selected batch for formatting, template, schema, and persona issues.\n\n1. Select a batch from Active Registry Batch.\n2. Click Run AI Quality Audit.\n3. Review the score and flagged examples.\n4. Regenerate flagged examples or delete examples that should not be kept, then run the audit again to check the batch."
+          : "";
+    setExpertMessages(savedMessages.length
+      ? savedMessages
+      : openingGuide
+        ? [{ role: "assistant", content: openingGuide }]
+        : []);
     setExpertInput("");
     setActiveTab("expert");
   };
@@ -4275,21 +4287,6 @@ export default function App() {
       </AnimatePresence>
 
       <main className={`flex-1 ${["define", "convert", "assess"].includes(activeTab) ? "max-w-[1920px]" : "max-w-[1720px]"} mx-auto w-full px-4 sm:px-6 lg:px-8 py-5`}>
-        {activeTab !== "define" && activeTab !== "expert" && activeTab !== "registry" && activeTab !== "synthesizer" && (
-          <div className="mb-3 flex justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                if (activeTab === "convert" || activeTab === "triad" || activeTab === "assess") {
-                  openAiGuide(activeTab);
-                }
-              }}
-              className="rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
-            >
-              AI Guide
-            </button>
-          </div>
-        )}
         <div className="mb-3 lg:hidden">
           <button
             type="button"
@@ -5648,6 +5645,13 @@ export default function App() {
                         <p className="text-xs text-slate-400">
                           Convert raw technical texts, manuals, literature, or transcripts into structured fine-tuning conversational logs.
                         </p>
+                        <button
+                          type="button"
+                          onClick={() => openAiGuide("convert")}
+                          className="mt-3 rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
+                        >
+                          AI Guide
+                        </button>
                       </div>
                       {(docName || docContent) && (
                         <button
@@ -6345,6 +6349,13 @@ export default function App() {
                       <p className="text-xs text-slate-200 font-medium mt-1">
                         Add pre-generated TRiAD alignment examples to your project.
                       </p>
+                      <button
+                        type="button"
+                        onClick={() => openAiGuide("triad")}
+                        className="mt-3 rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
+                      >
+                        AI Guide
+                      </button>
                     </div>
 
                     {/* External dataset requirements */}
@@ -6614,6 +6625,13 @@ export default function App() {
                       <p className="text-xs text-slate-400">
                         Select a batch from the registry to execute full-format, template, schema, and persona quality audits.
                       </p>
+                      <button
+                        type="button"
+                        onClick={() => openAiGuide("assess")}
+                        className="mt-3 rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
+                      >
+                        AI Guide
+                      </button>
                     </div>
 
                     {/* Selector */}
