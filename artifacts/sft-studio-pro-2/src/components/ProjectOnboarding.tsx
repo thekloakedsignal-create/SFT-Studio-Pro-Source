@@ -242,12 +242,6 @@ const BATCH_RECOMMENDATION_LIBRARY: BatchRecommendation[] = [{
 Generate prompts pairing a task with hard constraints—word limits, bullet counts, tone requirements, "respond in exactly 3 sentences," or "answer without using X." Include prompts with multiple stacked constraints.`,
   temporaryConstraints: `Every response meets 100% of stated constraints. Exclude examples that complete the task but drop a constraint.`,
 }, {
-  topic: "Multi-Turn Conversational Coherence",
-  specialInstructions: `Context tracking, pronoun resolution, and topic continuity across long dialogues.
-
-Generate conversations with 4–15 turns, including topic shifts, callbacks to earlier turns, and ambiguous references resolved from context.`,
-  temporaryConstraints: `Persona and facts established earlier stay consistent throughout. Include turns where the correct response depends on 3+ turns of history.`,
-}, {
   topic: "Factual Q&A and Explanation at Multiple Levels",
   specialInstructions: `Answering questions and explaining concepts from ELI5 up to expert depth.
 
@@ -299,7 +293,6 @@ Generate requests with explicit creative constraints—genre, POV, era, tone, rh
 
 const GENERAL_RECOMMENDED_BATCH_TOPICS = [
   "Instruction Following with Explicit Constraints",
-  "Multi-Turn Conversational Coherence",
   "Factual Q&A and Explanation at Multiple Levels",
   "Step-by-Step Reasoning and Math",
   "Code Generation, Explanation, and Debugging",
@@ -611,19 +604,16 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       const generated = plan?.additionalBatches.find(item => item.skill.toLowerCase() === skill.toLowerCase());
       return generated
         ? {
-            topic: generated.topic,
+            topic: skill,
             specialInstructions: generated.specialInstructions,
             temporaryConstraints: generated.temporaryConstraints,
           }
         : {
-            topic: `Skill: ${skill}`,
+            topic: skill,
             specialInstructions: `Create project-relevant training examples where the assistant clearly demonstrates this requested skill: ${skill}. Each example must make the skill visible in the assistant's response and align with the project goal: ${approvedProjectDefinition.targetTask}.`,
             temporaryConstraints: `Do not omit or dilute the requested skill: ${skill}. Follow the project constraints: ${approvedProjectDefinition.constraints || "none"}. Do not invent facts or capabilities.`,
           };
-    }).filter((item, index, all) =>
-      !["red teaming", "adversarial"].includes(item.topic.toLowerCase()) &&
-      all.findIndex(candidate => candidate.topic.toLowerCase() === item.topic.toLowerCase()) === index
-    );
+    });
     const requiredSafetyBatches: BatchRecommendation[] = [
       {
         topic: "Red Teaming",
@@ -646,10 +636,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
         recommendations.unshift(recipe);
       }
     }
-    const uniqueRecommendations = recommendations.filter((item, index, all) =>
-      all.findIndex(candidate => candidate.topic.toLowerCase() === item.topic.toLowerCase()) === index
-    );
-    setBatchRecommendations(uniqueRecommendations);
+    setBatchRecommendations(recommendations);
     setStep("batch-recommendations");
   };
 
