@@ -272,12 +272,6 @@ Generate summaries at specified lengths, rewrites at different reading levels, t
 Generate prompts with an explicit target schema and responses that populate it from unstructured text. Include nested objects, arrays, and missing-field edge cases.`,
   temporaryConstraints: `Output is valid, parseable JSON with no prose wrapping. Missing data uses null or empty values per the schema.`,
 }, {
-  topic: "Translation and Cross-Language Adaptation",
-  specialInstructions: `Producing natural translations that preserve meaning, tone, and register.
-
-Generate translation pairs across languages and registers—formal letters, casual dialogue, idioms and proverbs, technical text. Include cases where a literal choice won't land, with the adapted rendering instead.`,
-  temporaryConstraints: `Meaning and register preserved—colorful source text stays colorful, formal stays formal. Terminology consistent within a document. Untranslatable terms get a brief note, never a forced wrong rendering.`,
-}, {
   topic: "Goal Decomposition and Planning",
   specialInstructions: `Turning objectives into ordered, concrete action steps.
 
@@ -298,7 +292,6 @@ const GENERAL_RECOMMENDED_BATCH_TOPICS = [
   "Code Generation, Explanation, and Debugging",
   "Summarization and Text Transformation",
   "Structured Output and Data Extraction",
-  "Translation and Cross-Language Adaptation",
   "Goal Decomposition and Planning",
   "Controlled Creative and Long-Form Writing",
 ];
