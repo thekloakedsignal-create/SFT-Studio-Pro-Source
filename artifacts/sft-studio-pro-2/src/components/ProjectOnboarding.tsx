@@ -901,12 +901,16 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             </div>
           )}
           {step === "batch-recommendations" && (
-            <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200">
-              <li>In the project UI, open a recommended topic. Use the Copy button at the bottom of the topic to copy it into the Batch Synthesizer.</li>
-              <li>{mixGuidance}</li>
-              <li>Generate one batch at a time.</li>
-              <li>After each batch finishes, approve or reject it before generating another batch.</li>
-            </ol>
+            <div className="space-y-3">
+              <p className="border border-slate-600 bg-slate-900 px-4 py-3 text-sm text-slate-200">
+                {mixGuidance}
+              </p>
+              <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200">
+                <li>In the Synthesizer, open a recommended topic and use the Copy button at the bottom of the topic to copy it into the synthesizer fields.</li>
+                <li>Generate one batch at a time.</li>
+                <li>Review each generated batch and approve or reject it before generating another.</li>
+              </ol>
+            </div>
           )}
           {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "remember-model-name", "batch-skills"].includes(step) && (
             <div className="flex gap-2">
