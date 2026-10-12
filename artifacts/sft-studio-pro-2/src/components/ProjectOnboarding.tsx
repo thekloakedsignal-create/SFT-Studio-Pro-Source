@@ -907,13 +907,14 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
           )}
           {step === "batch-recommendations" && (
             <div className="space-y-3">
-              <p className="border border-slate-600 bg-slate-900 px-4 py-3 text-sm text-slate-200">
-                {mixGuidance}
-              </p>
               <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200">
-                <li>In the Synthesizer, open a recommended topic and use the Copy button at the bottom of the topic to copy it into the synthesizer fields.</li>
+                <li>In the Synthesizer, select a recommended topic and click Copy to Synthesizer above the recommendation to fill the generator fields.</li>
                 <li>Generate one batch at a time.</li>
                 <li>Review each generated batch and approve or reject it before generating another.</li>
+                <li>{trainingModel === "Llama 3.1 70B"
+                  ? "For each topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning examples when training Llama 3.1 70B."
+                  : "For each topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples."}</li>
+                <li>You can generate as many batches as you wish. Aim for 3,000–5,000 total examples for a personal-use AI, or 10,000–20,000 total examples for an enterprise AI with specialized skills.</li>
               </ol>
             </div>
           )}
