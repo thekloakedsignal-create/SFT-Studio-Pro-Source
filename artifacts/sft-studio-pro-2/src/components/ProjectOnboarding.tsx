@@ -759,15 +759,14 @@ export function ProjectOnboarding({ onComplete, onSkip }: Props) {
                 className={buttonClass}
                 onClick={() => setShowWorkshopChoice(false)}
               >
-                Guided Tour — Continue Project Onboarding
-                <span className="ml-2 text-xs font-medium">(recommended for new users)</span>
+                AI guided workflow
               </button>
               <button
                 type="button"
                 className={buttonClass}
                 onClick={onSkip}
               >
-                Skip Guide — Close Project Onboarding and open the new project screen in the app
+                Skip guide
               </button>
             </div>
           </div>
