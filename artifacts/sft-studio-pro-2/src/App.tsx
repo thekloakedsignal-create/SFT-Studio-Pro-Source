@@ -5131,7 +5131,19 @@ export default function App() {
                         Recommended batches ({completedRecommendedBatches.length}/{batchRecommendations.length} checked)
                       </summary>
                       <div className="space-y-3 border-t border-purple-500/20 px-4 py-4">
-                        <p className="text-xs text-slate-300">Check each recommendation after you have generated it.</p>
+                        {activeRecommendedBatch && (
+                          <button
+                            type="button"
+                            className="rounded border border-purple-300 bg-purple-300 px-3 py-1.5 text-xs font-semibold !text-[#000000] hover:bg-purple-200"
+                            onClick={() => {
+                              setBatchDesc(activeRecommendedBatch.topic);
+                              setBatchInstructions(activeRecommendedBatch.specialInstructions);
+                              setBatchTempConstraints(activeRecommendedBatch.temporaryConstraints);
+                            }}
+                          >
+                            Copy to Synthesizer
+                          </button>
+                        )}
                         {activeRecommendedBatch && (
                           <>
                             <div className="flex items-center gap-2">
@@ -5180,20 +5192,7 @@ export default function App() {
                               className="mt-1 accent-purple-400"
                             />
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-2">
-                                <h3 className="text-sm font-semibold text-slate-100">{activeRecommendedBatch.topic}</h3>
-                                <button
-                                  type="button"
-                                  className="shrink-0 rounded border border-purple-300 bg-purple-300 px-3 py-2 text-sm font-semibold !text-[#000000] hover:bg-purple-200"
-                                  onClick={() => {
-                                    setBatchDesc(activeRecommendedBatch.topic);
-                                    setBatchInstructions(activeRecommendedBatch.specialInstructions);
-                                    setBatchTempConstraints(activeRecommendedBatch.temporaryConstraints);
-                                  }}
-                                >
-                                  Copy to batch generator
-                                </button>
-                              </div>
+                              <h3 className="text-sm font-semibold text-slate-100">{activeRecommendedBatch.topic}</h3>
                               <div className="mt-3 space-y-3">
                                 {([
                                   ["topic", "Batch Description", activeRecommendedBatch.topic],
