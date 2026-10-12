@@ -5180,7 +5180,20 @@ export default function App() {
                               className="mt-1 accent-purple-400"
                             />
                             <div className="min-w-0 flex-1">
-                              <h3 className="text-sm font-semibold text-slate-100">{activeRecommendedBatch.topic}</h3>
+                              <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-sm font-semibold text-slate-100">{activeRecommendedBatch.topic}</h3>
+                                <button
+                                  type="button"
+                                  className="shrink-0 rounded border border-purple-300 bg-purple-300 px-3 py-2 text-sm font-semibold !text-[#000000] hover:bg-purple-200"
+                                  onClick={() => {
+                                    setBatchDesc(activeRecommendedBatch.topic);
+                                    setBatchInstructions(activeRecommendedBatch.specialInstructions);
+                                    setBatchTempConstraints(activeRecommendedBatch.temporaryConstraints);
+                                  }}
+                                >
+                                  Copy to batch generator
+                                </button>
+                              </div>
                               <div className="mt-3 space-y-3">
                                 {([
                                   ["topic", "Batch Description", activeRecommendedBatch.topic],
@@ -5195,17 +5208,6 @@ export default function App() {
                                   );
                                 })}
                               </div>
-                              <button
-                                type="button"
-                                className="mt-3 rounded border border-purple-300 bg-purple-300 px-3 py-2 text-sm font-semibold !text-[#000000] hover:bg-purple-200"
-                                onClick={() => {
-                                  setBatchDesc(activeRecommendedBatch.topic);
-                                  setBatchInstructions(activeRecommendedBatch.specialInstructions);
-                                  setBatchTempConstraints(activeRecommendedBatch.temporaryConstraints);
-                                }}
-                              >
-                                Copy to batch generator
-                              </button>
                             </div>
                           </div>
                           </>
