@@ -4,7 +4,6 @@
     "incremental": true,
     "tsBuildInfoFile": ".tsbuildinfo",
     "outDir": "dist",
-    "rootDir": ".",
     "allowImportingTsExtensions": true,
     "types": ["node"]
   },
