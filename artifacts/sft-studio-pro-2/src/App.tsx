@@ -4281,9 +4281,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
-                if (activeTab === "synthesizer") {
-                  setShowBatchRecommendationInterview(true);
-                } else if (activeTab === "convert" || activeTab === "triad" || activeTab === "assess") {
+                if (activeTab === "convert" || activeTab === "triad" || activeTab === "assess") {
                   openAiGuide(activeTab);
                 }
               }}
