@@ -558,7 +558,6 @@ export default function App() {
   const [activeRecommendedBatchIndex, setActiveRecommendedBatchIndex] = useState(0);
   const activeRecommendedBatch = batchRecommendations[activeRecommendedBatchIndex];
   const [completedRecommendedBatches, setCompletedRecommendedBatches] = useState<string[]>([]);
-  const [copiedRecommendedField, setCopiedRecommendedField] = useState("");
   const [batchSize, setBatchSize] = useState<number>(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState<{ current: number; total: number; percent: number } | null>(null);
@@ -5188,26 +5187,9 @@ export default function App() {
                                   ["instructions", "Special Instructions", activeRecommendedBatch.specialInstructions],
                                   ["constraints", "Temporary Constraints", activeRecommendedBatch.temporaryConstraints],
                                 ] as const).map(([section, title, text]) => {
-                                  const copyKey = `${activeRecommendedBatch.topic}:${section}`;
                                   return (
                                     <section key={section} className="border-t border-slate-700 pt-2">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <h3 className="text-xs font-bold text-slate-200">{title}</h3>
-                                        <button
-                                          type="button"
-                                          className="rounded border border-purple-300 bg-purple-300 px-2 py-1 text-xs font-bold !text-[#000000] hover:bg-purple-200"
-                                          onClick={async () => {
-                                            try {
-                                              await navigator.clipboard.writeText(text);
-                                              setCopiedRecommendedField(copyKey);
-                                            } catch {
-                                              setCopiedRecommendedField(`failed:${copyKey}`);
-                                            }
-                                          }}
-                                        >
-                                          {copiedRecommendedField === copyKey ? "Copied" : copiedRecommendedField === `failed:${copyKey}` ? "Copy failed" : "Copy"}
-                                        </button>
-                                      </div>
+                                      <h3 className="text-xs font-bold text-slate-200">{title}</h3>
                                       <p className="mt-1 whitespace-pre-wrap text-xs text-slate-300">{text}</p>
                                     </section>
                                   );
@@ -5222,7 +5204,7 @@ export default function App() {
                                   setBatchTempConstraints(activeRecommendedBatch.temporaryConstraints);
                                 }}
                               >
-                                Copy to batch generator
+                                Copy All
                               </button>
                             </div>
                           </div>
