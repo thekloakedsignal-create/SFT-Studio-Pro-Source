@@ -399,6 +399,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [showWorkshopChoice, setShowWorkshopChoice] = useState(!startAtBatchInterview);
   const [step, setStep] = useState<Step>(startAtBatchInterview ? "batch-skills" : "name");
   const [projectName, setProjectName] = useState(initialProjectSettings?.name || "");
+  const [goal, setGoal] = useState(initialProjectSettings?.targetTask || "");
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
   const [adaptiveQuestion, setAdaptiveQuestion] = useState("");
   const [constraints, setConstraints] = useState(initialProjectSettings?.constraints || "");
@@ -641,6 +642,10 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   };
 
   const skipToProject = () => {
+    if (startAtBatchInterview) {
+      onSkip();
+      return;
+    }
     onComplete({
       name: "General Instruction Tuner",
       systemPrompt: "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
@@ -1043,7 +1048,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
         </div>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-5 py-4 sm:px-7">
-          <button type="button" className="inline-flex items-center gap-2 px-2 py-2 text-sm text-slate-200 hover:text-white disabled:opacity-50" onClick={goBack} disabled={step === "name" || pending}>
+          <button type="button" className="inline-flex items-center gap-2 px-2 py-2 text-sm text-slate-200 hover:text-white disabled:opacity-50" onClick={goBack} disabled={step === "name" || (startAtBatchInterview && step === "batch-skills") || pending}>
             <ArrowLeft className="h-4 w-4" /> Previous
           </button>
           <div className="flex flex-wrap gap-2">

@@ -468,7 +468,11 @@ export default function App() {
   }
 
   const [activeTab, setActiveTab] = useState<"define" | "synthesizer" | "convert" | "triad" | "assess" | "registry" | "expert">("define");
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [activeTab]);
   const [showProjectOnboarding, setShowProjectOnboarding] = useState(true);
+  const [showBatchRecommendationInterview, setShowBatchRecommendationInterview] = useState(false);
   const [guidePage, setGuidePage] = useState<"synthesizer" | "convert" | "triad" | "assess" | null>(null);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [activeResourcePage, setActiveResourcePage] = useState<(typeof RESOURCE_LINKS)[number] | null>(null);
@@ -4022,14 +4026,29 @@ export default function App() {
     );
   }
 
-  if (showProjectOnboarding) {
+  if (showProjectOnboarding || showBatchRecommendationInterview) {
     return (
       <ProjectOnboarding
+        startAtBatchInterview={showBatchRecommendationInterview}
+        initialProjectSettings={showBatchRecommendationInterview ? project : undefined}
         onSkip={() => {
-          setActiveTab("define");
-          setShowProjectOnboarding(false);
+          if (showBatchRecommendationInterview) {
+            setShowBatchRecommendationInterview(false);
+            setActiveTab("synthesizer");
+          } else {
+            setActiveTab("define");
+            setShowProjectOnboarding(false);
+          }
         }}
         onComplete={(settings, recommendations) => {
+          if (showBatchRecommendationInterview) {
+            setBatchRecommendations(recommendations ?? []);
+            setCompletedRecommendedBatches([]);
+            setActiveRecommendedBatchIndex(0);
+            setShowBatchRecommendationInterview(false);
+            setActiveTab("synthesizer");
+            return;
+          }
           setProject(settings);
           setIsFieldsUnlocked(true);
           setBatchTemplate(settings.templateType || TemplateType.SINGLE_TURN);
@@ -4257,12 +4276,14 @@ export default function App() {
       </AnimatePresence>
 
       <main className={`flex-1 ${["define", "convert", "assess"].includes(activeTab) ? "max-w-[1920px]" : "max-w-[1720px]"} mx-auto w-full px-4 sm:px-6 lg:px-8 py-5`}>
-        {activeTab !== "define" && activeTab !== "expert" && activeTab !== "registry" && (
+        {activeTab !== "define" && activeTab !== "expert" && activeTab !== "registry" && activeTab !== "synthesizer" && (
           <div className="mb-3 flex justify-end">
             <button
               type="button"
               onClick={() => {
-                if (activeTab === "synthesizer" || activeTab === "convert" || activeTab === "triad" || activeTab === "assess") {
+                if (activeTab === "synthesizer") {
+                  setShowBatchRecommendationInterview(true);
+                } else if (activeTab === "convert" || activeTab === "triad" || activeTab === "assess") {
                   openAiGuide(activeTab);
                 }
               }}
@@ -5096,18 +5117,10 @@ export default function App() {
                       </h2>
                       <button
                         type="button"
-                        onClick={() => {
-                          const recommendations = document.getElementById("batch-recommendations") as HTMLDetailsElement | null;
-                          if (recommendations) {
-                            recommendations.open = true;
-                            recommendations.scrollIntoView({ behavior: "smooth", block: "start" });
-                          } else {
-                            openAiGuide("synthesizer");
-                          }
-                        }}
+                        onClick={() => setShowBatchRecommendationInterview(true)}
                         className="rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
                       >
-                        Batch Recommendations
+                        AI Guide
                       </button>
                     </div>
                     <p className="mt-2 text-xs text-slate-400">
