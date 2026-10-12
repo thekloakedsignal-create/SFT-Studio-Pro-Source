@@ -13,12 +13,8 @@ export interface BatchRecommendation {
   specialInstructions: string;
   temporaryConstraints: string;
 }
-type SkillCoverage = {
+type SkillBatchDraft = BatchRecommendation & {
   skill: string;
-  libraryTopic: string;
-  topic: string;
-  specialInstructions: string;
-  temporaryConstraints: string;
 };
 
 const TRAINING_MODELS: { value: TrainingModel; recommended?: boolean }[] = [
@@ -338,7 +334,7 @@ const PROMPTS: Record<Step, string> = {
   "system-choice": "The system prompt is included in every generated training example. It sets the model’s role and instructions, so it directly shapes every example. Would you like to write it or have me draft one?",
   "system-review": "Review the full system prompt below. Edit it if you want, then explicitly approve it. It will be saved to the project and included in every generated example.",
   "definition-review": "Your project definition is complete. Review the summary and give final approval. Approval locks these settings for batch generation; use Edit answer if anything needs changing.",
-  "batch-skills": "The batch generator creates training examples from your project settings for review. What special skills or abilities should this AI have? I’ll use your answer and project goal to recommend batches. Red Teaming and Adversarial are always included.",
+  "batch-skills": "A batch is a group of training examples focused on one topic. The topic, special instructions, and constraints tell the Synthesizer what examples to create; you then review the examples before accepting them. What specific skills or abilities should this AI demonstrate? List each one on a separate line so I can include them all in the recommendations.",
   "batch-recommendations": "Your recommendations will be sent to the project UI when you continue.",
 };
 
@@ -375,29 +371,30 @@ function parseGoldenExample(raw: string) {
   return null;
 }
 
-function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; skillCoverage: SkillCoverage[] } | null {
+function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; additionalBatches: SkillBatchDraft[] } | null {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   try {
     const parsed = JSON.parse(cleaned);
-    if (!Array.isArray(parsed.libraryTopics) || !Array.isArray(parsed.skillCoverage)) return null;
-    const skillCoverage = parsed.skillCoverage
+    if (!Array.isArray(parsed.libraryTopics) || !Array.isArray(parsed.additionalBatches)) return null;
+    const additionalBatches = parsed.additionalBatches
       .filter((item: any) =>
         typeof item?.skill === "string" && item.skill.trim() &&
-        typeof item?.libraryTopic === "string" &&
         typeof item?.topic === "string" &&
+        item.topic.trim() &&
         typeof item?.specialInstructions === "string" &&
-        typeof item?.temporaryConstraints === "string"
+        item.specialInstructions.trim() &&
+        typeof item?.temporaryConstraints === "string" &&
+        item.temporaryConstraints.trim()
       )
       .map((item: any) => ({
         skill: item.skill.trim(),
-        libraryTopic: item.libraryTopic.trim(),
         topic: item.topic.trim(),
         specialInstructions: item.specialInstructions.trim(),
         temporaryConstraints: item.temporaryConstraints.trim(),
       }));
     return {
       libraryTopics: parsed.libraryTopics.filter((topic: unknown): topic is string => typeof topic === "string"),
-      skillCoverage,
+      additionalBatches,
     };
   } catch {
     return null;
@@ -582,15 +579,20 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     const recommendedTopics = allowReasoning
       ? GENERAL_RECOMMENDED_BATCH_TOPICS
       : GENERAL_RECOMMENDED_BATCH_TOPICS.filter(topic => !/reasoning/i.test(topic));
+    const skillItems = specialSkills
+      .split(/\r?\n|[,;]/)
+      .map(item => item.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").replace(/^(?:and|&)\s+/i, "").trim())
+      .filter(item => item && !/^(?:none|none specified|no special skills?)\.?$/i.test(item))
+      .filter((item, index, all) => all.findIndex(candidate => candidate.toLowerCase() === item.toLowerCase()) === index);
     const draft = await askAI(
       `You are the Project Onboarding batch-recommendation assistant. Analyze the approved project goal, constraints, selected model, and every skill the user named. ` +
       `Choose relevant recipe topics from the curated library by topic name only; do not rewrite or return any library recipe instructions or constraints. ` +
-      `Return additional recipes only for named skills or abilities that are not already covered by a selected library topic. For every such skill, include a specific topic, special instructions, and temporary constraints. ` +
+      `For every separate item in the required user-skill list, provide one matching additional batch, unless a selected library recipe directly covers it. For each additional batch, copy that exact skill item into "skill" and provide a specific topic, special instructions, and temporary constraints that make the skill observable in examples for this project. Never omit a listed skill. Do not use generic instructions. ` +
       `Always include the library topics that fit the project, and recommend these broadly useful topics when suitable: ${recommendedTopics.join(", ")}. ` +
       `${mixGuidance} Do not make separate format-only batches. ` +
-      `Do not create training examples or actual batches. Return only valid JSON: {"libraryTopics":["exact topic name"],"additionalBatches":[{"topic":"...","specialInstructions":"...","temporaryConstraints":"..."}]}. ` +
+      `Do not create training examples or actual batches. Return only valid JSON: {"libraryTopics":["exact topic name"],"additionalBatches":[{"skill":"exact user skill item","topic":"...","specialInstructions":"...","temporaryConstraints":"..."}]}. ` +
       `Available curated topic names: ${JSON.stringify(eligibleLibrary.map(item => item.topic))}\n` +
-      `Project name: ${approvedProjectDefinition.name}\nProject goal: ${approvedProjectDefinition.targetTask}\nProject constraints: ${approvedProjectDefinition.constraints || "none"}\nSelected base model: ${trainingModel}\nSpecial skills and abilities stated by the user (cover every item): ${specialSkills.trim() || "none specified"}`
+      `Project name: ${approvedProjectDefinition.name}\nProject goal: ${approvedProjectDefinition.targetTask}\nProject constraints: ${approvedProjectDefinition.constraints || "none"}\nSelected base model: ${trainingModel}\nExact user-skill items to cover: ${JSON.stringify(skillItems)}`
     );
     const plan = draft ? parseBatchRecommendationPlan(draft) : null;
     if (draft && !plan) {
@@ -605,9 +607,20 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
         selectedLibrary.push(recipe);
       }
     }
-    const userSpecificBatches = (plan?.additionalBatches ?? []).filter((item, index, all) =>
-      (allowReasoning || !/\breasoning\b|chain[- ]of[- ]thought|\bcot\b/i.test(item.topic)) &&
-      !eligibleLibrary.some(recipe => recipe.topic.toLowerCase() === item.topic.toLowerCase()) &&
+    const userSpecificBatches = skillItems.map(skill => {
+      const generated = plan?.additionalBatches.find(item => item.skill.toLowerCase() === skill.toLowerCase());
+      return generated
+        ? {
+            topic: generated.topic,
+            specialInstructions: generated.specialInstructions,
+            temporaryConstraints: generated.temporaryConstraints,
+          }
+        : {
+            topic: `Skill: ${skill}`,
+            specialInstructions: `Create project-relevant training examples where the assistant clearly demonstrates this requested skill: ${skill}. Each example must make the skill visible in the assistant's response and align with the project goal: ${approvedProjectDefinition.targetTask}.`,
+            temporaryConstraints: `Do not omit or dilute the requested skill: ${skill}. Follow the project constraints: ${approvedProjectDefinition.constraints || "none"}. Do not invent facts or capabilities.`,
+          };
+    }).filter((item, index, all) =>
       !["red teaming", "adversarial"].includes(item.topic.toLowerCase()) &&
       all.findIndex(candidate => candidate.topic.toLowerCase() === item.topic.toLowerCase()) === index
     );
