@@ -1249,7 +1249,7 @@ export default function App() {
       } catch (e) {}
 
       setNotification({ 
-        text: `Project "${projectToSave.name || "SFT Project"}" saved and locked!`,
+        text: `Project "${projectToSave.name || "SFT Project"}" saved and locked!`, 
         type: "success" 
       });
       return true;
@@ -4008,9 +4008,6 @@ export default function App() {
         }}
         onSaveProjectDefinition={async settings => {
           setProject(settings);
-          setBatchTemplate(settings.templateType || TemplateType.SINGLE_TURN);
-          setDocTemplate(settings.templateType || TemplateType.SINGLE_TURN);
-          setTriadTemplate(settings.templateType || TemplateType.SINGLE_TURN);
           return handleSaveProject(null, settings);
         }}
         onExit={() => {
