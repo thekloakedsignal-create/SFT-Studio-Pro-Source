@@ -765,6 +765,15 @@ export function ProjectOnboarding({ onComplete }: Props) {
 
           <div className="flex justify-start">
             <div className="max-w-[90%] border border-[#c4c4c4] bg-[#e5e5e5] px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]">
+              {step === "triad-choice" && (
+                <div className="mb-3 space-y-2">
+                  <p>Alright. I’ve added recommendations to the batch synthesizer.</p>
+                  <p>If you are training a Qwen model, make sure to generate a mix of reasoning, single-turn, and multi-turn batches to add to your data set.</p>
+                  <p>You should aim for a total of 3000-5000 examples for personal-use AI, and 10,000 to 20,000 for more rigorous enterprise tasks.</p>
+                  <p>You can generate as many batches as you want on as many topics as you choose.</p>
+                  <p>Your recommendations are ready. Send them to the batch generator as before.</p>
+                </div>
+              )}
               <p>{step === "goal-followup" ? adaptiveQuestion : PROMPTS[step]}</p>
               {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "batch-skills"].includes(step) && (
                 <button
