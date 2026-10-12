@@ -463,7 +463,7 @@ export default function App() {
     return <AuthPopupHandler />;
   }
 
-  const [activeTab, setActiveTab] = useState<"define" | "synthesizer" | "convert" | "triad" | "assess" | "registry" | "expert">("define");
+  const [activeTab, setActiveTab] = useState<"define" | "synthesizer" | "convert" | "triad" | "assess" | "registry" | "expert" | "trainer">("define");
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [activeTab]);
@@ -660,6 +660,7 @@ export default function App() {
   const [showBillingModal, setShowBillingModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [showRunTrainingModal, setShowRunTrainingModal] = useState(false);
+  const [trainerHandoff, setTrainerHandoff] = useState({ model: "Qwen3.5 9 Base", template: "Instruct ChatML (<|im_start|>)" });
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showCustomPackageModal, setShowCustomPackageModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -4048,7 +4049,13 @@ export default function App() {
             setShowProjectOnboarding(false);
           }
         }}
-        onComplete={(settings, recommendations) => {
+        onComplete={(settings, recommendations, trainingModel) => {
+          if (!showBatchRecommendationInterview) {
+            setTrainerHandoff({
+              model: trainingModel || "Qwen3.5 9 Base",
+              template: `${settings.instructTemplate || "ChatML"} (<|im_start|>)`,
+            });
+          }
           if (showBatchRecommendationInterview) {
             setBatchRecommendations(recommendations ?? []);
             setCompletedRecommendedBatches([]);
@@ -4483,6 +4490,22 @@ export default function App() {
             >
               <MessageSquare className="h-4 w-4 shrink-0" />
               <span>7. App Support</span>
+            </button>
+
+            <button
+              id="tab-trainer"
+              onClick={() => {
+                setActiveTab("trainer");
+                setIsMobileNavOpen(false);
+              }}
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 ${
+                activeTab === "trainer"
+                  ? "bg-blue-500/15 text-blue-300 border border-blue-500/25 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
+              }`}
+            >
+              <Cpu className="h-4 w-4 shrink-0" />
+              <span>8. Automated Trainer</span>
             </button>
 
           </div>
@@ -7371,22 +7394,6 @@ export default function App() {
                         </button>
                       </div>
 
-                      {/* Automated Full Fine-Tune (Together AI) */}
-                      <div className="space-y-2 pt-3 border-t border-slate-800/60">
-                        <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase block">3. Automated Full Fine-Tune (Together AI)</span>
-                        <p className="text-[10px] text-slate-500 leading-relaxed">
-                          Uploads the selected, QA-checked dataset and validator split to Together AI and runs a full fine-tune of Qwen/Qwen3.5-9B (from Qwen/Qwen3.5-9B-Base) with Hugging Face export. You approve the upload and the billable job separately before either happens.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setShowRunTrainingModal(true)}
-                          disabled={(compiledDataset.trainingSet.length + compiledDataset.validationSet.length) === 0}
-                          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-500/15 to-indigo-600/15 hover:from-blue-500/25 hover:to-indigo-600/25 border border-blue-500/40 text-slate-100 text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-40 transition cursor-pointer"
-                        >
-                          <Cpu className="h-4 w-4 text-blue-400" />
-                          <span>Run Training</span>
-                        </button>
-                      </div>
                     </div>
                   </div>
 
@@ -7605,6 +7612,34 @@ export default function App() {
                   </div>
                 </div>
               </motion.div>
+            )}
+
+            {activeTab === "trainer" && (
+              <section className="mx-auto w-full max-w-5xl space-y-5 rounded-xl border border-slate-800/60 bg-slate-950/30 p-6">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-100">Automated Trainer</h2>
+                  <p className="mt-1 text-sm text-slate-400">Review the project’s handoff settings, then open the trainer when you are ready. Training will not start automatically.</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Selected model</h3>
+                    <p className="mt-2 text-sm font-bold text-slate-100">{trainerHandoff.model}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Training template</h3>
+                    <p className="mt-2 text-sm font-bold text-slate-100">{trainerHandoff.template}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowRunTrainingModal(true)}
+                  disabled={(compiledDataset.trainingSet.length + compiledDataset.validationSet.length) === 0}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-500/40 bg-blue-500/15 px-5 py-3 text-sm font-bold text-slate-100 transition hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Cpu className="h-4 w-4 text-blue-400" />
+                  Open automated trainer
+                </button>
+              </section>
             )}
 
           </AnimatePresence>
