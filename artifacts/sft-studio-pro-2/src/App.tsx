@@ -469,6 +469,7 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<"define" | "synthesizer" | "convert" | "triad" | "assess" | "registry" | "expert">("define");
   const [showProjectOnboarding, setShowProjectOnboarding] = useState(true);
+  const [showBatchRecommendationInterview, setShowBatchRecommendationInterview] = useState(false);
   const [guidePage, setGuidePage] = useState<"synthesizer" | "convert" | "triad" | "assess" | null>(null);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [activeResourcePage, setActiveResourcePage] = useState<(typeof RESOURCE_LINKS)[number] | null>(null);
@@ -4022,14 +4023,22 @@ export default function App() {
     );
   }
 
-  if (showProjectOnboarding) {
+  if (showProjectOnboarding || showBatchRecommendationInterview) {
     return (
       <ProjectOnboarding
+        startAtBatchInterview={showBatchRecommendationInterview}
+        initialProjectSettings={showBatchRecommendationInterview ? project : undefined}
         onSkip={() => {
-          setActiveTab("define");
-          setShowProjectOnboarding(false);
+          if (showBatchRecommendationInterview) {
+            setShowBatchRecommendationInterview(false);
+            setActiveTab("synthesizer");
+          } else {
+            setActiveTab("define");
+            setShowProjectOnboarding(false);
+          }
         }}
         onComplete={(settings, recommendations) => {
+          if (showBatchRecommendationInterview) return;
           setProject(settings);
           setIsFieldsUnlocked(true);
           setBatchTemplate(settings.templateType || TemplateType.SINGLE_TURN);
@@ -4262,7 +4271,9 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
-                if (activeTab === "synthesizer" || activeTab === "convert" || activeTab === "triad" || activeTab === "assess") {
+                if (activeTab === "synthesizer") {
+                  setShowBatchRecommendationInterview(true);
+                } else if (activeTab === "convert" || activeTab === "triad" || activeTab === "assess") {
                   openAiGuide(activeTab);
                 }
               }}
@@ -5094,21 +5105,6 @@ export default function App() {
                         <Sparkles className="h-5 w-5 text-green-400" />
                         Synthetic SFT Batch Generator
                       </h2>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const recommendations = document.getElementById("batch-recommendations") as HTMLDetailsElement | null;
-                          if (recommendations) {
-                            recommendations.open = true;
-                            recommendations.scrollIntoView({ behavior: "smooth", block: "start" });
-                          } else {
-                            openAiGuide("synthesizer");
-                          }
-                        }}
-                        className="rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
-                      >
-                        Batch Recommendations
-                      </button>
                     </div>
                     <p className="mt-2 text-xs text-slate-400">
                       Synthesize training examples modeled against your active project settings. Customize batch modifiers below.

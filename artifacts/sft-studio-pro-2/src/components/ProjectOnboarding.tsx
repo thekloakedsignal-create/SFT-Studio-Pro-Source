@@ -310,6 +310,8 @@ const GENERAL_RECOMMENDED_BATCH_TOPICS = [
 interface Props {
   onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[]) => void;
   onSkip: () => void;
+  startAtBatchInterview?: boolean;
+  initialProjectSettings?: ProjectSettings;
 }
 
 const PROMPTS: Record<Step, string> = {
@@ -393,14 +395,14 @@ function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; a
   }
 }
 
-export function ProjectOnboarding({ onComplete, onSkip }: Props) {
-  const [showWorkshopChoice, setShowWorkshopChoice] = useState(true);
-  const [step, setStep] = useState<Step>("name");
-  const [projectName, setProjectName] = useState("");
-  const [goal, setGoal] = useState("");
+export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = false, initialProjectSettings }: Props) {
+  const [showWorkshopChoice, setShowWorkshopChoice] = useState(!startAtBatchInterview);
+  const [step, setStep] = useState<Step>(startAtBatchInterview ? "batch-skills" : "name");
+  const [projectName, setProjectName] = useState(initialProjectSettings?.name || "");
+  const [goal, setGoal] = useState(initialProjectSettings?.targetTask || "");
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
   const [adaptiveQuestion, setAdaptiveQuestion] = useState("");
-  const [constraints, setConstraints] = useState("");
+  const [constraints, setConstraints] = useState(initialProjectSettings?.constraints || "");
   const [trainingModel, setTrainingModel] = useState<TrainingModel>("Qwen3.5 9 Base");
   const [voiceDescription, setVoiceDescription] = useState("");
   const [voiceSample, setVoiceSample] = useState("");
@@ -414,7 +416,7 @@ export function ProjectOnboarding({ onComplete, onSkip }: Props) {
   const [specialSkills, setSpecialSkills] = useState("");
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
   const [activeRecommendationIndex, setActiveRecommendationIndex] = useState(0);
-  const [approvedProjectDefinition, setApprovedProjectDefinition] = useState<ProjectSettings | null>(null);
+  const [approvedProjectDefinition, setApprovedProjectDefinition] = useState<ProjectSettings | null>(initialProjectSettings || null);
   const [triadChoice, setTriadChoice] = useState<"yes" | "no" | null>(null);
   const [copiedBatchSection, setCopiedBatchSection] = useState("");
   const [error, setError] = useState("");
@@ -640,6 +642,10 @@ export function ProjectOnboarding({ onComplete, onSkip }: Props) {
   };
 
   const skipToProject = () => {
+    if (startAtBatchInterview) {
+      onSkip();
+      return;
+    }
     onComplete({
       name: "General Instruction Tuner",
       systemPrompt: "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
@@ -1042,7 +1048,7 @@ export function ProjectOnboarding({ onComplete, onSkip }: Props) {
         </div>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-5 py-4 sm:px-7">
-          <button type="button" className="inline-flex items-center gap-2 px-2 py-2 text-sm text-slate-200 hover:text-white disabled:opacity-50" onClick={goBack} disabled={step === "name" || pending}>
+          <button type="button" className="inline-flex items-center gap-2 px-2 py-2 text-sm text-slate-200 hover:text-white disabled:opacity-50" onClick={goBack} disabled={step === "name" || (startAtBatchInterview && step === "batch-skills") || pending}>
             <ArrowLeft className="h-4 w-4" /> Previous
           </button>
           <div className="flex flex-wrap gap-2">
