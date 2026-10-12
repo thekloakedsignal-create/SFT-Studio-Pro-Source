@@ -4041,7 +4041,14 @@ export default function App() {
           }
         }}
         onComplete={(settings, recommendations) => {
-          if (showBatchRecommendationInterview) return;
+          if (showBatchRecommendationInterview) {
+            setBatchRecommendations(recommendations ?? []);
+            setCompletedRecommendedBatches([]);
+            setActiveRecommendedBatchIndex(0);
+            setShowBatchRecommendationInterview(false);
+            setActiveTab("synthesizer");
+            return;
+          }
           setProject(settings);
           setIsFieldsUnlocked(true);
           setBatchTemplate(settings.templateType || TemplateType.SINGLE_TURN);
