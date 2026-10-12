@@ -496,7 +496,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
       "system-choice": rememberName === "yes" ? "remember-model-name" : "remember-name-choice",
       "system-review": "system-choice", "definition-review": "system-review",
       "batch-skills": "definition-review", "batch-recommendations": "batch-skills",
-      "triad-choice": "batch-recommendations", "quality-analysis": "triad-choice",
+      "triad-choice": "batch-skills", "quality-analysis": "triad-choice",
     };
     setError("");
     if (step === "definition-review" && approvedProjectDefinition) {
@@ -591,7 +591,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
     );
     const plan = draft ? parseBatchRecommendationPlan(draft) : null;
     if (draft && !plan) {
-      setError("I couldn’t read the AI’s recommendation plan, so I’m showing the curated library instead.");
+      setError("I couldn’t read the AI’s recommendation plan, so curated recommendations will be sent to the batch generator.");
     }
     const findLibraryRecipe = (topic: string) =>
       eligibleLibrary.find(item => item.topic.toLowerCase() === topic.trim().toLowerCase());
@@ -635,7 +635,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
     );
     setBatchRecommendations(uniqueRecommendations);
     setActiveRecommendationIndex(0);
-    setStep("batch-recommendations");
+    setStep("triad-choice");
   };
 
   const skipToProject = () => {

@@ -5027,7 +5027,15 @@ export default function App() {
                       Synthetic SFT Batch Generator
                     </h2>
                     <p className="text-xs text-slate-400">
-                      Synthesize training examples modeled against your active project settings. Customize batch modifiers below.
+                      Alright. I’ve added recommendations to the batch synthesizer.
+                      <br /><br />
+                      If you are training a Qwen model, make sure to generate a mix of reasoning, single-turn, and multi-turn batches to add to your data set.
+                      <br /><br />
+                      You should aim for a total of 3000-5000 examples for personal-use AI, and 10,000 to 20,000 for more rigorous enterprise tasks.
+                      <br /><br />
+                      You can generate as many batches as you want on as many topics as you choose.
+                      <br /><br />
+                      Your recommendations are ready. Send them to the batch generator as before.
                     </p>
                   </div>
 
