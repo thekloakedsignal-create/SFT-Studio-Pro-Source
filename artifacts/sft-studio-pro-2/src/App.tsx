@@ -220,47 +220,42 @@ function parseExpertMarkdown(text: string) {
 }
 
 function RenderInlineExpertText({ text }: { text: string }) {
-  // Split lines to keep paragraph breaks
   const lines = text.split("\n");
+  const renderInline = (value: string) => value.split(/(\*\*[^*]+\*\*|__[^_]+__|(?<!\*)\*[^*\n]+\*(?!\*)|(?<!_)_[^_\n]+_(?!_)|~~[^~]+~~|`[^`]+`|\[[^\]]+\]\([^)]+\))/g).filter(Boolean).map((part, i) => {
+    if (/^\*\*.+\*\*$|^__.+__$/.test(part)) return <strong key={i} className="rounded-sm bg-purple-200 px-0.5 font-extrabold text-purple-950">{part.slice(2, -2)}</strong>;
+    if (/^(?<!\*)\*.+\*(?!\*)$|^(?<!_)_.+_(?!_)$/.test(part)) return <em key={i}>{part.slice(1, -1)}</em>;
+    if (/^~~.+~~$/.test(part)) return <del key={i}>{part.slice(2, -2)}</del>;
+    if (/^`.+`$/.test(part)) return <code key={i} className="rounded bg-slate-950 px-1.5 py-0.5 font-mono text-emerald-300">{part.slice(1, -1)}</code>;
+    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (link) {
+      const href = /^(https?:|mailto:)/i.test(link[2]) ? link[2] : undefined;
+      return href ? <a key={i} href={href} target="_blank" rel="noreferrer" className="text-emerald-300 underline">{link[1]}</a> : link[1];
+    }
+    return part;
+  });
+  const isListItem = (line: string) => /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(line);
+  const listContent = (line: string) => line.replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+)/, "");
   return (
-    <div className="space-y-1.5 text-slate-300">
+    <div className="space-y-2 text-slate-300">
       {lines.map((line, lineIdx) => {
-        // Parse list items
-        const listMatch = line.match(/^(\s*)(-\s|\*\s|\d+\.\s)(.*)/);
-        let lineContent = line;
-        let isListItem = false;
-        let listPrefix = "";
-        
-        if (listMatch) {
-          isListItem = true;
-          listPrefix = listMatch[2];
-          lineContent = listMatch[3];
-        }
-
-        const inlineParts = lineContent.split(/(\*\*.*?\*\*|`.*?`)/g);
-        const renderedLine = inlineParts.map((part, i) => {
-          if (part.startsWith("**") && part.endsWith("**")) {
-            return <strong key={i} className="font-extrabold text-emerald-300 font-sans">{part.slice(2, -2)}</strong>;
-          } else if (part.startsWith("`") && part.endsWith("`")) {
-            return <code key={i} className="bg-slate-950 border border-slate-850 text-[11px] px-1.5 py-0.5 font-mono text-emerald-400 font-semibold">{part.slice(1, -1)}</code>;
+        if (!line.trim()) return null;
+        const heading = line.match(/^\s{0,3}(#{1,6})\s+(.+)$/);
+        if (heading) return <h3 key={lineIdx} className="my-2 font-bold text-purple-950 bg-purple-200 rounded-sm px-1 w-fit">{renderInline(heading[2])}</h3>;
+        if (/^\s*(?:---+|___+|\*\*\*+)\s*$/.test(line)) return <hr key={lineIdx} className="border-slate-700" />;
+        const quote = line.match(/^\s*>\s?(.*)$/);
+        if (quote) return <blockquote key={lineIdx} className="border-l-2 border-slate-500 pl-3 italic text-slate-300">{renderInline(quote[1])}</blockquote>;
+        if (isListItem(line)) {
+          const ordered = /^\s*\d+[.)]\s+/.test(line);
+          const items = [line];
+          while (lineIdx + 1 < lines.length && isListItem(lines[lineIdx + 1]) && /^\s*\d+[.)]\s+/.test(lines[lineIdx + 1]) === ordered) {
+            items.push(lines[++lineIdx]);
           }
-          return part;
-        });
-
-        if (isListItem) {
-          return (
-            <div key={lineIdx} className="flex gap-2 pl-3 my-1 leading-relaxed text-xs">
-              <span className="text-emerald-400 font-bold font-mono shrink-0">{listPrefix}</span>
-              <span className="text-slate-300">{renderedLine}</span>
-            </div>
-          );
+          const List = ordered ? "ol" : "ul";
+          return <List key={lineIdx} className={`${ordered ? "list-decimal" : "list-disc"} space-y-1 pl-5 leading-relaxed text-xs`}>
+            {items.map((item, itemIdx) => <li key={itemIdx}>{renderInline(listContent(item))}</li>)}
+          </List>;
         }
-
-        return (
-          <p key={lineIdx} className={`${line.trim() === "" ? "h-2" : "my-1"} leading-relaxed text-xs text-slate-300`}>
-            {renderedLine}
-          </p>
-        );
+        return <p key={lineIdx} className="leading-relaxed text-xs">{renderInline(line)}</p>;
       })}
     </div>
   );
@@ -7601,10 +7596,10 @@ export default function App() {
                       <button
                         type="submit"
                         disabled={isExpertSending || !expertInput.trim()}
-                        className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-800 disabled:text-slate-600 disabled:border-slate-800 border border-emerald-400 text-slate-950 font-bold rounded-xl transition flex items-center justify-center gap-2 shrink-0 cursor-pointer text-sm shadow-md"
+                        className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-800 disabled:!text-black disabled:border-slate-800 border border-emerald-400 !text-black font-extrabold rounded-xl transition flex items-center justify-center gap-2 shrink-0 cursor-pointer text-sm shadow-md"
                       >
-                        <Send className="h-4 w-4" />
-                        <span>Send</span>
+                        <Send className="h-4 w-4 text-black" />
+                        <span className="font-extrabold text-black">Send</span>
                       </button>
                     </form>
                   </div>
