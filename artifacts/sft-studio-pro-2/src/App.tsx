@@ -469,6 +469,7 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<"define" | "synthesizer" | "convert" | "triad" | "assess" | "registry" | "expert">("define");
   const [showProjectOnboarding, setShowProjectOnboarding] = useState(true);
+  const [guidePage, setGuidePage] = useState<"synthesizer" | "convert" | "triad" | "assess" | null>(null);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [activeResourcePage, setActiveResourcePage] = useState<(typeof RESOURCE_LINKS)[number] | null>(null);
   
@@ -510,6 +511,26 @@ export default function App() {
       headers.set("X-Device-ID", getDeviceId());
     }
     return fetch(input, { ...init, headers });
+  };
+  const guideStorageKey = (projectId: string) =>
+    `sft_project_guide_${auth.currentUser?.uid || getDeviceId()}_${projectId}`;
+  const readGuideState = (projectId: string) => {
+    try {
+      return JSON.parse(localStorage.getItem(guideStorageKey(projectId)) || "{}");
+    } catch {
+      return {};
+    }
+  };
+  const writeGuideState = (projectId: string, update: Record<string, unknown>) => {
+    const current = readGuideState(projectId);
+    localStorage.setItem(guideStorageKey(projectId), JSON.stringify({ ...current, ...update }));
+  };
+  const openAiGuide = (page: "synthesizer" | "convert" | "triad" | "assess") => {
+    setGuidePage(page);
+    const saved = readGuideState(selectedProjectId || "");
+    setExpertMessages(saved.conversations?.[page] || []);
+    setExpertInput("");
+    setActiveTab("expert");
   };
 
   // Batches state initialized with initial default data
@@ -1427,6 +1448,12 @@ export default function App() {
     const finalBatches = orderBatchesForReview(Array.from(batchesMap.values()), preferredBatchIds);
 
     setSelectedProjectId(selectedId);
+    const savedGuideState = readGuideState(selectedId);
+    setBatchRecommendations(Array.isArray(savedGuideState.recommendations) ? savedGuideState.recommendations : []);
+    setCompletedRecommendedBatches(Array.isArray(savedGuideState.completedRecommendedBatches) ? savedGuideState.completedRecommendedBatches : []);
+    setActiveRecommendedBatchIndex(0);
+    setGuidePage(null);
+    setExpertMessages([]);
     setIsFieldsUnlocked(false);
     const loadedFormat = selected.settings?.projectFormat || (selected.settings?.templateType === TemplateType.INSTRUCTION_TEMPLATE ? ProjectFormat.INSTRUCTION : ProjectFormat.CONVERSATION);
     const loadedTemplateType = selected.settings?.templateType || (loadedFormat === ProjectFormat.INSTRUCTION ? TemplateType.INSTRUCTION_TEMPLATE : TemplateType.SINGLE_TURN);
@@ -1471,6 +1498,14 @@ export default function App() {
     const messageContent = input.trim();
     const newMessages = [...expertMessages, { role: "user" as const, content: messageContent }];
     setExpertMessages(newMessages);
+    const persistGuideMessages = (messages: Array<{ role: "user" | "assistant"; content: string; source?: string }>) => {
+      if (!guidePage || !selectedProjectId) return;
+      const current = readGuideState(selectedProjectId);
+      writeGuideState(selectedProjectId, {
+        conversations: { ...(current.conversations || {}), [guidePage]: messages }
+      });
+    };
+    persistGuideMessages(newMessages);
     if (!textToSend) {
       setExpertInput("");
     }
@@ -1488,7 +1523,7 @@ export default function App() {
             systemPrompt: project.systemPrompt,
             projectDefinition: project,
             hasSavedProject: Boolean(selectedProjectId),
-            activeTab,
+            activeTab: guidePage || activeTab,
             totalBatches: batches.length,
             totalExamples: batches.reduce((acc, b) => acc + (b.examples?.length || 0), 0),
             approvedBatches: batches.filter(b => b.status === "Approved").length
@@ -1501,15 +1536,13 @@ export default function App() {
       }
 
       const data = await response.json();
-      setExpertMessages(prev => [
-        ...prev,
-        { role: "assistant" as const, content: data.text || "Sorry, I encountered an issue." }
-      ]);
+      const nextMessages = [...newMessages, { role: "assistant" as const, content: data.text || "Sorry, I encountered an issue." }];
+      setExpertMessages(nextMessages);
+      persistGuideMessages(nextMessages);
     } catch (error: any) {
-      setExpertMessages(prev => [
-        ...prev,
-        { role: "assistant" as const, content: "Unable to complete your request. Please try again." }
-      ]);
+      const nextMessages = [...newMessages, { role: "assistant" as const, content: "Unable to complete your request. Please try again." }];
+      setExpertMessages(nextMessages);
+      persistGuideMessages(nextMessages);
     } finally {
       setIsExpertSending(false);
     }
@@ -1584,6 +1617,11 @@ export default function App() {
     // Set active project states
     setSelectedProjectId(newProjId);
     setIsFieldsUnlocked(true);
+    setBatchRecommendations([]);
+    setCompletedRecommendedBatches([]);
+    setActiveRecommendedBatchIndex(0);
+    setGuidePage(null);
+    setExpertMessages([]);
     setProject(defaultSettings);
     setShowProjectOnboarding(true);
     setBatches([]);
@@ -3993,14 +4031,24 @@ export default function App() {
           setBatchTemplate(settings.templateType || TemplateType.SINGLE_TURN);
           setDocTemplate(settings.templateType || TemplateType.SINGLE_TURN);
           setTriadTemplate(settings.templateType || TemplateType.SINGLE_TURN);
-          if (recommendations?.length) {
-            setBatchRecommendations(recommendations);
-            setCompletedRecommendedBatches([]);
-            setActiveRecommendedBatchIndex(0);
-            setActiveTab("synthesizer");
-          } else {
-            setActiveTab("define");
+          const previousGuideState = selectedProjectId ? readGuideState(selectedProjectId) : {};
+          const completedRecommendations = recommendations ?? (
+            Array.isArray(previousGuideState.recommendations) ? previousGuideState.recommendations : []
+          );
+          setBatchRecommendations(completedRecommendations);
+          const completedTopics = Array.isArray(previousGuideState.completedRecommendedBatches)
+            ? previousGuideState.completedRecommendedBatches
+            : [];
+          setCompletedRecommendedBatches(completedTopics);
+          setActiveRecommendedBatchIndex(0);
+          if (selectedProjectId && recommendations !== undefined) {
+            writeGuideState(selectedProjectId, { recommendations, completedRecommendedBatches: [] });
           }
+          setActiveTab("define");
+          setNotification({
+            text: "Congratulations—Project Definition is complete. Review the prefilled page and Save & Lock it when ready. Use the menu or purple arrow to open Batch Synthesizer, then AI Guide for Section 2.",
+            type: "success"
+          });
           setShowProjectOnboarding(false);
         }}
       />
@@ -4205,6 +4253,21 @@ export default function App() {
       </AnimatePresence>
 
       <main className={`flex-1 ${["define", "convert", "assess"].includes(activeTab) ? "max-w-[1920px]" : "max-w-[1720px]"} mx-auto w-full px-4 sm:px-6 lg:px-8 py-5`}>
+        {activeTab !== "define" && activeTab !== "expert" && activeTab !== "registry" && (
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                if (activeTab === "synthesizer" || activeTab === "convert" || activeTab === "triad" || activeTab === "assess") {
+                  openAiGuide(activeTab);
+                }
+              }}
+              className="rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
+            >
+              AI Guide
+            </button>
+          </div>
+        )}
         <div className="mb-3 lg:hidden">
           <button
             type="button"

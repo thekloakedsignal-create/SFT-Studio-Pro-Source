@@ -550,11 +550,10 @@ export function ProjectOnboarding({ onComplete }: Props) {
   };
 
   const approveProjectDefinition = () => {
-    setApprovedProjectDefinition(buildProjectDefinition());
-    setBatchRecommendations([]);
+    const definition = buildProjectDefinition();
+    setApprovedProjectDefinition(definition);
     setError("");
-    setAssistantReply("");
-    setStep("batch-skills");
+    onComplete(definition);
   };
 
   const finish = () => {
@@ -1012,7 +1011,7 @@ export function ProjectOnboarding({ onComplete }: Props) {
               setAssistantReply("");
               setStep("definition-review");
             }}><Check className="h-4 w-4" /> Approve prompt &amp; continue</button>}
-            {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm project definition & continue" : "Approve project definition & continue"}</button>}
+            {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm & finish Project Definition" : "Approve & finish Project Definition"}</button>}
             {["name", "goal", "constraints", "remember-model-name", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
             {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("triad-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
