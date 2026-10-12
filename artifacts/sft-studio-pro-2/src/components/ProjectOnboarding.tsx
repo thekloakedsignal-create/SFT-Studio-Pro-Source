@@ -5,7 +5,7 @@ import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateT
 type Step =
   | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
   | "voice-own" | "voice-review" | "golden-generation" | "golden-review" | "remember-name-choice" | "remember-model-name" | "system-choice" | "system-review"
-  | "definition-review" | "batch-skills" | "batch-recommendations";
+  | "definition-review" | "batch-skills" | "batch-recommendations" | "quality-analysis";
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B";
 export interface BatchRecommendation {
@@ -333,6 +333,7 @@ const PROMPTS: Record<Step, string> = {
   "definition-review": "Your project definition is complete. Review the summary and give final approval. Approval locks these settings for batch generation; use Edit answer if anything needs changing.",
   "batch-skills": "The batch generator creates training examples from your project settings for review. What special skills or abilities should this AI have? I’ll use your answer and project goal to recommend batches. Red Teaming and Adversarial are always included.",
   "batch-recommendations": "Here are my recommended batches based on your project and the skills you described. Red Teaming and Adversarial are included to help test safety against attacks and bad actors.",
+  "quality-analysis": "",
 };
 
 async function requestDraft(instruction: string, appContext: Record<string, unknown>) {
@@ -435,7 +436,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
 
   const activeRecommendation = batchRecommendations[activeRecommendationIndex];
 
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations"];
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "quality-analysis"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
@@ -454,6 +455,9 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       : []),
     ...(currentStepPosition > stepOrder.indexOf("system-review") && systemPrompt
       ? [{ step: "system-review" as Step, label: "System prompt", answer: systemPrompt }]
+      : []),
+    ...(currentStepPosition > stepOrder.indexOf("triad-choice") && triadChoice
+      ? [{ step: "triad-choice" as Step, label: "TRiAD moral alignment", answer: triadChoice === "yes" ? "Yes — remember to add it from the TRiAD tab" : "No" }]
       : []),
   ].filter(item => stepOrder.indexOf(item.step) < currentStepPosition);
 
@@ -494,6 +498,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       "system-choice": rememberName === "yes" ? "remember-model-name" : "remember-name-choice",
       "system-review": "system-choice", "definition-review": "system-review",
       "batch-skills": "definition-review", "batch-recommendations": "batch-skills",
+      "triad-choice": "batch-skills", "quality-analysis": "triad-choice",
     };
     setError("");
     if (step === "definition-review" && approvedProjectDefinition) {
@@ -631,7 +636,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     );
     setBatchRecommendations(uniqueRecommendations);
     setActiveRecommendationIndex(0);
-    setStep("batch-recommendations");
+    setStep("quality-analysis");
   };
 
   const skipToProject = () => {
@@ -806,6 +811,15 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
 
           <div className="flex justify-start">
             <div className="max-w-[90%] border border-[#c4c4c4] bg-[#e5e5e5] px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]">
+              {step === "triad-choice" && (
+                <div className="mb-3 space-y-2">
+                  <p>Alright. I’ve added recommendations to the batch synthesizer.</p>
+                  <p>If you are training a Qwen model, make sure to generate a mix of reasoning, single-turn, and multi-turn batches to add to your data set.</p>
+                  <p>You should aim for a total of 3000-5000 examples for personal-use AI, and 10,000 to 20,000 for more rigorous enterprise tasks.</p>
+                  <p>You can generate as many batches as you want on as many topics as you choose.</p>
+                  <p>Your recommendations are ready. Send them to the batch generator as before.</p>
+                </div>
+              )}
               <p>{step === "goal-followup" ? adaptiveQuestion : PROMPTS[step]}</p>
               {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "batch-skills"].includes(step) && (
                 <button
@@ -1028,7 +1042,8 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm & finish Project Definition" : "Approve & finish Project Definition"}</button>}
             {["name", "goal", "constraints", "remember-model-name", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
-            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={finish}>Go to Batch generator <ArrowRight className="h-4 w-4" /></button>}
+            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("quality-analysis")}>Continue <ArrowRight className="h-4 w-4" /></button>}
+            {step === "quality-analysis" && <button type="button" className={buttonClass} onClick={finish}>Go to Batch generator <ArrowRight className="h-4 w-4" /></button>}
           </div>
         </footer>
       </section>
