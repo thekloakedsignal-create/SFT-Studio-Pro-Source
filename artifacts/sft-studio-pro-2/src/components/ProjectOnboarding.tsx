@@ -5,7 +5,7 @@ import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateT
 type Step =
   | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
   | "voice-own" | "voice-review" | "golden-generation" | "golden-review" | "remember-name-choice" | "remember-model-name" | "system-choice" | "system-review"
-  | "definition-review" | "batch-skills" | "batch-recommendations";
+  | "definition-review" | "batch-skills" | "batch-recommendations" | "quality-analysis";
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B";
 export interface BatchRecommendation {
@@ -332,7 +332,8 @@ const PROMPTS: Record<Step, string> = {
   "system-review": "Review the full system prompt below. Edit it if you want, then explicitly approve it. It will be saved to the project and included in every generated example.",
   "definition-review": "Your project definition is complete. Review the summary and give final approval. Approval locks these settings for batch generation; use Edit answer if anything needs changing.",
   "batch-skills": "The batch generator creates training examples from your project settings for review. What special skills or abilities should this AI have? I’ll use your answer and project goal to recommend batches. Red Teaming and Adversarial are always included.",
-  "batch-recommendations": "Your recommendations will be sent to the project UI when you continue.",
+  "batch-recommendations": "Here are my recommended batches based on your project and the skills you described. Red Teaming and Adversarial are included to help test safety against attacks and bad actors.",
+  "quality-analysis": "",
 };
 
 async function requestDraft(instruction: string, appContext: Record<string, unknown>) {
@@ -413,7 +414,9 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
   const [specialSkills, setSpecialSkills] = useState("");
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
+  const [activeRecommendationIndex, setActiveRecommendationIndex] = useState(0);
   const [approvedProjectDefinition, setApprovedProjectDefinition] = useState<ProjectSettings | null>(initialProjectSettings || null);
+  const [copiedBatchSection, setCopiedBatchSection] = useState("");
   const [error, setError] = useState("");
   const [assistantReply, setAssistantReply] = useState("");
   const [pending, setPending] = useState(false);
@@ -431,7 +434,9 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     ? "For every topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning templates for Llama 3.1 70B."
     : "For every topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples.";
 
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations"];
+  const activeRecommendation = batchRecommendations[activeRecommendationIndex];
+
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "quality-analysis"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
@@ -450,6 +455,9 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       : []),
     ...(currentStepPosition > stepOrder.indexOf("system-review") && systemPrompt
       ? [{ step: "system-review" as Step, label: "System prompt", answer: systemPrompt }]
+      : []),
+    ...(currentStepPosition > stepOrder.indexOf("triad-choice") && triadChoice
+      ? [{ step: "triad-choice" as Step, label: "TRiAD moral alignment", answer: triadChoice === "yes" ? "Yes — remember to add it from the TRiAD tab" : "No" }]
       : []),
   ].filter(item => stepOrder.indexOf(item.step) < currentStepPosition);
 
@@ -490,6 +498,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       "system-choice": rememberName === "yes" ? "remember-model-name" : "remember-name-choice",
       "system-review": "system-choice", "definition-review": "system-review",
       "batch-skills": "definition-review", "batch-recommendations": "batch-skills",
+      "triad-choice": "batch-skills", "quality-analysis": "triad-choice",
     };
     setError("");
     if (step === "definition-review" && approvedProjectDefinition) {
@@ -626,7 +635,8 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       all.findIndex(candidate => candidate.topic.toLowerCase() === item.topic.toLowerCase()) === index
     );
     setBatchRecommendations(uniqueRecommendations);
-    setStep("batch-recommendations");
+    setActiveRecommendationIndex(0);
+    setStep("quality-analysis");
   };
 
   const skipToProject = () => {
@@ -719,6 +729,15 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
 
   const textareaClass = "w-full resize-y bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-purple-400 focus:outline-none";
   const buttonClass = "inline-flex items-center justify-center gap-2 border border-purple-500 bg-purple-300 px-4 py-2.5 text-sm font-bold !text-[#000000] transition hover:bg-purple-200 disabled:cursor-not-allowed disabled:opacity-50";
+  const copyRecommendationSection = async (key: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedBatchSection(key);
+    } catch {
+      setError("Clipboard access is unavailable in this browser.");
+    }
+  };
+
   if (showWorkshopChoice) {
     return (
       <main className="min-h-screen bg-slate-900 px-4 py-8 text-white sm:py-12">
@@ -792,6 +811,15 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
 
           <div className="flex justify-start">
             <div className="max-w-[90%] border border-[#c4c4c4] bg-[#e5e5e5] px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]">
+              {step === "triad-choice" && (
+                <div className="mb-3 space-y-2">
+                  <p>Alright. I’ve added recommendations to the batch synthesizer.</p>
+                  <p>If you are training a Qwen model, make sure to generate a mix of reasoning, single-turn, and multi-turn batches to add to your data set.</p>
+                  <p>You should aim for a total of 3000-5000 examples for personal-use AI, and 10,000 to 20,000 for more rigorous enterprise tasks.</p>
+                  <p>You can generate as many batches as you want on as many topics as you choose.</p>
+                  <p>Your recommendations are ready. Send them to the batch generator as before.</p>
+                </div>
+              )}
               <p>{step === "goal-followup" ? adaptiveQuestion : PROMPTS[step]}</p>
               {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "batch-skills"].includes(step) && (
                 <button
@@ -901,12 +929,71 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             </div>
           )}
           {step === "batch-recommendations" && (
-            <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200">
-              <li>In the project UI, open a recommended topic. Use the Copy button at the bottom of the topic to copy it into the Batch Synthesizer.</li>
-              <li>{mixGuidance}</li>
-              <li>Generate one batch at a time.</li>
-              <li>After each batch finishes, approve or reject it before generating another batch.</li>
-            </ol>
+            <div className="space-y-3">
+              <p className="border border-slate-600 bg-slate-900 px-4 py-3 text-sm text-slate-200">
+                {mixGuidance}
+              </p>
+              {batchRecommendations.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label="Previous recommended batch"
+                      className={buttonClass}
+                      disabled={activeRecommendationIndex === 0}
+                      onClick={() => setActiveRecommendationIndex(index => Math.max(0, index - 1))}
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </button>
+                    <select
+                      aria-label="Choose a recommended batch"
+                      className="min-w-0 flex-1 rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+                      value={activeRecommendationIndex}
+                      onChange={event => setActiveRecommendationIndex(Number(event.target.value))}
+                    >
+                      {batchRecommendations.map((item, index) => (
+                        <option key={`${item.topic}-${index}`} value={index}>{index + 1}. {item.topic}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      aria-label="Next recommended batch"
+                      className={buttonClass}
+                      disabled={activeRecommendationIndex >= batchRecommendations.length - 1}
+                      onClick={() => setActiveRecommendationIndex(index => Math.min(batchRecommendations.length - 1, index + 1))}
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="text-center text-xs text-slate-300">
+                    Recommendation {activeRecommendationIndex + 1} of {batchRecommendations.length}
+                  </p>
+                  {activeRecommendation && (
+                    <article className="space-y-3 border border-slate-600 bg-slate-900 px-4 py-3">
+                      <h2 className="font-semibold text-white">{activeRecommendation.topic}</h2>
+                      {([
+                        ["topic", "Batch Description", activeRecommendation.topic],
+                        ["instructions", "Special Instructions", activeRecommendation.specialInstructions],
+                        ["constraints", "Temporary Constraints", activeRecommendation.temporaryConstraints],
+                      ] as const).map(([section, label, text]) => {
+                        const key = `${activeRecommendation.topic}:${section}`;
+                        return (
+                          <section key={section} className="border-t border-slate-700 pt-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-sm font-bold text-slate-100">{label}</h3>
+                              <button type="button" className={buttonClass} onClick={() => void copyRecommendationSection(key, text)}>
+                                {copiedBatchSection === key ? "Copied" : "Copy"}
+                              </button>
+                            </div>
+                            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">{text}</p>
+                          </section>
+                        );
+                      })}
+                    </article>
+                  )}
+                </>
+              )}
+            </div>
           )}
           {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "remember-model-name", "batch-skills"].includes(step) && (
             <div className="flex gap-2">
@@ -955,7 +1042,8 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm & finish Project Definition" : "Approve & finish Project Definition"}</button>}
             {["name", "goal", "constraints", "remember-model-name", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
-            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={finish}>Go to Batch generator <ArrowRight className="h-4 w-4" /></button>}
+            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("quality-analysis")}>Continue <ArrowRight className="h-4 w-4" /></button>}
+            {step === "quality-analysis" && <button type="button" className={buttonClass} onClick={finish}>Go to Batch generator <ArrowRight className="h-4 w-4" /></button>}
           </div>
         </footer>
       </section>
