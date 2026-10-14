@@ -469,37 +469,7 @@ export default function App() {
   }, [activeTab]);
   const [showProjectOnboarding, setShowProjectOnboarding] = useState(true);
   const [showBatchRecommendationInterview, setShowBatchRecommendationInterview] = useState(false);
-  const [guidePage, setGuidePage] = useState<"synthesizer" | "convert" | "triad" | "assess" | "registry" | null>(null);
-  const [guideStepIndex, setGuideStepIndex] = useState(0);
-  const [registryTrainingChoice, setRegistryTrainingChoice] = useState<"undecided" | "yes" | "no">("undecided");
-  const guideSteps: Record<"synthesizer" | "convert" | "triad" | "assess" | "registry", string[]> = {
-    synthesizer: [],
-    convert: [
-      "Add your documents to the temporary queue. The files stay in this browser session; choose one queued document to load it into the converter.",
-      "Choose Knowledge for reference material, Transcript for conversations, or Literature for literary material. Each type has its own conversion-instructions field.",
-      "Do you have any transcripts? If so, choose Transcript and enter role labels that match the source, such as User and Assistant. Keep role labels separate from conversion instructions. Clearly labeled transcripts can preserve identity and persona carryover.",
-      "Write any custom conversion instructions for the selected document. When finished, check that document’s “Instructions complete” box in the queue.",
-      "Run the conversion for the selected document. Repeat for other queued documents, one at a time.",
-      "Review the resulting batch in QA before adding it to the Data Registry."
-    ],
-    triad: [
-      "TRiAD alignment is optional. Choose whether to include it in your project.",
-      "Choose a batch size: 150, 300, or 750 examples.",
-      "Choose the template and enter the dataset URL shown for the selected size.",
-      "Select Run Script & Import, then review the imported batch in your project."
-    ],
-    assess: [
-      "Choose the batch to analyze from Active Registry Batch.",
-      "Run the AI Quality Audit. QA analyzes the batch, flags examples, and gives an explanation for each flag.",
-      "Review each flagged example. Use Regenerate Flagged to regenerate them; you can repeat this if examples remain flagged, including until the score reaches 100% if you want.",
-      "Use Deduplicate to delete all flagged examples. This is different from regenerating them.",
-      "Approve or reject the batch. You may approve it with flags remaining; a 100% score is not required, and you make the final decision."
-    ],
-    registry: [
-      "Would you like to run automated training?",
-      "Review the selected QA-approved batches below. If they are correct, give final approval to continue to the existing Automated Trainer."
-    ]
-  };
+  const [guidePage, setGuidePage] = useState<"synthesizer" | "convert" | "triad" | "assess" | null>(null);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [activeResourcePage, setActiveResourcePage] = useState<(typeof RESOURCE_LINKS)[number] | null>(null);
   
@@ -555,20 +525,16 @@ export default function App() {
     const current = readGuideState(projectId);
     localStorage.setItem(guideStorageKey(projectId), JSON.stringify({ ...current, ...update }));
   };
-  const openAiGuide = (page: "synthesizer" | "convert" | "triad" | "assess" | "registry") => {
+  const openAiGuide = (page: "synthesizer" | "convert" | "triad" | "assess") => {
     setGuidePage(page);
-    setGuideStepIndex(0);
-    if (page === "registry") setRegistryTrainingChoice("undecided");
     const saved = readGuideState(selectedProjectId || "");
     const savedMessages = saved.conversations?.[page] || [];
     const openingGuide = page === "convert"
-      ? "I’ll guide you through document conversion one step at a time. Use the steps above this chat."
+      ? "Document Converter turns source documents into editable training examples.\n\n1. Save and lock Project Definition first.\n2. Upload a DOCX, PDF, or image, or enter supported text.\n3. Choose the document type and output template. Add conversion instructions if needed.\n4. Click Convert Document to SFT, then review the converted examples."
       : page === "triad"
-        ? "I’ll guide you through TRiAD alignment one step at a time. Use the steps above this chat."
+        ? "TRiAD Alignment imports pre-generated alignment examples into your project. It is for alignment data, not document uploads.\n\n1. Save and lock Project Definition first.\n2. Choose the batch size and template.\n3. Enter a Google Drive share link or a direct CSV, JSON, or JSONL download URL.\n4. Click Run Script & Import, then review the imported examples."
         : page === "assess"
-          ? "I’ll guide you through quality analysis one step at a time. Use the steps above this chat."
-          : page === "registry"
-            ? "I’ll guide you through selecting, formatting, and exporting a dataset one step at a time. Use the steps above this chat."
+          ? "AI Quality Assessment checks a selected batch for formatting, template, schema, and persona issues.\n\n1. Select a batch from Active Registry Batch.\n2. Click Run AI Quality Audit.\n3. Review the score and flagged examples.\n4. Regenerate flagged examples or delete examples that should not be kept, then run the audit again to check the batch."
           : "";
     setExpertMessages(savedMessages.length
       ? savedMessages
@@ -624,37 +590,6 @@ export default function App() {
   const [fixedUserPrompt, setFixedUserPrompt] = useState<string>("Please analyze and explain the following document chunk.");
   const [latestConvertedDocBatchId, setLatestConvertedDocBatchId] = useState<string | null>(null);
   const [converterInstructions, setConverterInstructions] = useState<string>("");
-  const [queuedDocuments, setQueuedDocuments] = useState<Array<{ id: string; file: File; instructions: string; instructionsDone: boolean }>>([]);
-  const [activeQueuedDocumentId, setActiveQueuedDocumentId] = useState("");
-  const enqueueDocuments = (files: File[]) => {
-    const queued = files.map((file, index) => ({
-      id: `${Date.now()}-${index}-${file.name}`,
-      file,
-      instructions: "",
-      instructionsDone: false
-    }));
-    setQueuedDocuments(current => [...current, ...queued]);
-    if (queued.length) {
-      setNotification({ text: `Added ${queued.length} document${queued.length === 1 ? "" : "s"} to the temporary queue.`, type: "success" });
-    }
-  };
-  const openQueuedDocument = (id: string) => {
-    const queued = queuedDocuments.find(item => item.id === id);
-    if (!queued) return;
-    setActiveQueuedDocumentId(id);
-    setConverterInstructions(queued.instructions);
-    processUploadedDoc(queued.file);
-  };
-  const updateConverterInstructions = (value: string) => {
-    setConverterInstructions(value);
-    if (activeQueuedDocumentId) {
-      setQueuedDocuments(current => current.map(item =>
-        item.id === activeQueuedDocumentId
-          ? { ...item, instructions: value, instructionsDone: false }
-          : item
-      ));
-    }
-  };
 
   // Memoized document word count for fast rendering without regex re-runs
   const docWordCount = useMemo(() => {
@@ -790,7 +725,7 @@ export default function App() {
   });
   const [showUploadAccessModal, setShowUploadAccessModal] = useState<boolean>(false);
   const [showExportAccessModal, setShowExportAccessModal] = useState<boolean>(false);
-  const [pendingDroppedFiles, setPendingDroppedFiles] = useState<File[]>([]);
+  const [pendingDroppedFile, setPendingDroppedFile] = useState<File | null>(null);
   const [isDraggingDoc, setIsDraggingDoc] = useState<boolean>(false);
   const [pendingExport, setPendingExport] = useState<{
     format: "json" | "jsonl";
@@ -1995,7 +1930,6 @@ export default function App() {
     setDocSuggestionExplanation("");
     setDocCount(8);
     setConverterInstructions("");
-    setActiveQueuedDocumentId("");
     const fileInput = document.getElementById("doc-file-input") as HTMLInputElement;
     if (fileInput) fileInput.value = "";
     setNotification({ text: "Document upload and content cleared.", type: "info" });
@@ -2461,9 +2395,9 @@ export default function App() {
 
   // Handle File upload input change
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    enqueueDocuments(files);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processUploadedDoc(file);
     e.target.value = "";
   };
 
@@ -2485,9 +2419,9 @@ export default function App() {
       console.error(e);
     }
     setShowUploadAccessModal(false);
-    if (pendingDroppedFiles.length) {
-      enqueueDocuments(pendingDroppedFiles);
-      setPendingDroppedFiles([]);
+    if (pendingDroppedFile) {
+      processUploadedDoc(pendingDroppedFile);
+      setPendingDroppedFile(null);
     } else {
       setTimeout(() => {
         docFileInputRef.current?.click();
@@ -2498,7 +2432,7 @@ export default function App() {
   // Handle Decline for document uploader access
   const handleDeclineUpload = () => {
     setShowUploadAccessModal(false);
-    setPendingDroppedFiles([]);
+    setPendingDroppedFile(null);
     setNotification({ text: "File access request declined. Upload canceled.", type: "info" });
   };
 
@@ -2507,14 +2441,14 @@ export default function App() {
     e.preventDefault();
     e.stopPropagation();
     setIsDraggingDoc(false);
-    const files = Array.from(e.dataTransfer.files || []);
-    if (!files.length) return;
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
 
     if (!isUploadPermitted) {
-      setPendingDroppedFiles(files);
+      setPendingDroppedFile(file);
       setShowUploadAccessModal(true);
     } else {
-      enqueueDocuments(files);
+      processUploadedDoc(file);
     }
   };
 
@@ -5753,40 +5687,6 @@ export default function App() {
                       )}
                     </div>
 
-                    <details className="mb-5 rounded-xl border border-purple-400/30 bg-purple-950/20">
-                      <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-slate-200">
-                        Temporary document queue ({queuedDocuments.length})
-                        <span className="ml-2 text-[10px] font-normal text-slate-400">Files remain in this browser session only.</span>
-                      </summary>
-                      <div className="space-y-2 border-t border-purple-400/20 p-3">
-                        {queuedDocuments.length === 0 ? (
-                          <p className="text-[11px] text-slate-400">Add documents below. Select one here to load it into the converter.</p>
-                        ) : queuedDocuments.map(item => (
-                          <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2">
-                            <button
-                              type="button"
-                              onClick={() => openQueuedDocument(item.id)}
-                              disabled={isConverting || isAnalyzingDoc}
-                              className={`text-left text-xs font-semibold hover:text-purple-300 disabled:opacity-40 ${activeQueuedDocumentId === item.id ? "text-purple-300" : "text-slate-200"}`}
-                            >
-                              {item.file.name}{activeQueuedDocumentId === item.id ? " · loaded" : ""}
-                            </button>
-                            <label className="flex items-center gap-2 text-[11px] text-slate-300">
-                              <input
-                                type="checkbox"
-                                checked={item.instructionsDone}
-                                onChange={event => setQueuedDocuments(current => current.map(entry =>
-                                  entry.id === item.id ? { ...entry, instructionsDone: event.target.checked } : entry
-                                ))}
-                                className="accent-purple-400"
-                              />
-                              Instructions complete
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-
                     {selectedProjectId && !isFieldsUnlocked && (
                       <div className="bg-blue-500/10 border border-blue-500/20 px-4 py-3 rounded-xl flex items-center justify-between gap-3 text-xs text-blue-400 mb-6 font-sans">
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -5824,7 +5724,6 @@ export default function App() {
                           ref={docFileInputRef}
                           id="doc-file-input"
                           type="file"
-                          multiple
                           accept=".txt,.md,.json,.csv,.docx,.png,.jpg,.jpeg,.webp,.pdf"
                           onChange={handleFileChange}
                           className="hidden"
@@ -5841,12 +5740,12 @@ export default function App() {
                           ) : (
                             <span className="inline-flex items-center gap-2">
                               <Upload className="h-4 w-4 text-blue-400" />
-                              <span>Add documents to temporary queue</span>
+                              <span>Upload DOCX, Doc, PDF, or Image (OCR)</span>
                             </span>
                           )}
                         </div>
                         <span className="block text-[10px] text-slate-500 mt-1">
-                          Select or drag multiple DOCX, Markdown, TXT, JSON, CSV, PDF, or image files (PNG/JPG/WebP) into the temporary queue
+                          Click to select or drag and drop DOCX, Markdown, TXT, JSON, CSV, PDF, or Image (PNG/JPG/WebP)
                         </span>
                         {docName && (
                           <div className="mt-2.5 relative z-10 flex items-center justify-center gap-2 max-w-full px-2">
@@ -6169,10 +6068,10 @@ export default function App() {
                             <span>Custom Conversion & Style Instructions</span>
                             <span className="text-[10px] text-slate-400 font-normal">(Instruct the AI on response length, depth, detail, and filtering)</span>
                           </label>
-                           {converterInstructions && (
+                          {converterInstructions && (
                             <button
                               type="button"
-                              onClick={() => updateConverterInstructions("")}
+                              onClick={() => setConverterInstructions("")}
                               className="text-[10px] text-slate-400 hover:text-slate-200 transition cursor-pointer"
                             >
                               Clear
@@ -6181,7 +6080,7 @@ export default function App() {
                         </div>
                         <textarea
                           value={converterInstructions}
-                          onChange={(e) => updateConverterInstructions(e.target.value)}
+                          onChange={(e) => setConverterInstructions(e.target.value)}
                           rows={3}
                           placeholder="e.g., Provide long, comprehensive, multi-paragraph responses with rich explanations and practical context. Do not make responses short (avoid brief 2-3 sentence answers). Filter out meeting setup, greetings, and administrative banter."
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:border-blue-500/50 outline-none font-sans custom-scrollbar leading-relaxed"
@@ -6191,21 +6090,21 @@ export default function App() {
                           <span className="text-[10px] text-slate-500 mr-1">Quick presets:</span>
                           <button
                             type="button"
-                            onClick={() => updateConverterInstructions(converterInstructions ? converterInstructions + "\n- Provide long, comprehensive, multi-paragraph responses (>300 words). Do not create brief 2-3 sentence answers." : "Provide long, comprehensive, multi-paragraph responses (>300 words). Do not create brief 2-3 sentence answers.")}
+                            onClick={() => setConverterInstructions(prev => prev ? prev + "\n- Provide long, comprehensive, multi-paragraph responses (>300 words). Do not create brief 2-3 sentence answers." : "Provide long, comprehensive, multi-paragraph responses (>300 words). Do not create brief 2-3 sentence answers.")}
                             className="px-2 py-0.5 rounded-md bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/50 text-[10px] text-blue-300 transition cursor-pointer"
                           >
                             + Long & Comprehensive Answers
                           </button>
                           <button
                             type="button"
-                            onClick={() => updateConverterInstructions(converterInstructions ? converterInstructions + "\n- Exclude all meeting preamble, greetings, attendee check-ins, and administrative logistics. Focus strictly on core domain knowledge." : "Exclude all meeting preamble, greetings, attendee check-ins, and administrative logistics. Focus strictly on core domain knowledge.")}
+                            onClick={() => setConverterInstructions(prev => prev ? prev + "\n- Exclude all meeting preamble, greetings, attendee check-ins, and administrative logistics. Focus strictly on core domain knowledge." : "Exclude all meeting preamble, greetings, attendee check-ins, and administrative logistics. Focus strictly on core domain knowledge.")}
                             className="px-2 py-0.5 rounded-md bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/50 text-[10px] text-amber-300 transition cursor-pointer"
                           >
                             + Filter Preamble & Logistics
                           </button>
                           <button
                             type="button"
-                            onClick={() => updateConverterInstructions(converterInstructions ? converterInstructions + "\n- Structure assistant responses with step-by-step reasoning, bulleted takeaways, and actionable technical depth." : "Structure assistant responses with step-by-step reasoning, bulleted takeaways, and actionable technical depth.")}
+                            onClick={() => setConverterInstructions(prev => prev ? prev + "\n- Structure assistant responses with step-by-step reasoning, bulleted takeaways, and actionable technical depth." : "Structure assistant responses with step-by-step reasoning, bulleted takeaways, and actionable technical depth.")}
                             className="px-2 py-0.5 rounded-md bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/50 text-[10px] text-emerald-300 transition cursor-pointer"
                           >
                             + Step-by-Step Technical Depth
@@ -7239,13 +7138,6 @@ export default function App() {
                     <p className="text-xs text-slate-400">
                       Select QA-checked batches to include in the final dataset.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => openAiGuide("registry")}
-                      className="mt-3 rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
-                    >
-                      AI Guide
-                    </button>
                   </div>
 
                   <div className="space-y-3">
@@ -7551,98 +7443,6 @@ export default function App() {
                 exit={{ opacity: 0, y: -8 }}
                 className="w-full max-w-5xl mx-auto"
               >
-                {guidePage && guideSteps[guidePage].length > 0 && (
-                  <section className="mb-4 rounded-xl border border-purple-400/30 bg-purple-950/20 p-4 sm:p-5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="text-sm font-bold text-slate-100">
-                        {guidePage === "convert" ? "Document Upload Guide" : guidePage === "triad" ? "TRiAD Guide" : guidePage === "assess" ? "QA Guide" : "Data Registry Guide"}
-                      </h3>
-                      <span className="text-[11px] font-semibold text-purple-200">Step {guideStepIndex + 1} of {guideSteps[guidePage].length}</span>
-                    </div>
-                    <p className="mt-3 text-sm leading-relaxed text-slate-200">
-                      {guideSteps[guidePage][guideStepIndex]}
-                    </p>
-                    {guidePage === "registry" ? (
-                      <div className="mt-4 space-y-3">
-                        {guideStepIndex === 0 ? (
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setRegistryTrainingChoice("yes");
-                                setGuideStepIndex(1);
-                              }}
-                              className="rounded-lg border border-purple-400 bg-purple-300 px-3 py-1.5 text-xs font-bold text-black"
-                            >
-                              Yes, continue
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setRegistryTrainingChoice("no")}
-                              className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200"
-                            >
-                              No, not now
-                            </button>
-                          </div>
-                        ) : registryTrainingChoice === "yes" ? (
-                          <>
-                            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-300">
-                              {batches.filter(batch => isRegistryEligible(batch) && selectedRegistryBatches[batch.id] !== false).length
-                                ? batches.filter(batch => isRegistryEligible(batch) && selectedRegistryBatches[batch.id] !== false).map(batch => (
-                                  <div key={batch.id}>{batch.name} · {batch.examplesCount} examples</div>
-                                ))
-                                : "No QA-approved batches are currently selected. Select batches in the Registry before approving."}
-                            </div>
-                            <div className="flex justify-between gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setRegistryTrainingChoice("undecided");
-                                  setGuideStepIndex(0);
-                                }}
-                                className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200"
-                              >
-                                Back
-                              </button>
-                              <button
-                                type="button"
-                                disabled={!batches.some(batch => isRegistryEligible(batch) && selectedRegistryBatches[batch.id] !== false)}
-                                onClick={() => {
-                                  setActiveTab("trainer");
-                                  setShowRunTrainingModal(true);
-                                }}
-                                className="rounded-lg border border-purple-400 bg-purple-300 px-3 py-1.5 text-xs font-bold text-black disabled:opacity-40"
-                              >
-                                Approve batches & continue to training
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <p className="text-xs text-slate-300">No training was started. You can open Automated Trainer later.</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="mt-4 flex justify-between">
-                        <button
-                          type="button"
-                          disabled={guideStepIndex === 0}
-                          onClick={() => setGuideStepIndex(index => Math.max(0, index - 1))}
-                          className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 disabled:opacity-40"
-                        >
-                          Previous
-                        </button>
-                        <button
-                          type="button"
-                          disabled={guideStepIndex >= guideSteps[guidePage].length - 1}
-                          onClick={() => setGuideStepIndex(index => Math.min(guideSteps[guidePage].length - 1, index + 1))}
-                          className="rounded-lg border border-purple-400 bg-purple-300 px-3 py-1.5 text-xs font-bold text-black disabled:opacity-40"
-                        >
-                          Next step
-                        </button>
-                      </div>
-                    )}
-                  </section>
-                )}
                 <div className="bg-slate-950/30 border border-slate-800/50 rounded-xl flex flex-col h-[720px] overflow-hidden shadow-lg">
                   {/* Chat Header */}
                   <div className="flex items-center justify-between border-b border-slate-800/70 px-6 py-4 bg-slate-900/30 kk-strip">
