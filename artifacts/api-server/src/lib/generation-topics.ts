@@ -2,7 +2,7 @@
 export async function planGenerationTopics(
   stacks: Array<Array<{ count: number }>>,
   batchDescription: string,
-  request: (prompt: string) => Promise<string>,
+  request: (prompt: string, attempt: number) => Promise<string>,
 ): Promise<string[][]> {
   const parallelSlots = Math.max(...stacks.map(stack => stack.length));
   const listLengths = Array.from({ length: parallelSlots }, (_, slot) =>
@@ -33,7 +33,7 @@ Before responding, count the topics in your response and verify you have provide
     let rawResponse = "";
     let receivedCount: number | string = "unparseable";
     try {
-      rawResponse = await request(prompt);
+      rawResponse = await request(prompt, attempt);
       const parsed: unknown = JSON.parse(rawResponse);
       const record = parsed && typeof parsed === "object" && !Array.isArray(parsed)
         ? parsed as Record<string, unknown>

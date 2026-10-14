@@ -1014,6 +1014,7 @@ function getGenerationModels(): string[] {
 function createModelGenerationStacks(
   totalExamples: number,
   models: string[],
+  useWideStacksFor100 = false,
 ): Array<Array<{ model: string; count: number }>> {
   if (totalExamples <= 0) return [];
   const groupOne = models.slice(0, 5);
@@ -1030,8 +1031,10 @@ function createModelGenerationStacks(
     return [assign(allModels), assign(allModels), assign(groupOne)];
   }
   if (totalExamples === 50) return repeat(5, allModels);
-  if (totalExamples === 100) return repeat(10, allModels);
   const duplicatedModels = [...allModels, ...allModels];
+  if (totalExamples === 100) {
+    return useWideStacksFor100 ? repeat(5, duplicatedModels) : repeat(10, allModels);
+  }
   if (totalExamples === 200) {
     return repeat(10, duplicatedModels);
   }
@@ -1379,13 +1382,17 @@ ${JSON.stringify({ examples: [{ messages: [
     const modelAbortControllers = new Map(
       generationModels.map(model => [model, new AbortController()])
     );
-    const generationStacks = createModelGenerationStacks(countNum, generationModels);
+    const generationStacks = createModelGenerationStacks(
+      countNum,
+      generationModels,
+      turnMode === "Single Turn" || turnMode === "Multi Turn",
+    );
     const topicPlanTimeoutMs = countNum >= 100 ? 180_000 : SFT_TOPIC_PLAN_TIMEOUT_MS;
     const generationTopics = await planGenerationTopics(
       generationStacks,
       String(batchDescription || ""),
-      async prompt => extractResponseText(await callDigitalOceanChatCompletions({
-        model: "gemma-4-31B-it",
+      async (prompt, attempt) => extractResponseText(await callDigitalOceanChatCompletions({
+        model: attempt === 0 ? "gemma-4-31B-it" : "qwen3.8-max",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
