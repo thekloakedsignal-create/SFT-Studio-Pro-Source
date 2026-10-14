@@ -1140,6 +1140,7 @@ app.post("/api/generate", async (req, res) => {
   const recoveryTurnCounts: number[] = [];
   let mixedVariation = 0;
   let isReasoningGeneration = false;
+  let usesReasoningRetryFlow = false;
   const useJobPolling = req.body?.jobMode === true;
   let generationJobId: string | undefined;
   if (useJobPolling) {
@@ -1214,6 +1215,7 @@ app.post("/api/generate", async (req, res) => {
       (tTypeLower.includes("mixed") || tTypeLower.includes("mix")) ? "Mixed" :
       "Single Turn";
     isReasoningGeneration = turnMode === "Reasoning";
+    usesReasoningRetryFlow = isReasoningGeneration || turnMode === "Single Turn" || turnMode === "Multi Turn";
     if (turnMode === "Mixed") generationDeadline = Infinity;
     const reasoningFormatInstruction = `
 REASONING TEMPLATE FORMAT:
@@ -1892,7 +1894,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 : requestConfig,
               timeoutMs,
               exactMessages: isReasoningGeneration,
-              ...(ignoreModelAbort || isReasoningGeneration ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
+              ...(ignoreModelAbort || usesReasoningRetryFlow ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
             });
             let parsed: any[];
             if (turnMode === "Reasoning") {
@@ -1946,7 +1948,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           let responseModel = targetModel;
           let generated: any[] = [];
           try {
-            if (!isReasoningGeneration && stalledModels.has(targetModel)) {
+            if (!usesReasoningRetryFlow && stalledModels.has(targetModel)) {
               timedOutExampleCount += currentChunkSize;
               logger.warn(
                 { model: targetModel, stack: c + 1, batchId: generationBatchId },
@@ -1959,7 +1961,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             if (isDigitalOceanRequestTimeout(primaryError)) {
               if (turnMode !== "Multi Turn") {
                 stalledModels.add(targetModel);
-                if (!isReasoningGeneration) modelAbortControllers.get(targetModel)?.abort();
+                if (!usesReasoningRetryFlow) modelAbortControllers.get(targetModel)?.abort();
               }
               timedOutExampleCount += currentChunkSize;
               logger.warn(
@@ -2073,7 +2075,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
               singleTurnFailure ??= failure.reason;
             }
           });
-          if (turnMode === "Multi Turn" || isReasoningGeneration) multiTurnStacks.push(completion);
+          if (usesReasoningRetryFlow) multiTurnStacks.push(completion);
           else await completion;
         }
       } catch (error: any) {
@@ -2141,7 +2143,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       }));
     }
     if (replacementCount > 0 && requestExamplesForMissingBatch) {
-      if (isReasoningGeneration) generationDeadline = Infinity;
+      if (usesReasoningRetryFlow) generationDeadline = Infinity;
       // Refill each missing example with an individual request, bounded by concurrency and deadline.
       const requestReplacement = requestExamplesForMissingBatch;
       let nextReplacement = 0;
@@ -2157,9 +2159,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             ? generationModels[reasoningRetryModelIndices[slot] % generationModels.length]
             : turnMode === "Mixed"
               ? generationModels[slot % generationModels.length]
-              : turnMode === "Multi Turn"
-                ? ["deepseek-4-flash", "gemma-4-31B-it"][slot % 2]
-                : generationModels[slot % generationModels.length];
+              : generationModels[slot % generationModels.length];
           try {
             let examples: any[];
             try {
