@@ -94,7 +94,7 @@ const RESOURCE_LINKS = [
   {
     id: "documentation",
     title: "Documentation",
-    url: "https://thekloakedsignal-create.github.io/sft-studio-pro-v1.0-user-manual-p_O6Jmj/",
+    url: "https://thekloakedsignal-create.github.io/sft-pro-docs/",
   },
   {
     id: "privacy-policy",
