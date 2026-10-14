@@ -1432,7 +1432,7 @@ GOLDEN EXEMPLAR
 
 ${exemplarTargetResponse}
 
-For tone and diction, the golden exemplar is the primary and most important guide. Match its voice, word choice, cadence, warmth, and formality as closely as possible. Batch instructions determine the subject and task; do not copy the exemplar's content or treat its original prompt as the task to answer.
+For tone and diction, the golden exemplar is the primary and most important guide. Match its voice, style, cadence, warmth, and formality as closely as possible. Batch instructions determine the subject and task; do not copy the exemplar's content or treat its original prompt as the task to answer.
 
 
 BATCH DEFINITION
@@ -1519,7 +1519,7 @@ FINAL OUTPUT TEMPLATE
 
         PROJECT DEFINITION — EXEMPLAR TARGET RESPONSE:
         ${exemplarTargetResponse}
-        For tone and diction, this golden exemplar is the primary and most important guide. Match its voice, word choice, cadence, warmth, and formality as closely as possible. Project and batch instructions determine the subject and task; do not copy the exemplar's content or treat its original prompt as the task to answer.
+        For tone and diction, this golden exemplar is the primary and most important guide. Match its voice, style, cadence, warmth, and formality as closely as possible. Project and batch instructions determine the subject and task; do not copy the exemplar's content or treat its original prompt as the task to answer.
         
         BATCH TEMPORARY SETTINGS:
         - Batch Description: ${batchDescription || "Standard synth batch"}
