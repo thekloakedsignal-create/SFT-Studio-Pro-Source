@@ -38,6 +38,7 @@ export function RunTrainingModal({
   open, onClose, exportFormat, trainingModel, onTrainingModelChange, getSerializedSplits, apiFetch, notify
 }: RunTrainingModalProps) {
   const selectedModel = TRAINING_MODELS[trainingModel];
+  const MODEL_DISPLAY = selectedModel?.model || trainingModel;
   const BASE_DISPLAY = selectedModel?.base || "";
   const [step, setStep] = useState<Step>("configure");
   const [suffix, setSuffix] = useState(trainingModel === "Qwen3.5 9 Base" ? "sft-studio" : "custom-v1");
@@ -120,14 +121,14 @@ export function RunTrainingModal({
       }));
       setPreflight(data);
       if (!data.credentials?.together || !data.credentials?.huggingFace) {
-        setError("Training is not configured yet. Please contact the app administrator.");
+        setError("Server credentials are not configured yet. Add TOGETHER_API_KEY and HF_TOKEN to the app secrets, then run the preflight again.");
       } else if (!data.modelAvailable) {
-        setError("The selected model is currently unavailable for training.");
+        setError(data.error || `${MODEL_DISPLAY} is not currently available for fine-tuning.`);
       } else {
         setStep("upload");
       }
     } catch (e: any) {
-      setError("Unable to check training availability. Please try again.");
+      setError(e?.message || "Preflight check failed.");
     } finally {
       setBusy(false);
     }
@@ -163,9 +164,9 @@ export function RunTrainingModal({
       }));
       setEstimate(est.estimate);
       setStep("submit");
-      notify("Datasets are ready. Review the estimated cost before starting training.", "success");
+      notify("Datasets uploaded and validated by Together AI. Review the cost estimate before submitting.", "success");
     } catch (e: any) {
-      setError("Unable to prepare your datasets for training. Please try again.");
+      setError(e?.message || "Dataset upload failed.");
     } finally {
       setBusy(false);
     }
@@ -193,7 +194,7 @@ export function RunTrainingModal({
       pollJob(data.job.id);
       notify(`Fine-tune job ${data.job.id} submitted.`, "success");
     } catch (e: any) {
-      setError("Unable to confirm the training submission. It has not been submitted again.");
+      setError(e?.message || "Job submission failed. The job was not resubmitted.");
     } finally {
       setBusy(false);
     }
@@ -212,7 +213,7 @@ export function RunTrainingModal({
       window.open(data.url, "_blank", "noopener");
       notify("Checkpoint download started.", "success");
     } catch (e: any) {
-      setError("Unable to download your model. Please try again.");
+      setError(e?.message || "Checkpoint download failed.");
     } finally {
       setBusy(false);
     }
@@ -252,7 +253,7 @@ export function RunTrainingModal({
                   Automated Full Fine-Tune
                 </h2>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Train your model using your approved dataset. Uploading and starting paid training each require your approval.
+                  Uploads your approved Registry dataset to Together AI and runs a full fine-tune. Nothing is sent or billed without your explicit approval at each step.
                 </p>
                 <p className="text-[11px] text-slate-300 mt-2">
                   Training typically takes 1–3 hours. When it completes, you will receive the public Hugging Face repository link for your model.
@@ -265,7 +266,13 @@ export function RunTrainingModal({
 
             {/* Fixed configuration summary */}
             <div className="p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-400 space-y-1.5">
-              <div className="flex justify-between"><span>Model to train</span><span className="text-slate-200">{BASE_DISPLAY}</span></div>
+              <div className="flex justify-between"><span>Training model</span><span className="text-slate-200">{MODEL_DISPLAY}</span></div>
+              <div className="flex justify-between"><span>From HF base (BYOM)</span><span className="text-slate-200">{BASE_DISPLAY}</span></div>
+              <div className="flex justify-between"><span>Training type</span><span className="text-slate-200">Full (LoRA disabled)</span></div>
+              <div className="flex justify-between"><span>Epochs / Checkpoints</span><span className="text-slate-200">2 / 1</span></div>
+              {selectedModel?.evaluations && <div className="flex justify-between"><span>Evaluations</span><span className="text-slate-200">{selectedModel.evaluations}</span></div>}
+              {selectedModel?.batchSize && <div className="flex justify-between"><span>Training batch size</span><span className="text-slate-200">{selectedModel.batchSize}</span></div>}
+              <div className="flex justify-between"><span>Export format</span><span className="text-emerald-400 uppercase">{exportFormat}</span></div>
               <div className="flex justify-between border-t border-slate-800 pt-1.5"><span>Training split</span><span className="text-green-400 font-bold">{splits.training.length} examples</span></div>
               <div className="flex justify-between"><span>Validator split</span><span className="text-yellow-400 font-bold">{splits.validation.length} examples</span></div>
             </div>
@@ -273,7 +280,7 @@ export function RunTrainingModal({
             {(!trainingValid || !validationValid) && step === "configure" && (
               <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/20 text-[11px] text-red-300">
                 <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>Select valid training and validation examples before continuing.</span>
+                <span>Both splits must be non-empty and pass the final format check for [{exportFormat.toUpperCase()}] before preflight. Adjust the selection or format above.</span>
               </div>
             )}
 
@@ -320,6 +327,17 @@ export function RunTrainingModal({
                   </div>
                   <p className="mt-1 text-[11px] text-slate-400">Your public output model will be named RoseG/{hfRepoName.trim() || "your-chosen-name"}.</p>
                 </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Model Name Suffix</label>
+                  <input
+                    type="text"
+                    value={suffix}
+                    onChange={e => setSuffix(e.target.value)}
+                    placeholder="sft-studio"
+                    maxLength={64}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500/50 font-mono"
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={runPreflight}
@@ -327,10 +345,10 @@ export function RunTrainingModal({
                   className="w-full py-2.5 px-4 rounded-xl kk-primary text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                 >
                   {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-                  <span>{busy ? "Checking…" : "Check Readiness"}</span>
+                  <span>{busy ? "Running Preflight…" : "Run Preflight Check"}</span>
                 </button>
                 <p className="text-[10px] text-slate-500 leading-relaxed">
-                  Checks whether training is ready. Nothing is uploaded or billed yet.
+                  Preflight verifies the live model availability and server credentials. No data is uploaded and nothing is billed at this step.
                 </p>
               </div>
             )}
@@ -339,10 +357,11 @@ export function RunTrainingModal({
               <div className="space-y-3">
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-[11px] text-emerald-300">
                   <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>Ready to upload your dataset.</span>
+                  <span>Preflight passed: credentials configured and {MODEL_DISPLAY} is available for fine-tuning.</span>
                 </div>
                 <div className="p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-400 space-y-1.5">
-                  <div className="flex justify-between"><span>Output model</span><span className="text-slate-200">RoseG/{hfRepoName || "(required)"}</span></div>
+                  <div className="flex justify-between"><span>Destination HF repo</span><span className="text-slate-200">RoseG/{hfRepoName || "(required)"}</span></div>
+                  <div className="flex justify-between"><span>Suffix</span><span className="text-slate-200">{suffix}</span></div>
                   <div className="flex justify-between"><span>Training upload</span><span className="text-green-400">{splits.training.length} examples (JSONL)</span></div>
                   <div className="flex justify-between"><span>Validator upload</span><span className="text-yellow-400">{splits.validation.length} examples (JSONL)</span></div>
                 </div>
@@ -356,7 +375,7 @@ export function RunTrainingModal({
                   <span>{busy ? "Uploading & Validating…" : "Approve & Upload Datasets"}</span>
                 </button>
                 <p className="text-[10px] text-slate-500 leading-relaxed">
-                  Upload your training and validation examples. You will review the cost and approve training separately.
+                  This sends both JSONL datasets to Together AI. The job itself is still a separate approval with its cost estimate.
                 </p>
               </div>
             )}
@@ -365,17 +384,18 @@ export function RunTrainingModal({
               <div className="space-y-3">
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-[11px] text-emerald-300">
                   <Cloud className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>Your datasets are ready for training.</span>
+                  <span>Datasets uploaded and validated server-side (training: {files?.trainingFileId}, validation: {files?.validationFileId}).</span>
                 </div>
                 <div className="p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-400 space-y-1.5">
                   <div className="flex justify-between"><span>Training examples</span><span className="text-green-400 font-bold">{files?.trainingCount}</span></div>
                   <div className="flex justify-between"><span>Validation examples</span><span className="text-yellow-400 font-bold">{files?.validationCount}</span></div>
-                  <div className="flex justify-between"><span>Model to train</span><span className="text-slate-200">{BASE_DISPLAY}</span></div>
+                  <div className="flex justify-between"><span>Model</span><span className="text-slate-200">{MODEL_DISPLAY}</span></div>
+                  <div className="flex justify-between"><span>From HF base</span><span className="text-slate-200">{BASE_DISPLAY}</span></div>
                   <div className="flex justify-between"><span>Output repo</span><span className="text-slate-200">RoseG/{hfRepoName}</span></div>
                   <div className="flex justify-between border-t border-slate-800 pt-1.5 text-base">
                     <span className="text-slate-300 font-bold text-[11px]">Estimated cost</span>
                     <span className="text-emerald-400 font-bold text-sm">
-                      {estimatePrice !== null ? `$${Number(estimatePrice).toFixed(2)}` : "Estimate unavailable"}
+                      {estimatePrice !== null ? `$${Number(estimatePrice).toFixed(2)}` : "See Together response"}
                     </span>
                   </div>
                 </div>
@@ -405,11 +425,17 @@ export function RunTrainingModal({
                     : statusLabel === "error" || statusLabel === "cancelled" ? <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                     : <RefreshCw className="h-4 w-4 shrink-0 mt-0.5 animate-spin" />}
                   <span>
-                    Training status: <span className="font-bold uppercase">{job.status || "unknown"}</span>
+                    Job <span className="font-mono font-bold">{job.id}</span> — status: <span className="font-bold uppercase">{job.status || "unknown"}</span>
+                    {statusLabel !== "completed" && statusLabel !== "error" && statusLabel !== "cancelled" && " (updates automatically every 10 seconds)"}
                   </span>
                 </div>
                 {!["completed", "error", "cancelled"].includes(statusLabel) && (
                   <p className="text-[11px] text-slate-300">You can close this window and return to the trainer. Keep the app open for automatic completion updates.</p>
+                )}
+                {Array.isArray(job.events) && job.events.length > 0 && (
+                  <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[10px] font-mono text-slate-400 space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+                    {job.events.map((e: string, i: number) => <div key={i}>• {e}</div>)}
+                  </div>
                 )}
                 {statusLabel === "completed" && (
                   <div className="space-y-2">
