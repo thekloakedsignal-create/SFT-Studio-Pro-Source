@@ -2147,14 +2147,21 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       // Refill each missing example with an individual request, bounded by concurrency and deadline.
       const requestReplacement = requestExamplesForMissingBatch;
       let nextReplacement = 0;
-      await Promise.all(Array.from({ length: Math.min(10, replacementCount) }, async () => {
-        while (nextReplacement < replacementCount) {
+      let replacementsInFlight = 0;
+      const replacementConcurrency = Math.max(10, ...generationStacks.map(stack => stack.length));
+      await Promise.all(Array.from({ length: Math.min(replacementConcurrency, replacementCount) }, async () => {
+        while (nextReplacement < replacementCount || replacementsInFlight > 0) {
+          if (nextReplacement >= replacementCount) {
+            await new Promise(resolve => setTimeout(resolve, 250));
+            continue;
+          }
           if (Date.now() >= generationDeadline) {
             recoveryFailureReason = "The batch deadline expired before all missing examples could be recovered.";
             if (isReasoningGeneration) recoveryFailureCategory ??= "provider_timeout";
             return;
           }
           const slot = nextReplacement++;
+          replacementsInFlight++;
           let replacementModel = isReasoningGeneration
             ? generationModels[reasoningRetryModelIndices[slot] % generationModels.length]
             : turnMode === "Mixed"
@@ -2197,6 +2204,8 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             if (isReasoningGeneration) reasoningRetryModelIndices.push(reasoningRetryModelIndices[slot] + 1);
             if (turnMode === "Multi Turn") recoveryTurnCounts.push(recoveryTurnCounts[slot]);
             if (turnMode === "Mixed") mixedRecoveryTurns.push(mixedRecoveryTurns[slot]);
+          } finally {
+            replacementsInFlight--;
           }
         }
       }));
