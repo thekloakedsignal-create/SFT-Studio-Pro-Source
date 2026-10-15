@@ -23,9 +23,17 @@ import { logger } from "../lib/logger.ts";
 
 const TOGETHER_API_BASE = "https://api.together.ai/v1";
 
-// Requested BYOM pair: Together catalog base template + Hugging Face checkpoint.
-const TRAINING_MODEL = "Qwen/Qwen3.5-9B";
-const FROM_HF_MODEL = "Qwen/Qwen3.5-9B-Base";
+// Together catalog templates paired with the selected Hugging Face checkpoint.
+const TRAINING_CONFIGS: Record<string, { model: string; from_hf_model: string; n_evals?: number; batch_size?: number }> = {
+  "Qwen3.5 9 Base": { model: "Qwen/Qwen3.5-9B", from_hf_model: "Qwen/Qwen3.5-9B-Base", n_evals: 1 },
+  "Qwen3.5 4B Base": { model: "Qwen/Qwen3.5-4B", from_hf_model: "Qwen/Qwen3.5-4B-Base", n_evals: 1 },
+  "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", from_hf_model: "meta-llama/Llama-3.1-70B", n_evals: 1, batch_size: 32 },
+};
+function getTrainingConfig(selection: unknown) {
+  const key = selection === undefined ? "Qwen3.5 9 Base" : selection;
+  return typeof key === "string" && Object.prototype.hasOwnProperty.call(TRAINING_CONFIGS, key)
+    ? TRAINING_CONFIGS[key] : undefined;
+}
 const N_EPOCHS = 2;
 const N_CHECKPOINTS = 1;
 const PREFLIGHT_TTL_MS = 60 * 60 * 1000; // upload allowed within 1h of preflight
@@ -35,6 +43,7 @@ const TERMINAL_JOB_STATUSES = new Set(["completed", "error", "cancelled"]);
 // Per-owner consent/flow state and job ownership, persisted across restarts.
 interface OwnerSession {
   preflightAt?: string;
+  preflightModel?: string;
   upload?: {
     trainingFileId: string;
     validationFileId: string;
@@ -45,6 +54,7 @@ interface OwnerSession {
   estimate?: {
     trainingFileId: string;
     validationFileId: string;
+    model?: string;
     estimate: unknown;
     at: string;
   };
@@ -156,9 +166,9 @@ async function waitForFileProcessing(fileId: string): Promise<void> {
   const maxAttempts = 30;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const info = await togetherRequest(`/files/${encodeURIComponent(fileId)}`);
-    const status = String(info?.status || "").toLowerCase();
-    if (info?.Processed === true || status === "processed") return;
-    if (status.includes("error") || status.includes("fail")) {
+    const status = String(info?.processing_status || info?.status || "").toLowerCase();
+    if (status === "completed" || (!info?.processing_status && (info?.Processed === true || status === "processed"))) return;
+    if (status === "invalid_format" || status.includes("error") || status.includes("fail")) {
       throw new Error(info?.error || `Together AI could not process uploaded file ${fileId}.`);
     }
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -170,6 +180,8 @@ async function waitForFileProcessing(fileId: string): Promise<void> {
 router.post("/finetune/preflight", async (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
+  const config = getTrainingConfig(req.body?.trainingModel);
+  if (!config) return res.status(400).json({ success: false, error: "Unsupported training model." });
   const togetherConfigured = Boolean(process.env.TOGETHER_API_KEY);
   const huggingFaceConfigured = Boolean(process.env.HF_TOKEN);
   if (!togetherConfigured || !huggingFaceConfigured) {
@@ -177,8 +189,8 @@ router.post("/finetune/preflight", async (req: AuthRequest, res) => {
       success: true,
       credentials: { together: togetherConfigured, huggingFace: huggingFaceConfigured },
       modelAvailable: false,
-      model: TRAINING_MODEL,
-      fromHfModel: FROM_HF_MODEL,
+      model: config.model,
+      fromHfModel: config.from_hf_model,
       defaultHfRepoName: (process.env.HF_OUTPUT_REPO_NAME || "").replace(/^RoseG\//i, ""),
       error: "Server API credentials are not fully configured yet.",
     });
@@ -186,20 +198,20 @@ router.post("/finetune/preflight", async (req: AuthRequest, res) => {
   try {
     const models = await togetherRequest("/models");
     const list = Array.isArray(models) ? models : models?.data || [];
-    const modelAvailable = list.some((m: any) => m?.id === TRAINING_MODEL);
+    const modelAvailable = list.some((m: any) => m?.id === config.model);
     if (modelAvailable) {
-      store.sessions[uid] = { ...store.sessions[uid], preflightAt: new Date().toISOString() };
+      store.sessions[uid] = { ...store.sessions[uid], preflightAt: new Date().toISOString(), preflightModel: config.model };
       saveStore(store);
     }
     return res.json({
       success: true,
       credentials: { together: true, huggingFace: true },
       modelAvailable,
-      model: TRAINING_MODEL,
-      fromHfModel: FROM_HF_MODEL,
+      model: config.model,
+      fromHfModel: config.from_hf_model,
       defaultHfRepoName: (process.env.HF_OUTPUT_REPO_NAME || "").replace(/^RoseG\//i, ""),
-      settings: { trainingType: "Full (LoRA disabled)", epochs: N_EPOCHS, checkpoints: N_CHECKPOINTS },
-      ...(modelAvailable ? {} : { error: `${TRAINING_MODEL} is not currently available for fine-tuning on Together AI.` }),
+      settings: { trainingType: "Full (LoRA disabled)", epochs: N_EPOCHS, checkpoints: N_CHECKPOINTS, evaluations: config.n_evals, batchSize: config.batch_size },
+      ...(modelAvailable ? {} : { error: `${config.model} is not currently available for fine-tuning on Together AI.` }),
     });
   } catch (error: any) {
     logger.warn({ error: error?.message }, "Fine-tune preflight failed");
@@ -211,12 +223,15 @@ router.post("/finetune/preflight", async (req: AuthRequest, res) => {
 router.post("/finetune/upload", async (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
+  const config = getTrainingConfig(req.body?.trainingModel);
+  if (!config) return res.status(400).json({ success: false, error: "Unsupported training model." });
   const { trainingJsonl, validationJsonl, suffix, confirmUpload } = req.body || {};
   if (confirmUpload !== true) {
     return res.status(400).json({ success: false, error: "Dataset upload requires explicit approval." });
   }
   const preflightAt = store.sessions[uid]?.preflightAt;
-  if (!preflightAt || Date.now() - Date.parse(preflightAt) > PREFLIGHT_TTL_MS) {
+  if (!preflightAt || Date.now() - Date.parse(preflightAt) > PREFLIGHT_TTL_MS
+    || (store.sessions[uid]?.preflightModel || TRAINING_CONFIGS["Qwen3.5 9 Base"].model) !== config.model) {
     return res.status(409).json({ success: false, error: "Run the preflight check before uploading datasets." });
   }
   const training = validateJsonl(trainingJsonl, "training");
@@ -260,6 +275,8 @@ router.post("/finetune/upload", async (req: AuthRequest, res) => {
 router.post("/finetune/estimate", async (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
+  const config = getTrainingConfig(req.body?.trainingModel);
+  if (!config) return res.status(400).json({ success: false, error: "Unsupported training model." });
   const { trainingFileId, validationFileId } = req.body || {};
   const upload = store.sessions[uid]?.upload;
   if (!upload || upload.trainingFileId !== trainingFileId || upload.validationFileId !== validationFileId) {
@@ -272,8 +289,7 @@ router.post("/finetune/estimate", async (req: AuthRequest, res) => {
       body: JSON.stringify({
         training_file: trainingFileId,
         validation_file: validationFileId,
-        model: TRAINING_MODEL,
-        from_hf_model: FROM_HF_MODEL,
+        ...config,
         training_type: { type: "Full" },
         n_epochs: N_EPOCHS,
         n_checkpoints: N_CHECKPOINTS,
@@ -284,7 +300,7 @@ router.post("/finetune/estimate", async (req: AuthRequest, res) => {
     }
     store.sessions[uid] = {
       ...store.sessions[uid],
-      estimate: { trainingFileId, validationFileId, estimate, at: new Date().toISOString() },
+      estimate: { trainingFileId, validationFileId, model: config.model, estimate, at: new Date().toISOString() },
     };
     saveStore(store);
     return res.json({ success: true, estimate });
@@ -299,6 +315,8 @@ router.post("/finetune/estimate", async (req: AuthRequest, res) => {
 router.post("/finetune/jobs", async (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
+  const config = getTrainingConfig(req.body?.trainingModel);
+  if (!config) return res.status(400).json({ success: false, error: "Unsupported training model." });
   const { trainingFileId, validationFileId, suffix, hfRepoName, confirmSubmit } = req.body || {};
   if (confirmSubmit !== true) {
     return res.status(400).json({ success: false, error: "Job submission requires explicit approval." });
@@ -307,7 +325,8 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
   if (!session?.upload || session.upload.trainingFileId !== trainingFileId || session.upload.validationFileId !== validationFileId) {
     return res.status(403).json({ success: false, error: "Jobs can only be created from your own uploaded datasets." });
   }
-  if (!session.estimate || session.estimate.trainingFileId !== trainingFileId || session.estimate.validationFileId !== validationFileId) {
+  if (!session.estimate || session.estimate.trainingFileId !== trainingFileId || session.estimate.validationFileId !== validationFileId
+    || (session.estimate.model || TRAINING_CONFIGS["Qwen3.5 9 Base"].model) !== config.model) {
     return res.status(409).json({ success: false, error: "Review a cost estimate for these datasets before submitting the job." });
   }
   const hfToken = process.env.HF_TOKEN;
@@ -339,8 +358,7 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
       body: JSON.stringify({
         training_file: trainingFileId,
         validation_file: validationFileId,
-        model: TRAINING_MODEL,
-        from_hf_model: FROM_HF_MODEL,
+        ...config,
         training_type: { type: "Full" },
         n_epochs: N_EPOCHS,
         n_checkpoints: N_CHECKPOINTS,

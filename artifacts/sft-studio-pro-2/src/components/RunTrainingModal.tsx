@@ -6,8 +6,11 @@ import {
 } from "lucide-react";
 import { validateRegistryOutput } from "../lib/registry-validation";
 
-const MODEL_DISPLAY = "Qwen/Qwen3.5-9B";
-const BASE_DISPLAY = "Qwen/Qwen3.5-9B-Base";
+const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations?: number; batchSize?: number }> = {
+  "Qwen3.5 9 Base": { model: "Qwen/Qwen3.5-9B", base: "Qwen/Qwen3.5-9B-Base", evaluations: 1 },
+  "Qwen3.5 4B Base": { model: "Qwen/Qwen3.5-4B", base: "Qwen/Qwen3.5-4B-Base", evaluations: 1 },
+  "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", base: "meta-llama/Llama-3.1-70B", evaluations: 1, batchSize: 32 },
+};
 
 type Step = "configure" | "upload" | "submit" | "progress";
 
@@ -15,6 +18,8 @@ interface RunTrainingModalProps {
   open: boolean;
   onClose: () => void;
   exportFormat: string;
+  trainingModel: string;
+  onTrainingModelChange: (model: string) => void;
   // Serialized + ready-to-validate records for each split (compiled from selected, approved batches)
   getSerializedSplits: () => { training: unknown[]; validation: unknown[] };
   apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -30,10 +35,13 @@ async function readApi(res: Response): Promise<any> {
 }
 
 export function RunTrainingModal({
-  open, onClose, exportFormat, getSerializedSplits, apiFetch, notify
+  open, onClose, exportFormat, trainingModel, onTrainingModelChange, getSerializedSplits, apiFetch, notify
 }: RunTrainingModalProps) {
+  const selectedModel = TRAINING_MODELS[trainingModel];
+  const MODEL_DISPLAY = selectedModel?.model || trainingModel;
+  const BASE_DISPLAY = selectedModel?.base || "";
   const [step, setStep] = useState<Step>("configure");
-  const [suffix, setSuffix] = useState("sft-studio");
+  const [suffix, setSuffix] = useState(trainingModel === "Qwen3.5 9 Base" ? "sft-studio" : "custom-v1");
   const [hfRepoName, setHfRepoName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +63,8 @@ export function RunTrainingModal({
 
   useEffect(() => {
     if (open) {
+      setSuffix(current => ["sft-studio", "custom-v1"].includes(current)
+        ? (trainingModel === "Qwen3.5 9 Base" ? "sft-studio" : "custom-v1") : current);
       setStep("configure");
       setError(null);
       setPreflight(null);
@@ -93,7 +103,7 @@ export function RunTrainingModal({
       const data = await readApi(await apiFetch("/api/finetune/preflight", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ suffix, hfRepoName }),
+        body: JSON.stringify({ suffix, hfRepoName, trainingModel }),
       }));
       setPreflight(data);
       if (data.defaultHfRepoName && !hfRepoName) setHfRepoName(data.defaultHfRepoName);
@@ -129,6 +139,7 @@ export function RunTrainingModal({
           trainingJsonl: toJsonl(current.training),
           validationJsonl: toJsonl(current.validation),
           suffix,
+          trainingModel,
           confirmUpload: true,
         }),
       }));
@@ -136,7 +147,7 @@ export function RunTrainingModal({
       const est = await readApi(await apiFetch("/api/finetune/estimate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trainingFileId: data.trainingFileId, validationFileId: data.validationFileId }),
+        body: JSON.stringify({ trainingFileId: data.trainingFileId, validationFileId: data.validationFileId, trainingModel }),
       }));
       setEstimate(est.estimate);
       setStep("submit");
@@ -161,6 +172,7 @@ export function RunTrainingModal({
           validationFileId: files.validationFileId,
           suffix,
           hfRepoName,
+          trainingModel,
           confirmSubmit: true,
         }),
       }));
@@ -235,6 +247,8 @@ export function RunTrainingModal({
               <div className="flex justify-between"><span>From HF base (BYOM)</span><span className="text-slate-200">{BASE_DISPLAY}</span></div>
               <div className="flex justify-between"><span>Training type</span><span className="text-slate-200">Full (LoRA disabled)</span></div>
               <div className="flex justify-between"><span>Epochs / Checkpoints</span><span className="text-slate-200">2 / 1</span></div>
+              {selectedModel?.evaluations && <div className="flex justify-between"><span>Evaluations</span><span className="text-slate-200">{selectedModel.evaluations}</span></div>}
+              {selectedModel?.batchSize && <div className="flex justify-between"><span>Training batch size</span><span className="text-slate-200">{selectedModel.batchSize}</span></div>}
               <div className="flex justify-between"><span>Export format</span><span className="text-emerald-400 uppercase">{exportFormat}</span></div>
               <div className="flex justify-between border-t border-slate-800 pt-1.5"><span>Training split</span><span className="text-green-400 font-bold">{splits.training.length} examples</span></div>
               <div className="flex justify-between"><span>Validator split</span><span className="text-yellow-400 font-bold">{splits.validation.length} examples</span></div>
@@ -256,6 +270,24 @@ export function RunTrainingModal({
 
             {step === "configure" && (
               <div className="space-y-3">
+                <div>
+                  <label htmlFor="training-model" className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Model to train</label>
+                  <select
+                    id="training-model"
+                    value={trainingModel}
+                    disabled={busy}
+                    onChange={e => {
+                      onTrainingModelChange(e.target.value);
+                      setSuffix(current => ["sft-studio", "custom-v1"].includes(current)
+                        ? (e.target.value === "Qwen3.5 9 Base" ? "sft-studio" : "custom-v1") : current);
+                      setPreflight(null);
+                      setError(null);
+                    }}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200"
+                  >
+                    {Object.entries(TRAINING_MODELS).map(([key, model]) => <option key={key} value={key}>{model.base}</option>)}
+                  </select>
+                </div>
                 <div>
                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Hugging Face Output Repository</label>
                   <div className="flex items-center rounded-lg border border-slate-800 bg-slate-900 focus-within:border-emerald-500/50">

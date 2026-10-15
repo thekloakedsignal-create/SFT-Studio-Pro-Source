@@ -8150,6 +8150,8 @@ export default function App() {
         open={showRunTrainingModal}
         onClose={() => setShowRunTrainingModal(false)}
         exportFormat={exportTemplateFormat}
+        trainingModel={trainerHandoff.model}
+        onTrainingModelChange={model => setTrainerHandoff(current => ({ ...current, model }))}
         getSerializedSplits={() => ({
           training: compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, exportTemplateFormat)),
           validation: compiledDataset.validationSet.map(ex => formatExampleForExport(ex, exportTemplateFormat)),
