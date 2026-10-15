@@ -16,7 +16,7 @@ type Props = {
 };
 
 const titles = [
-  "Upload your first document",
+  "Prepare your document",
   "Choose the conversion type",
   "Label the speakers in a transcript",
   "Add your conversion instructions",
@@ -43,7 +43,7 @@ export function DocumentGuide({ progress, onChange, onClose, onComplete, canAdva
       <div className="rounded-lg border border-[#c4c4c4] bg-[#e5e5e5] p-4 text-sm leading-relaxed !text-black space-y-3">
         {step === 0 && <>
           <p>The Document Converter turns material you already have into training examples for your model. Use it for knowledge documents, conversations, or literature.</p>
-          <p>Use Upload documents below to select your files. The guide keeps them in a temporary list so you can prepare each one separately before sending them to the converter.</p>
+          <p>After this guide, upload or paste one document at a time in the Document Converter.</p>
           <p className="!font-bold">Do any of your documents contain transcripts or conversations?</p>
           <div className="flex flex-wrap gap-2">
             {[true, false].map(answer => (
@@ -65,7 +65,7 @@ export function DocumentGuide({ progress, onChange, onClose, onComplete, canAdva
             <li><strong>Transcript:</strong> for conversations with identifiable speakers. The converter copies the dialogue using your speaker labels and removes metadata; it does not rewrite the speakers’ words.</li>
             <li><strong>Literature:</strong> for stories and other literary material. Use instructions to describe how the source should be handled.</li>
           </ul>
-          <p>Select the matching type for each uploaded document in the guide below. Conversion does not start here.</p>
+          <p>Select the matching type in the Document Converter. Conversion does not start here.</p>
         </>}
         {step === 2 && <>
           <p>If you chose Knowledge or Literature, there are no speaker labels to enter. You can continue to the next step.</p>
@@ -75,7 +75,7 @@ export function DocumentGuide({ progress, onChange, onClose, onComplete, canAdva
           <p>Under <strong>Transcript Dialogue Layout</strong>, choose <strong>Single-Turn Pairs (Q&amp;A)</strong> for separate question-and-answer examples, or <strong>Multi-Turn Dialogue</strong> to keep consecutive exchanges together.</p>
         </>}
         {step === 3 && <>
-          <p>For Knowledge and Literature, click <strong>Suggest instructions for this document</strong>. The AI uses the document and your project definition to draft instructions. Review or edit them before continuing.</p>
+          <p>For Knowledge and Literature, enter your instructions in <strong>Custom Conversion &amp; Style Instructions</strong> in the Document Converter.</p>
           <ul className="list-disc pl-5 space-y-2">
             <li><strong>Knowledge:</strong> specify the material to focus on and the depth of explanation you want. The optional focus prompt can narrow the subject.</li>
             <li><strong>Literature:</strong> describe how you want the literary source handled. Review the <strong>Literature User Prompt Pattern</strong> if you want to control how story requests are phrased.</li>
@@ -84,23 +84,23 @@ export function DocumentGuide({ progress, onChange, onClose, onComplete, canAdva
           <p>For Knowledge or Literature, review the converter’s output-template selection: Single Turn, Multi Turn, or Mixed. Single Turn creates separate exchanges; Multi Turn creates conversations; Mixed combines both.</p>
         </>}
         {step === 4 && <>
-          <p>After this guide, your files will appear under <strong>Suggested document conversions</strong>. Select a document and click <strong>Copy to Document Converter</strong> to fill the source text, conversion type, and either its instructions or its transcript speaker labels.</p>
+          <p>After this guide, upload or paste your document in the Document Converter, choose its conversion type, and enter either its instructions or its transcript speaker labels.</p>
           <p>For Knowledge or Literature, review <strong>Optimal SFT Examples Estimated</strong> and its explanation. Use <strong>Re-Analyze</strong> if you need the source analyzed again. Transcript mode retains matched dialogue rather than generating to that estimated count.</p>
           <p>When everything is ready, click <strong>Convert Document to SFT</strong> in the converter below. Wait for that document’s conversion to finish before loading the next one.</p>
-          <p>Copying a document only fills the form. It does not start conversion. Process one document at a time and check it off in the list when you are done.</p>
+          <p>Loading a document only fills the form. It does not start conversion. Process one document at a time.</p>
         </>}
         {step === 5 && <>
-          <p>A batch is the group of training examples created from one conversion. Here is how to create each batch after you send your documents to the converter:</p>
+          <p>A batch is the group of training examples created from one conversion. Here is how to create each batch in the Document Converter:</p>
           <ol className="list-decimal pl-5 space-y-3">
-            <li>Open <strong>Suggested document conversions</strong>, choose one document from the menu, and click <strong>Copy to Document Converter</strong>. This fills the form; it does not start conversion.</li>
+            <li>Upload or paste one document in the <strong>Document Converter</strong>. This fills the form; it does not start conversion.</li>
             <li>Check the document text and conversion type. <strong>Knowledge</strong> is for factual source material; <strong>Literature</strong> is for literary material; <strong>Transcript</strong> is for labeled conversations.</li>
-            <li>For <strong>Knowledge or Literature</strong>, review the copied instructions, select Single Turn, Multi Turn, or Mixed, and click <strong>Re-Analyze</strong> to get an example-count estimate for this document. Review the analysis and confirm that the selected conversion type still matches your source.</li>
+            <li>For <strong>Knowledge or Literature</strong>, enter your conversion instructions, select Single Turn, Multi Turn, or Mixed, and click <strong>Re-Analyze</strong> to get an example-count estimate for this document. Review the analysis and confirm that the selected conversion type still matches your source.</li>
             <li>For <strong>Transcript</strong>, check that both speaker tags match the labels in your document. Choose <strong>Single-Turn Pairs (Q&amp;A)</strong> or <strong>Multi-Turn Dialogue</strong>. No conversion instructions are needed: metadata is removed and the labeled dialogue is kept turn by turn.</li>
-            <li>Click <strong>Convert Document to SFT</strong>. Generate one document batch at a time. Wait for it to finish before copying another document into the converter.</li>
+            <li>Click <strong>Convert Document to SFT</strong>. Generate one document batch at a time. Wait for it to finish before loading another document into the converter.</li>
             <li>Read the examples under <strong>Document Conversion Review &amp; Approval</strong>. Approve or reject the batch before moving on. For batches you keep, open <strong>AI Quality Assessment</strong>, select the batch, and click <strong>Run AI Quality Audit</strong>. Review it in QA before including it in the Data Registry.</li>
-            <li>Return to your suggested-document list, check <strong>Finished processing this document</strong>, select the next document, and repeat from step 1.</li>
+            <li>When you are done with that document, upload or paste the next one and repeat from step 1.</li>
           </ol>
-          <p>When you are ready, click <strong>Send documents to converter</strong> below. Your list will appear on this page; no conversion starts automatically.</p>
+          <p>When you are ready, click <strong>Done</strong> below to close the guide and use the Document Converter. No conversion starts automatically.</p>
         </>}
       </div>
 
@@ -112,7 +112,7 @@ export function DocumentGuide({ progress, onChange, onClose, onComplete, canAdva
         </button>
         {step < titles.length - 1
           ? <button type="button" disabled={!canAdvance} onClick={() => onChange({ ...progress, step: step + 1 })} className={`${buttonClass} inline-flex items-center gap-1 disabled:opacity-50`}>Next <ArrowRight className="h-4 w-4" /></button>
-          : <button type="button" disabled={!canAdvance} onClick={onComplete} className={`${buttonClass} disabled:opacity-50`}>Send documents to converter</button>}
+          : <button type="button" disabled={!canAdvance} onClick={onComplete} className={`${buttonClass} disabled:opacity-50`}>Done</button>}
       </div>
       <a
         href="https://thekloakedsignal-create.github.io/sft-pro-docs/part-three-document-converter.html"
