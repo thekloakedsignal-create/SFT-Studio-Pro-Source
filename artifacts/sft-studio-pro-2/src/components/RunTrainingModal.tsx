@@ -5,6 +5,7 @@ import {
   ShieldAlert, Cloud, ExternalLink
 } from "lucide-react";
 import { validateRegistryOutput } from "../lib/registry-validation";
+import { ModelSampleChat } from "./ModelSampleChat";
 
 const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations?: number; batchSize?: number }> = {
   "Qwen3.5 9 Base": { model: "Qwen/Qwen3.5-9B", base: "Qwen/Qwen3.5-9B-Base", evaluations: 1 },
@@ -48,6 +49,7 @@ export function RunTrainingModal({
   const [files, setFiles] = useState<{ trainingFileId: string; validationFileId: string; trainingCount: number; validationCount: number } | null>(null);
   const [estimate, setEstimate] = useState<any>(null);
   const [job, setJob] = useState<any>(null);
+  const [sampleActive, setSampleActive] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const splits = open ? getSerializedSplits() : { training: [], validation: [] };
@@ -224,7 +226,7 @@ export function RunTrainingModal({
   const outputRepoUrl = `https://huggingface.co/${outputModelName.split("/").map(encodeURIComponent).join("/")}`;
   const closeTrainer = () => {
     if (busy) return;
-    if (["completed", "error", "cancelled"].includes(statusLabel)) setJob(null);
+    if (["error", "cancelled"].includes(statusLabel)) setJob(null);
     onClose();
   };
 
@@ -413,6 +415,7 @@ export function RunTrainingModal({
                 )}
                 {statusLabel === "completed" && (
                   <div className="space-y-2">
+                    <ModelSampleChat key={job.id} jobId={job.id} apiFetch={apiFetch} onActiveChange={setSampleActive} />
                     <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-300">
                       <p>Output model: {outputModelName}</p>
                       <a href={outputRepoUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-2 break-all text-emerald-400 underline">
@@ -430,6 +433,21 @@ export function RunTrainingModal({
                         <span>{busy ? "Preparing Download…" : "Download Full Checkpoint"}</span>
                       </button>
                     )}
+                    <button
+                      type="button"
+                      disabled={sampleActive}
+                      onClick={() => {
+                        setJob(null);
+                        setFiles(null);
+                        setEstimate(null);
+                        setPreflight(null);
+                        setError(null);
+                        setStep("configure");
+                      }}
+                      className="text-xs font-bold text-slate-300 underline disabled:opacity-40"
+                    >
+                      Train another model
+                    </button>
                   </div>
                 )}
               </div>
