@@ -589,6 +589,24 @@ main [class~="opacity-45"] { opacity: .72; }
   color: #e2e8f0 !important;
 }
 
+/* Keep reading-guide text black and its entry buttons consistently light purple. */
+#root > div:has(> .kk-header) > main .kk-workspace-panel .kk-reading-guide,
+#root > div:has(> .kk-header) > main .kk-workspace-panel .kk-reading-guide *,
+#root > div:has(> .kk-header) > main .kk-qa-panel .kk-reading-guide,
+#root > div:has(> .kk-header) > main .kk-qa-panel .kk-reading-guide * {
+  color: #000000 !important;
+}
+
+#root > div:has(> .kk-header) > main button.kk-guide-trigger {
+  background: #d8b4fe !important;
+  border-color: #c084fc !important;
+  color: #000000 !important;
+}
+
+#root > div:has(> .kk-header) > main button.kk-guide-trigger:hover:not(:disabled) {
+  background: #e9d5ff !important;
+}
+
 #root input:is([type="checkbox"], [type="radio"]) {
   accent-color: #9f70b8;
 }

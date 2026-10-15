@@ -29,7 +29,7 @@ export function DocumentGuide({ progress, onChange, onClose, onComplete, canAdva
   const step = Math.max(0, Math.min(titles.length - 1, progress.step));
   const buttonClass = "rounded-lg border border-purple-400 bg-purple-300 px-3 py-2 text-sm !font-bold !text-black hover:bg-purple-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-700";
   return (
-    <section aria-label="Document conversion guide" className="rounded-xl border border-purple-300 bg-[#f5f1e8] p-4 sm:p-5 !text-black space-y-4">
+    <section aria-label="Document conversion guide" className="kk-reading-guide rounded-xl border border-purple-300 bg-[#f5f1e8] p-4 sm:p-5 !text-black space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs !font-bold !text-black">Document Guide · Step {step + 1} of {titles.length}</p>

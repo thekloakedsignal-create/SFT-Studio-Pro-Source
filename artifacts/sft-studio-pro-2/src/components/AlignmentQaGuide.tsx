@@ -113,7 +113,7 @@ export function AlignmentQaGuide({ page, onClose }: Props) {
   const buttonClass = "rounded-lg border border-purple-400 bg-purple-300 px-3 py-2 text-sm !font-bold !text-black hover:bg-purple-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-700";
 
   return (
-    <section aria-label={guide.title} className="mb-5 rounded-xl border border-purple-300 bg-[#f5f1e8] p-4 sm:p-5 !text-black space-y-4">
+    <section aria-label={guide.title} className="kk-reading-guide mb-5 rounded-xl border border-purple-300 bg-[#f5f1e8] p-4 sm:p-5 !text-black space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs !font-bold !text-black">{guide.title} · Step {step + 1} of {guide.steps.length}</p>

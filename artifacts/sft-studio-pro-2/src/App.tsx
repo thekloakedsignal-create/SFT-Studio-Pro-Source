@@ -5166,7 +5166,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setShowBatchRecommendationInterview(true)}
-                        className="rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
+                        className="kk-guide-trigger rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
                       >
                         AI Guide
                       </button>
@@ -5702,7 +5702,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => openAiGuide("convert")}
-                          className="mt-3 rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
+                          className="kk-guide-trigger mt-3 rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
                         >
                           AI Guide
                         </button>
@@ -6445,7 +6445,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => openAiGuide("triad")}
-                        className="mt-3 rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
+                        className="kk-guide-trigger mt-3 rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
                       >
                         AI Guide
                       </button>
@@ -6723,7 +6723,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => openAiGuide("assess")}
-                        className="mt-3 rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
+                        className="kk-guide-trigger mt-3 rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
                       >
                         AI Guide
                       </button>
