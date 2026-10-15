@@ -1,5 +1,262 @@
 [
   {
+    "id": "project-1792104038813",
+    "userId": "0l3DRt7a96NkbBJ736dNKf1mASn1",
+    "name": "SFT Project 17",
+    "settings": {
+      "name": "SFT Project 17",
+      "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+      "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+      "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+      "selectedPreset": "General Use AI",
+      "projectFormat": "Instruction",
+      "templateType": "Instruction Template",
+      "instructTemplate": "ChatML",
+      "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      "representativePrompt": "Explain why the sky appears blue.",
+      "representativeCompletion": "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
+    },
+    "batches": [
+      {
+        "id": "d09e9c6d-5103-4e74-af4f-06df64f05e47",
+        "batchId": "d09e9c6d-5103-4e74-af4f-06df64f05e47",
+        "name": "Enter a training topic",
+        "source": "Generator",
+        "generationSettings": {
+          "name": "SFT Project 17",
+          "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+          "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+          "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+          "selectedPreset": "General Use AI",
+          "projectFormat": "Instruction",
+          "templateType": "Instruction Template",
+          "instructTemplate": "ChatML",
+          "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+          "representativePrompt": "Explain why the sky appears blue.",
+          "representativeCompletion": "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
+        },
+        "templateType": "Single Turn",
+        "examplesCount": 5,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What are the key factors to consider when selecting a training topic for a corporate workshop, and how do they impact learning outcomes?"
+              },
+              {
+                "role": "assistant",
+                "content": "Selecting a training topic for a corporate workshop relies on analyzing audience needs, aligning with business objectives, evaluating the topic's practicality, gauging employee engagement potential, and assessing available resources. These factors directly impact learning outcomes by ensuring the content is relevant, immediately applicable, motivating, and properly supported, which enhances knowledge retention and on-the-job performance."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1792104097233-0"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Response verification process"
+              },
+              {
+                "role": "assistant",
+                "content": "verification is the systematic checking of model outputs against predefined criteria to ensure correctness, relevance, and safety, typically involving human review, automated metrics, and iterative refinement."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1792104097233-1"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What is the 'tally mark' method of counting, and how is it typically implemented?"
+              },
+              {
+                "role": "assistant",
+                "content": "The tally mark method is a counting technique used to record frequencies in real-time by making a mark for each item encountered. Typically, four vertical lines are drawn for the first four counts, and the fifth count is recorded as a diagonal strike through the previous four. This grouping into sets of five allows for quick and efficient totaling at the end of the process."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1792104097233-2"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What is the basic logical principle that allows a supervisor to assign different SFT training topics to a synthetic dataset generation engine?"
+              },
+              {
+                "role": "assistant",
+                "content": "The core logical principle is the separation of concerns, specifically in the form of decoupling the instruction logic from the execution engine. A supervisory script or system can define a topic (like \"Topic assignment logic\") as a categorical instruction, which the generation engine then interprets as a high-level constraint. This logic allows the supervisor to systematically guide data synthesis by switching topics without altering the engine's underlying prompt-response generation code, thereby enabling controlled diversity and scalability in dataset creation."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1792104097233-3"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What is batch description analysis and why is it important in data processing workflows?"
+              },
+              {
+                "role": "assistant",
+                "content": "Batch description analysis is the process of examining and interpreting metadata and configuration details that define how data processing jobs are executed in batches. It involves reviewing parameters such as input sources, transformation rules, scheduling intervals, error handling procedures, and resource requirements.\n\nThis practice is important because it helps identify inefficiencies, potential bottlenecks, and failure points in automated workflows. By analyzing batch descriptions, teams can optimize processing times, ensure data integrity, and maintain proper audit trails. It also enables better coordination between dependent jobs and facilitates troubleshooting when issues arise in production environments."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1792104097233-4"
+          }
+        ],
+        "status": "Pending",
+        "timestamp": "2026-10-15 22:41:37.233Z",
+        "description": "Enter a training topic",
+        "specialInstructions": "Enter topic specific instructions",
+        "temporaryConstraints": "Enter topic specific restrictions"
+      },
+      {
+        "id": "00883ae2-da67-4058-9bd8-e2fa4e04cb05",
+        "batchId": "00883ae2-da67-4058-9bd8-e2fa4e04cb05",
+        "name": "Enter a training topic",
+        "source": "Generator",
+        "generationSettings": {
+          "name": "SFT Project 17",
+          "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
+          "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
+          "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
+          "selectedPreset": "General Use AI",
+          "projectFormat": "Instruction",
+          "templateType": "Instruction Template",
+          "instructTemplate": "ChatML",
+          "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+          "representativePrompt": "Explain why the sky appears blue.",
+          "representativeCompletion": "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
+        },
+        "templateType": "Single Turn",
+        "examplesCount": 5,
+        "examples": [
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Given the text: 'Joseph Haydn spent much of his career as a court musician for the wealthy Esterházy family at their remote estate,' what is the primary topic?"
+              },
+              {
+                "role": "assistant",
+                "content": "The primary topic is the professional life of composer Joseph Haydn."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1792104069007-0"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Counting responses"
+              },
+              {
+                "role": "assistant",
+                "content": "There are three messages in this conversation: the system message, your user query, and my assistant response."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1792104069007-1"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What is the purpose of a checksum in data verification processes?"
+              },
+              {
+                "role": "assistant",
+                "content": "A checksum is a small block of data derived from a larger set of digital data to ensure its integrity. During the verification process, the sender calculates a value based on the content of the data and attaches it to the transmission; the receiver then performs the same calculation upon arrival. If the receiver's calculated checksum matches the one sent, the data is considered intact; if they differ, it indicates that the data was corrupted or altered during transit."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1792104069007-2"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "What are the key considerations when selecting a topic for a supervised fine-tuning dataset?"
+              },
+              {
+                "role": "assistant",
+                "content": "Key considerations include ensuring the topic aligns with the target application, provides sufficient quality and variety of examples, covers edge cases relevant to the model's intended use, and is scoped to a manageable size for annotation and training."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1792104069007-3"
+          },
+          {
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations."
+              },
+              {
+                "role": "user",
+                "content": "Please provide a three-sentence summary of how photosynthesis works. Ensure the first sentence defines the process, the second mentions the role of sunlight, and the third explains the primary output."
+              },
+              {
+                "role": "assistant",
+                "content": "Photosynthesis is the process used by plants and other organisms to convert light energy into chemical energy. Chlorophyll absorbs sunlight to power the chemical reaction that transforms water and carbon dioxide into nutrients. This process ultimately produces glucose for the plant and releases oxygen into the atmosphere."
+              }
+            ],
+            "templateType": "Single Turn",
+            "id": "synth-1792104069007-4"
+          }
+        ],
+        "status": "Approved",
+        "timestamp": "2026-10-15 22:41:09.007Z",
+        "description": "Enter a training topic",
+        "specialInstructions": "Enter topic specific instructions",
+        "temporaryConstraints": "Enter topic specific restrictions"
+      }
+    ],
+    "updatedAt": "2026-10-15T22:41:38.490Z"
+  },
+  {
     "id": "project-1792016130389",
     "userId": "0l3DRt7a96NkbBJ736dNKf1mASn1",
     "name": "The ultimate tester",

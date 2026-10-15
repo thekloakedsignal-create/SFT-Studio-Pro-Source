@@ -14,6 +14,10 @@ const plans: Record<string, string | undefined> = {
 export const TRAINING_MODEL_PLANS: Record<string, string> = {
   "Qwen3.5 4B Base": "train_4b", "Qwen3.5 9 Base": "train_9b", "Llama 3.1 70B": "train_70b",
 };
+// Only the verified owner identity can bypass billing; never trust a client profile role.
+function isOwner(user: AuthRequest["user"]) {
+  return user?.email_verified === true && user.email?.toLowerCase() === "thekloakedsignal@gmail.com";
+}
 type Account = { used: number; extra: number; training: Record<string, number> };
 type Checkout = { uid: string; planKey: string; checkoutId: string; at: string; paymentId?: string };
 type Reservation = { uid: string; count: number };
@@ -42,7 +46,9 @@ function remaining(s: Store, uid: string) {
   const reserved = Object.values(s.reservations).filter(r => r.uid === uid).reduce((n, r) => n + r.count, 0);
   return Math.max(0, 5000 + a.extra - a.used - reserved);
 }
-export function reserveExamples(uid: string | undefined, count: number): string {
+export function reserveExamples(user: AuthRequest["user"], count: number): string {
+  if (isOwner(user)) return "";
+  const uid = user?.uid;
   if (!uid) throw Object.assign(new Error("Sign in to use your 5,000 free examples."), { status: 401 });
   if (!Number.isInteger(count) || count < 1) throw Object.assign(new Error("Invalid example count."), { status: 400 });
   return change(s => {
@@ -53,6 +59,7 @@ export function reserveExamples(uid: string | undefined, count: number): string 
   });
 }
 export function settleExamples(id: string, produced: number) {
+  if (!id) return;
   change(s => {
     const r = s.reservations[id];
     if (!r) return;
@@ -60,7 +67,10 @@ export function settleExamples(id: string, produced: number) {
     delete s.reservations[id];
   });
 }
-export function consumeTraining(uid: string, model: string) {
+export function consumeTraining(user: AuthRequest["user"], model: string) {
+  if (isOwner(user)) return;
+  const uid = user?.uid;
+  if (!uid) throw Object.assign(new Error("Please sign in."), { status: 401 });
   const key = TRAINING_MODEL_PLANS[model];
   change(s => {
     const a = account(s, uid);
@@ -78,13 +88,15 @@ router.use("/whop", optionalAuth, (req: AuthRequest, res, next) => {
   if (!req.user?.uid) { res.status(401).json({ success: false, error: "Please sign in." }); return; }
   next();
 });
-function payload(uid: string) {
+function payload(uid: string, user?: AuthRequest["user"]) {
+  if (isOwner(user)) return { success: true, bypass: true, usageUsed: 0, allowance: null, remaining: null, training: {} };
   const a = account(store, uid);
-  return { success: true, usageUsed: a.used, allowance: 5000 + a.extra, remaining: remaining(store, uid), training: a.training };
+  return { success: true, bypass: false, usageUsed: a.used, allowance: 5000 + a.extra, remaining: remaining(store, uid), training: a.training };
 }
-router.get("/whop/entitlements", (req: AuthRequest, res) => { res.json(payload(req.user!.uid)); });
+router.get("/whop/entitlements", (req: AuthRequest, res) => { res.json(payload(req.user!.uid, req.user)); });
 
 router.post("/whop/checkout", async (req: AuthRequest, res) => {
+  if (isOwner(req.user)) { res.json(payload(req.user!.uid, req.user)); return; }
   try {
     const key = req.body?.planKey;
     const planId = typeof key === "string" && Object.hasOwn(plans, key) ? plans[key] : undefined;
@@ -114,8 +126,10 @@ router.post("/whop/checkout", async (req: AuthRequest, res) => {
 // Only checkouts created by this server for this authenticated account can grant credit.
 router.post("/whop/verify", async (req: AuthRequest, res) => {
   const uid = req.user!.uid;
+  if (isOwner(req.user)) { res.json({ ...payload(uid, req.user), credited: 0 }); return; }
   try {
     const pending = Object.entries(store.checkouts).filter(([, c]) => c.uid === uid && !c.paymentId);
+    if (!pending.length) { res.json({ ...payload(uid, req.user), credited: 0 }); return; }
     const client = await getWhopClient();
     let credited = 0;
     for (const [id, c] of pending) {
@@ -140,7 +154,7 @@ router.post("/whop/verify", async (req: AuthRequest, res) => {
         break;
       }
     }
-    res.json({ ...payload(uid), credited });
+    res.json({ ...payload(uid, req.user), credited });
   } catch {
     res.status(502).json({ success: false, error: "Payment verification unavailable. Please try again." });
   }
@@ -149,6 +163,7 @@ router.post("/whop/verify", async (req: AuthRequest, res) => {
 // Protect the existing trainer without changing Together requests or model settings.
 router.post(["/finetune/preflight", "/finetune/upload", "/finetune/jobs"], optionalAuth, (req: AuthRequest, res, next) => {
   if (!req.user?.uid) { res.status(401).json({ success: false, error: "Please sign in." }); return; }
+  if (isOwner(req.user)) { next(); return; }
   const key = TRAINING_MODEL_PLANS[req.body?.trainingModel ?? "Qwen3.5 9 Base"];
   if (!key || !(account(store, req.user.uid).training[key] > 0)) {
     res.status(402).json({ success: false, error: "Payment is required for this training run." }); return;

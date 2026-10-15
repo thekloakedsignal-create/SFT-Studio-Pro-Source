@@ -1132,7 +1132,7 @@ app.post("/api/generate", optionalAuth, async (req: AuthRequest, res) => {
   }
   let usageReservation: string;
   try {
-    usageReservation = reserveExamples(req.user?.uid, countNum);
+    usageReservation = reserveExamples(req.user, countNum);
   } catch (error: any) {
     return res.status(error.status || 503).json({ success: false, error: error.message });
   }
@@ -3170,7 +3170,7 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
     }
     const transcriptTemplate = multiTurn ? "Multi Turn" : "Single Turn";
     try {
-      const reservation = reserveExamples(req.user?.uid, groups.length);
+      const reservation = reserveExamples(req.user, groups.length);
       settleExamples(reservation, groups.length);
     } catch (error: any) {
       return res.status(error.status || 503).json({ success: false, error: error.message });
@@ -3190,7 +3190,7 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
 
   let usageReservation: string;
   try {
-    usageReservation = reserveExamples(req.user?.uid, requestedCount);
+    usageReservation = reserveExamples(req.user, requestedCount);
   } catch (error: any) {
     return res.status(error.status || 503).json({ success: false, error: error.message });
   }

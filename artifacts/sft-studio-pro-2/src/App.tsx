@@ -58,7 +58,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { AboutModal } from "./components/AboutModal";
 import { RunTrainingModal } from "./components/RunTrainingModal";
-import { PaymentGate } from "./components/PaymentGate";
+import { PaymentGate, trainingPlan } from "./components/PaymentGate";
 import { ProjectOnboarding, type BatchRecommendation } from "./components/ProjectOnboarding";
 import { PricingModal } from "./components/PricingModal";
 import { CustomPackageModal } from "./components/CustomPackageModal";
@@ -1229,6 +1229,7 @@ export default function App() {
       const response = await projectApiFetch("/api/whop/entitlements");
       const balance = await response.json();
       if (!response.ok || !balance.success) throw new Error(balance.error || "Unable to check example allowance.");
+      if (balance.bypass === true) return true;
       if (balance.remaining < count) { setShowExamplePaygate(true); return false; }
       return true;
     } catch (error: any) {
@@ -7732,6 +7733,7 @@ export default function App() {
                   <Cpu className="h-4 w-4 text-blue-400" />
                   Open automated trainer
                 </button>
+                <PaymentGate apiFetch={projectApiFetch} planKey={trainingPlan[trainerHandoff.model]} />
               </section>
             )}
 

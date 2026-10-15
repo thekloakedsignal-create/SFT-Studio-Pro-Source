@@ -402,7 +402,7 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
   }
   const trainingSelection = req.body?.trainingModel ?? "Qwen3.5 9 Base";
   try {
-    consumeTraining(uid, trainingSelection);
+    consumeTraining(req.user, trainingSelection);
   } catch (error: any) {
     return res.status(error.status || 503).json({ success: false, error: error.message });
   }

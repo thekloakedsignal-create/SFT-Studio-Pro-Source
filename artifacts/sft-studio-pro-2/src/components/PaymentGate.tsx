@@ -53,7 +53,7 @@ export function PaymentGate({ apiFetch, planKey, onReady }: {
         if (!res.ok || !data.success) throw new Error(data.error || "Unable to check payment.");
         setBalance(data);
         setError("");
-        callbacks.current.onReady?.(Number(data.training?.[planKey] || 0) > 0);
+        callbacks.current.onReady?.(data.bypass === true || Number(data.training?.[planKey] || 0) > 0);
       } catch (e: any) {
         if (!disposed) { setError(e.message); callbacks.current.onReady?.(false); }
       } finally {
@@ -85,6 +85,12 @@ export function PaymentGate({ apiFetch, planKey, onReady }: {
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "Unable to open checkout.");
+      if (data.bypass === true) {
+        tab?.close();
+        setBalance(data);
+        callbacks.current.onReady?.(true);
+        return;
+      }
       setCheckoutUrl(data.purchaseUrl);
       if (tab) tab.location.href = data.purchaseUrl;
     } catch (e: any) {
@@ -93,6 +99,7 @@ export function PaymentGate({ apiFetch, planKey, onReady }: {
     } finally { setBusy(false); }
   };
 
+  if (balance?.bypass === true) return null;
   return <div className="rounded-xl border border-emerald-500/30 bg-slate-900 p-3 space-y-2 text-xs text-slate-200">
     <p className="font-semibold">{usage ? "Example allowance" : "Training payment"}</p>
     <p>{usage
