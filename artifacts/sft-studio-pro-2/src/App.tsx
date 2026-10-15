@@ -5190,6 +5190,7 @@ export default function App() {
                               setBatchDesc(activeRecommendedBatch.topic);
                               setBatchInstructions(activeRecommendedBatch.specialInstructions);
                               setBatchTempConstraints(activeRecommendedBatch.temporaryConstraints);
+                              setNotification({ text: "Batch instructions copied", type: "success" });
                             }}
                           >
                             Copy to Synthesizer
