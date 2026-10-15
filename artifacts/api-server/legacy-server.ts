@@ -11,6 +11,7 @@ import { db } from "./src/db/index.ts";
 import { projects, batches, users, studentCodes } from "./src/db/schema.ts";
 import { eq, and, inArray } from "drizzle-orm";
 import { optionalAuth, AuthRequest } from "./src/middleware/auth.ts";
+import { reserveExamples, settleExamples } from "./src/routes/whop.ts";
 import { logger } from "./src/lib/logger.ts";
 import { auditTemplateFormat } from "./src/lib/quality-format.ts";
 import {
@@ -1104,7 +1105,7 @@ app.get("/api/generate/jobs/:jobId", (req, res) => {
 });
 
 // 1. Generate SFT Batch
-app.post("/api/generate", async (req, res) => {
+app.post("/api/generate", optionalAuth, async (req: AuthRequest, res) => {
   const {
     projectName,
     systemPrompt,
@@ -1128,6 +1129,12 @@ app.post("/api/generate", async (req, res) => {
       success: false,
       error: `Batch size must be one of: ${SUPPORTED_GENERATION_BATCH_SIZES.join(", ")}.`
     });
+  }
+  let usageReservation: string;
+  try {
+    usageReservation = reserveExamples(req.user?.uid, countNum);
+  } catch (error: any) {
+    return res.status(error.status || 503).json({ success: false, error: error.message });
   }
   const generationBatchId = randomUUID();
   const generationTimeoutMs = Math.ceil(countNum / 50) * SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS;
@@ -2183,6 +2190,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
           ? formatAIErrorMessage(singleTurnFailure)
           : recoveryFailureReason || `Generation completed ${formattedPartialExamples.length} of ${countNum} examples.`
       };
+      settleExamples(usageReservation, formattedPartialExamples.length);
       if (generationJobId) {
         const job = generationJobs.get(generationJobId);
         if (job) {
@@ -2216,6 +2224,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       examples: formattedExamples, 
       source: `DigitalOcean Inference (${generationModels.join(", ")})`
     };
+    settleExamples(usageReservation, formattedExamples.length);
     if (generationJobId) {
       const job = generationJobs.get(generationJobId);
       if (job) {
@@ -2233,6 +2242,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     return res.json(generationResponse);
   } catch (error: any) {
     console.error("DigitalOcean batch generation error:", error);
+    settleExamples(usageReservation, 0);
     if (generationJobId) {
       const job = generationJobs.get(generationJobId);
       if (job) {
@@ -3159,6 +3169,12 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
       }
     }
     const transcriptTemplate = multiTurn ? "Multi Turn" : "Single Turn";
+    try {
+      const reservation = reserveExamples(req.user?.uid, groups.length);
+      settleExamples(reservation, groups.length);
+    } catch (error: any) {
+      return res.status(error.status || 503).json({ success: false, error: error.message });
+    }
     return res.json({
       success: true, source: "Verbatim Transcript Conversion", templateType: transcriptTemplate,
       requestedCount: groups.length, partial: false,
@@ -3172,8 +3188,15 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
     return res.status(400).json({ success: false, error: "Example count must be an integer between 1 and 250." });
   }
 
+  let usageReservation: string;
+  try {
+    usageReservation = reserveExamples(req.user?.uid, requestedCount);
+  } catch (error: any) {
+    return res.status(error.status || 503).json({ success: false, error: error.message });
+  }
   let conversionJob: (typeof documentConversionJobs extends Map<string, infer Job> ? Job : never) | undefined;
   const finishConversion = (code: number, result: any) => {
+    settleExamples(usageReservation, result.success ? result.examples?.length || 0 : 0);
     if (!conversionJob) {
       res.status(code).json(result);
       return;

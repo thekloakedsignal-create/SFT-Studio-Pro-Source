@@ -5,6 +5,7 @@ import {
   ShieldAlert, Cloud, ExternalLink
 } from "lucide-react";
 import { validateRegistryOutput } from "../lib/registry-validation";
+import { PaymentGate, trainingPlan } from "./PaymentGate";
 
 const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations: number }> = {
   "Qwen3.5 9 Base": { model: "Qwen/Qwen3.5-9B", base: "Qwen/Qwen3.5-9B-Base", evaluations: 1 },
@@ -51,6 +52,7 @@ export function RunTrainingModal({
   const [files, setFiles] = useState<{ trainingFileId: string; validationFileId: string; trainingCount: number; validationCount: number } | null>(null);
   const [estimate, setEstimate] = useState<any>(null);
   const [job, setJob] = useState<any>(null);
+  const [paidModel, setPaidModel] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const splits = open ? getSerializedSplits() : { training: [], validation: [] };
@@ -163,7 +165,7 @@ export function RunTrainingModal({
       }));
       setEstimate(est.estimate);
       setStep("submit");
-      notify("Datasets uploaded and validated by Together AI. Review the cost estimate before submitting.", "success");
+      notify("Datasets uploaded and validated. Ready to submit.", "success");
     } catch (e: any) {
       setError(e?.message || "Dataset upload failed.");
     } finally {
@@ -265,11 +267,11 @@ export function RunTrainingModal({
             {/* Fixed configuration summary */}
             <div className="p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-400 space-y-1.5">
               <div className="flex justify-between"><span>Training model</span><span className="text-slate-200">{MODEL_DISPLAY}</span></div>
-              <div className="flex justify-between"><span>From HF base (BYOM)</span><span className="text-slate-200">{BASE_DISPLAY}</span></div>
+              <div className="flex justify-between"><span>Base model</span><span className="text-slate-200">{BASE_DISPLAY}</span></div>
               <div className="flex justify-between"><span>Training type</span><span className="text-slate-200">Full (LoRA disabled)</span></div>
               <div className="flex justify-between"><span>Epochs</span><span className="text-slate-200">2</span></div>
               <div className="flex justify-between"><span>Evaluations</span><span className="text-slate-200">{selectedModel?.evaluations ?? 1}</span></div>
-              <div className="flex justify-between"><span>Export format</span><span className="text-emerald-400 uppercase">{exportFormat}</span></div>
+              <div className="flex justify-between"><span>Training format</span><span className="text-emerald-400">ChatML Instruction (&lt;|im_start|&gt;)</span></div>
               <div className="flex justify-between border-t border-slate-800 pt-1.5"><span>Training split</span><span className="text-green-400 font-bold">{splits.training.length} examples</span></div>
               <div className="flex justify-between"><span>Validator split</span><span className="text-yellow-400 font-bold">{splits.validation.length} examples</span></div>
             </div>
@@ -277,7 +279,7 @@ export function RunTrainingModal({
             {(!trainingValid || !validationValid) && step === "configure" && (
               <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/20 text-[11px] text-red-300">
                 <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>Both splits must be non-empty and pass the final format check for [{exportFormat.toUpperCase()}] before preflight. Adjust the selection or format above.</span>
+                <span>Both splits must be non-empty and pass the automatic ChatML Instruction format check before training.</span>
               </div>
             )}
 
@@ -297,6 +299,7 @@ export function RunTrainingModal({
                     value={trainingModel}
                     disabled={busy}
                     onChange={e => {
+                        setPaidModel(null);
                       onTrainingModelChange(e.target.value);
                       setSuffix(current => ["sft-studio", "custom-v1"].includes(current) ? "" : current);
                       setPreflight(null);
@@ -308,7 +311,9 @@ export function RunTrainingModal({
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="output-model-name" className="block text-xs font-bold text-slate-300 mb-1">What would you like to name your model?</label>
+                  <PaymentGate key={trainingModel} apiFetch={apiFetch} planKey={trainingPlan[trainingModel]}
+                    onReady={ready => setPaidModel(ready ? trainingModel : null)} />
+                  <label htmlFor="output-model-name" className="block text-xs font-bold text-slate-300 mb-1 mt-3">What would you like to name your model?</label>
                   <div className="flex items-center rounded-lg border border-slate-800 bg-slate-900 focus-within:border-emerald-500/50">
                     <span className="pl-3 text-xs font-mono text-emerald-400">RoseG/</span>
                     <input
@@ -337,7 +342,7 @@ export function RunTrainingModal({
                 <button
                   type="button"
                   onClick={runPreflight}
-                  disabled={busy || !trainingValid || !validationValid || !hfRepoName.trim()}
+                  disabled={busy || paidModel !== trainingModel || !trainingValid || !validationValid || !hfRepoName.trim()}
                   className="w-full py-2.5 px-4 rounded-xl kk-primary text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                 >
                   {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
@@ -371,7 +376,7 @@ export function RunTrainingModal({
                   <span>{busy ? "Uploading & Validating…" : "Approve & Upload Datasets"}</span>
                 </button>
                 <p className="text-[10px] text-slate-500 leading-relaxed">
-                  This sends both JSONL datasets to Together AI. The job itself is still a separate approval with its cost estimate.
+                  This sends both automatically formatted ChatML Instruction datasets to Together AI. Starting training still requires separate approval.
                 </p>
               </div>
             )}

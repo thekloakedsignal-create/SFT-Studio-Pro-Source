@@ -58,6 +58,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { AboutModal } from "./components/AboutModal";
 import { RunTrainingModal } from "./components/RunTrainingModal";
+import { PaymentGate } from "./components/PaymentGate";
 import { ProjectOnboarding, type BatchRecommendation } from "./components/ProjectOnboarding";
 import { PricingModal } from "./components/PricingModal";
 import { CustomPackageModal } from "./components/CustomPackageModal";
@@ -671,6 +672,7 @@ export default function App() {
   const [showBillingModal, setShowBillingModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [showRunTrainingModal, setShowRunTrainingModal] = useState(false);
+  const [showExamplePaygate, setShowExamplePaygate] = useState(false);
   const [trainerHandoff, setTrainerHandoff] = useState({ model: "Qwen3.5 9 Base", template: "Instruct ChatML (<|im_start|>)" });
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showCustomPackageModal, setShowCustomPackageModal] = useState(false);
@@ -1220,6 +1222,19 @@ export default function App() {
       return false;
     }
     return true;
+  };
+
+  const checkExampleAllowance = async (count: number): Promise<boolean> => {
+    try {
+      const response = await projectApiFetch("/api/whop/entitlements");
+      const balance = await response.json();
+      if (!response.ok || !balance.success) throw new Error(balance.error || "Unable to check example allowance.");
+      if (balance.remaining < count) { setShowExamplePaygate(true); return false; }
+      return true;
+    } catch (error: any) {
+      setNotification({ text: error.message, type: "error" });
+      return false;
+    }
   };
 
   // Save the SFT project to Firestore directly (incremental delta saving)
@@ -1996,7 +2011,7 @@ export default function App() {
       return;
     }
 
-    if (!checkGenerationLimit(batchSize)) return;
+    if (!await checkExampleAllowance(batchSize)) return;
     const generationProjectId = selectedProjectId;
     setIsGenerating(true);
     setGenerationProgress({ current: 0, total: batchSize, percent: 0 });
@@ -2050,7 +2065,7 @@ export default function App() {
 
       const runSubChunk = async (countToGen: number, currentSubIdx: number): Promise<any[]> => {
         try {
-            const res = await fetch("/api/generate", {
+            const res = await projectApiFetch("/api/generate", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -2072,6 +2087,7 @@ export default function App() {
             });
 
             const startData = await res.json();
+             if (res.status === 402) setShowExamplePaygate(true);
             if (!res.ok || !startData?.success) {
               throw new Error(startData?.error || `Generation request failed (${res.status}).`);
             }
@@ -2612,7 +2628,7 @@ export default function App() {
       setNotification({ text: "Please provide document content or upload a text-based file first.", type: "error" });
       return;
     }
-    if (!checkGenerationLimit(docCount)) return;
+    if (!await checkExampleAllowance(docType === "transcript" ? 1 : docCount)) return;
 
     const tracksGenerationProgress = docType === "knowledge_base" || docType === "literature";
     setDocConversionProgress(tracksGenerationProgress ? { completed: 0, total: docCount } : null);
@@ -2657,6 +2673,7 @@ export default function App() {
         throw new Error(`Server returned status ${res.status}: unable to parse response.`);
       }
 
+      if (res.status === 402) setShowExamplePaygate(true);
       if (!res.ok) throw new Error(data.error || `Conversion request failed (${res.status}).`);
       if (res.status === 202) {
         if (typeof data.jobId !== "string") throw new Error("Conversion job ID is missing.");
@@ -2740,7 +2757,6 @@ export default function App() {
       setNotification({ text: "Enter a dataset URL before importing.", type: "error" });
       return;
     }
-    if (!checkGenerationLimit(triadSize)) return;
     setIsTriadImporting(true);
     setNotification({ text: `Importing up to ${triadSize} examples from the dataset URL...`, type: "info" });
 
@@ -8159,6 +8175,12 @@ export default function App() {
         apiFetch={projectApiFetch}
         notify={(text, type) => setNotification({ text, type })}
       />
+      {showExamplePaygate && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4">
+        <div role="dialog" aria-modal="true" aria-label="Example allowance" className="w-full max-w-md rounded-xl bg-slate-950 p-4 border border-slate-700">
+          <button type="button" onClick={() => setShowExamplePaygate(false)} className="mb-3 text-sm text-slate-300">Close</button>
+          <PaymentGate apiFetch={projectApiFetch} planKey="usage_10k" />
+        </div>
+      </div>}
       <CustomPackageModal
         isOpen={showCustomPackageModal}
         onClose={() => setShowCustomPackageModal(false)}

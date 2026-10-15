@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
 import { logger } from "../lib/logger.ts";
+import { consumeTraining, restoreTraining } from "./whop.ts";
 
 // Together AI full fine-tuning automation for the SFT Studio Data Registry.
 // All provider (Together AI) and Hugging Face credentials live exclusively in
@@ -193,6 +194,16 @@ function validateJsonl(content: unknown, label: string): { lines: string[]; erro
       const row = JSON.parse(lines[i]);
       if (!row || Array.isArray(row) || typeof row !== "object") {
         return { lines: [], error: `The ${label} dataset line ${i + 1} is not a JSON object.` };
+      }
+      const pattern = /<\|im_start\|>(system|user|assistant)\n([\s\S]*?)\n<\|im_end\|>/g;
+      const text = typeof row.text === "string" ? row.text : "";
+      const turns = [...text.matchAll(pattern)];
+      const dialogue = turns[0]?.[1] === "system" ? turns.slice(1) : turns;
+      if (!turns.length || text.replace(pattern, "").trim()
+        || turns.some(t => !t[2].trim() || /<\|im_(?:start|end)\|>/.test(t[2]))
+        || dialogue.length < 2 || dialogue.length % 2
+        || dialogue.some((t, index) => t[1] !== (index % 2 ? "assistant" : "user"))) {
+        return { lines: [], error: `The ${label} dataset line ${i + 1} must use ChatML Instruction (<|im_start|>) format.` };
       }
     } catch {
       return { lines: [], error: `The ${label} dataset line ${i + 1} is not valid JSON.` };
@@ -388,6 +399,12 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
     } catch {
       // Unknown/unreachable older job: do not block on it.
     }
+  }
+  const trainingSelection = req.body?.trainingModel ?? "Qwen3.5 9 Base";
+  try {
+    consumeTraining(uid, trainingSelection);
+  } catch (error: any) {
+    return res.status(error.status || 503).json({ success: false, error: error.message });
   }
   try {
     const job = await togetherRequest("/fine-tunes", {
