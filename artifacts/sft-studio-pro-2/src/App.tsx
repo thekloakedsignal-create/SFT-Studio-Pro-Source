@@ -6923,53 +6923,6 @@ export default function App() {
                        </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Issues List */}
-                      <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-2xl">
-                        <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                          <ShieldAlert className="h-4 w-4 text-amber-400" />
-                          Flagged SFT Compliance Issues
-                        </h3>
-                        <div className="space-y-3 custom-scrollbar max-h-60 overflow-y-auto pr-1">
-                          {activeReport.issues.map((iss, idx) => (
-                            <div key={idx} className="bg-slate-900/60 p-3 rounded-xl border border-slate-800 text-xs">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono uppercase tracking-wide font-bold ${
-                                  iss.severity === "High" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
-                                  iss.severity === "Medium" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
-                                  "bg-slate-800 text-slate-400"
-                                }`}>
-                                  {iss.severity} Severity
-                                </span>
-                                <span className="text-slate-500 text-[10px] font-mono">
-                                  {iss.type}
-                                </span>
-                              </div>
-                              <p className="text-slate-400 mb-1 text-[10px] uppercase font-bold">Reason:</p>
-                              <p className="text-slate-300 leading-relaxed font-sans">{iss.message}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Optimization Suggestions */}
-                      <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-2xl">
-                        <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-green-400" />
-                          AI Synthesis Suggestions
-                        </h3>
-                        <ul className="space-y-3">
-                          {activeReport.suggestions.map((sug, idx) => (
-                            <li key={idx} className="flex gap-2 text-xs leading-relaxed text-slate-300">
-                              <span className="h-5 w-5 rounded-full bg-green-500/10 text-green-400 flex items-center justify-center shrink-0 font-mono font-bold text-[10px]">
-                                {idx + 1}
-                              </span>
-                              <span className="mt-0.5">{sug}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
                   </>
                 )}
 
