@@ -4128,11 +4128,12 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
     const regeneratedExamples: any[] = [];
     const failures: { exampleIndex: number; error: string }[] = [];
     let nextItem = 0;
-    const repairStacks = createModelGenerationStacks(flaggedItems.length, getGenerationModels());
-    for (let stackIndex = 0; stackIndex < repairStacks.length; stackIndex++) {
-      if (stackIndex) await new Promise(resolve => setTimeout(resolve, 2000));
-      await Promise.all(repairStacks[stackIndex].map(async ({ model }) => {
-        const item = flaggedItems[nextItem++];
+    const repairTasks = createModelGenerationStacks(flaggedItems.length, getGenerationModels()).flat();
+    await Promise.all(Array.from({ length: Math.min(20, repairTasks.length) }, async () => {
+      while (nextItem < repairTasks.length) {
+        const itemIndex = nextItem++;
+        const { model } = repairTasks[itemIndex];
+        const item = flaggedItems[itemIndex];
         const originalTemplate = item.example.templateType || templateType;
         const itemTemplate = /mixed/i.test(originalTemplate || "")
           ? (item.example.messages.filter((message: any) => message?.role === "user").length > 1 ? "Multi Turn" : "Single Turn")
@@ -4227,8 +4228,8 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
         } finally {
           if (job) { job.completed++; job.updatedAt = Date.now(); }
         }
-      }));
-    }
+      }
+    }));
     finish(200, { success: regeneratedExamples.length > 0, regeneratedExamples, failures,
       partial: failures.length > 0, error: regeneratedExamples.length ? undefined : "No flagged responses could be repaired." });
     return;
