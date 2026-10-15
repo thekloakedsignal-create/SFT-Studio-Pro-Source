@@ -36,7 +36,7 @@ const TRAINING_CONFIGS: Record<string, {
   packing?: boolean;
   n_checkpoints?: number;
   learning_rate?: number;
-  lr_scheduler?: string;
+  lr_scheduler?: { lr_scheduler_type: string };
 }> = {
   "Qwen3.5 9 Base": {
     model: "Qwen/Qwen3.5-9B",
@@ -50,7 +50,7 @@ const TRAINING_CONFIGS: Record<string, {
     max_seq_length: 65536,
     n_checkpoints: 1,
     learning_rate: 0.00001,
-    lr_scheduler: "cosine",
+    lr_scheduler: { lr_scheduler_type: "cosine" },
   },
   "Qwen3.5 4B Base": {
     model: "Qwen/Qwen3.5-4B",
@@ -64,7 +64,7 @@ const TRAINING_CONFIGS: Record<string, {
     max_seq_length: 131072,
     n_checkpoints: 1,
     learning_rate: 0.00001,
-    lr_scheduler: "cosine",
+    lr_scheduler: { lr_scheduler_type: "cosine" },
   },
   "Llama 3.1 70B": {
     model: "meta-llama/Llama-3.3-70B-Instruct-Reference",
@@ -78,7 +78,7 @@ const TRAINING_CONFIGS: Record<string, {
     max_seq_length: 24576,
     n_checkpoints: 1,
     learning_rate: 0.00001,
-    lr_scheduler: "cosine",
+    lr_scheduler: { lr_scheduler_type: "cosine" },
   },
 };
 function getTrainingConfig(selection: unknown) {
