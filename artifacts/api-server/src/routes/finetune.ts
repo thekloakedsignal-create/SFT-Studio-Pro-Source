@@ -176,7 +176,7 @@ async function waitForFileProcessing(fileId: string): Promise<void> {
   throw new Error("Timed out waiting for Together AI to validate an uploaded dataset.");
 }
 
-// Preflight: confirm server credentials (booleans only) and live model compatibility.
+// Preflight: confirm server credentials and the selected fine-tuning template's limits.
 router.post("/finetune/preflight", async (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
@@ -196,9 +196,8 @@ router.post("/finetune/preflight", async (req: AuthRequest, res) => {
     });
   }
   try {
-    const models = await togetherRequest("/models");
-    const list = Array.isArray(models) ? models : models?.data || [];
-    const modelAvailable = list.some((m: any) => m?.id === config.model);
+    const limits = await togetherRequest(`/fine-tunes/models/limits?model_name=${encodeURIComponent(config.model)}`);
+    const modelAvailable = limits?.model_name === config.model && limits?.supports_full_training === true;
     if (modelAvailable) {
       store.sessions[uid] = { ...store.sessions[uid], preflightAt: new Date().toISOString(), preflightModel: config.model };
       saveStore(store);
