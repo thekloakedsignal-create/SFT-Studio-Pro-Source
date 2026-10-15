@@ -12,4 +12,3 @@
 - [Batch recommendation library](batch-recommendation-library.md) — Add user-supplied recipes one at a time; preserve each field and its separate copy control.
 - [Registry QA gate](registry-qa-gate.md) — Registry inclusion requires a completed QA check, not a perfect score; final serialized output gets a format-only check.
 - [Storage and generation](local-project-storage.md) — Preserve deliberate saved-project loading; never automatically reopen cached projects or reuse cached batches for generation.
-- [Trained model samples](trained-model-samples.md) — One explicit 15-minute chat per trained model; retain stopped endpoint as the durable use marker and keep cleanup server-side.

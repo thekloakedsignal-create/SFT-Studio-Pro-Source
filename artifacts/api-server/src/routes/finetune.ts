@@ -3,7 +3,6 @@ import path from "path";
 import fs from "fs";
 import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
 import { logger } from "../lib/logger.ts";
-import { createModelSampleRouter } from "./model-sample.ts";
 
 // Together AI full fine-tuning automation for the SFT Studio Data Registry.
 // All provider (Together AI) and Hugging Face credentials live exclusively in
@@ -98,12 +97,6 @@ const store = loadStore();
 
 const router: IRouter = Router();
 router.use(optionalAuth);
-router.use(createModelSampleRouter(async (uid, jobId) => {
-  if (store.jobOwners[jobId] !== uid) {
-    throw Object.assign(new Error("Job not found."), { status: 404 });
-  }
-  return togetherRequest(`/fine-tunes/${encodeURIComponent(jobId)}`);
-}));
 
 // Require a verified signed-in account. A self-asserted device ID is not
 // sufficient to spend money against the server's shared provider credentials.
