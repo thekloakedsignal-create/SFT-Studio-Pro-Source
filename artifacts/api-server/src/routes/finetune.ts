@@ -25,7 +25,7 @@ const TOGETHER_API_BASE = "https://api.together.ai/v1";
 
 // Together catalog templates paired with the selected Hugging Face checkpoint.
 const TRAINING_CONFIGS: Record<string, { model: string; from_hf_model: string; n_evals: number }> = {
-  "Qwen3.5 9 Base": { model: "Qwen/qwen3.5-9B", from_hf_model: "Qwen/qwen3.5-9B-Base", n_evals: 1 },
+  "Qwen3.5 9 Base": { model: "Qwen/qwen3.5-9B", from_hf_model: "Qwen/qwen3.5-9B-base", n_evals: 1 },
   "Qwen3.5 4B Base": { model: "Qwen/Qwen3.5-4B", from_hf_model: "Qwen/Qwen3.5-4B-Base", n_evals: 1 },
   "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", from_hf_model: "meta-llama/Llama-3.1-70B", n_evals: 1 },
 };
@@ -348,7 +348,7 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
         training_type: { type: "Full" },
         n_epochs: N_EPOCHS,
         n_evals: config.n_evals,
-        suffix: typeof suffix === "string" && suffix.trim() ? suffix.trim().slice(0, 64) : "sft-studio",
+        ...(typeof suffix === "string" && suffix.trim() ? { suffix: suffix.trim().slice(0, 64) } : {}),
         hf_api_token: hfToken,
         hf_output_repo_name: repoName,
       }),

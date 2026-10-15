@@ -7,7 +7,7 @@ import {
 import { validateRegistryOutput } from "../lib/registry-validation";
 
 const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations: number }> = {
-  "Qwen3.5 9 Base": { model: "Qwen/qwen3.5-9B", base: "Qwen/qwen3.5-9B-Base", evaluations: 1 },
+  "Qwen3.5 9 Base": { model: "Qwen/qwen3.5-9B", base: "Qwen/qwen3.5-9B-base", evaluations: 1 },
   "Qwen3.5 4B Base": { model: "Qwen/Qwen3.5-4B", base: "Qwen/Qwen3.5-4B-Base", evaluations: 1 },
   "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", base: "meta-llama/Llama-3.1-70B", evaluations: 1 },
 };
@@ -38,10 +38,12 @@ export function RunTrainingModal({
   open, onClose, exportFormat, trainingModel, onTrainingModelChange, getSerializedSplits, apiFetch, notify
 }: RunTrainingModalProps) {
   const selectedModel = TRAINING_MODELS[trainingModel];
-  const MODEL_DISPLAY = selectedModel?.model || trainingModel;
+  const MODEL_DISPLAY = trainingModel === "Qwen3.5 9 Base"
+    ? "Qwen3.5 9B FP8"
+    : selectedModel?.model || trainingModel;
   const BASE_DISPLAY = selectedModel?.base || "";
   const [step, setStep] = useState<Step>("configure");
-  const [suffix, setSuffix] = useState(trainingModel === "Qwen3.5 9 Base" ? "sft-studio" : "custom-v1");
+  const [suffix, setSuffix] = useState("");
   const [hfRepoName, setHfRepoName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,8 +69,7 @@ export function RunTrainingModal({
         setStep("progress");
         return;
       }
-      setSuffix(current => ["sft-studio", "custom-v1"].includes(current)
-        ? (trainingModel === "Qwen3.5 9 Base" ? "sft-studio" : "custom-v1") : current);
+      setSuffix(current => ["sft-studio", "custom-v1"].includes(current) ? "" : current);
       setStep("configure");
       setError(null);
       setPreflight(null);
@@ -298,8 +299,7 @@ export function RunTrainingModal({
                     disabled={busy}
                     onChange={e => {
                       onTrainingModelChange(e.target.value);
-                      setSuffix(current => ["sft-studio", "custom-v1"].includes(current)
-                        ? (e.target.value === "Qwen3.5 9 Base" ? "sft-studio" : "custom-v1") : current);
+                      setSuffix(current => ["sft-studio", "custom-v1"].includes(current) ? "" : current);
                       setPreflight(null);
                       setError(null);
                     }}
@@ -330,7 +330,7 @@ export function RunTrainingModal({
                     type="text"
                     value={suffix}
                     onChange={e => setSuffix(e.target.value)}
-                    placeholder="sft-studio"
+                    placeholder="e.g. ft-123"
                     maxLength={64}
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500/50 font-mono"
                   />
