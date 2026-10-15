@@ -88,7 +88,7 @@ function getTrainingConfig(selection: unknown) {
 const N_EPOCHS = 2;
 const PREFLIGHT_TTL_MS = 60 * 60 * 1000; // upload allowed within 1h of preflight
 
-const TERMINAL_JOB_STATUSES = new Set(["completed", "error", "cancelled"]);
+const TERMINAL_JOB_STATUSES = new Set(["completed", "error", "user_error", "failed", "cancelled"]);
 
 // Per-owner consent/flow state and job ownership, persisted across restarts.
 interface OwnerSession {
