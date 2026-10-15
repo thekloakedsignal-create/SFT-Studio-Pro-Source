@@ -63,6 +63,10 @@ export function RunTrainingModal({
 
   useEffect(() => {
     if (open) {
+      if (job?.id) {
+        setStep("progress");
+        return;
+      }
       setSuffix(current => ["sft-studio", "custom-v1"].includes(current)
         ? (trainingModel === "Qwen3.5 9 Base" ? "sft-studio" : "custom-v1") : current);
       setStep("configure");
@@ -72,27 +76,37 @@ export function RunTrainingModal({
       setEstimate(null);
       setJob(null);
       setBusy(false);
-    } else {
-      stopPolling();
     }
   }, [open]);
 
   const pollJob = (jobId: string) => {
     stopPolling();
+    let checking = false;
     pollRef.current = setInterval(async () => {
+      if (checking) return;
+      checking = true;
       try {
         const data = await readApi(await apiFetch(`/api/finetune/jobs/${encodeURIComponent(jobId)}`));
-        setJob(data.job);
+        setJob((current: any) => ({ ...current, ...data.job }));
         if (["completed", "error", "cancelled"].includes(String(data.job?.status || "").toLowerCase())) {
           stopPolling();
+          if (String(data.job?.status || "").toLowerCase() === "completed") {
+            notify(`Training complete. Open the automated trainer for your model's Hugging Face repository link.`, "success");
+          }
         }
       } catch {
         // Keep polling; transient status failures should not lose the run.
+      } finally {
+        checking = false;
       }
     }, 10000);
   };
 
   const runPreflight = async () => {
+    if (!hfRepoName.trim()) {
+      setError("Choose a name for your model before continuing.");
+      return;
+    }
     if (!trainingValid || !validationValid) {
       setError("Both the training and validator splits must be non-empty and pass the final format check before continuing.");
       return;
@@ -106,7 +120,6 @@ export function RunTrainingModal({
         body: JSON.stringify({ suffix, hfRepoName, trainingModel }),
       }));
       setPreflight(data);
-      if (data.defaultHfRepoName && !hfRepoName) setHfRepoName(data.defaultHfRepoName);
       if (!data.credentials?.together || !data.credentials?.huggingFace) {
         setError("Server credentials are not configured yet. Add TOGETHER_API_KEY and HF_TOKEN to the app secrets, then run the preflight again.");
       } else if (!data.modelAvailable) {
@@ -176,7 +189,7 @@ export function RunTrainingModal({
           confirmSubmit: true,
         }),
       }));
-      setJob(data.job);
+      setJob({ ...data.job, hfRepoName: `RoseG/${hfRepoName.trim()}` });
       setStep("progress");
       pollJob(data.job.id);
       notify(`Fine-tune job ${data.job.id} submitted.`, "success");
@@ -208,6 +221,13 @@ export function RunTrainingModal({
 
   const statusLabel = String(job?.status || "").toLowerCase();
   const estimatePrice = estimate?.estimated_total_price ?? estimate?.total_price ?? estimate?.price ?? null;
+  const outputModelName = job?.hfRepoName || `RoseG/${hfRepoName.trim()}`;
+  const outputRepoUrl = `https://huggingface.co/${outputModelName.split("/").map(encodeURIComponent).join("/")}`;
+  const closeTrainer = () => {
+    if (busy) return;
+    if (["completed", "error", "cancelled"].includes(statusLabel)) setJob(null);
+    onClose();
+  };
 
   return (
     <AnimatePresence>
@@ -217,7 +237,7 @@ export function RunTrainingModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4"
-          onClick={() => { if (!busy) onClose(); }}
+          onClick={closeTrainer}
         >
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -235,8 +255,11 @@ export function RunTrainingModal({
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   Uploads your approved Registry dataset to Together AI and runs a full fine-tune. Nothing is sent or billed without your explicit approval at each step.
                 </p>
+                <p className="text-[11px] text-slate-300 mt-2">
+                  Training typically takes 1–3 hours. When it completes, you will receive the public Hugging Face repository link for your model.
+                </p>
               </div>
-              <button type="button" onClick={() => { if (!busy) onClose(); }} className="p-1.5 rounded-lg hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition cursor-pointer">
+              <button type="button" onClick={closeTrainer} className="p-1.5 rounded-lg hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition cursor-pointer">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -289,17 +312,20 @@ export function RunTrainingModal({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Hugging Face Output Repository</label>
+                  <label htmlFor="output-model-name" className="block text-xs font-bold text-slate-300 mb-1">What would you like to name your model?</label>
                   <div className="flex items-center rounded-lg border border-slate-800 bg-slate-900 focus-within:border-emerald-500/50">
                     <span className="pl-3 text-xs font-mono text-emerald-400">RoseG/</span>
                     <input
+                      id="output-model-name"
                       type="text"
+                      required
                       value={hfRepoName}
                       onChange={e => setHfRepoName(e.target.value.replace(/^\/+/, "").replace(/[/?#\s]/g, "-"))}
-                      placeholder="your-output-repo"
+                      placeholder="your-chosen-name"
                       className="min-w-0 flex-1 bg-transparent px-1 py-2 text-xs text-slate-200 outline-none font-mono"
                     />
                   </div>
+                  <p className="mt-1 text-[11px] text-slate-400">Your public output model will be named RoseG/{hfRepoName.trim() || "your-chosen-name"}.</p>
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Model Name Suffix</label>
@@ -315,7 +341,7 @@ export function RunTrainingModal({
                 <button
                   type="button"
                   onClick={runPreflight}
-                  disabled={busy || !trainingValid || !validationValid}
+                  disabled={busy || !trainingValid || !validationValid || !hfRepoName.trim()}
                   className="w-full py-2.5 px-4 rounded-xl kk-primary text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                 >
                   {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
@@ -403,6 +429,9 @@ export function RunTrainingModal({
                     {statusLabel !== "completed" && statusLabel !== "error" && statusLabel !== "cancelled" && " (updates automatically every 10 seconds)"}
                   </span>
                 </div>
+                {!["completed", "error", "cancelled"].includes(statusLabel) && (
+                  <p className="text-[11px] text-slate-300">You can close this window and return to the trainer. Keep the app open for automatic completion updates.</p>
+                )}
                 {Array.isArray(job.events) && job.events.length > 0 && (
                   <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[10px] font-mono text-slate-400 space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
                     {job.events.map((e: string, i: number) => <div key={i}>• {e}</div>)}
@@ -410,14 +439,11 @@ export function RunTrainingModal({
                 )}
                 {statusLabel === "completed" && (
                   <div className="space-y-2">
-                    {job.outputName && (
-                      <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-300 flex items-center justify-between gap-2">
-                        <span className="truncate">Output model: {job.outputName}</span>
-                        <ExternalLink className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                      </div>
-                    )}
                     <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-300">
-                      HF export repository: <span className="text-emerald-400">RoseG/{hfRepoName}</span>
+                      <p>Output model: {outputModelName}</p>
+                      <a href={outputRepoUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-2 break-all text-emerald-400 underline">
+                        {outputRepoUrl}<ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                      </a>
                     </div>
                     {job.modelOutputPath && (
                       <button
