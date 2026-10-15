@@ -40,7 +40,7 @@ const TRAINING_CONFIGS: Record<string, {
 }> = {
   "Qwen3.5 9 Base": {
     model: "Qwen/Qwen3.5-9B",
-    from_hf_model: "Qwen/qwen3.5-9B-base",
+    from_hf_model: "Qwen/Qwen3.5-9B-Base",
     n_evals: 1,
     batch_size: 8,
     gradient_accumulation_steps: 1,

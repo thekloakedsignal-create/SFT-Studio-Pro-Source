@@ -7,7 +7,7 @@ import {
 import { validateRegistryOutput } from "../lib/registry-validation";
 
 const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations: number }> = {
-  "Qwen3.5 9 Base": { model: "Qwen/Qwen3.5-9B", base: "Qwen/qwen3.5-9B-base", evaluations: 1 },
+  "Qwen3.5 9 Base": { model: "Qwen/Qwen3.5-9B", base: "Qwen/Qwen3.5-9B-Base", evaluations: 1 },
   "Qwen3.5 4B Base": { model: "Qwen/Qwen3.5-4B", base: "Qwen/Qwen3.5-4B-Base", evaluations: 1 },
   "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", base: "meta-llama/Llama-3.1-70B", evaluations: 1 },
 };
