@@ -8149,12 +8149,12 @@ export default function App() {
       <RunTrainingModal
         open={showRunTrainingModal}
         onClose={() => setShowRunTrainingModal(false)}
-        exportFormat={exportTemplateFormat}
+        exportFormat="chatml_token"
         trainingModel={trainerHandoff.model}
         onTrainingModelChange={model => setTrainerHandoff(current => ({ ...current, model }))}
         getSerializedSplits={() => ({
-          training: compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, exportTemplateFormat)),
-          validation: compiledDataset.validationSet.map(ex => formatExampleForExport(ex, exportTemplateFormat)),
+          training: compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, "chatml_token")),
+          validation: compiledDataset.validationSet.map(ex => formatExampleForExport(ex, "chatml_token")),
         })}
         apiFetch={projectApiFetch}
         notify={(text, type) => setNotification({ text, type })}

@@ -1,4 +1,4 @@
-import Whop from '@whop/sdk';
+import { WhopClient as Whop } from '@whop/sdk';
 
 let clientPromise: Promise<Whop> | null = null;
 
@@ -41,7 +41,7 @@ async function initWhopClient(): Promise<Whop> {
     );
   }
 
-  return new Whop({ apiKey: settings.api_key });
+  return new Whop({ token: settings.api_key, maxRetries: 0, timeoutInSeconds: 20 });
 }
 
 export function getWhopClient(): Promise<Whop> {
