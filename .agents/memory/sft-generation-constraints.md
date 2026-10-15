@@ -3,7 +3,13 @@ name: SFT generation constraints
 description: User's non-negotiable constraints for SFT model dispatch and the generation UI.
 ---
 
-The scoped recovery policies below and the Reasoning-only policy in `reasoning-template-scope.md` override the baseline recovery policy where they differ.
+The latest scheduling instruction below overrides older wave, deadline, and refill-concurrency policies in this file and in `reasoning-template-scope.md`.
+
+For every batch size and format, concurrency slots must keep cycling until the requested count is full; slow examples must not block other slots. Preserve each assigned topic and template, accept only one result per slot, and leave topic planning and generation prompts unchanged.
+
+**Why:** The user explicitly requested “Adjust all of it so retries never stall on slow examples they keep moving,” after rejecting changes to the working topic planner.
+
+**How to apply:** Confine changes to scheduling/recovery. Do not change provider payloads, generation instructions, schemas, parser, or UI to solve a scheduling slowdown. The earlier fixed-deadline and separate-retry-phase policies below are historical, not current requirements.
 
 Multi Turn alone replaces Qwen with Gemma, starts later groups without waiting for all earlier responses, and shares individual concurrent refills between GLM and Gemma. Assign each topic a rotating 2, 3, or 4 user–assistant exchange count, preserving that assignment on retries.
 

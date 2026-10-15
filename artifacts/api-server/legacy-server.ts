@@ -1407,6 +1407,7 @@ ${JSON.stringify({ examples: [{ messages: [
     );
     const chunkTasks: Array<Array<() => Promise<any[]>>> = generationStacks.map(() => []);
     const taskOutputs: Array<Array<any[] | undefined>> = generationStacks.map(stack => new Array(stack.length));
+    const generationAbort = new AbortController();
     let completedExampleCount = 0;
     const exemplarTargetResponse = req.body.representativeCompletion || "No exemplar target response provided.";
 
@@ -1894,7 +1895,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
                 : requestConfig,
               timeoutMs,
               exactMessages: isReasoningGeneration,
-              ...(ignoreModelAbort || usesReasoningRetryFlow ? {} : { abortSignal: modelAbortControllers.get(model)?.signal })
+              abortSignal: generationAbort.signal
             });
             let parsed: any[];
             if (turnMode === "Reasoning") {
@@ -2029,6 +2030,7 @@ No internal deliberation, planning, or reasoning fields are permitted.`
             responseModel = backupModel;
           }
 
+          if (generationAbort.signal.aborted || taskOutputs[c][modelIndex]?.length) return [];
           completedExampleCount += generated.length;
           taskOutputs[c][modelIndex] = generated;
           sendProgressEvent({
@@ -2050,7 +2052,9 @@ No internal deliberation, planning, or reasoning fields are permitted.`
     }
 
     let singleTurnFailure: unknown;
-    const multiTurnStacks: Promise<void>[] = [];
+    const recoveryExamples: any[] = [];
+    let recoveryFailureReason: string | null = null;
+    let recoveryFailureCategory: GenerationFailureCategory | undefined;
     if (generationJobId) {
       const job = generationJobs.get(generationJobId);
       if (job?.status === "running") {
@@ -2059,157 +2063,67 @@ No internal deliberation, planning, or reasoning fields are permitted.`
       }
     }
     startProgressStream();
-    for (let stackIndex = 0; stackIndex < chunkTasks.length; stackIndex++) {
-      if (stackIndex > 0) {
-        const remainingBatchMs = generationDeadline - Date.now();
-        const spacingMs = Math.min(2000, Math.max(0, remainingBatchMs));
-        if (spacingMs > 0) await new Promise((resolve) => setTimeout(resolve, spacingMs));
+    // Keep a bounded pool cycling over unfinished slots, without a wave/retry barrier.
+    generationDeadline = Infinity;
+    usesReasoningRetryFlow = true;
+    const pending = chunkTasks.flatMap((stack, stackIndex) =>
+      stack.map((task, modelIndex) => ({ task, stackIndex, modelIndex, slot: 0, attempts: 0 })));
+    pending.forEach((item, slot) => {
+      item.slot = slot;
+      recoveryTopics[slot] = generationTopics[item.stackIndex][item.modelIndex];
+      recoveryTurnCounts[slot] = 2 + slot % 3;
+      mixedRecoveryTurns[slot] = slot % 2 === 0 ? "Single Turn" : "Multi Turn";
+    });
+    const concurrency = Math.min(countNum, Math.max(...generationStacks.map(stack => stack.length)));
+    let finishBatch!: () => void;
+    const batchFinished = new Promise<void>(resolve => { finishBatch = resolve; });
+    const workers = Array.from({ length: concurrency }, async () => {
+      while (completedExampleCount < countNum) {
+        const item = pending.shift();
+        if (!item) return;
+        if (taskOutputs[item.stackIndex][item.modelIndex]?.length) continue;
+        // Leave the slot available: an idle worker can replace a slow in-flight call.
+        // Only the first valid result for this slot is accepted.
+        pending.push(item);
+        const attempt = item.attempts++;
+        const model = generationModels[(item.modelIndex + attempt) % generationModels.length];
+        try {
+          if (attempt === 0) {
+            await item.task();
+          } else {
+            const examples = await requestExamplesForMissingBatch!(
+              model, 1, SFT_SINGLE_EXAMPLE_TIMEOUT_MS, item.slot);
+            if (!generationAbort.signal.aborted && !taskOutputs[item.stackIndex][item.modelIndex]?.length) {
+              taskOutputs[item.stackIndex][item.modelIndex] = examples;
+              completedExampleCount += examples.length;
+              sendProgressEvent({
+                type: "progress",
+                taskId: `recovery:${item.slot}:${attempt}`,
+                model,
+                generatedCount: examples.length,
+                completedCount: completedExampleCount,
+                total: countNum
+              });
+            }
+          }
+        } catch (error: any) {
+          if (generationAbort.signal.aborted) return;
+          singleTurnFailure ??= error;
+          recoveryFailureReason = formatAIErrorMessage(error);
+          if (isReasoningGeneration) recoveryFailureCategory = getReasoningFailureCategory(error);
+          logger.warn(
+            { model, slot: item.slot, batchId: generationBatchId, error: recoveryFailureReason },
+            "Generation slot failed; cycling to the next request"
+          );
+        }
+        if (completedExampleCount >= countNum) {
+          generationAbort.abort();
+          finishBatch();
+          return;
+        }
       }
-      try {
-        // Collect all in-flight responses; non-Reasoning modes also continue
-        // later scheduled stacks rather than stopping after one failed slot.
-        {
-          const completion = Promise.allSettled(chunkTasks[stackIndex].map(task => task())).then(results => {
-            const failure = results.find(result => result.status === "rejected");
-            if (failure?.status === "rejected") {
-              singleTurnFailure ??= failure.reason;
-            }
-          });
-          if (usesReasoningRetryFlow) multiTurnStacks.push(completion);
-          else await completion;
-        }
-      } catch (error: any) {
-        const detail = formatAIErrorMessage(error);
-        const partialExamples = taskOutputs
-          .flatMap(stack => stack.flatMap(examples => examples || []))
-          .slice(0, countNum)
-          .map((example, index) => sanitizeExample({
-            ...example,
-            id: `gen-${index}-${Date.now()}`
-          }, turnMode));
-        if (partialExamples.length > 0) {
-          const partialResponse = {
-            success: true as const,
-            batchId: generationBatchId,
-            examples: partialExamples,
-            source: `DigitalOcean Inference (${generationModels.join(", ")})`,
-            partial: true as const,
-            requestedCount: countNum,
-            partialReason: detail
-          };
-          if (generationJobId) {
-            const job = generationJobs.get(generationJobId);
-            if (job) {
-              job.status = "partial";
-              job.progress.completed = partialExamples.length;
-              job.result = partialResponse;
-              if (turnMode === "Reasoning") {
-                job.failureCategory = getReasoningFailureCategory(error);
-              }
-              job.updatedAt = Date.now();
-            }
-            return;
-          }
-          if (progressStreamStarted) {
-            sendProgressEvent({ type: "partial", ...partialResponse });
-            return res.end();
-          }
-          return res.json(partialResponse);
-        }
-        throw Object.assign(
-          new Error(`Generation stopped after ${completedExampleCount} of ${countNum} examples completed. ${detail}`),
-          { failureCategory: turnMode === "Reasoning" ? getReasoningFailureCategory(error) : undefined }
-        );
-      }
-    }
-
-    await Promise.all(multiTurnStacks);
-    let recoveryExamples: any[] = [];
-    let recoveryFailureReason: string | null = null;
-    let recoveryFailureCategory: GenerationFailureCategory | undefined;
-    let recoveryModel = isReasoningGeneration ? "deepseek-4-flash" : "gemma-4-31B-it";
-    let replacementCount = Math.max(0, countNum - completedExampleCount);
-    const reasoningRetryModelIndices: number[] = [];
-    {
-      let slot = 0;
-      generationStacks.forEach((stack, stackIndex) => stack.forEach((_, modelIndex) => {
-        if (!taskOutputs[stackIndex][modelIndex]?.length) {
-          recoveryTopics.push(generationTopics[stackIndex][modelIndex]);
-          if (isReasoningGeneration) reasoningRetryModelIndices.push(modelIndex + 1);
-          if (turnMode === "Multi Turn") recoveryTurnCounts.push(2 + slot % 3);
-          if (turnMode === "Mixed") mixedRecoveryTurns.push(slot % 2 === 0 ? "Single Turn" : "Multi Turn");
-        }
-        slot++;
-      }));
-    }
-    if (replacementCount > 0 && requestExamplesForMissingBatch) {
-      if (usesReasoningRetryFlow) generationDeadline = Infinity;
-      // Refill each missing example with an individual request, bounded by concurrency and deadline.
-      const requestReplacement = requestExamplesForMissingBatch;
-      let nextReplacement = 0;
-      let replacementsInFlight = 0;
-      const replacementConcurrency = Math.max(10, ...generationStacks.map(stack => stack.length));
-      await Promise.all(Array.from({ length: Math.min(replacementConcurrency, replacementCount) }, async () => {
-        while (nextReplacement < replacementCount || replacementsInFlight > 0) {
-          if (nextReplacement >= replacementCount) {
-            await new Promise(resolve => setTimeout(resolve, 250));
-            continue;
-          }
-          if (Date.now() >= generationDeadline) {
-            recoveryFailureReason = "The batch deadline expired before all missing examples could be recovered.";
-            if (isReasoningGeneration) recoveryFailureCategory ??= "provider_timeout";
-            return;
-          }
-          const slot = nextReplacement++;
-          replacementsInFlight++;
-          let replacementModel = isReasoningGeneration
-            ? generationModels[reasoningRetryModelIndices[slot] % generationModels.length]
-            : turnMode === "Mixed"
-              ? generationModels[slot % generationModels.length]
-              : generationModels[slot % generationModels.length];
-          try {
-            let examples: any[];
-            try {
-              examples = await requestReplacement(replacementModel, 1, SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
-            } catch (error: any) {
-              if (isReasoningGeneration || turnMode === "Mixed" || !isProviderOverload(error)) throw error;
-              const backup = turnMode === "Multi Turn"
-                ? (replacementModel === "deepseek-4-flash" ? "gemma-4-31B-it" : "deepseek-4-flash")
-                : generationModels.find(model => model !== replacementModel && !stalledModels.has(model));
-              if (!backup) throw error;
-              replacementModel = backup;
-              examples = await requestReplacement(replacementModel, 1, SFT_SINGLE_EXAMPLE_TIMEOUT_MS, slot);
-            }
-            recoveryExamples.push(...examples);
-            completedExampleCount += examples.length;
-            sendProgressEvent({
-              type: "progress",
-              taskId: `recovery:${slot}:${replacementModel}`,
-              model: replacementModel,
-              generatedCount: examples.length,
-              completedCount: completedExampleCount,
-              total: countNum
-            });
-          } catch (error: any) {
-            recoveryFailureReason ??= formatAIErrorMessage(error);
-            if (isReasoningGeneration) {
-              recoveryFailureCategory ??= getReasoningFailureCategory(error);
-            }
-            logger.warn(
-              { model: replacementModel, slot, batchId: generationBatchId, error: formatAIErrorMessage(error) },
-              "Replacement failed; preserving other completed examples"
-            );
-            replacementCount++;
-            recoveryTopics.push(recoveryTopics[slot]);
-            if (isReasoningGeneration) reasoningRetryModelIndices.push(reasoningRetryModelIndices[slot] + 1);
-            if (turnMode === "Multi Turn") recoveryTurnCounts.push(recoveryTurnCounts[slot]);
-            if (turnMode === "Mixed") mixedRecoveryTurns.push(mixedRecoveryTurns[slot]);
-          } finally {
-            replacementsInFlight--;
-          }
-        }
-      }));
-    }
+    });
+    await Promise.race([batchFinished, Promise.all(workers)]);
 
     let allExamples: any[] = [];
     taskOutputs.forEach((stackOutputs, stackIndex) => {
