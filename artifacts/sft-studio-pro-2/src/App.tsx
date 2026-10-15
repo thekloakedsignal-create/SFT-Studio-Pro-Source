@@ -7710,7 +7710,6 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowRunTrainingModal(true)}
-                  disabled={(compiledDataset.trainingSet.length + compiledDataset.validationSet.length) === 0}
                   className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-500/40 bg-blue-500/15 px-5 py-3 text-sm font-bold text-slate-100 transition hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Cpu className="h-4 w-4 text-blue-400" />
