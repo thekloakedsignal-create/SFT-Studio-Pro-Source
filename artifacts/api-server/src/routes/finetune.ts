@@ -25,7 +25,7 @@ const TOGETHER_API_BASE = "https://api.together.ai/v1";
 
 // Together catalog templates paired with the selected Hugging Face checkpoint.
 const TRAINING_CONFIGS: Record<string, { model: string; from_hf_model: string; n_evals?: number; batch_size?: number }> = {
-  "Qwen3.5 9 Base": { model: "Qwen/Qwen3.5-9B", from_hf_model: "Qwen/Qwen3.5-9B-Base", n_evals: 1 },
+  "Qwen3.5 9 Base": { model: "Qwen/Qwen3.5-9B", from_hf_model: "Qwen/qwen3.5-9B-Base", n_evals: 1 },
   "Qwen3.5 4B Base": { model: "Qwen/Qwen3.5-4B", from_hf_model: "Qwen/Qwen3.5-4B-Base", n_evals: 1 },
   "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", from_hf_model: "meta-llama/Llama-3.1-70B", n_evals: 1, batch_size: 32 },
 };
