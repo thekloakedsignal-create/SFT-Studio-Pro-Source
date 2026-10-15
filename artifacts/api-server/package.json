@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.9",
+    "@whop/sdk": "^2.5.0",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "cookie-parser": "^1.4.7",
