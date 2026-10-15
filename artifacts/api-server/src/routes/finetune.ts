@@ -24,10 +24,10 @@ import { logger } from "../lib/logger.ts";
 const TOGETHER_API_BASE = "https://api.together.ai/v1";
 
 // Together catalog templates paired with the selected Hugging Face checkpoint.
-const TRAINING_CONFIGS: Record<string, { model: string; from_hf_model: string; n_evals?: number; batch_size?: number }> = {
+const TRAINING_CONFIGS: Record<string, { model: string; from_hf_model: string; n_evals: number }> = {
   "Qwen3.5 9 Base": { model: "Qwen/Qwen3.5-9B", from_hf_model: "Qwen/qwen3.5-9B-Base", n_evals: 1 },
   "Qwen3.5 4B Base": { model: "Qwen/Qwen3.5-4B", from_hf_model: "Qwen/Qwen3.5-4B-Base", n_evals: 1 },
-  "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", from_hf_model: "meta-llama/Llama-3.1-70B", n_evals: 1, batch_size: 32 },
+  "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", from_hf_model: "meta-llama/Llama-3.1-70B", n_evals: 1 },
 };
 function getTrainingConfig(selection: unknown) {
   const key = selection === undefined ? "Qwen3.5 9 Base" : selection;
@@ -35,7 +35,6 @@ function getTrainingConfig(selection: unknown) {
     ? TRAINING_CONFIGS[key] : undefined;
 }
 const N_EPOCHS = 2;
-const N_CHECKPOINTS = 1;
 const PREFLIGHT_TTL_MS = 60 * 60 * 1000; // upload allowed within 1h of preflight
 
 const TERMINAL_JOB_STATUSES = new Set(["completed", "error", "cancelled"]);
@@ -202,7 +201,7 @@ router.post("/finetune/preflight", async (req: AuthRequest, res) => {
     model: config.model,
     fromHfModel: config.from_hf_model,
     defaultHfRepoName: (process.env.HF_OUTPUT_REPO_NAME || "").replace(/^RoseG\//i, ""),
-    settings: { trainingType: "Full (LoRA disabled)", epochs: N_EPOCHS, checkpoints: N_CHECKPOINTS, evaluations: config.n_evals, batchSize: config.batch_size },
+    settings: { trainingType: "Full (LoRA disabled)", epochs: N_EPOCHS, evaluations: config.n_evals },
   });
 });
 
@@ -279,7 +278,7 @@ router.post("/finetune/estimate", async (req: AuthRequest, res) => {
         ...config,
         training_type: { type: "Full" },
         n_epochs: N_EPOCHS,
-        n_checkpoints: N_CHECKPOINTS,
+        n_evals: config.n_evals,
       }),
     });
     if (!estimate || estimate.estimation_available === false) {
@@ -348,7 +347,7 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
         ...config,
         training_type: { type: "Full" },
         n_epochs: N_EPOCHS,
-        n_checkpoints: N_CHECKPOINTS,
+        n_evals: config.n_evals,
         suffix: typeof suffix === "string" && suffix.trim() ? suffix.trim().slice(0, 64) : "sft-studio",
         hf_api_token: hfToken,
         hf_output_repo_name: repoName,

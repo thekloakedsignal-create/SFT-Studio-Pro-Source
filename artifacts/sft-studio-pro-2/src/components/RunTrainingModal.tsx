@@ -6,10 +6,10 @@ import {
 } from "lucide-react";
 import { validateRegistryOutput } from "../lib/registry-validation";
 
-const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations?: number; batchSize?: number }> = {
+const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations: number }> = {
   "Qwen3.5 9 Base": { model: "Qwen/Qwen3.5-9B", base: "Qwen/qwen3.5-9B-Base", evaluations: 1 },
   "Qwen3.5 4B Base": { model: "Qwen/Qwen3.5-4B", base: "Qwen/Qwen3.5-4B-Base", evaluations: 1 },
-  "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", base: "meta-llama/Llama-3.1-70B", evaluations: 1, batchSize: 32 },
+  "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", base: "meta-llama/Llama-3.1-70B", evaluations: 1 },
 };
 
 type Step = "configure" | "upload" | "submit" | "progress";
@@ -267,9 +267,8 @@ export function RunTrainingModal({
               <div className="flex justify-between"><span>Training model</span><span className="text-slate-200">{MODEL_DISPLAY}</span></div>
               <div className="flex justify-between"><span>From HF base (BYOM)</span><span className="text-slate-200">{BASE_DISPLAY}</span></div>
               <div className="flex justify-between"><span>Training type</span><span className="text-slate-200">Full (LoRA disabled)</span></div>
-              <div className="flex justify-between"><span>Epochs / Checkpoints</span><span className="text-slate-200">2 / 1</span></div>
-              {selectedModel?.evaluations && <div className="flex justify-between"><span>Evaluations</span><span className="text-slate-200">{selectedModel.evaluations}</span></div>}
-              {selectedModel?.batchSize && <div className="flex justify-between"><span>Training batch size</span><span className="text-slate-200">{selectedModel.batchSize}</span></div>}
+              <div className="flex justify-between"><span>Epochs</span><span className="text-slate-200">2</span></div>
+              <div className="flex justify-between"><span>Evaluations</span><span className="text-slate-200">{selectedModel?.evaluations ?? 1}</span></div>
               <div className="flex justify-between"><span>Export format</span><span className="text-emerald-400 uppercase">{exportFormat}</span></div>
               <div className="flex justify-between border-t border-slate-800 pt-1.5"><span>Training split</span><span className="text-green-400 font-bold">{splits.training.length} examples</span></div>
               <div className="flex justify-between"><span>Validator split</span><span className="text-yellow-400 font-bold">{splits.validation.length} examples</span></div>
@@ -346,7 +345,7 @@ export function RunTrainingModal({
                   <span>{busy ? "Running Preflight…" : "Run Preflight Check"}</span>
                 </button>
                 <p className="text-[10px] text-slate-500 leading-relaxed">
-                  Preflight verifies the live model availability and server credentials. No data is uploaded and nothing is billed at this step.
+                  Preflight confirms server credentials. No data is uploaded and nothing is billed at this step.
                 </p>
               </div>
             )}
