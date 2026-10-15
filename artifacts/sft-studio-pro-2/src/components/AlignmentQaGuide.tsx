@@ -45,7 +45,7 @@ const guides: Record<Props["page"], { title: string; documentation: string; step
         title: "Review the imported examples",
         content: <>
           <p>Scroll to <strong>TRiAD Alignment Batch Review</strong> and read the imported examples. Check the system prompt and the user and assistant messages.</p>
-          <p>The imported batch is marked approved automatically. It still needs a QA analysis before it can be selected for the final dataset in the Data Registry. Open <strong>AI Quality Assessment</strong>, select the alignment batch, and run its audit.</p>
+          <p>The imported batch is marked approved automatically and appears selected in the Data Registry without requiring QA. Open QA only if you want to review it; a QA audit is not required for Registry inclusion.</p>
           <p>Click <strong>Done</strong> to close this guide. If you decide not to include alignment data, simply leave this optional section without importing.</p>
         </>,
       },
@@ -59,7 +59,7 @@ const guides: Record<Props["page"], { title: string; documentation: string; step
         title: "Understand what QA checks",
         content: <>
           <p>Quality Assurance (QA) reviews a batch of training examples for formatting, template, structure, and content or persona issues. It flags potentially problematic examples and explains each flag in writing.</p>
-          <p>Every batch must be analyzed in QA before it can be selected in the Data Registry. QA analyzes your examples; it is not a question-and-answer interview.</p>
+          <p>Every batch other than TRiAD Alignment must be analyzed in QA before it can be selected in the Data Registry. TRiAD Alignment batches are automatically approved and selected on import; they do not require QA. QA analyzes examples; it is not a question-and-answer interview.</p>
         </>,
       },
       {
@@ -98,7 +98,7 @@ const guides: Record<Props["page"], { title: string; documentation: string; step
         content: <>
           <p>After reviewing the audit, click <strong>Approve</strong> to keep the batch for your dataset, or <strong>Reject</strong> to exclude it.</p>
           <p>You may leave flags in place and approve a batch if you have reviewed the explanations and believe the examples meet your intent. You have the final say; a 100% score is not required.</p>
-          <p>Select the next batch from <strong>Active Registry Batch</strong> and repeat the process. Once the batches you want to use have been analyzed and approved, select them in the <strong>Data Registry</strong>.</p>
+          <p>Select the next batch from <strong>Active Registry Batch</strong> and repeat the process. Select QA-reviewed and approved batches in the <strong>Data Registry</strong>. TRiAD Alignment batches are already selected there when imported; you can uncheck them if you do not want to include them.</p>
           <p>Click <strong>Done</strong> to close this guide. No audit, regeneration, deletion, or approval runs automatically.</p>
         </>,
       },

@@ -20,3 +20,9 @@ The TRiAD guide is instructions-only, must call alignment optional, and must alw
 **Why:** The user explicitly requested the same instructions-only experience as the Document Guide and specified “always suggest 750 examples.”
 
 **How to apply:** Explain the existing import steps and close the guide when finished. Do not start an import, change the selected size, or alter processing logic from the guide.
+
+TRiAD Alignment imports are auto-approved and eligible for the Data Registry without QA; they should be selected by default.
+
+**Why:** The user explicitly approved this Registry exception and asked TRiAD batches to enter checked by default.
+
+**How to apply:** Preserve the existing QA requirement for all non-TRiAD batches. Rejected TRiAD batches must remain excluded.

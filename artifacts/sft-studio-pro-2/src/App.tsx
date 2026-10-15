@@ -3183,7 +3183,8 @@ export default function App() {
 
   // Registry Batch selections
   const isRegistryEligible = (batch: SFTBatch) =>
-    batch.status !== "Rejected" && Boolean(reports[batch.id] || batch.qualityReport);
+    batch.status !== "Rejected"
+    && (batch.source === "TRiAD Alignment" || Boolean(reports[batch.id] || batch.qualityReport));
 
   const toggleSelectRegistryBatch = (batchId: string) => {
     const batch = batches.find(b => b.id === batchId);
