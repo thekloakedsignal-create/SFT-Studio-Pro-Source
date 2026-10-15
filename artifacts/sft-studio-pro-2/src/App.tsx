@@ -4200,7 +4200,7 @@ export default function App() {
                     onChange={(e) => handleSelectProject(e.target.value)}
                     className="bg-transparent text-slate-200 outline-none w-full font-medium cursor-pointer truncate text-[11px] py-0.5"
                   >
-                    <option value="" disabled className="bg-slate-950 text-slate-400">Select Project...</option>
+                    <option value="" disabled className="bg-slate-950 text-white font-bold">Select Project</option>
                     <option value="NEW_PROJECT" className="bg-slate-950 text-emerald-400 font-semibold">+ New Project...</option>
                     {userProjects.map((p) => (
                       <option key={p.id} value={p.id} className="bg-slate-950 text-slate-200">

@@ -589,6 +589,11 @@ main [class~="opacity-45"] { opacity: .72; }
   color: #e2e8f0 !important;
 }
 
+#root #project-selector option[value=""] {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
 /* Keep reading-guide text black and its entry buttons consistently light purple. */
 #root > div:has(> .kk-header) > main .kk-workspace-panel .kk-reading-guide,
 #root > div:has(> .kk-header) > main .kk-workspace-panel .kk-reading-guide *,
