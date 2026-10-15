@@ -65,6 +65,7 @@ import { AccountModal } from "./components/AccountModal";
 import { DocsModal } from "./components/DocsModal";
 import { type DocumentGuideProgress } from "./components/DocumentGuide";
 import { DocumentGuideWorkspace } from "./components/DocumentGuideWorkspace";
+import { AlignmentQaGuide } from "./components/AlignmentQaGuide";
 import { type GuideDocument } from "./lib/document-guide";
 import { AuthPopupHandler } from "./components/AuthPopupHandler";
 import { FileAccessModal } from "./components/FileAccessModal";
@@ -474,6 +475,7 @@ export default function App() {
   const [showBatchRecommendationInterview, setShowBatchRecommendationInterview] = useState(false);
   const [guidePage, setGuidePage] = useState<"synthesizer" | "convert" | "triad" | "assess" | null>(null);
   const [showDocumentGuide, setShowDocumentGuide] = useState(false);
+  const [sectionGuide, setSectionGuide] = useState<"triad" | "assess" | null>(null);
   const [documentGuideProgress, setDocumentGuideProgress] = useState<DocumentGuideProgress>({ step: 0 });
   const [documentGuideQueues, setDocumentGuideQueues] = useState<Record<string, GuideDocument[]>>({});
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -542,19 +544,14 @@ export default function App() {
       setShowDocumentGuide(true);
       return;
     }
+    if (page === "triad" || page === "assess") {
+      setSectionGuide(page);
+      return;
+    }
     setGuidePage(page);
     const saved = readGuideState(selectedProjectId || "");
     const savedMessages = saved.conversations?.[page] || [];
-    const openingGuide = page === "triad"
-        ? "TRiAD Alignment imports pre-generated alignment examples into your project. It is for alignment data, not document uploads.\n\n1. Save and lock Project Definition first.\n2. Choose the batch size and template.\n3. Enter a Google Drive share link or a direct CSV, JSON, or JSONL download URL.\n4. Click Run Script & Import, then review the imported examples."
-        : page === "assess"
-          ? "AI Quality Assessment checks a selected batch for formatting, template, schema, and persona issues.\n\n1. Select a batch from Active Registry Batch.\n2. Click Run AI Quality Audit.\n3. Review the score and flagged examples.\n4. Regenerate flagged examples or delete examples that should not be kept, then run the audit again to check the batch."
-          : "";
-    setExpertMessages(savedMessages.length
-      ? savedMessages
-      : openingGuide
-        ? [{ role: "assistant", content: openingGuide }]
-        : []);
+    setExpertMessages(savedMessages);
     setExpertInput("");
     setActiveTab("expert");
   };
@@ -6431,6 +6428,8 @@ export default function App() {
                       </button>
                     </div>
 
+                    {sectionGuide === "triad" && <AlignmentQaGuide key="triad" page="triad" onClose={() => setSectionGuide(null)} />}
+
                     {/* External dataset requirements */}
                     <div className="bg-slate-900/40 border border-slate-800/60 p-4 rounded-xl mb-6">
                       <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
@@ -6723,6 +6722,8 @@ export default function App() {
                       </select>
                     </div>
                   </div>
+
+                  {sectionGuide === "assess" && <AlignmentQaGuide key="assess" page="assess" onClose={() => setSectionGuide(null)} />}
 
                   {/* Quality Audit Stats & Buttons */}
                   {currentBatch ? (

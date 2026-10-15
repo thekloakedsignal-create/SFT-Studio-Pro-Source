@@ -14,3 +14,9 @@ Present TRiAD as pre-generated alignment only, not a file uploader. Keep its dat
 **Why:** The user explicitly clarified that TRiAD is pre-generated alignment and requested a UI-only explanation with the path box hidden.
 
 **How to apply:** Retain batch-size and template controls; do not reintroduce upload instructions or change the underlying import functions.
+
+The TRiAD guide is instructions-only, must call alignment optional, and must always recommend 750 examples.
+
+**Why:** The user explicitly requested the same instructions-only experience as the Document Guide and specified “always suggest 750 examples.”
+
+**How to apply:** Explain the existing import steps and close the guide when finished. Do not start an import, change the selected size, or alter processing logic from the guide.
