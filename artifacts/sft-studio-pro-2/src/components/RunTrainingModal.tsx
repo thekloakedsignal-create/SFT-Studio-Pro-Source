@@ -8,7 +8,7 @@ import { validateRegistryOutput } from "../lib/registry-validation";
 
 const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations: number }> = {
   "Qwen3.5 9 Base": { model: "Qwen/Qwen3.5-9B", base: "Qwen/Qwen3.5-9B-Base", evaluations: 1 },
-  "Qwen3.5 4B Base": { model: "Qwen/Qwen3.5-4B", base: "Qwen/Qwen3.5-4B (hosted — no BYOM)", evaluations: 1 },
+  "Qwen3.5 4B Base": { model: "Qwen/Qwen3.5-4B", base: "Qwen/Qwen3.5-4B", evaluations: 1 },
   "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", base: "meta-llama/Llama-3.1-70B", evaluations: 1 },
 };
 
@@ -219,7 +219,6 @@ export function RunTrainingModal({
   };
 
   const statusLabel = String(job?.status || "").toLowerCase();
-  const estimatePrice = estimate?.estimated_total_price ?? estimate?.total_price ?? estimate?.price ?? null;
   const outputModelName = job?.hfRepoName || `RoseG/${hfRepoName.trim()}`;
   const outputRepoUrl = `https://huggingface.co/${outputModelName.split("/").map(encodeURIComponent).join("/")}`;
   const closeTrainer = () => {
@@ -389,12 +388,6 @@ export function RunTrainingModal({
                   <div className="flex justify-between"><span>Model</span><span className="text-slate-200">{MODEL_DISPLAY}</span></div>
                   <div className="flex justify-between"><span>From HF base</span><span className="text-slate-200">{BASE_DISPLAY}</span></div>
                   <div className="flex justify-between"><span>Output repo</span><span className="text-slate-200">RoseG/{hfRepoName}</span></div>
-                  <div className="flex justify-between border-t border-slate-800 pt-1.5 text-base">
-                    <span className="text-slate-300 font-bold text-[11px]">Estimated cost</span>
-                    <span className="text-emerald-400 font-bold text-sm">
-                      {estimatePrice !== null ? `$${Number(estimatePrice).toFixed(2)}` : "See Together response"}
-                    </span>
-                  </div>
                 </div>
                 <button
                   type="button"
