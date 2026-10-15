@@ -176,7 +176,7 @@ async function waitForFileProcessing(fileId: string): Promise<void> {
   throw new Error("Timed out waiting for Together AI to validate an uploaded dataset.");
 }
 
-// Preflight: confirm server credentials and the selected fine-tuning template's limits.
+// Preflight checks only that the server credentials are configured.
 router.post("/finetune/preflight", async (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
@@ -188,34 +188,22 @@ router.post("/finetune/preflight", async (req: AuthRequest, res) => {
     return res.json({
       success: true,
       credentials: { together: togetherConfigured, huggingFace: huggingFaceConfigured },
-      modelAvailable: false,
       model: config.model,
       fromHfModel: config.from_hf_model,
       defaultHfRepoName: (process.env.HF_OUTPUT_REPO_NAME || "").replace(/^RoseG\//i, ""),
       error: "Server API credentials are not fully configured yet.",
     });
   }
-  try {
-    const limits = await togetherRequest(`/fine-tunes/models/limits?model_name=${encodeURIComponent(config.model)}`);
-    const modelAvailable = limits?.model_name === config.model && limits?.supports_full_training === true;
-    if (modelAvailable) {
-      store.sessions[uid] = { ...store.sessions[uid], preflightAt: new Date().toISOString(), preflightModel: config.model };
-      saveStore(store);
-    }
-    return res.json({
-      success: true,
-      credentials: { together: true, huggingFace: true },
-      modelAvailable,
-      model: config.model,
-      fromHfModel: config.from_hf_model,
-      defaultHfRepoName: (process.env.HF_OUTPUT_REPO_NAME || "").replace(/^RoseG\//i, ""),
-      settings: { trainingType: "Full (LoRA disabled)", epochs: N_EPOCHS, checkpoints: N_CHECKPOINTS, evaluations: config.n_evals, batchSize: config.batch_size },
-      ...(modelAvailable ? {} : { error: `${config.model} is not currently available for fine-tuning on Together AI.` }),
-    });
-  } catch (error: any) {
-    logger.warn({ error: error?.message }, "Fine-tune preflight failed");
-    return res.status(error?.status || 502).json({ success: false, error: error?.message || "Preflight check failed." });
-  }
+  store.sessions[uid] = { ...store.sessions[uid], preflightAt: new Date().toISOString(), preflightModel: config.model };
+  saveStore(store);
+  return res.json({
+    success: true,
+    credentials: { together: true, huggingFace: true },
+    model: config.model,
+    fromHfModel: config.from_hf_model,
+    defaultHfRepoName: (process.env.HF_OUTPUT_REPO_NAME || "").replace(/^RoseG\//i, ""),
+    settings: { trainingType: "Full (LoRA disabled)", epochs: N_EPOCHS, checkpoints: N_CHECKPOINTS, evaluations: config.n_evals, batchSize: config.batch_size },
+  });
 });
 
 // Upload both splits (requires a recent successful preflight and explicit approval).

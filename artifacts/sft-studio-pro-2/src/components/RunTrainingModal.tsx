@@ -122,8 +122,6 @@ export function RunTrainingModal({
       setPreflight(data);
       if (!data.credentials?.together || !data.credentials?.huggingFace) {
         setError("Server credentials are not configured yet. Add TOGETHER_API_KEY and HF_TOKEN to the app secrets, then run the preflight again.");
-      } else if (!data.modelAvailable) {
-        setError(data.error || `${MODEL_DISPLAY} is not currently available for fine-tuning.`);
       } else {
         setStep("upload");
       }
@@ -357,7 +355,7 @@ export function RunTrainingModal({
               <div className="space-y-3">
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-[11px] text-emerald-300">
                   <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>Preflight passed: credentials configured and {MODEL_DISPLAY} is available for fine-tuning.</span>
+                  <span>Preflight passed: server credentials are configured.</span>
                 </div>
                 <div className="p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-400 space-y-1.5">
                   <div className="flex justify-between"><span>Destination HF repo</span><span className="text-slate-200">RoseG/{hfRepoName || "(required)"}</span></div>
