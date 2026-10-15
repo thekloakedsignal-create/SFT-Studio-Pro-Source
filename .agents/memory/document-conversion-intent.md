@@ -9,6 +9,12 @@ Knowledge and literature synthesize grounded training examples. Transcript mode 
 
 **How to apply:** Keep Transcript exact and separate converter changes from batch generation. Do not apply transcript-copy behavior to Knowledge or Literature.
 
+The Document Guide must collect uploads temporarily, draft editable per-document instructions for Knowledge and Literature, and hand off a selectable, checkable document list like the suggested-batches display. Transcripts need speaker labels, not instructions. Show clear numbered batch-creation instructions before handoff.
+
+**Why:** The user explicitly corrected the generic chat/static-guide interpretation and said transcripts remove metadata and use labeled turns to create turn-by-turn examples.
+
+**How to apply:** Base guidance on the project's document site, preserve the distinction among all three conversion types, and keep handoff limited to filling the existing converter UI. Do not start conversion automatically or change its processing logic.
+
 The document converter offers Single Turn, Multi Turn, and Mixed only—not Reasoning.
 
 **Why:** The user explicitly asked to remove the Reasoning option from the converter while keeping the repair confined to document conversion.

@@ -63,6 +63,9 @@ import { PricingModal } from "./components/PricingModal";
 import { CustomPackageModal } from "./components/CustomPackageModal";
 import { AccountModal } from "./components/AccountModal";
 import { DocsModal } from "./components/DocsModal";
+import { type DocumentGuideProgress } from "./components/DocumentGuide";
+import { DocumentGuideWorkspace } from "./components/DocumentGuideWorkspace";
+import { type GuideDocument } from "./lib/document-guide";
 import { AuthPopupHandler } from "./components/AuthPopupHandler";
 import { FileAccessModal } from "./components/FileAccessModal";
 import { 
@@ -470,6 +473,9 @@ export default function App() {
   const [showProjectOnboarding, setShowProjectOnboarding] = useState(true);
   const [showBatchRecommendationInterview, setShowBatchRecommendationInterview] = useState(false);
   const [guidePage, setGuidePage] = useState<"synthesizer" | "convert" | "triad" | "assess" | null>(null);
+  const [showDocumentGuide, setShowDocumentGuide] = useState(false);
+  const [documentGuideProgress, setDocumentGuideProgress] = useState<DocumentGuideProgress>({ step: 0 });
+  const [documentGuideQueues, setDocumentGuideQueues] = useState<Record<string, GuideDocument[]>>({});
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [activeResourcePage, setActiveResourcePage] = useState<(typeof RESOURCE_LINKS)[number] | null>(null);
   
@@ -526,12 +532,20 @@ export default function App() {
     localStorage.setItem(guideStorageKey(projectId), JSON.stringify({ ...current, ...update }));
   };
   const openAiGuide = (page: "synthesizer" | "convert" | "triad" | "assess") => {
+    if (page === "convert") {
+      const saved = readGuideState(selectedProjectId || "").documentWalkthrough;
+      const hasFiles = Boolean(documentGuideQueues[selectedProjectId || "draft"]?.length);
+      setDocumentGuideProgress({
+        step: hasFiles && Number.isInteger(saved?.step) ? Math.max(0, Math.min(5, saved.step)) : 0,
+        hasTranscripts: typeof saved?.hasTranscripts === "boolean" ? saved.hasTranscripts : undefined,
+      });
+      setShowDocumentGuide(true);
+      return;
+    }
     setGuidePage(page);
     const saved = readGuideState(selectedProjectId || "");
     const savedMessages = saved.conversations?.[page] || [];
-    const openingGuide = page === "convert"
-      ? "Document Converter turns source documents into editable training examples.\n\n1. Save and lock Project Definition first.\n2. Upload a DOCX, PDF, or image, or enter supported text.\n3. Choose the document type and output template. Add conversion instructions if needed.\n4. Click Convert Document to SFT, then review the converted examples."
-      : page === "triad"
+    const openingGuide = page === "triad"
         ? "TRiAD Alignment imports pre-generated alignment examples into your project. It is for alignment data, not document uploads.\n\n1. Save and lock Project Definition first.\n2. Choose the batch size and template.\n3. Enter a Google Drive share link or a direct CSV, JSON, or JSONL download URL.\n4. Click Run Script & Import, then review the imported examples."
         : page === "assess"
           ? "AI Quality Assessment checks a selected batch for formatting, template, schema, and persona issues.\n\n1. Select a batch from Active Registry Batch.\n2. Click Run AI Quality Audit.\n3. Review the score and flagged examples.\n4. Regenerate flagged examples or delete examples that should not be kept, then run the audit again to check the batch."
@@ -5686,6 +5700,45 @@ export default function App() {
                         </button>
                       )}
                     </div>
+
+                        <DocumentGuideWorkspace
+                          key={selectedProjectId || "draft"}
+                          open={showDocumentGuide}
+                          progress={documentGuideProgress}
+                          onProgressChange={progress => {
+                            setDocumentGuideProgress(progress);
+                            if (selectedProjectId) writeGuideState(selectedProjectId, { documentWalkthrough: progress });
+                          }}
+                          onClose={() => setShowDocumentGuide(false)}
+                          documents={documentGuideQueues[selectedProjectId || "draft"] || []}
+                          setDocuments={update => {
+                            const key = selectedProjectId || "draft";
+                            setDocumentGuideQueues(current => ({
+                              ...current,
+                              [key]: typeof update === "function" ? update(current[key] || []) : update,
+                            }));
+                          }}
+                          project={project}
+                          uploadPermitted={isUploadPermitted}
+                          onPermitUpload={() => {
+                            setIsUploadPermitted(true);
+                            sessionStorage.setItem("triad_upload_access_granted", "true");
+                          }}
+                          busy={isConverting || isAnalyzingDoc}
+                          onLoad={document => {
+                            setDocContent(document.text);
+                            setDocName(document.file.name);
+                            setDocType(document.type);
+                            setHasUserManuallySetDocType(true);
+                            setConverterInstructions(document.type === "transcript" ? "" : document.instructions);
+                            setUserTag(document.type === "transcript" ? document.userTag : "");
+                            setAssistantTag(document.type === "transcript" ? document.assistantTag : "");
+                            setDocConversionProgress(null);
+                            setDocSuggestionExplanation(document.type === "transcript"
+                              ? "Transcript conversion retains the matched labeled dialogue."
+                              : "Click Re-Analyze to estimate examples for this document before converting.");
+                          }}
+                        />
 
                     {selectedProjectId && !isFieldsUnlocked && (
                       <div className="bg-blue-500/10 border border-blue-500/20 px-4 py-3 rounded-xl flex items-center justify-between gap-3 text-xs text-blue-400 mb-6 font-sans">
