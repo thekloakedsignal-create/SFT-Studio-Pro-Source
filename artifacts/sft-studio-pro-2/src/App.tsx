@@ -6918,11 +6918,8 @@ export default function App() {
                     <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-2xl mb-6">
                        <h2 className="text-lg font-bold text-white mb-2">Batch Assessment Summary</h2>
                        <p className="text-sm text-slate-400">
-                         Assessed <span className="text-white font-semibold">{currentBatch.examples.length}</span> examples.
-                         Found <span className="text-amber-400 font-semibold">{activeReport.issues.length}</span> issues requiring review:
-                         <span className="text-red-400 font-semibold"> {activeReport.issues.filter(i => i.severity === "High").length} high</span>,
-                         <span className="text-amber-400 font-semibold"> {activeReport.issues.filter(i => i.severity === "Medium").length} medium</span>,
-                         <span className="text-slate-300 font-semibold"> {activeReport.issues.filter(i => i.severity !== "High" && i.severity !== "Medium").length} low</span>.
+                         Assessed <span className="text-white font-semibold">{currentBatch.examples.length}</span> examples. 
+                         Found <span className="text-amber-400 font-semibold">{activeReport.issues.length}</span> issues requiring review.
                        </p>
                     </div>
 
