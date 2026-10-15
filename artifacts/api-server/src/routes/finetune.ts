@@ -441,6 +441,14 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
   }
 });
 
+// Restore the latest owned run after a reload; this does not submit or resume training.
+router.get("/finetune/latest", (req: AuthRequest, res) => {
+  const uid = requireUser(req, res);
+  if (!uid) return;
+  const jobId = Object.entries(store.jobOwners).filter(([, owner]) => owner === uid).at(-1)?.[0] || null;
+  return res.json({ success: true, jobId });
+});
+
 // Job status + recent event messages for progress display (owner only).
 router.get("/finetune/jobs/:id", async (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
@@ -451,10 +459,10 @@ router.get("/finetune/jobs/:id", async (req: AuthRequest, res) => {
     return res.status(404).json({ success: false, error: "Job not found." });
   }
   try {
-    const job = await togetherRequest(`/fine-tunes/${encodeURIComponent(jobId)}`);
+    const job = await togetherRequest(`/fine-tunes/${encodeURIComponent(jobId)}`, { signal: AbortSignal.timeout(15000) });
     let events: string[] = [];
     try {
-      const ev = await togetherRequest(`/fine-tunes/${encodeURIComponent(jobId)}/events`);
+      const ev = await togetherRequest(`/fine-tunes/${encodeURIComponent(jobId)}/events`, { signal: AbortSignal.timeout(5000) });
       const list = Array.isArray(ev?.data) ? ev.data : [];
       events = list.slice(-5).map((e: any) => String(e?.message || "")).filter(Boolean);
     } catch {
@@ -465,6 +473,7 @@ router.get("/finetune/jobs/:id", async (req: AuthRequest, res) => {
       job: {
         id: job.id,
         status: job.status,
+        hfRepoName: job.hf_output_repo_name || null,
         model: job.model,
         outputName: job.output_name || null,
         modelOutputPath: job.model_output_path || null,

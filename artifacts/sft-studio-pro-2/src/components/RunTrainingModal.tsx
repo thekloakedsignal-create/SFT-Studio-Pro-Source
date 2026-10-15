@@ -14,6 +14,7 @@ const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations
 };
 
 type Step = "configure" | "upload" | "submit" | "progress";
+const terminalStatuses = new Set(["completed", "error", "user_error", "failed", "cancelled"]);
 
 interface RunTrainingModalProps {
   open: boolean;
@@ -63,9 +64,8 @@ export function RunTrainingModal({
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   };
 
-  useEffect(() => () => stopPolling(), []);
-
   useEffect(() => {
+    let cancelled = false;
     if (open) {
       if (job?.id) {
         setStep("progress");
@@ -79,31 +79,54 @@ export function RunTrainingModal({
       setEstimate(null);
       setJob(null);
       setBusy(false);
+      void (async () => {
+        try {
+          const data = await readApi(await apiFetch("/api/finetune/latest", { cache: "no-store", signal: AbortSignal.timeout(25000) }));
+          if (!cancelled && data.jobId) {
+            setJob({ id: data.jobId });
+            setStep("progress");
+          }
+        } catch {
+          if (!cancelled) setError("Unable to restore the previous training status. Close and reopen the trainer to retry.");
+        }
+      })();
     }
+    return () => { cancelled = true; };
   }, [open]);
 
-  const pollJob = (jobId: string) => {
+  useEffect(() => {
     stopPolling();
+    const jobId = job?.id;
+    if (!jobId) return;
+    let cancelled = false;
     let checking = false;
-    pollRef.current = setInterval(async () => {
+    const refresh = async () => {
       if (checking) return;
       checking = true;
       try {
-        const data = await readApi(await apiFetch(`/api/finetune/jobs/${encodeURIComponent(jobId)}`));
+        const data = await readApi(await apiFetch(`/api/finetune/jobs/${encodeURIComponent(jobId)}`, {
+          cache: "no-store", signal: AbortSignal.timeout(25000),
+        }));
+        if (cancelled) return;
         setJob((current: any) => ({ ...current, ...data.job }));
-        if (["completed", "error", "cancelled"].includes(String(data.job?.status || "").toLowerCase())) {
+        setError(null);
+        if (terminalStatuses.has(String(data.job?.status || "").trim().toLowerCase())) {
           stopPolling();
-          if (String(data.job?.status || "").toLowerCase() === "completed") {
+          if (String(data.job?.status || "").trim().toLowerCase() === "completed") {
             notify(`Training complete. Open the automated trainer for your model's Hugging Face repository link.`, "success");
           }
         }
       } catch {
-        // Keep polling; transient status failures should not lose the run.
+        if (!cancelled) setError("Unable to refresh training status. Retrying automatically.");
       } finally {
         checking = false;
       }
-    }, 10000);
-  };
+    };
+    pollRef.current = setInterval(refresh, 10000);
+    void refresh();
+    window.addEventListener("focus", refresh);
+    return () => { cancelled = true; stopPolling(); window.removeEventListener("focus", refresh); };
+  }, [job?.id, open]);
 
   const runPreflight = async () => {
     if (!hfRepoName.trim()) {
@@ -192,7 +215,6 @@ export function RunTrainingModal({
       }));
       setJob({ ...data.job, hfRepoName: `RoseG/${hfRepoName.trim()}` });
       setStep("progress");
-      pollJob(data.job.id);
       notify(`Fine-tune job ${data.job.id} submitted.`, "success");
     } catch (e: any) {
       setError(e?.message || "Job submission failed. The job was not resubmitted.");
@@ -220,12 +242,13 @@ export function RunTrainingModal({
     }
   };
 
-  const statusLabel = String(job?.status || "").toLowerCase();
-  const outputModelName = job?.hfRepoName || `RoseG/${hfRepoName.trim()}`;
+  const statusLabel = String(job?.status || "").trim().toLowerCase();
+  const isTerminal = terminalStatuses.has(statusLabel);
+  const outputModelName = job?.hfRepoName || (hfRepoName.trim() ? `RoseG/${hfRepoName.trim()}` : "");
   const outputRepoUrl = `https://huggingface.co/${outputModelName.split("/").map(encodeURIComponent).join("/")}`;
   const closeTrainer = () => {
     if (busy) return;
-    if (["completed", "error", "cancelled"].includes(statusLabel)) setJob(null);
+    if (isTerminal) setJob(null);
     onClose();
   };
 
@@ -413,18 +436,18 @@ export function RunTrainingModal({
               <div className="space-y-3">
                 <div className={`flex items-start gap-2 p-3 rounded-xl border text-[11px] ${
                   statusLabel === "completed" ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-300"
-                  : statusLabel === "error" || statusLabel === "cancelled" ? "bg-red-500/5 border-red-500/20 text-red-300"
+                  : isTerminal ? "bg-red-500/5 border-red-500/20 text-red-300"
                   : "bg-blue-500/5 border-blue-500/20 text-blue-300"
                 }`}>
                   {statusLabel === "completed" ? <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                    : statusLabel === "error" || statusLabel === "cancelled" ? <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                    : isTerminal ? <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                     : <RefreshCw className="h-4 w-4 shrink-0 mt-0.5 animate-spin" />}
                   <span>
                     Job <span className="font-mono font-bold">{job.id}</span> — status: <span className="font-bold uppercase">{job.status || "unknown"}</span>
-                    {statusLabel !== "completed" && statusLabel !== "error" && statusLabel !== "cancelled" && " (updates automatically every 10 seconds)"}
+                    {!isTerminal && " (updates automatically every 10 seconds)"}
                   </span>
                 </div>
-                {!["completed", "error", "cancelled"].includes(statusLabel) && (
+                {!isTerminal && (
                   <p className="text-[11px] text-slate-300">You can close this window and return to the trainer. Keep the app open for automatic completion updates.</p>
                 )}
                 {Array.isArray(job.events) && job.events.length > 0 && (
@@ -434,12 +457,12 @@ export function RunTrainingModal({
                 )}
                 {statusLabel === "completed" && (
                   <div className="space-y-2">
-                    <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-300">
+                    {outputModelName && <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-300">
                       <p>Output model: {outputModelName}</p>
                       <a href={outputRepoUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-2 break-all text-emerald-400 underline">
                         {outputRepoUrl}<ExternalLink className="h-3.5 w-3.5 shrink-0" />
                       </a>
-                    </div>
+                    </div>}
                     {job.modelOutputPath && (
                       <button
                         type="button"
@@ -453,6 +476,8 @@ export function RunTrainingModal({
                     )}
                   </div>
                 )}
+                {isTerminal && <button type="button" onClick={() => { setJob(null); setFiles(null); setError(null); setStep("configure"); }}
+                  className="w-full rounded-xl kk-primary px-4 py-2.5 text-xs font-bold">Start another training run</button>}
               </div>
             )}
           </motion.div>
