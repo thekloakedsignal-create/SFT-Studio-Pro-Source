@@ -23,6 +23,8 @@ Clean role/content messages are valid before export; do not require serialized A
 
 QA “Regenerate Flagged” must send concurrent individual requests, preserving each original example's template (including its Single Turn/Multi Turn layout within Mixed). Keep repair slots continuously occupied rather than waiting for whole groups to finish. Change only flagged assistant responses using the original project/batch instructions and QA recommended fixes; do not regenerate unflagged examples. For invalid formats, allow structural repairs, including merging duplicate assistant turns and reconstructing missing user prompts, rather than preserving the broken message layout.
 
+After Deduplicate removes flagged examples, update the displayed QA report counts to reflect the remaining batch.
+
 **Why:** The user requested concurrent requests “the same way other batches do in the template of the original example” and a 100% UI score after all flagged responses are fixed. They clarified that regeneration must reformat examples with double assistant responses or missing user prompts, and later asked to increase repair concurrency because it was too slow.
 
 **How to apply:** Preserve user/system messages unless correcting their invalid format or placement is necessary; retain failed items as flagged, save repairs and the updated report before showing completion, and show 100% only after every flagged item was successfully repaired. Snapshot project instructions for new batches; older batches lack historical project settings, so use their original system messages and stored batch instructions with current project settings where necessary.

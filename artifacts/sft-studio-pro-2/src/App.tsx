@@ -2992,7 +2992,7 @@ export default function App() {
     const targetBatch = batches.find(b => b.id === batchId);
     if (!targetBatch) return;
 
-    const targetReport = reports[batchId];
+    const targetReport = reports[batchId] || targetBatch.qualityReport;
     const flaggedIndices = new Set<number>(
       (targetReport?.issues || []).map(iss => iss.exampleIndex)
     );
@@ -3017,13 +3017,35 @@ export default function App() {
     });
 
     const removedCount = targetBatch.examples.length - uniqueExamples.length;
+    const updatedReport: QualityReport | undefined = targetReport
+      ? {
+          ...targetReport,
+          overallScore: 100,
+          issues: [],
+          suggestions: [],
+          duplicateCheck: {
+            duplicatesFound: 0,
+            duplicatesList: [],
+            deduplicatedLength: uniqueExamples.length
+          },
+          stats: {
+            totalExamples: uniqueExamples.length,
+            flaggedCount: 0,
+            passedCount: uniqueExamples.length
+          }
+        }
+      : undefined;
     const updatedTargetBatch: SFTBatch = {
       ...targetBatch,
       examples: uniqueExamples,
-      examplesCount: uniqueExamples.length
+      examplesCount: uniqueExamples.length,
+      ...(updatedReport ? { qualityReport: updatedReport } : {})
     };
 
     setBatches(prev => prev.map(b => (b.id === batchId ? updatedTargetBatch : b)));
+    if (updatedReport) {
+      setReports(prev => ({ ...prev, [batchId]: updatedReport }));
+    }
 
     if (selectedProjectId) {
       saveBatch(selectedProjectId, updatedTargetBatch);
