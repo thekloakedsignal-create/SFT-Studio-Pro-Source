@@ -13,6 +13,12 @@ const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations
   "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", base: "meta-llama/Llama-3.1-70B", evaluations: 1 },
 };
 
+type SavedModelChoice = {
+  togetherModelName: string;
+  hfRepoName: string;
+  baseTrainingModel: string;
+};
+
 type Step = "configure" | "upload" | "submit" | "progress";
 const terminalStatuses = new Set(["completed", "error", "user_error", "failed", "cancelled"]);
 
@@ -39,10 +45,12 @@ async function readApi(res: Response): Promise<any> {
 export function RunTrainingModal({
   open, onClose, exportFormat, trainingModel, onTrainingModelChange, getSerializedSplits, apiFetch, notify
 }: RunTrainingModalProps) {
+  const [savedModels, setSavedModels] = useState<SavedModelChoice[]>([]);
+  const [continuationModel, setContinuationModel] = useState<SavedModelChoice | null>(null);
   const selectedModel = TRAINING_MODELS[trainingModel];
-  const MODEL_DISPLAY = trainingModel === "Qwen3.5 9 Base"
+  const MODEL_DISPLAY = continuationModel?.hfRepoName || (trainingModel === "Qwen3.5 9 Base"
     ? "Qwen3.5 9B FP8"
-    : selectedModel?.model || trainingModel;
+    : selectedModel?.model || trainingModel);
   const BASE_DISPLAY = selectedModel?.base || "";
   const [step, setStep] = useState<Step>("configure");
   const [suffix, setSuffix] = useState("");
@@ -67,6 +75,15 @@ export function RunTrainingModal({
   useEffect(() => {
     let cancelled = false;
     if (open) {
+      setContinuationModel(null);
+      void (async () => {
+        try {
+          const data = await readApi(await apiFetch("/api/finetune/model-choices", { cache: "no-store" }));
+          if (!cancelled) setSavedModels(Array.isArray(data.models) ? data.models : []);
+        } catch {
+          if (!cancelled) setSavedModels([]);
+        }
+      })();
       if (job?.id) {
         setStep("progress");
         return;
@@ -113,6 +130,12 @@ export function RunTrainingModal({
         if (terminalStatuses.has(String(data.job?.status || "").trim().toLowerCase())) {
           stopPolling();
           if (String(data.job?.status || "").trim().toLowerCase() === "completed") {
+            try {
+              const choices = await readApi(await apiFetch("/api/finetune/model-choices", { cache: "no-store" }));
+              if (!cancelled) setSavedModels(Array.isArray(choices.models) ? choices.models : []);
+            } catch {
+              // The completed model is persisted server-side and will load next time the trainer opens.
+            }
             notify(`Training complete. Open the automated trainer for your model's Hugging Face repository link.`, "success");
           }
         }
@@ -184,7 +207,12 @@ export function RunTrainingModal({
       const est = await readApi(await apiFetch("/api/finetune/estimate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trainingFileId: data.trainingFileId, validationFileId: data.validationFileId, trainingModel }),
+        body: JSON.stringify({
+          trainingFileId: data.trainingFileId,
+          validationFileId: data.validationFileId,
+          trainingModel,
+          ...(continuationModel ? { fromCheckpoint: continuationModel.togetherModelName } : {}),
+        }),
       }));
       setEstimate(est.estimate);
       setStep("submit");
@@ -210,6 +238,7 @@ export function RunTrainingModal({
           suffix,
           hfRepoName,
           trainingModel,
+          ...(continuationModel ? { fromCheckpoint: continuationModel.togetherModelName } : {}),
           confirmSubmit: true,
         }),
       }));
@@ -319,10 +348,21 @@ export function RunTrainingModal({
                   <label htmlFor="training-model" className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Model to train</label>
                   <select
                     id="training-model"
-                    value={trainingModel}
+                    value={continuationModel ? `checkpoint:${continuationModel.togetherModelName}` : trainingModel}
                     disabled={busy}
                     onChange={e => {
-                        setPaidModel(null);
+                      const choice = savedModels.find(model => `checkpoint:${model.togetherModelName}` === e.target.value);
+                      if (choice) {
+                        if (choice.baseTrainingModel !== trainingModel) setPaidModel(null);
+                        setContinuationModel(choice);
+                        onTrainingModelChange(choice.baseTrainingModel);
+                        setSuffix(current => ["sft-studio", "custom-v1"].includes(current) ? "" : current);
+                        setPreflight(null);
+                        setError(null);
+                        return;
+                      }
+                      if (e.target.value !== trainingModel) setPaidModel(null);
+                      setContinuationModel(null);
                       onTrainingModelChange(e.target.value);
                       setSuffix(current => ["sft-studio", "custom-v1"].includes(current) ? "" : current);
                       setPreflight(null);
@@ -331,6 +371,13 @@ export function RunTrainingModal({
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200"
                   >
                     {Object.entries(TRAINING_MODELS).map(([key, model]) => <option key={key} value={key}>{model.base}</option>)}
+                    {savedModels.length > 0 && (
+                      <optgroup label="Continue from a previous model">
+                        {savedModels.map(model => (
+                          <option key={model.togetherModelName} value={`checkpoint:${model.togetherModelName}`}>{model.hfRepoName}</option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
                 <div>

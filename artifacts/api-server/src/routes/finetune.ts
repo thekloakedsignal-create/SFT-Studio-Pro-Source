@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
 import { logger } from "../lib/logger.ts";
+import { adminDb } from "../lib/firebase-admin.ts";
 import { consumeTraining, restoreTraining } from "./whop.ts";
 
 // Together AI full fine-tuning automation for the SFT Studio Data Registry.
@@ -106,6 +107,7 @@ interface OwnerSession {
     trainingFileId: string;
     validationFileId: string;
     model?: string;
+    fromCheckpoint?: string;
     estimate: unknown;
     at: string;
   };
@@ -113,6 +115,7 @@ interface OwnerSession {
 interface FinetuneStore {
   sessions: Record<string, OwnerSession>;
   jobOwners: Record<string, string>;
+  jobTrainingModels: Record<string, string>;
 }
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -125,12 +128,13 @@ function loadStore(): FinetuneStore {
       return {
         sessions: parsed?.sessions && typeof parsed.sessions === "object" ? parsed.sessions : {},
         jobOwners: parsed?.jobOwners && typeof parsed.jobOwners === "object" ? parsed.jobOwners : {},
+        jobTrainingModels: parsed?.jobTrainingModels && typeof parsed.jobTrainingModels === "object" ? parsed.jobTrainingModels : {},
       };
     }
   } catch (error) {
     logger.warn({ error: String(error) }, "Fine-tune session store could not be read; starting fresh");
   }
-  return { sessions: {}, jobOwners: {} };
+  return { sessions: {}, jobOwners: {}, jobTrainingModels: {} };
 }
 
 function saveStore(store: FinetuneStore) {
@@ -145,6 +149,52 @@ function saveStore(store: FinetuneStore) {
 }
 
 const store = loadStore();
+const MODEL_CHOICES_COLLECTION = "userModelChoices";
+
+interface UserModelChoice {
+  togetherModelName: string;
+  hfRepoName: string;
+  baseTrainingModel: string;
+  jobId: string;
+  createdAt: string;
+}
+
+async function getUserModelChoices(uid: string): Promise<UserModelChoice[]> {
+  const snapshot = await adminDb.collection(MODEL_CHOICES_COLLECTION).doc(uid).get();
+  const models = snapshot.data()?.models;
+  return Array.isArray(models) ? models.filter((model: any) =>
+    typeof model?.togetherModelName === "string"
+    && typeof model?.hfRepoName === "string"
+    && typeof model?.baseTrainingModel === "string") : [];
+}
+
+async function findUserModelChoice(uid: string, togetherModelName: string): Promise<UserModelChoice | null> {
+  return (await getUserModelChoices(uid)).find(model => model.togetherModelName === togetherModelName) || null;
+}
+
+async function rememberCompletedModel(uid: string, job: any, jobId: string): Promise<void> {
+  const togetherModelName = job?.model_output_name || job?.output_name || job?.model_object_name;
+  const hfRepoName = job?.hf_output_repo_name;
+  const baseTrainingModel = store.jobTrainingModels[jobId]
+    || Object.entries(TRAINING_CONFIGS).find(([, config]) => config.model === job?.model)?.[0];
+  if (typeof togetherModelName !== "string" || typeof hfRepoName !== "string" || !baseTrainingModel) return;
+
+  const ref = adminDb.collection(MODEL_CHOICES_COLLECTION).doc(uid);
+  const choice: UserModelChoice = {
+    togetherModelName,
+    hfRepoName,
+    baseTrainingModel,
+    jobId,
+    createdAt: job?.updated_at || new Date().toISOString(),
+  };
+  await adminDb.runTransaction(async transaction => {
+    const snapshot = await transaction.get(ref);
+    const existing = Array.isArray(snapshot.data()?.models) ? snapshot.data()!.models : [];
+    const models = existing.filter((model: any) => model?.togetherModelName !== togetherModelName);
+    models.push(choice);
+    transaction.set(ref, { models });
+  });
+}
 
 const router: IRouter = Router();
 router.use(optionalAuth);
@@ -325,23 +375,30 @@ router.post("/finetune/estimate", async (req: AuthRequest, res) => {
   if (!uid) return;
   const config = getTrainingConfig(req.body?.trainingModel);
   if (!config) return res.status(400).json({ success: false, error: "Unsupported training model." });
+  const fromCheckpoint = typeof req.body?.fromCheckpoint === "string" ? req.body.fromCheckpoint.trim() : "";
+  const checkpointChoice = fromCheckpoint ? await findUserModelChoice(uid, fromCheckpoint).catch(() => null) : null;
+  if (fromCheckpoint && (!checkpointChoice || checkpointChoice.baseTrainingModel !== req.body?.trainingModel)) {
+    return res.status(403).json({ success: false, error: "That saved model is not available for this training run." });
+  }
   const { trainingFileId, validationFileId } = req.body || {};
   const upload = store.sessions[uid]?.upload;
   if (!upload || upload.trainingFileId !== trainingFileId || upload.validationFileId !== validationFileId) {
     return res.status(403).json({ success: false, error: "Cost estimates are only available for your own uploaded datasets." });
   }
   try {
+    const estimateConfig = fromCheckpoint ? { ...config, model: undefined } : config;
     const estimate = await togetherRequest("/fine-tunes/estimate-price", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         training_file: trainingFileId,
         validation_file: validationFileId,
-        ...config,
+        ...estimateConfig,
         training_method: { method: "sft", train_on_inputs: "auto" },
         training_type: { type: "Full" },
         n_epochs: N_EPOCHS,
         n_evals: config.n_evals,
+        ...(fromCheckpoint ? { from_checkpoint: fromCheckpoint } : {}),
       }),
     });
     if (!estimate || estimate.estimation_available === false) {
@@ -349,7 +406,7 @@ router.post("/finetune/estimate", async (req: AuthRequest, res) => {
     }
     store.sessions[uid] = {
       ...store.sessions[uid],
-      estimate: { trainingFileId, validationFileId, model: config.model, estimate, at: new Date().toISOString() },
+      estimate: { trainingFileId, validationFileId, model: config.model, fromCheckpoint: fromCheckpoint || undefined, estimate, at: new Date().toISOString() },
     };
     saveStore(store);
     return res.json({ success: true, estimate });
@@ -367,6 +424,11 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
   const config = getTrainingConfig(req.body?.trainingModel);
   if (!config) return res.status(400).json({ success: false, error: "Unsupported training model." });
   const { trainingFileId, validationFileId, suffix, hfRepoName, confirmSubmit } = req.body || {};
+  const fromCheckpoint = typeof req.body?.fromCheckpoint === "string" ? req.body.fromCheckpoint.trim() : "";
+  const checkpointChoice = fromCheckpoint ? await findUserModelChoice(uid, fromCheckpoint).catch(() => null) : null;
+  if (fromCheckpoint && (!checkpointChoice || checkpointChoice.baseTrainingModel !== req.body?.trainingModel)) {
+    return res.status(403).json({ success: false, error: "That saved model is not available for this training run." });
+  }
   if (confirmSubmit !== true) {
     return res.status(400).json({ success: false, error: "Job submission requires explicit approval." });
   }
@@ -375,7 +437,8 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
     return res.status(403).json({ success: false, error: "Jobs can only be created from your own uploaded datasets." });
   }
   if (!session.estimate || session.estimate.trainingFileId !== trainingFileId || session.estimate.validationFileId !== validationFileId
-    || (session.estimate.model || TRAINING_CONFIGS["Qwen3.5 9 Base"].model) !== config.model) {
+    || (session.estimate.model || TRAINING_CONFIGS["Qwen3.5 9 Base"].model) !== config.model
+    || (session.estimate.fromCheckpoint || "") !== fromCheckpoint) {
     return res.status(409).json({ success: false, error: "Review a cost estimate for these datasets before submitting the job." });
   }
   const hfToken = process.env.HF_TOKEN;
@@ -407,17 +470,19 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
     return res.status(error.status || 503).json({ success: false, error: error.message });
   }
   try {
+    const submissionConfig = fromCheckpoint ? { ...config, model: undefined } : config;
     const job = await togetherRequest("/fine-tunes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         training_file: trainingFileId,
         validation_file: validationFileId,
-        ...config,
+        ...submissionConfig,
         training_method: { method: "sft", train_on_inputs: "auto" },
         training_type: { type: "Full" },
         n_epochs: N_EPOCHS,
         n_evals: config.n_evals,
+        ...(fromCheckpoint ? { from_checkpoint: fromCheckpoint } : {}),
         ...(typeof suffix === "string" && suffix.trim() ? { suffix: suffix.trim().slice(0, 64) } : {}),
         hf_api_token: hfToken,
         hf_output_repo_name: repoName,
@@ -425,6 +490,7 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
     });
     if (!job?.id) throw new Error("Together AI did not return a job ID.");
     store.jobOwners[job.id] = uid;
+    store.jobTrainingModels[job.id] = trainingSelection;
     saveStore(store);
     return res.json({
       success: true,
@@ -449,6 +515,27 @@ router.get("/finetune/latest", (req: AuthRequest, res) => {
   return res.json({ success: true, jobId });
 });
 
+router.get("/finetune/model-choices", async (req: AuthRequest, res) => {
+  const uid = requireUser(req, res);
+  if (!uid) return;
+  try {
+    const latestJobId = Object.entries(store.jobOwners).filter(([, owner]) => owner === uid).at(-1)?.[0];
+    if (latestJobId) {
+      try {
+        const latestJob = await togetherRequest(`/fine-tunes/${encodeURIComponent(latestJobId)}`);
+        if (String(latestJob?.status || "").toLowerCase() === "completed") {
+          await rememberCompletedModel(uid, latestJob, latestJobId);
+        }
+      } catch (error) {
+        logger.warn({ error: String(error), jobId: latestJobId }, "Latest model choice could not be refreshed");
+      }
+    }
+    return res.json({ success: true, models: await getUserModelChoices(uid) });
+  } catch {
+    return res.status(502).json({ success: false, error: "Could not load saved models." });
+  }
+});
+
 // Job status + recent event messages for progress display (owner only).
 router.get("/finetune/jobs/:id", async (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
@@ -460,6 +547,13 @@ router.get("/finetune/jobs/:id", async (req: AuthRequest, res) => {
   }
   try {
     const job = await togetherRequest(`/fine-tunes/${encodeURIComponent(jobId)}`, { signal: AbortSignal.timeout(15000) });
+    if (String(job?.status || "").toLowerCase() === "completed") {
+      try {
+        await rememberCompletedModel(uid, job, jobId);
+      } catch (error) {
+        logger.warn({ error: String(error), jobId }, "Completed model could not be saved to account");
+      }
+    }
     let events: string[] = [];
     try {
       const ev = await togetherRequest(`/fine-tunes/${encodeURIComponent(jobId)}/events`, { signal: AbortSignal.timeout(5000) });
@@ -475,7 +569,7 @@ router.get("/finetune/jobs/:id", async (req: AuthRequest, res) => {
         status: job.status,
         hfRepoName: job.hf_output_repo_name || null,
         model: job.model,
-        outputName: job.output_name || null,
+        outputName: job.model_output_name || job.output_name || null,
         modelOutputPath: job.model_output_path || null,
         trainingFileId: job.training_file || null,
         createdAt: job.created_at || null,
