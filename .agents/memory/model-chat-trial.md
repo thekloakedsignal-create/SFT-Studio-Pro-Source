@@ -13,4 +13,4 @@ Do not change cleanup script logic when repairing automated training, job update
 
 **Why:** The user explicitly restricted these repairs to the training and chat flow.
 
-**How to apply:** Preserve cleanup behavior and its access to trial records; ask before any database change that would require altering cleanup.
+**How to apply:** Preserve cleanup behavior and its access to trial records. The user subsequently authorized moving training and chat storage to SQL, including cleanup's database access, without changing workflows or cleanup timing/shutdown rules.

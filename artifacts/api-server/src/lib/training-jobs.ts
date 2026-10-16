@@ -6,8 +6,11 @@ import { createRecord, getRecord, listRecords, setRecord } from "./training-reco
 // written or used as a fallback after the import; SQL is the source of truth.
 export async function importLegacyTraining(uid: string) {
   if (await getRecord("legacy-import", uid)) return;
-  const file = path.join(process.cwd(), ".data", "finetune-sessions.json");
-  if (fs.existsSync(file)) {
+  const file = [
+    path.join(process.cwd(), ".data", "finetune-sessions.json"),
+    path.join(process.cwd(), "artifacts", "api-server", ".data", "finetune-sessions.json"),
+  ].find(candidate => fs.existsSync(candidate));
+  if (file) {
     const legacy = JSON.parse(fs.readFileSync(file, "utf8"));
     if (legacy.sessions?.[uid]) {
       await createRecord("session", uid, { state: legacy.sessions[uid] });

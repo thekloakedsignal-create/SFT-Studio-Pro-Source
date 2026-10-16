@@ -14,3 +14,9 @@ Sign-in moved from Firebase Auth to Replit Auth on 2026-10-15; Firestore and the
 Keep the owner's account identity stable across sign-ins and normalize existing sessions to that same identity; never derive it from the deployment's mutable local user cache.
 **Why:** Production held the saved batches, but a later sign-in selected a different account ID and hid them. A successful save does not prove that the next session can load the same records.
 **How to apply:** Preserve the existing project owner ID rather than moving projects or relaxing access checks. Keep this correction backend-only.
+
+Training sessions, job tracking, saved models, and chat trials must use the same SQL database as projects; the earlier instruction to retain Firestore does not apply to these features.
+
+**Why:** The user explicitly requested “Put them all on SQL without breaking or changing the workflows” after the split between SQL, local files, and unavailable Firestore blocked completion updates and chat.
+
+**How to apply:** Keep Firebase configuration intact for unrelated code, but do not reconnect Firestore or restore file-based persistence for training/chat. Preserve account ownership during legacy imports.

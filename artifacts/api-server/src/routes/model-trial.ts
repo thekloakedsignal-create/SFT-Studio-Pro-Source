@@ -73,8 +73,16 @@ async function loadLatestCompletedModel(uid: string) {
     await rememberJobStatus(uid, jobId, job);
     if (String(job?.status || "").trim().toLowerCase() !== "completed") continue;
     const modelId = job?.model_object_id || saved.modelId;
-    const projectId = job?.project_id || job?.projectId || saved.projectId;
-    if (typeof modelId !== "string" || typeof projectId !== "string") continue;
+    if (typeof modelId !== "string") continue;
+    let projectId = job?.project_id || job?.projectId || saved.projectId;
+    if (!projectId) {
+      const identity = await togetherRequest(TOGETHER_V1, "/whoami");
+      projectId = identity?.project_id;
+      if (typeof projectId !== "string" || !projectId) {
+        throw new Error("Together did not return the trained model's project ID.");
+      }
+      await setRecord("job", jobId, { projectId });
+    }
     return {
       jobId, modelId, projectId,
       modelName: String(job?.model_object_name || job?.model_output_name || job?.output_name || saved.outputName || "Trained model"),
@@ -155,7 +163,7 @@ router.post("/finetune/model-trial/start", async (req: AuthRequest, res) => {
 
     const modelConfigs = await togetherRequest(
       TOGETHER_V2,
-      `/projects/${encodeURIComponent(projectId)}/models/${encodeURIComponent(model.modelId)}/configs`,
+      `/projects/${encodeURIComponent(projectId)}/configs?referenceModel=${encodeURIComponent(`projects/${projectId}/models/${model.modelId}`)}`,
     );
     const config = selectConfig(Array.isArray(modelConfigs?.data) ? modelConfigs.data : []);
     if (!config) return res.status(422).json({ success: false, error: "This model is not available for chat yet." });
