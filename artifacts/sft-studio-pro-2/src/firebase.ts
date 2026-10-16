@@ -1,45 +1,12 @@
 import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  GoogleAuthProvider, 
-  TwitterAuthProvider, 
-  signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult,
-  signOut,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  setPersistence,
-  browserLocalPersistence
-} from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
+import { auth, signOut } from './appAuth';
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || undefined);
 
-export const auth = getAuth(app);
-// Ensure local persistence
-setPersistence(auth, browserLocalPersistence).catch((err) => {
-  console.warn("Could not set auth local persistence:", err);
-});
-export const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('profile');
-googleProvider.addScope('email');
-googleProvider.setCustomParameters({ prompt: 'select_account' });
-export const twitterProvider = new TwitterAuthProvider();
-twitterProvider.setCustomParameters({ prompt: 'select_account' });
-
-export { 
-  signInWithPopup, 
-  signInWithRedirect, 
-  getRedirectResult, 
-  signOut, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  setPersistence,
-  browserLocalPersistence
-};
+export { auth, signOut };
 
 /**
  * Recursively prepares data objects for Firestore by filtering out `undefined` property keys.
