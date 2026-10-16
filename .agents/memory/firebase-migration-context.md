@@ -20,3 +20,9 @@ Training sessions, job tracking, saved models, and chat trials must use the same
 **Why:** The user explicitly requested “Put them all on SQL without breaking or changing the workflows” after the split between SQL, local files, and unavailable Firestore blocked completion updates and chat.
 
 **How to apply:** Keep Firebase configuration intact for unrelated code, but do not reconnect Firestore or restore file-based persistence for training/chat. Preserve account ownership during legacy imports.
+
+The user subsequently chose Clerk Auth and authorized consolidating their two accounts' successful training runs under their primary login, without changing the surrounding workflows.
+
+**Why:** The user explicitly confirmed the provider switch and requested both successful runs in one account.
+
+**How to apply:** Follow the reviewed Clerk migration process. Preserve existing project-owner IDs through the identity bridge; limit training ownership reconciliation to the specifically authorized successful runs, not all jobs visible through the provider key.
