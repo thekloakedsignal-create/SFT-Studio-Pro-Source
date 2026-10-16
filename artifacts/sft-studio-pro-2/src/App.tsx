@@ -58,6 +58,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { AboutModal } from "./components/AboutModal";
 import { RunTrainingModal } from "./components/RunTrainingModal";
+import { ModelChatTab } from "./components/ModelChatTab";
 import { PaymentGate, trainingPlan } from "./components/PaymentGate";
 import { ProjectOnboarding, type BatchRecommendation } from "./components/ProjectOnboarding";
 import { PricingModal } from "./components/PricingModal";
@@ -468,7 +469,7 @@ export default function App() {
     return <AuthPopupHandler />;
   }
 
-  const [activeTab, setActiveTab] = useState<"define" | "synthesizer" | "convert" | "triad" | "assess" | "registry" | "expert" | "trainer">("define");
+  const [activeTab, setActiveTab] = useState<"define" | "synthesizer" | "convert" | "triad" | "assess" | "registry" | "expert" | "trainer" | "modelChat">("define");
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [activeTab]);
@@ -4559,6 +4560,22 @@ export default function App() {
               <span>8. Automated Trainer</span>
             </button>
 
+            <button
+              id="tab-model-chat"
+              onClick={() => {
+                setActiveTab("modelChat");
+                setIsMobileNavOpen(false);
+              }}
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 ${
+                activeTab === "modelChat"
+                  ? "bg-blue-500/15 text-blue-300 border border-blue-500/25 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
+              }`}
+            >
+              <MessageSquare className="h-4 w-4 shrink-0" />
+              <span>9. Model Chat</span>
+            </button>
+
           </div>
 
           <div className="rounded-xl border border-slate-800/60 bg-slate-950/30 p-3">
@@ -7736,6 +7753,8 @@ export default function App() {
                 <PaymentGate apiFetch={projectApiFetch} planKey={trainingPlan[trainerHandoff.model]} />
               </section>
             )}
+
+            {activeTab === "modelChat" && <ModelChatTab apiFetch={projectApiFetch} />}
 
           </AnimatePresence>
         </div>
