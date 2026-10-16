@@ -17,7 +17,7 @@ import {
   Info,
   LogOut
 } from "lucide-react";
-import { User as FirebaseUser, signOut } from "firebase/auth";
+import { type AppUser as FirebaseUser, signOut } from "../appAuth";
 import { auth, db } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 

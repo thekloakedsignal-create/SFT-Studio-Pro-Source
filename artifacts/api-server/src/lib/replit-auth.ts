@@ -39,8 +39,12 @@ function existingUidForEmail(email: string | null): string | null {
   }
 }
 
+// The owner's Replit login email maps to the owner's existing account.
+const EMAIL_ALIASES: Record<string, string> = { "dubsteph47@gmail.com": "thekloakedsignal@gmail.com" };
+
 export function userFromClaims(claims: Record<string, unknown>): AppUser {
-  const email = typeof claims.email === "string" ? claims.email : null;
+  const rawEmail = typeof claims.email === "string" ? claims.email : null;
+  const email = rawEmail ? EMAIL_ALIASES[rawEmail.toLowerCase()] || rawEmail : null;
   const name = [claims.first_name, claims.last_name].filter(v => typeof v === "string" && v).join(" ");
   return {
     uid: existingUidForEmail(email) || String(claims.sub),

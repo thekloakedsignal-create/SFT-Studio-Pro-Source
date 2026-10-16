@@ -70,7 +70,6 @@ import { DocumentGuideWorkspace } from "./components/DocumentGuideWorkspace";
 import { AlignmentQaGuide } from "./components/AlignmentQaGuide";
 import { RegistryGuide } from "./components/RegistryGuide";
 import { type GuideDocument } from "./lib/document-guide";
-import { AuthPopupHandler } from "./components/AuthPopupHandler";
 import { FileAccessModal } from "./components/FileAccessModal";
 import { 
   PresetType, 
@@ -84,14 +83,8 @@ import {
   QualityIssue,
   SFTMessage 
 } from "./types";
-import { 
-  auth, 
-  getRedirectResult,
-  signOut, 
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword 
-} from "./firebase";
-import { onAuthStateChanged, signInWithCredential, GoogleAuthProvider, User as FirebaseUser } from "firebase/auth";
+import { auth, signOut } from "./firebase";
+import { onAuthStateChanged, login, type AppUser as FirebaseUser } from "./appAuth";
 
 const RESOURCE_LINKS = [
   {
@@ -460,12 +453,6 @@ function ProgressiveScrollList<T>({
 }
 
 export default function App() {
-  // Check if opened as dedicated standalone Google Authentication popup window
-  const isAuthPopupFlow = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("auth_flow") === "google";
-  if (isAuthPopupFlow) {
-    return <AuthPopupHandler />;
-  }
-
   const [activeTab, setActiveTab] = useState<"define" | "synthesizer" | "convert" | "triad" | "assess" | "registry" | "expert" | "trainer" | "modelChat">("define");
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -512,12 +499,8 @@ export default function App() {
   };
   const projectApiFetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const headers = new Headers(init.headers);
-    if (auth.currentUser) {
-      headers.set("Authorization", `Bearer ${await auth.currentUser.getIdToken()}`);
-    } else {
-      headers.set("X-Device-ID", getDeviceId());
-    }
-    return fetch(input, { ...init, headers });
+    if (!auth.currentUser) headers.set("X-Device-ID", getDeviceId());
+    return fetch(input, { ...init, headers, credentials: "include" });
   };
   const guideStorageKey = (projectId: string) =>
     `sft_project_guide_${auth.currentUser?.uid || getDeviceId()}_${projectId}`;
@@ -748,99 +731,6 @@ export default function App() {
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
-
-  // Listen for messages from dedicated authentication popup window
-  useEffect(() => {
-    const handleAuthMessage = async (event: MessageEvent) => {
-      if (event.data?.type === "SFT_AUTH_SUCCESS") {
-        setIsSigningIn(null);
-        if (event.data?.idToken) {
-          try {
-            const cred = GoogleAuthProvider.credential(event.data.idToken, event.data.accessToken);
-            const userCred = await signInWithCredential(auth, cred);
-            if (userCred.user) {
-              setCurrentUser(userCred.user);
-              await loadUserProfile(userCred.user.uid);
-              await loadUserProjects(userCred.user.uid);
-              setNotification({ 
-                text: `Welcome, ${userCred.user.displayName || userCred.user.email}!`, 
-                type: "success" 
-              });
-              return;
-            }
-          } catch (e) {
-            console.warn("Credential sign-in notice:", e);
-          }
-        }
-        if (auth.currentUser) {
-          setCurrentUser(auth.currentUser);
-          await loadUserProfile(auth.currentUser.uid);
-          await loadUserProjects(auth.currentUser.uid);
-          setNotification({ 
-            text: `Welcome, ${auth.currentUser.displayName || auth.currentUser.email}!`, 
-            type: "success" 
-          });
-        }
-      }
-    };
-    window.addEventListener("message", handleAuthMessage);
-    return () => window.removeEventListener("message", handleAuthMessage);
-  }, []);
-
-  // Robust email auth sign-in and registration handler
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) {
-      setNotification({ text: "Please enter both email and password.", type: "error" });
-      return;
-    }
-    if (password.length < 6) {
-      setNotification({ text: "Password must be at least 6 characters long.", type: "error" });
-      return;
-    }
-    
-    setIsSigningIn(isSignUp ? "Registering" : "Signing In");
-    setNotification({ text: isSignUp ? "Creating secure SFT account..." : "Authenticating credentials...", type: "info" });
-
-    try {
-      if (isSignUp) {
-        const result = await createUserWithEmailAndPassword(auth, email, password);
-        if (result?.user) {
-          setNotification({ 
-            text: `Account created successfully! Welcome, ${result.user.email}.`, 
-            type: "success" 
-          });
-        }
-      } else {
-        const result = await signInWithEmailAndPassword(auth, email, password);
-        if (result?.user) {
-          setNotification({ 
-            text: `Welcome back! Logged in as ${result.user.email}.`, 
-            type: "success" 
-          });
-        }
-      }
-    } catch (error: any) {
-      console.error("Email authentication error:", error);
-      let friendlyMessage = `Authentication failed: ${error.message}`;
-      
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-        friendlyMessage = "Incorrect email or password. Please verify and try again.";
-      } else if (error.code === 'auth/email-already-in-use') {
-        friendlyMessage = "This email is already registered. Try signing in instead.";
-      } else if (error.code === 'auth/invalid-email') {
-        friendlyMessage = "Please enter a valid email address.";
-      } else if (error.code === 'auth/weak-password') {
-        friendlyMessage = "Password is too weak. Please use a stronger password.";
-      } else if (error.code === 'auth/operation-not-allowed') {
-        friendlyMessage = "Email/password sign-in is currently unavailable.";
-      }
-      
-      setNotification({ text: friendlyMessage, type: "error" });
-    } finally {
-      setIsSigningIn(null);
-    }
-  };
 
   // Load user SFT projects list from Postgres SQL backend
   const loadUserProjects = async (userId: string) => {
@@ -1713,34 +1603,6 @@ export default function App() {
   // Enforce document title on mount
   useEffect(() => {
     document.title = "SFT Studio Pro | TRiAD AI by TRiADiC Intelligence Labs";
-  }, []);
-
-  // Check for redirect sign-in result on mount
-  useEffect(() => {
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (result?.user) {
-          setCurrentUser(result.user);
-          await loadUserProfile(result.user.uid);
-          await loadUserProjects(result.user.uid);
-          setNotification({ 
-            text: `Welcome, ${result.user.displayName || result.user.email}!`, 
-            type: "success" 
-          });
-        }
-      })
-      .catch((error: any) => {
-        console.error("Redirect sign-in error:", error);
-        let friendlyMessage = "Sign in via redirect failed.";
-        if (error.code === 'auth/operation-not-allowed') {
-          friendlyMessage = "This sign-in option is currently unavailable.";
-        } else if (error.code === 'auth/unauthorized-domain') {
-          friendlyMessage = "Sign-in is unavailable at this address.";
-        } else if (error.message) {
-          friendlyMessage = error.message;
-        }
-        setNotification({ text: friendlyMessage, type: "error" });
-      });
   }, []);
 
   // Auth Subscription
@@ -3862,61 +3724,15 @@ export default function App() {
                 </div>
               )}
 
-              {/* Email/Password Auth Form */}
-              <form onSubmit={handleEmailAuth} className="space-y-4 pt-1">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    className="w-full px-4 py-3 bg-slate-900 border border-slate-800/80 focus:border-green-500/50 rounded-xl text-sm text-white placeholder-slate-500 outline-none transition focus:ring-1 focus:ring-green-500/20"
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Password</label>
-                  </div>
-                  <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-3 bg-slate-900 border border-slate-800/80 focus:border-green-500/50 rounded-xl text-sm text-white placeholder-slate-500 outline-none transition focus:ring-1 focus:ring-green-500/20"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSigningIn !== null}
-                  className="w-full py-3 kk-primary rounded-xl font-bold text-sm transition cursor-pointer disabled:opacity-50 select-none shadow-lg shadow-green-500/10 flex items-center justify-center gap-1.5"
-                >
-                  {isSigningIn && (isSigningIn === "Registering" || isSigningIn === "Signing In") ? (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                      <span>Processing...</span>
-                    </>
-                  ) : (
-                    <span>{isSignUp ? "Create Secure Account" : "Sign In to Workspace"}</span>
-                  )}
-                </button>
-
-                <div className="text-center pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSignUp(!isSignUp);
-                      setNotification(null);
-                    }}
-                    className="text-xs text-green-400 hover:text-green-300 font-medium transition cursor-pointer"
-                  >
-                    {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign up and try for free"}
-                  </button>
-                </div>
-              </form>
+              {/* Replit sign-in */}
+              <button
+                type="button"
+                onClick={login}
+                className="w-full py-3 kk-primary rounded-xl font-bold text-sm transition cursor-pointer select-none shadow-lg shadow-green-500/10 flex items-center justify-center gap-1.5"
+              >
+                <span>Log in</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
 
               {isSigningIn && !["Registering", "Signing In"].includes(isSigningIn) && (
                 <div className="flex items-center justify-center gap-2 text-sm text-green-400 font-medium py-1 animate-pulse">
