@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import { getSessionUser, type AppUser } from "../lib/replit-auth.ts";
+import { getAuth } from "@clerk/express";
+import { resolveClerkAccount, type AppUser } from "../lib/clerk-account.ts";
+import { logger } from "../lib/logger.ts";
 
 export interface AuthRequest extends Request {
   user?: AppUser;
@@ -17,10 +19,25 @@ export const optionalAuth = async (
   }
 
   try {
-    const user = await getSessionUser(req);
-    if (user) req.user = user;
+    if (req.user) return next();
+    const auth = getAuth(req);
+    if (auth.userId) {
+      req.user = await resolveClerkAccount(auth.sessionClaims as unknown as Record<string, unknown>);
+    }
   } catch (error) {
-    console.warn("Optional auth session notice:", error);
+    logger.warn({ error: String(error) }, "Account bridge unavailable");
+    res.status(503).json({ success: false, error: "Your account could not be loaded. Please retry." });
+    return;
   }
   next();
+};
+
+export const requireAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  await optionalAuth(req, res, () => {
+    if (!req.user) {
+      res.status(401).json({ success: false, error: "Please sign in." });
+      return;
+    }
+    next();
+  });
 };

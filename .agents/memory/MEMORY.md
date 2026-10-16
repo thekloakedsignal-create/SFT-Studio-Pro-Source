@@ -1,5 +1,5 @@
 - [SFT generation constraints](sft-generation-constraints.md) — Generate every refill via an individual concurrent provider request; never use bulk or fabricated fallback examples.
-- [Firebase migration context](firebase-migration-context.md) — Firestore stays; sign-in is Replit Auth, mapped to existing account IDs by email.
+- [Firebase migration context](firebase-migration-context.md) — Clerk replaces sign-in only; preserve legacy account ownership and SQL training/chat storage.
 - [Batch snapshot compatibility](batch-snapshot-compatibility.md) — Preserve newer incremental saves and deletions when older clients submit whole-project snapshots.
 - [Reasoning and Mixed scope](reasoning-template-scope.md) — Mixed excludes Reasoning; preserve it in Batch Synthesis and remove it only from Document Converter when asked.
 - [TRiAD import source](triad-import-source.md) — Keep TRiAD imports URL-based; do not restore embedded helpful/harmful seed examples or fallback records.

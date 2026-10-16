@@ -10,7 +10,7 @@ import { PDFParse } from "pdf-parse";
 import { db } from "./src/db/index.ts";
 import { projects, batches, users, studentCodes } from "./src/db/schema.ts";
 import { eq, and, inArray } from "drizzle-orm";
-import { optionalAuth, AuthRequest } from "./src/middleware/auth.ts";
+import { optionalAuth, requireAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { reserveExamples, settleExamples } from "./src/routes/whop.ts";
 import { logger } from "./src/lib/logger.ts";
 import { auditTemplateFormat } from "./src/lib/quality-format.ts";
@@ -552,8 +552,11 @@ app.post("/api/sql/student-codes", async (req, res) => {
 });
 
 // User Profile routes in Postgres & Local fallback
-app.get("/api/sql/users/:uid", async (req, res) => {
+app.get("/api/sql/users/:uid", requireAuth, async (req: AuthRequest, res) => {
   const uid = req.params.uid;
+  if (uid !== req.user?.uid) {
+    return res.status(403).json({ success: false, error: "This account is not yours." });
+  }
   if (!uid) {
     return res.status(400).json({ success: false, error: "Missing user uid." });
   }
@@ -576,8 +579,11 @@ app.get("/api/sql/users/:uid", async (req, res) => {
   }
 });
 
-app.post("/api/sql/users", async (req, res) => {
-  const { uid, email, subscriptionStatus, limit, redeemedCode } = req.body;
+app.post("/api/sql/users", requireAuth, async (req: AuthRequest, res) => {
+  const { uid, subscriptionStatus, limit, redeemedCode } = req.body;
+  if (uid !== req.user?.uid) {
+    return res.status(403).json({ success: false, error: "This account is not yours." });
+  }
   if (!uid) {
     return res.status(400).json({ success: false, error: "Missing user uid." });
   }
@@ -585,7 +591,6 @@ app.post("/api/sql/users", async (req, res) => {
   // Save to local cache first to ensure immediate offline-resilient consistency
   const userRecord = {
     uid,
-    email: email || null,
     subscriptionStatus: subscriptionStatus || "Free",
     limit: limit !== undefined ? limit : 5000,
     redeemedCode: redeemedCode || null,
@@ -598,7 +603,6 @@ app.post("/api/sql/users", async (req, res) => {
     await db.insert(users)
       .values({
         uid,
-        email: email || null,
         subscriptionStatus: subscriptionStatus || "Free",
         limit: limit !== undefined ? limit : 5000,
         redeemedCode: redeemedCode || null,
@@ -607,7 +611,6 @@ app.post("/api/sql/users", async (req, res) => {
       .onConflictDoUpdate({
         target: users.uid,
         set: {
-          email: email || null,
           subscriptionStatus: subscriptionStatus || "Free",
           limit: limit !== undefined ? limit : 5000,
           redeemedCode: redeemedCode || null,

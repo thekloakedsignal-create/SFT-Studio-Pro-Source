@@ -1,5 +1,5 @@
-// Replit Auth session, exposed with the same names the app already uses
-// (auth.currentUser, onAuthStateChanged, signOut) so the rest of the app is unchanged.
+// Compatibility adapter for app-specific account UIDs. Clerk owns the session;
+// the React bridge publishes only after Clerk and the local account are ready.
 export interface AppUser {
   uid: string;
   email: string | null;
@@ -18,19 +18,17 @@ export const auth: { currentUser: AppUser | null } = { currentUser: null };
 const listeners = new Set<Listener>();
 let resolved = false;
 
-const ready = fetch("/api/auth/user", { credentials: "include", cache: "no-store" })
-  .then(r => (r.ok ? r.json() : { user: null }))
-  .then(data => {
-    const u = data?.user;
-    auth.currentUser = u?.uid
-      ? { uid: u.uid, email: u.email ?? null, displayName: u.displayName ?? null, photoURL: u.photoURL ?? null, emailVerified: Boolean(u.email_verified) }
-      : null;
-  })
-  .catch(() => { auth.currentUser = null; })
-  .finally(() => {
-    resolved = true;
-    listeners.forEach(fn => fn(auth.currentUser));
-  });
+let logout: (() => Promise<void>) | undefined;
+
+export function publishAccount(user: AppUser | null) {
+  auth.currentUser = user;
+  resolved = true;
+  listeners.forEach(fn => fn(user));
+}
+
+export function bindSignOut(callback: () => Promise<void>) {
+  logout = callback;
+}
 
 export function onAuthStateChanged(_auth: typeof auth, callback: Listener): () => void {
   listeners.add(callback);
@@ -39,10 +37,10 @@ export function onAuthStateChanged(_auth: typeof auth, callback: Listener): () =
 }
 
 export function login(): void {
-  window.location.href = `/api/login?returnTo=${encodeURIComponent(window.location.pathname || "/")}`;
+  window.location.href = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/sign-in`;
 }
 
 export async function signOut(_auth?: typeof auth): Promise<void> {
-  await ready;
-  window.location.href = "/api/logout";
+  if (!logout) throw new Error("Authentication is still loading.");
+  await logout();
 }

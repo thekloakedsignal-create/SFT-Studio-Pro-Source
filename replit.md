@@ -16,6 +16,7 @@ _Replace the heading above with the project's name, and this line with one sente
 - pnpm workspaces, Node.js 24, TypeScript 5.9
 - API: Express 5
 - DB: PostgreSQL + Drizzle ORM
+- Authentication: Replit-managed Clerk, using browser session cookies. The server maps signed identity claims to existing application UIDs; Clerk-native IDs must not replace legacy project ownership.
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)

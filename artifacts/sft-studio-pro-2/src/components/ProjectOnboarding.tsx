@@ -1,3 +1,4 @@
+import { fetchResponse as fetch } from "@workspace/api-client-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check, HelpCircle, LoaderCircle, MessageSquare, Send } from "lucide-react";
 import { InstructTemplate, PresetType, ProjectFormat, ProjectSettings, TemplateType } from "../types";

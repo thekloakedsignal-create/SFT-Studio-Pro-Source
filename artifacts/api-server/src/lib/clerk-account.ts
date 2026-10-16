@@ -1,0 +1,44 @@
+import { trainingPool } from "./training-records.mjs";
+
+// Preserve the existing application UID and owner alias, not Clerk's native ID.
+export const OWNER_UID = "izaaUGzC28eM6FJcisbfKhGrwaF3";
+const OWNER_EMAIL = "thekloakedsignal@gmail.com";
+export const TARGET_EMAIL = "dubsteph47@gmail.com";
+
+export interface AppUser {
+  uid: string;
+  email: string | null;
+  identityEmail: string | null;
+  email_verified: boolean;
+  displayName: string | null;
+  photoURL: string | null;
+}
+
+export async function resolveClerkAccount(claims: Record<string, unknown>): Promise<AppUser> {
+  const subject = typeof claims.userId === "string" ? claims.userId : null;
+  if (!subject) throw new Error("The signed-in session is missing its application identity.");
+  const identityEmail = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : null;
+  const verified = claims.email_verified === true || claims.emailVerified === true;
+  const isOwner = verified && (identityEmail === TARGET_EMAIL || identityEmail === OWNER_EMAIL);
+  const email = isOwner ? OWNER_EMAIL : identityEmail;
+  const pool = trainingPool();
+  let uid = isOwner ? OWNER_UID : subject;
+  let existing = await pool.query("SELECT uid FROM users WHERE uid = $1", [uid]);
+  // Existing accounts were bridged by email; preserve that lookup for migrated users.
+  if (!existing.rowCount && verified && email && !isOwner) {
+    existing = await pool.query("SELECT uid FROM users WHERE lower(email) = $1 LIMIT 2", [email]);
+    if (existing.rows.length > 1) throw new Error("Multiple local accounts match this identity.");
+    if (existing.rows[0]) uid = existing.rows[0].uid;
+  }
+  // Identity columns remain untouched. Roles, quotas and relationships stay local.
+  await pool.query(
+    `INSERT INTO users (uid, subscription_status, "limit") VALUES ($1, $2, $3)
+     ON CONFLICT (uid) DO NOTHING`,
+    [uid, isOwner ? "Owner" : "Free", isOwner ? 999999999 : 5000],
+  );
+  return {
+    uid, email, identityEmail, email_verified: verified,
+    displayName: [claims.firstName, claims.lastName].filter(v => typeof v === "string" && v).join(" ") || null,
+    photoURL: null,
+  };
+}

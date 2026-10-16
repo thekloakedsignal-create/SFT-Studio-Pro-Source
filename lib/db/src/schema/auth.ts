@@ -1,6 +1,6 @@
 import { index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
+// Retained legacy session data; Clerk now owns active sessions. Do not drop.
 export const sessionsTable = pgTable(
   "sessions",
   {

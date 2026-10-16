@@ -8,7 +8,7 @@ This app was migrated from Google Studio with a Firebase database.
 **Why:** the user asked me to remember this.
 
 **How to apply:** Treat Firebase as an existing database when diagnosing or changing persistence; distinguish it from any separate SQL or local-file paths.
-Sign-in moved from Firebase Auth to Replit Auth on 2026-10-15; Firestore and the Firebase config stay. Replit sign-ins reuse the existing account ID matched by email, and the owner's Replit email is aliased to the owner email.
+The earlier Firebase-to-Replit sign-in migration kept Firebase configuration and reused existing account IDs by email, including the owner's legacy email alias. Clerk must preserve those existing account identities.
 **Why:** the user asked to switch auth without breaking anything and to keep the Firebase keys.
 
 Keep the owner's account identity stable across sign-ins and normalize existing sessions to that same identity; never derive it from the deployment's mutable local user cache.
@@ -26,3 +26,9 @@ The user subsequently chose Clerk Auth and authorized consolidating their two ac
 **Why:** The user explicitly confirmed the provider switch and requested both successful runs in one account.
 
 **How to apply:** Follow the reviewed Clerk migration process. Preserve existing project-owner IDs through the identity bridge; limit training ownership reconciliation to the specifically authorized successful runs, not all jobs visible through the provider key.
+
+The user reiterated: "DO NOT TOUCH WORKFLOWS OR APP LOGIC. MAKE MINIMAL POSSIBLE CHANGES" and confirmed finishing only the sign-in and account changes.
+
+**Why:** The user is concerned that an authentication migration will rewrite the surrounding application.
+
+**How to apply:** Do not redesign or refactor application features or change workflow configuration. Limit edits to authentication, account access and the explicitly approved ownership consolidation.

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { fetchResponse as fetch } from "@workspace/api-client-react";
 import { rememberBatch, forgetBatch, orderBatchesForReview } from "./lib/batch-recovery";
 import { validateRegistryOutput } from "./lib/registry-validation";
 import { mergeRepairReport } from "./lib/merge-repair-report";

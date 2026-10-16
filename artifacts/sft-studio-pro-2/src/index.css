@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@layer theme, base, clerk, components, utilities;
 @import "tailwindcss";
+@import "@clerk/themes/shadcn.css";
+
+.cl-formFieldInput::placeholder { color: #c5bbc9; opacity: 1; }
 
 @theme {
   --font-sans: "Playfair Display", Georgia, Cambria, "Times New Roman", Times, serif;

@@ -1,3 +1,4 @@
+import { fetchResponse as fetch } from "@workspace/api-client-react";
 import type { ProjectSettings } from "../types";
 
 export type GuideDocument = {
