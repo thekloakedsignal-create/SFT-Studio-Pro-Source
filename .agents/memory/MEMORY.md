@@ -13,4 +13,5 @@
 - [Registry QA gate](registry-qa-gate.md) — Registry inclusion requires a completed QA check, not a perfect score; final serialized output gets a format-only check.
 - [Storage and generation](local-project-storage.md) — Preserve deliberate saved-project loading; never automatically reopen cached projects or reuse cached batches for generation.
 - [Billing scope](billing-scope.md) — Owner bypasses every paygate; mandatory ChatML Instruction formatting remains independent of payment.
-- [Model chat trial](model-chat-trial.md) — Keep the free sample one-time and 15 minutes; user chose a 10-minute cleanup cadence.- [Generation voice fidelity](generation-voice-fidelity.md) — Project voice overrides provider alignment; never pathologize, reframe, or condescend to the user.
+- [Model chat trial](model-chat-trial.md) — Keep the free sample one-time and 15 minutes; user chose a 10-minute cleanup cadence.
+- [Generation voice fidelity](generation-voice-fidelity.md) — Project voice overrides provider alignment; never pathologize, reframe, or condescend to the user.
