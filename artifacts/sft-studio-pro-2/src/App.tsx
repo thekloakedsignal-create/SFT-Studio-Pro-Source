@@ -691,6 +691,7 @@ export default function App() {
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [showOnlyFlagged, setShowOnlyFlagged] = useState(false);
   const [showLoginDropdown, setShowLoginDropdown] = useState(false);
+  const [copiedRecommendationTopic, setCopiedRecommendationTopic] = useState<string | null>(null);
 
   // New Project and Delete Project Modal States
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -4941,9 +4942,10 @@ export default function App() {
                               setBatchInstructions(activeRecommendedBatch.specialInstructions);
                               setBatchTempConstraints(activeRecommendedBatch.temporaryConstraints);
                               setNotification({ text: "Batch instructions copied", type: "success" });
+                              setCopiedRecommendationTopic(activeRecommendedBatch.topic);
                             }}
                           >
-                            Copy to Synthesizer
+                            {copiedRecommendationTopic === activeRecommendedBatch.topic ? "Copied successfully" : "Copy to Synthesizer"}
                           </button>
                         )}
                         {activeRecommendedBatch && (

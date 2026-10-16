@@ -578,10 +578,20 @@ main [class~="opacity-45"] { opacity: .72; }
   color: #ffffff !important;
 }
 
+#root div:has(> #project-selector) {
+  background-color: #17131d !important;
+}
+
 #root #project-selector {
   background: transparent !important;
   border-color: #1e293b !important;
-  color: #e2e8f0 !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+}
+
+#root #project-selector option {
+  background: #17131d !important;
+  color: #ffffff !important;
 }
 
 #root #project-selector option:checked {
