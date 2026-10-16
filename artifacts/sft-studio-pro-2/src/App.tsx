@@ -68,6 +68,7 @@ import { DocsModal } from "./components/DocsModal";
 import { type DocumentGuideProgress } from "./components/DocumentGuide";
 import { DocumentGuideWorkspace } from "./components/DocumentGuideWorkspace";
 import { AlignmentQaGuide } from "./components/AlignmentQaGuide";
+import { RegistryGuide } from "./components/RegistryGuide";
 import { type GuideDocument } from "./lib/document-guide";
 import { AuthPopupHandler } from "./components/AuthPopupHandler";
 import { FileAccessModal } from "./components/FileAccessModal";
@@ -477,7 +478,7 @@ export default function App() {
   const [showBatchRecommendationInterview, setShowBatchRecommendationInterview] = useState(false);
   const [guidePage, setGuidePage] = useState<"synthesizer" | "convert" | "triad" | "assess" | null>(null);
   const [showDocumentGuide, setShowDocumentGuide] = useState(false);
-  const [sectionGuide, setSectionGuide] = useState<"triad" | "assess" | null>(null);
+  const [sectionGuide, setSectionGuide] = useState<"triad" | "assess" | "registry" | null>(null);
   const [documentGuideProgress, setDocumentGuideProgress] = useState<DocumentGuideProgress>({ step: 0 });
   const [documentGuideQueues, setDocumentGuideQueues] = useState<Record<string, GuideDocument[]>>({});
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -7250,7 +7251,21 @@ export default function App() {
                     <p className="text-xs text-slate-400">
                       Select QA-checked batches to include in the final dataset.
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => setSectionGuide("registry")}
+                      className="kk-guide-trigger mt-3 rounded-lg border border-purple-400 bg-purple-300 px-4 py-2 text-sm font-bold text-black hover:bg-purple-200"
+                    >
+                      AI Guide
+                    </button>
                   </div>
+
+                  {sectionGuide === "registry" && (
+                    <RegistryGuide
+                      onClose={() => setSectionGuide(null)}
+                      onOpenTrainer={() => { setSectionGuide(null); setActiveTab("trainer"); }}
+                    />
+                  )}
 
                   <div className="space-y-3">
                     {batches.filter(b => b.status !== "Rejected").length === 0 ? (
