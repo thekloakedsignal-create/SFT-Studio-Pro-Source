@@ -7281,45 +7281,22 @@ export default function App() {
                         <div
                           key={b.id}
                           onClick={() => toggleSelectRegistryBatch(b.id)}
-                          className={`border rounded-xl p-4 transition-all flex items-center justify-between ${
+                          className={`border rounded-lg px-2.5 py-1.5 transition-all flex items-center ${
                             !isRegistryEligible(b) ? "opacity-50 cursor-not-allowed border-slate-800 bg-slate-900/40" :
                             selectedRegistryBatches[b.id] !== false
-                              ? "border-green-500 bg-green-500/5 shadow-md shadow-green-500/5"
+                              ? "border-green-500 bg-green-500/5"
                               : "border-slate-800 bg-slate-900/40 hover:border-slate-700"
                           }`}
                         >
-                          <div className="space-y-1.5 flex-1 min-w-0 pr-4">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <input
-                                type="checkbox"
-                                checked={isRegistryEligible(b) && selectedRegistryBatches[b.id] !== false}
-                                disabled={!isRegistryEligible(b)}
-                                onClick={event => event.stopPropagation()}
-                                onChange={() => toggleSelectRegistryBatch(b.id)}
-                                className="rounded text-green-500 accent-green-500 cursor-pointer shrink-0"
-                              />
-                              <h3 className="text-xs font-bold text-slate-100 truncate" title={b.name}>{b.name}</h3>
-                            </div>
-                            {!isRegistryEligible(b) && (
-                              <p className="text-[11px] text-slate-400">Please run a check in QA to add this batch to final output.</p>
-                            )}
-
-                            <div className="flex flex-wrap gap-1.5 text-[10px] font-mono text-slate-400">
-                              <span className="bg-slate-900/60 px-1.5 py-0.5 rounded text-emerald-400/90 font-mono">
-                                ID: {b.batchId || b.id}
-                              </span>
-                              <span className="bg-slate-900/60 px-1.5 py-0.5 rounded">Source: {/transcript/i.test(b.source || "") ? "Transcript Conversion" : /doc/i.test(b.source || "") ? "Document Conversion" : /triad/i.test(b.source || "") ? "TRiAD Alignment" : /import/i.test(b.source || "") ? "Import" : "Generator"}</span>
-                              <span className="bg-slate-900/60 px-1.5 py-0.5 rounded">Template: {b.templateType}</span>
-                              <span className="bg-slate-900/60 px-1.5 py-0.5 rounded font-bold text-slate-300">{b.examplesCount} Examples</span>
-                            </div>
-                          </div>
-
-                          {/* Status Label */}
-                          <div className="shrink-0">
-                            <span className="px-2 py-1 rounded text-[10px] font-mono font-bold tracking-wide bg-green-500/10 text-green-400 border border-green-500/20">
-                              {isRegistryEligible(b) ? "QA Checked" : "QA Required"}
-                            </span>
-                          </div>
+                          <input
+                            type="checkbox"
+                            checked={isRegistryEligible(b) && selectedRegistryBatches[b.id] !== false}
+                            disabled={!isRegistryEligible(b)}
+                            onClick={event => event.stopPropagation()}
+                            onChange={() => toggleSelectRegistryBatch(b.id)}
+                            className="rounded text-green-500 accent-green-500 cursor-pointer shrink-0"
+                          />
+                          <h3 className="ml-2 text-xs font-bold text-slate-100 truncate" title={b.name}>{b.name}</h3>
                         </div>
                       ))
                     )}
