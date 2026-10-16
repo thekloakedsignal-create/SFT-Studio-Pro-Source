@@ -1349,6 +1349,7 @@ export default function App() {
     setEditingMessages([]);
     setExportedPreview("");
     
+    setActiveTab("define");
     setNotification({ text: `Loaded SFT Project "${selected.name || "Untitled Project"}"`, type: "success" });
   };
 
