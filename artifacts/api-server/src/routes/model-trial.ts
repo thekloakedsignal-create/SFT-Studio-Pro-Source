@@ -1,14 +1,12 @@
 import { Router, type IRouter } from "express";
-import fs from "node:fs";
-import path from "node:path";
 import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
-import { adminDb } from "../lib/firebase-admin.ts";
+import { createRecord, deleteRecord, getRecord, setRecord } from "../lib/training-records.mjs";
+import { ownedTrainingJobs, rememberJobStatus } from "../lib/training-jobs.ts";
+import { logger } from "../lib/logger.ts";
 
 const TOGETHER_V1 = "https://api.together.ai/v1";
 const TOGETHER_V2 = "https://api.together.ai/v2";
-const TRIAL_COLLECTION = "modelTrialSessions";
 const TRIAL_LENGTH_MS = 15 * 60 * 1000;
-const JOB_STORE = path.join(process.cwd(), ".data", "finetune-sessions.json");
 
 type TrialSession = {
   state: "starting" | "ready" | "expired" | "failed";
@@ -37,7 +35,15 @@ function userId(req: AuthRequest, res: any): string | null {
 }
 
 function trialRef(uid: string) {
-  return adminDb.collection(TRIAL_COLLECTION).doc(uid);
+  return {
+    get: async () => {
+      const data = await getRecord("trial", uid);
+      return { exists: data !== null, data: () => data };
+    },
+    update: (data: Record<string, unknown>) => setRecord("trial", uid, data),
+    set: (data: Record<string, unknown>) => setRecord("trial", uid, data),
+    delete: () => deleteRecord("trial", uid),
+  };
 }
 
 async function togetherRequest(base: string, route: string, init: RequestInit = {}) {
@@ -59,31 +65,22 @@ async function togetherRequest(base: string, route: string, init: RequestInit = 
   return body;
 }
 
-function latestOwnedJob(uid: string): string | null {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(JOB_STORE, "utf8"));
-    return Object.entries(parsed?.jobOwners || {})
-      .filter(([, owner]) => owner === uid)
-      .at(-1)?.[0] as string || null;
-  } catch {
-    return null;
-  }
-}
-
 async function loadLatestCompletedModel(uid: string) {
-  const jobId = latestOwnedJob(uid);
-  if (!jobId) return null;
-  const job = await togetherRequest(TOGETHER_V1, `/fine-tunes/${encodeURIComponent(jobId)}`);
-  if (String(job?.status || "").toLowerCase() !== "completed") return null;
-  const modelId = job?.model_object_id;
-  const projectId = job?.project_id || job?.projectId;
-  if (typeof modelId !== "string" || typeof projectId !== "string") return null;
-  return {
-    jobId,
-    modelId,
-    projectId,
-    modelName: String(job?.model_object_name || job?.model_output_name || job?.output_name || "Trained model"),
-  };
+  const jobs = await ownedTrainingJobs(uid);
+  for (const { id: jobId, data: saved } of jobs.reverse()) {
+    if (["error", "user_error", "failed", "cancelled"].includes(saved.status)) continue;
+    const job = await togetherRequest(TOGETHER_V1, `/fine-tunes/${encodeURIComponent(jobId)}`);
+    await rememberJobStatus(uid, jobId, job);
+    if (String(job?.status || "").trim().toLowerCase() !== "completed") continue;
+    const modelId = job?.model_object_id || saved.modelId;
+    const projectId = job?.project_id || job?.projectId || saved.projectId;
+    if (typeof modelId !== "string" || typeof projectId !== "string") continue;
+    return {
+      jobId, modelId, projectId,
+      modelName: String(job?.model_object_name || job?.model_output_name || job?.output_name || saved.outputName || "Trained model"),
+    };
+  }
+  return null;
 }
 
 function selectConfig(configs: any[]) {
@@ -99,11 +96,11 @@ router.get("/finetune/model-trial/status", async (req: AuthRequest, res) => {
   const uid = userId(req, res);
   if (!uid) return;
   try {
-    const [snapshot, latest] = await Promise.all([
-      trialRef(uid).get(),
-      loadLatestCompletedModel(uid),
-    ]);
+    res.setHeader("Cache-Control", "no-store");
+    const snapshot = await trialRef(uid).get();
     const trial = snapshot.exists ? snapshot.data() as TrialSession : null;
+    // An existing chat session does not depend on the training API remaining up.
+    const latest = trial ? null : await loadLatestCompletedModel(uid);
     if (trial?.state === "starting" && trial.endpointId && trial.deploymentId) {
       try {
         const deployment = await togetherRequest(
@@ -138,7 +135,8 @@ router.get("/finetune/model-trial/status", async (req: AuthRequest, res) => {
         remainingMs: trial.state === "ready" && expires ? Math.max(0, expires - Date.now()) : null,
       } : null,
     });
-  } catch {
+  } catch (error) {
+    logger.warn({ error: String(error) }, "Model chat status could not be loaded");
     return res.status(502).json({ success: false, error: "Could not load model chat status." });
   }
 });
@@ -163,19 +161,16 @@ router.post("/finetune/model-trial/start", async (req: AuthRequest, res) => {
     if (!config) return res.status(422).json({ success: false, error: "This model is not available for chat yet." });
 
     const ref = trialRef(uid);
-    await adminDb.runTransaction(async (transaction) => {
-      const current = await transaction.get(ref);
-      if (current.exists) throw new Error("TRIAL_ALREADY_USED");
-      transaction.create(ref, {
+    const created = await createRecord("trial", uid, {
         state: "starting",
         used: true,
         jobId: model.jobId,
         modelName: model.modelName,
         projectId,
         createdAt: new Date().toISOString(),
-      } satisfies TrialSession);
-      reserved = true;
-    });
+    } satisfies TrialSession);
+    if (!created) throw new Error("TRIAL_ALREADY_USED");
+    reserved = true;
 
     const endpoint = await togetherRequest(TOGETHER_V2, `/projects/${encodeURIComponent(projectId)}/endpoints`, {
       method: "POST",
@@ -228,7 +223,7 @@ router.post("/finetune/model-trial/start", async (req: AuthRequest, res) => {
         }
         await ref.delete();
       } catch {
-        await ref.set({ state: "failed", used: true, projectId, endpointId, deploymentId, createdAt: new Date().toISOString() }, { merge: true });
+        await ref.set({ state: "failed", used: true, projectId, endpointId, deploymentId, createdAt: new Date().toISOString() });
       }
     }
     return res.status(502).json({ success: false, error: "Model chat could not be started. The session was not charged." });

@@ -127,14 +127,15 @@ export function RunTrainingModal({
         if (cancelled) return;
         setJob((current: any) => ({ ...current, ...data.job }));
         setError(null);
-        if (terminalStatuses.has(String(data.job?.status || "").trim().toLowerCase())) {
+        const status = String(data.job?.status || "").trim().toLowerCase();
+        if (terminalStatuses.has(status) && (status !== "completed" || data.job?.modelReady)) {
           stopPolling();
           if (String(data.job?.status || "").trim().toLowerCase() === "completed") {
             try {
               const choices = await readApi(await apiFetch("/api/finetune/model-choices", { cache: "no-store" }));
               if (!cancelled) setSavedModels(Array.isArray(choices.models) ? choices.models : []);
             } catch {
-              // The completed model is persisted server-side and will load next time the trainer opens.
+              if (!cancelled) setError("Training completed, but saved models could not be refreshed. Reopen the trainer to retry.");
             }
             notify(`Training complete. Open the automated trainer for your model's Hugging Face repository link.`, "success");
           }

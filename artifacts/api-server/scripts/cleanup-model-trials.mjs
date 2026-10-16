@@ -1,10 +1,4 @@
-import fs from "node:fs";
-import { initializeApp, getApps } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-
-const config = JSON.parse(fs.readFileSync(new URL("../firebase-applet-config.json", import.meta.url), "utf8"));
-const app = getApps()[0] || initializeApp({ projectId: config.projectId });
-const db = getFirestore(app, config.firestoreDatabaseId);
+import { listRecords, setRecord, trainingPool } from "../src/lib/training-records.mjs";
 const apiKey = process.env.TOGETHER_API_KEY;
 const apiBase = "https://api.together.ai/v2";
 const trialLengthMs = 15 * 60 * 1000;
@@ -39,16 +33,15 @@ async function stopTrial(ref, trial) {
   await ref.update({ state: "expired", stoppedAt: new Date().toISOString() });
 }
 
-const sessions = await db.collection("modelTrialSessions")
-  .where("state", "in", ["starting", "ready", "failed"])
-  .get();
+const sessions = (await listRecords("trial"))
+  .filter(document => ["starting", "ready", "failed"].includes(document.data.state));
 let stopped = 0;
 let errors = 0;
 const now = Date.now();
 
-for (const document of sessions.docs) {
-  const trial = document.data();
-  const ref = document.ref;
+for (const document of sessions) {
+  const trial = document.data;
+  const ref = { update: data => setRecord("trial", document.id, data) };
   try {
     if (trial.state === "starting" && trial.endpointId && trial.deploymentId) {
       const deployment = await request(
@@ -83,3 +76,4 @@ for (const document of sessions.docs) {
 }
 
 console.log(`Model trial cleanup finished: ${stopped} stopped, ${errors} retryable errors.`);
+await trainingPool().end();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { LoaderCircle, MessageSquare, Send } from "lucide-react";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -17,6 +17,8 @@ type Props = {
 };
 
 export function ModelChatTab({ apiFetch }: Props) {
+  const apiFetchRef = useRef(apiFetch);
+  apiFetchRef.current = apiFetch;
   const [status, setStatus] = useState<TrialStatus | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -26,7 +28,7 @@ export function ModelChatTab({ apiFetch }: Props) {
 
   const refresh = useCallback(async () => {
     try {
-      const response = await apiFetch("/api/finetune/model-trial/status");
+      const response = await apiFetchRef.current("/api/finetune/model-trial/status", { cache: "no-store" });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.error || "Could not load model chat.");
       setStatus(result);
@@ -37,7 +39,7 @@ export function ModelChatTab({ apiFetch }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load model chat.");
     }
-  }, [apiFetch]);
+  }, []);
 
   useEffect(() => {
     void refresh();
