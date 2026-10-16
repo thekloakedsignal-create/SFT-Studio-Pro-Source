@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { rememberBatch, forgetBatch, orderBatchesForReview } from "./lib/batch-recovery";
 import { validateRegistryOutput } from "./lib/registry-validation";
+import { mergeRepairReport } from "./lib/merge-repair-report";
 import { 
   Sparkles, 
   Settings, 
@@ -2598,8 +2599,8 @@ export default function App() {
   };
 
   // Run SFT Quality Assessment
-  const handleAnalyzeQuality = async (batchId: string, batchOverride?: SFTBatch) => {
-    const targetBatch = batchOverride || batches.find(b => b.id === batchId);
+  const handleAnalyzeQuality = async (batchId: string) => {
+    const targetBatch = batches.find(b => b.id === batchId);
     if (!targetBatch) return;
 
     setIsAssessing(true);
@@ -2741,7 +2742,6 @@ export default function App() {
       // Map new examples into the batch
       setQaRepairProgress({ completed: flaggedItems.length, total: flaggedItems.length, saving: true });
       const newExamples = [...targetBatch.examples];
-      const regeneratedIndices = new Set(regeneratedList.map(r => r.exampleIndex));
       regeneratedList.forEach(item => {
         if (item.exampleIndex >= 0 && item.exampleIndex < newExamples.length) {
           newExamples[item.exampleIndex] = {
@@ -2751,18 +2751,27 @@ export default function App() {
         }
       });
 
-      const remainingIssues = targetReport.issues.filter(issue => !regeneratedIndices.has(issue.exampleIndex));
-      const remainingFlagged = new Set(remainingIssues.map(issue => issue.exampleIndex)).size;
-      const updatedReport: QualityReport = {
-        ...targetReport,
-        overallScore: Math.round((newExamples.length - remainingFlagged) / newExamples.length * 100),
-        issues: remainingIssues,
-        suggestions: remainingIssues.length ? targetReport.suggestions : [],
-        duplicateCheck: remainingIssues.length ? targetReport.duplicateCheck : {
-          duplicatesFound: 0, duplicatesList: [], deduplicatedLength: newExamples.length
-        },
-        stats: { totalExamples: newExamples.length, flaggedCount: remainingFlagged, passedCount: newExamples.length - remainingFlagged }
-      };
+      setNotification({ text: `Assessing only the ${regeneratedList.length} regenerated examples...`, type: "info" });
+      const repairedIndices = regeneratedList.map(item => item.exampleIndex);
+      const assessmentResponse = await projectApiFetch("/api/analyze-quality", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(45000),
+        body: JSON.stringify({
+          examples: repairedIndices.map(index => newExamples[index]),
+          systemPrompt: originalSettings.systemPrompt,
+          targetTask: originalSettings.targetTask,
+          constraints: originalSettings.constraints,
+          templateType: targetBatch.templateType || originalSettings.templateType,
+          instructTemplate: originalSettings.projectFormat === ProjectFormat.INSTRUCTION
+            ? originalSettings.instructTemplate : undefined,
+        }),
+      });
+      const assessment = await assessmentResponse.json();
+      if (!assessmentResponse.ok || !assessment.success || !Array.isArray(assessment.report?.issues)) {
+        throw new Error(assessment.error || "Could not assess the regenerated examples. Existing flags were retained.");
+      }
+      const updatedReport = mergeRepairReport(targetReport, assessment.report, repairedIndices, newExamples.length);
       const updatedBatch: SFTBatch = {
         ...targetBatch,
         examples: newExamples,
@@ -2774,15 +2783,19 @@ export default function App() {
       if (repairProjectId) {
         const saved = await saveBatch(repairProjectId, updatedBatch);
         if (!saved) {
-          setBatches(prev => prev.map(b => b.id === batchId ? { ...updatedBatch, qualityReport: targetReport } : b));
+          if (activeProjectId.current === repairProjectId) {
+            setBatches(prev => prev.map(b => b.id === batchId ? { ...updatedBatch, qualityReport: targetReport } : b));
+          }
           throw new Error("Responses repaired locally, but saving failed. The QA score has not been cleared.");
         }
       }
       if (activeProjectId.current === repairProjectId) {
         setBatches(prev => prev.map(b => (b.id === batchId ? updatedBatch : b)));
         setReports(prev => ({ ...prev, [batchId]: updatedReport }));
-        // Re-audit the repaired batch so remaining flags and the real score show.
-        await handleAnalyzeQuality(batchId, updatedBatch);
+        setNotification({
+          text: `Updated ${regeneratedList.length} regenerated examples. ${updatedReport.stats.flaggedCount} remain flagged. Quality score: ${updatedReport.overallScore}/100.`,
+          type: updatedReport.stats.flaggedCount ? "info" : "success",
+        });
       }
     } catch (err: any) {
       setNotification({ text: `Regeneration failed: ${err.message}`, type: "error" });

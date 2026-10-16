@@ -28,3 +28,7 @@ After Deduplicate removes flagged examples, update the displayed QA report count
 **Why:** The user requested concurrent requests “the same way other batches do in the template of the original example” and a 100% UI score after all flagged responses are fixed. They clarified that regeneration must reformat examples with double assistant responses or missing user prompts, and later asked to increase repair concurrency because it was too slow.
 
 **How to apply:** Preserve user/system messages unless correcting their invalid format or placement is necessary; retain failed items as flagged, save repairs and the updated report before showing completion, and show 100% only after every flagged item was successfully repaired. Snapshot project instructions for new batches; older batches lack historical project settings, so use their original system messages and stored batch instructions with current project settings where necessary.
+
+After Regenerate Flagged, assess only the regenerated examples, never automatically reassess the whole batch. Merge their findings into the original report and leave untouched examples' findings unchanged.
+**Why:** The user explicitly requested “Assessing the regens ONLY.”
+**How to apply:** Map subset assessment indices back to their original batch positions, retain flags for failed regeneration slots, and recalculate batch totals from the merged findings. Full-batch assessment remains a separate manual action.
