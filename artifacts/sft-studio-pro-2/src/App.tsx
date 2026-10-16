@@ -2598,8 +2598,8 @@ export default function App() {
   };
 
   // Run SFT Quality Assessment
-  const handleAnalyzeQuality = async (batchId: string) => {
-    const targetBatch = batches.find(b => b.id === batchId);
+  const handleAnalyzeQuality = async (batchId: string, batchOverride?: SFTBatch) => {
+    const targetBatch = batchOverride || batches.find(b => b.id === batchId);
     if (!targetBatch) return;
 
     setIsAssessing(true);
@@ -2781,14 +2781,9 @@ export default function App() {
       if (activeProjectId.current === repairProjectId) {
         setBatches(prev => prev.map(b => (b.id === batchId ? updatedBatch : b)));
         setReports(prev => ({ ...prev, [batchId]: updatedReport }));
+        // Re-audit the repaired batch so remaining flags and the real score show.
+        await handleAnalyzeQuality(batchId, updatedBatch);
       }
-
-      setNotification({
-        text: remainingFlagged
-          ? `Repaired ${regeneratedList.length} flagged examples. ${remainingFlagged} remain flagged; successful repairs were saved.`
-          : `All ${regeneratedList.length} flagged examples repaired and saved. QA score: 100%.`,
-        type: remainingFlagged ? "info" : "success"
-      });
     } catch (err: any) {
       setNotification({ text: `Regeneration failed: ${err.message}`, type: "error" });
     } finally {
