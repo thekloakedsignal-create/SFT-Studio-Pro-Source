@@ -4756,9 +4756,9 @@ export default function App() {
                                   <div className="text-purple-400 font-bold break-all">&lt;|im_start|&gt;system</div>
                                   <div className="pl-2 text-slate-300 break-words [overflow-wrap:anywhere]">{project.systemPrompt || "You are a helpful assistant."}<span className="text-purple-400 font-bold">&lt;|im_end|&gt;</span></div>
                                   <div className="text-blue-400 font-bold mt-1.5 break-all">&lt;|im_start|&gt;user</div>
-                                  <div className="pl-2 text-slate-300 break-words [overflow-wrap:anywhere]">Explain why the sky appears blue.<span className="text-blue-400 font-bold">&lt;|im_end|&gt;</span></div>
+                                  <div className="pl-2 text-slate-300 break-words [overflow-wrap:anywhere]">{project.representativePrompt || "Explain why the sky appears blue."}<span className="text-blue-400 font-bold">&lt;|im_end|&gt;</span></div>
                                   <div className="text-emerald-400 font-bold mt-1.5 break-all">&lt;|im_start|&gt;assistant</div>
-                                  <div className="pl-2 text-slate-300 break-words [overflow-wrap:anywhere]">The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths.<span className="text-emerald-400 font-bold">&lt;|im_end|&gt;</span></div>
+                                  <div className="pl-2 text-slate-300 break-words [overflow-wrap:anywhere]">{project.representativeCompletion || "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."}<span className="text-emerald-400 font-bold">&lt;|im_end|&gt;</span></div>
                                 </div>
                               )}
                               {(project.instructTemplate) === InstructTemplate.ALPACA && (
@@ -4775,9 +4775,9 @@ export default function App() {
                                 <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-slate-300 text-[11px] leading-relaxed font-mono min-w-0">
                                   <div className="break-words [overflow-wrap:anywhere]">
                                     <span className="text-amber-400 font-bold">&lt;s&gt;[INST] </span>
-                                    <span>Explain why the sky appears blue. </span>
+                                    <span>{project.representativePrompt || "Explain why the sky appears blue."} </span>
                                     <span className="text-amber-400 font-bold">[/INST] </span>
-                                    <span>The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths. </span>
+                                    <span>{project.representativeCompletion || "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."} </span>
                                     <span className="text-amber-400 font-bold">&lt;/s&gt;</span>
                                   </div>
                                 </div>

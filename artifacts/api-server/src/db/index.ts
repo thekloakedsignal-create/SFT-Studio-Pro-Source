@@ -8,7 +8,10 @@ declare global {
 
 export const createPool = () => {
   if (!process.env.SQL_HOST) {
-    return null;
+    // Fall back to the Replit database so projects persist in the published app.
+    if (!process.env.DATABASE_URL) return null;
+    global._postgresPool ??= new Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
+    return global._postgresPool;
   }
   if (!global._postgresPool) {
     global._postgresPool = new Pool({
