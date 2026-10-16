@@ -15,9 +15,6 @@ import {
 } from "lucide-react";
 import { 
   auth, 
-  googleProvider, 
-  twitterProvider, 
-  signInWithPopup, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword 
 } from "../firebase";
@@ -42,38 +39,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [notification, setNotification] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
 
   if (!isOpen) return null;
-
-  // Google Sign-In
-  const handleGoogleSignIn = async () => {
-    setIsSigningIn("Google");
-    setNotification({ text: "Connecting to Google Authentication...", type: "info" });
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      if (result?.user) {
-        setNotification({ text: `Welcome, ${result.user.displayName || result.user.email}!`, type: "success" });
-        setTimeout(() => {
-          onSuccess(result.user);
-          onClose();
-        }, 600);
-      }
-    } catch (error: any) {
-      console.warn("Google popup error, falling back to direct session:", error);
-      // If popup is blocked by browser/sandbox, provide seamless authentication fallback
-      const fallbackUser = {
-        uid: "user-" + (email || defaultEmail).replace(/[^a-zA-Z0-9]/g, "").slice(0, 16),
-        email: email || defaultEmail,
-        displayName: (email || defaultEmail).split("@")[0],
-        photoURL: `https://api.dicebear.com/7.x/bottts/svg?seed=${email || defaultEmail}`
-      };
-      setNotification({ text: `Signed in as ${fallbackUser.email}! Synchronizing workspace...`, type: "success" });
-      setTimeout(() => {
-        onSuccess(fallbackUser);
-        onClose();
-      }, 700);
-    } finally {
-      setIsSigningIn(null);
-    }
-  };
 
   // Email / Password Auth
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -221,22 +186,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <p className="leading-relaxed">{notification.text}</p>
           </div>
         )}
-
-        {/* Social Login Button */}
-        <button
-          onClick={handleGoogleSignIn}
-          disabled={isSigningIn !== null}
-          className="w-full mb-4 flex items-center justify-center gap-2.5 py-3 bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 rounded-xl font-semibold text-xs transition cursor-pointer disabled:opacity-50"
-        >
-          <span className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center text-[10px] font-black text-red-600">G</span>
-          <span>Continue with Google Account</span>
-        </button>
-
-        <div className="relative my-4 flex items-center">
-          <div className="flex-grow border-t border-slate-800"></div>
-          <span className="flex-shrink mx-3 text-[10px] text-slate-500 font-semibold uppercase tracking-wider">or email</span>
-          <div className="flex-grow border-t border-slate-800"></div>
-        </div>
 
         {/* Email & Password Form */}
         <form onSubmit={handleEmailAuth} className="space-y-3">

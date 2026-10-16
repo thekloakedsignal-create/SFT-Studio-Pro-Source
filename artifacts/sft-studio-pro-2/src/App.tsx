@@ -86,10 +86,6 @@ import {
 } from "./types";
 import { 
   auth, 
-  googleProvider, 
-  twitterProvider,
-  signInWithPopup, 
-  signInWithRedirect,
   getRedirectResult,
   signOut, 
   signInWithEmailAndPassword,
@@ -790,74 +786,6 @@ export default function App() {
     window.addEventListener("message", handleAuthMessage);
     return () => window.removeEventListener("message", handleAuthMessage);
   }, []);
-
-  // Robust social sign-in handler for mobile webviews, iframes, and standard browsers
-  const handleSignInWithProvider = async (provider: any, providerName: string, forceRedirect: boolean = false) => {
-    if (isSigningIn) return;
-    setIsSigningIn(providerName);
-    setShowLoginDropdown(false);
-
-    if (forceRedirect) {
-      try {
-        await signInWithRedirect(auth, provider);
-        return;
-      } catch (redirectError: any) {
-        console.error(`${providerName} redirect error:`, redirectError);
-        setNotification({ text: `Sign-in failed: ${redirectError.message}`, type: "error" });
-        setIsSigningIn(null);
-        return;
-      }
-    }
-
-    try {
-      const result = await signInWithPopup(auth, provider);
-      if (result?.user) {
-        setCurrentUser(result.user);
-        await loadUserProfile(result.user.uid);
-        await loadUserProjects(result.user.uid);
-        setNotification({ 
-          text: `Welcome, ${result.user.displayName || result.user.email}!`, 
-          type: "success" 
-        });
-      }
-    } catch (error: any) {
-      if (error?.code === 'auth/popup-closed-by-user') {
-        setIsSigningIn(null);
-        return;
-      }
-
-      console.error(`${providerName} login error:`, error);
-      
-      // If popup is blocked (e.g. mobile webview or strict sandbox), fallback to redirect
-      if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
-        try {
-          await signInWithRedirect(auth, provider);
-          return;
-        } catch (redirectErr: any) {
-          console.error("Redirect fallback error:", redirectErr);
-          window.open(
-            `${window.location.origin}${window.location.pathname}?auth_flow=google`,
-            "sft_auth_window",
-            "width=520,height=680"
-          );
-        }
-      }
-      
-      let friendlyMessage = `Sign in with ${providerName} failed.`;
-      if (error.code === 'auth/operation-not-allowed') {
-        friendlyMessage = `${providerName} sign-in is currently unavailable.`;
-      } else if (error.code === 'auth/unauthorized-domain') {
-        friendlyMessage = "Sign-in is unavailable at this address.";
-      } else if (error.code === 'auth/account-exists-with-different-credential') {
-        friendlyMessage = `An account already exists with this email using a different sign-in method.`;
-      } else if (error.message) {
-        friendlyMessage = `${providerName} sign-in failed. Please try again.`;
-      }
-      setNotification({ text: friendlyMessage, type: "error" });
-    } finally {
-      setIsSigningIn(null);
-    }
-  };
 
   // Robust email auth sign-in and registration handler
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -3989,36 +3917,6 @@ export default function App() {
                   </button>
                 </div>
               </form>
-
-              {/* Decorative Divider */}
-              <div className="relative py-2 flex items-center">
-                <div className="flex-grow border-t border-slate-900/80"></div>
-                <span className="flex-shrink mx-4 text-xs text-slate-500 font-semibold uppercase tracking-wider">or sign in with</span>
-                <div className="flex-grow border-t border-slate-900/80"></div>
-              </div>
-
-              {/* Social Login Buttons */}
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => handleSignInWithProvider(googleProvider, "Google")}
-                    disabled={isSigningIn !== null}
-                    className="flex items-center justify-center gap-2 px-3 py-3 bg-slate-900 hover:bg-slate-800/95 text-slate-200 border border-slate-800 rounded-xl font-semibold text-sm transition cursor-pointer disabled:opacity-50 select-none shadow-sm"
-                  >
-                    <span className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center text-[10px] font-black text-red-600">G</span>
-                    <span>Google</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleSignInWithProvider(twitterProvider, "Twitter (X)")}
-                    disabled={isSigningIn !== null}
-                    className="flex items-center justify-center gap-2 px-3 py-3 bg-slate-900 hover:bg-slate-800/95 text-slate-200 border border-slate-800 rounded-xl font-semibold text-sm transition cursor-pointer disabled:opacity-50 select-none shadow-sm"
-                  >
-                    <span className="w-5 h-5 rounded-full bg-sky-950 flex items-center justify-center text-[10px] font-bold text-sky-400">X</span>
-                    <span>Twitter</span>
-                  </button>
-                </div>
-              </div>
 
               {isSigningIn && !["Registering", "Signing In"].includes(isSigningIn) && (
                 <div className="flex items-center justify-center gap-2 text-sm text-green-400 font-medium py-1 animate-pulse">
