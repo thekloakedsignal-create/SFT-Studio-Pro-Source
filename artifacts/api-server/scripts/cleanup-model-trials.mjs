@@ -1,11 +1,10 @@
-import pg from "pg";
+import fs from "node:fs";
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
-const db = new pg.Pool(process.env.SQL_HOST ? {
-  host: process.env.SQL_HOST,
-  user: process.env.SQL_USER,
-  password: process.env.SQL_PASSWORD,
-  database: process.env.SQL_DB_NAME,
-} : { connectionString: process.env.DATABASE_URL });
+const config = JSON.parse(fs.readFileSync(new URL("../firebase-applet-config.json", import.meta.url), "utf8"));
+const app = getApps()[0] || initializeApp({ projectId: config.projectId });
+const db = getFirestore(app, config.firestoreDatabaseId);
 const apiKey = process.env.TOGETHER_API_KEY;
 const apiBase = "https://api.together.ai/v2";
 const trialLengthMs = 15 * 60 * 1000;
@@ -29,15 +28,7 @@ async function request(path, method = "GET", body) {
   return result;
 }
 
-async function updateTrial(uid, patch, expectedState) {
-  await db.query(
-    `UPDATE training_state SET data = data || $2::jsonb, updated_at = now()
-     WHERE user_id = $1 AND kind = 'trial' AND data->>'state' = $3`,
-    [uid, JSON.stringify(patch), expectedState],
-  );
-}
-
-async function stopTrial(uid, trial) {
+async function stopTrial(ref, trial) {
   if (trial.endpointId && trial.deploymentId) {
     await request(
       `/projects/${encodeURIComponent(trial.projectId)}/endpoints/${encodeURIComponent(trial.endpointId)}/deployments/${encodeURIComponent(trial.deploymentId)}`,
@@ -45,20 +36,19 @@ async function stopTrial(uid, trial) {
       { autoscaling: { minReplicas: 0, maxReplicas: 0 } },
     );
   }
-  await updateTrial(uid, { state: "expired", stoppedAt: new Date().toISOString() }, trial.state);
+  await ref.update({ state: "expired", stoppedAt: new Date().toISOString() });
 }
 
-const sessions = await db.query(
-  `SELECT user_id, data FROM training_state
-   WHERE kind = 'trial' AND data->>'state' IN ('starting', 'ready', 'failed')`,
-);
+const sessions = await db.collection("modelTrialSessions")
+  .where("state", "in", ["starting", "ready", "failed"])
+  .get();
 let stopped = 0;
 let errors = 0;
 const now = Date.now();
 
-for (const document of sessions.rows) {
-  const trial = document.data;
-  const uid = document.user_id;
+for (const document of sessions.docs) {
+  const trial = document.data();
+  const ref = document.ref;
   try {
     if (trial.state === "starting" && trial.endpointId && trial.deploymentId) {
       const deployment = await request(
@@ -68,23 +58,23 @@ for (const document of sessions.rows) {
       if (state.includes("READY") && !trial.expiresAt) {
         const readyAt = new Date();
         const expiresAt = new Date(readyAt.getTime() + trialLengthMs);
-        await updateTrial(uid, { state: "ready", readyAt: readyAt.toISOString(), expiresAt: expiresAt.toISOString() }, "starting");
+        await ref.update({ state: "ready", readyAt: readyAt.toISOString(), expiresAt: expiresAt.toISOString() });
         continue;
       }
       const createdAt = Date.parse(trial.createdAt || "");
       if (state.includes("FAILED") || (Number.isFinite(createdAt) && now - createdAt > 45 * 60 * 1000)) {
-        await stopTrial(uid, trial);
+        await stopTrial(ref, trial);
         stopped++;
       }
       continue;
     }
     if (trial.state === "ready" && Date.parse(trial.expiresAt || "") <= now) {
-      await stopTrial(uid, trial);
+      await stopTrial(ref, trial);
       stopped++;
       continue;
     }
     if (trial.state === "failed") {
-      await stopTrial(uid, trial);
+      await stopTrial(ref, trial);
       stopped++;
     }
   } catch {
@@ -93,4 +83,3 @@ for (const document of sessions.rows) {
 }
 
 console.log(`Model trial cleanup finished: ${stopped} stopped, ${errors} retryable errors.`);
-await db.end();

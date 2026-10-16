@@ -1,7 +1,9 @@
 import { Router, type IRouter } from "express";
+import path from "path";
+import fs from "fs";
 import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
 import { logger } from "../lib/logger.ts";
-import { loadTrainingStore, updateTrainingStore, readTrainingRecord, updateTrainingRecord, latestOwnedJob } from "../lib/training-store.ts";
+import { adminDb } from "../lib/firebase-admin.ts";
 import { consumeTraining, restoreTraining } from "./whop.ts";
 
 // Together AI full fine-tuning automation for the SFT Studio Data Registry.
@@ -14,8 +16,8 @@ import { consumeTraining, restoreTraining } from "./whop.ts";
 // Optional:
 //   HF_OUTPUT_REPO_NAME   - default Hugging Face output repository placeholder
 //
-// Security model: every endpoint requires a verified Replit Auth session.
-// Billable actions are additionally gated server-side: uploads require
+// Security model: every endpoint requires a verified signed-in account (Firebase
+// ID token). Billable actions are additionally gated server-side: uploads require
 // a recent successful preflight, and job submission requires the caller's own
 // validated uploaded files plus a cost estimate retrieved for exactly those files.
 // Uploaded files, estimates, and jobs are tracked per owner; status and download
@@ -90,6 +92,65 @@ const PREFLIGHT_TTL_MS = 60 * 60 * 1000; // upload allowed within 1h of prefligh
 
 const TERMINAL_JOB_STATUSES = new Set(["completed", "error", "user_error", "failed", "cancelled"]);
 
+// Per-owner consent/flow state and job ownership, persisted across restarts.
+interface OwnerSession {
+  preflightAt?: string;
+  preflightModel?: string;
+  upload?: {
+    trainingFileId: string;
+    validationFileId: string;
+    trainingCount: number;
+    validationCount: number;
+    at: string;
+  };
+  estimate?: {
+    trainingFileId: string;
+    validationFileId: string;
+    model?: string;
+    fromCheckpoint?: string;
+    estimate: unknown;
+    at: string;
+  };
+}
+interface FinetuneStore {
+  sessions: Record<string, OwnerSession>;
+  jobOwners: Record<string, string>;
+  jobTrainingModels: Record<string, string>;
+}
+
+const DATA_DIR = path.join(process.cwd(), ".data");
+const STORE_FILE = path.join(DATA_DIR, "finetune-sessions.json");
+
+function loadStore(): FinetuneStore {
+  try {
+    if (fs.existsSync(STORE_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(STORE_FILE, "utf-8"));
+      return {
+        sessions: parsed?.sessions && typeof parsed.sessions === "object" ? parsed.sessions : {},
+        jobOwners: parsed?.jobOwners && typeof parsed.jobOwners === "object" ? parsed.jobOwners : {},
+        jobTrainingModels: parsed?.jobTrainingModels && typeof parsed.jobTrainingModels === "object" ? parsed.jobTrainingModels : {},
+      };
+    }
+  } catch (error) {
+    logger.warn({ error: String(error) }, "Fine-tune session store could not be read; starting fresh");
+  }
+  return { sessions: {}, jobOwners: {}, jobTrainingModels: {} };
+}
+
+function saveStore(store: FinetuneStore) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    const tmp = `${STORE_FILE}.${Math.random().toString(36).slice(2)}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(store), "utf-8");
+    fs.renameSync(tmp, STORE_FILE);
+  } catch (error) {
+    logger.warn({ error: String(error) }, "Fine-tune session store could not be saved");
+  }
+}
+
+const store = loadStore();
+const MODEL_CHOICES_COLLECTION = "userModelChoices";
+
 interface UserModelChoice {
   togetherModelName: string;
   hfRepoName: string;
@@ -99,7 +160,8 @@ interface UserModelChoice {
 }
 
 async function getUserModelChoices(uid: string): Promise<UserModelChoice[]> {
-  const models = (await readTrainingRecord<{ models: UserModelChoice[] }>(uid, "models"))?.models;
+  const snapshot = await adminDb.collection(MODEL_CHOICES_COLLECTION).doc(uid).get();
+  const models = snapshot.data()?.models;
   return Array.isArray(models) ? models.filter((model: any) =>
     typeof model?.togetherModelName === "string"
     && typeof model?.hfRepoName === "string"
@@ -111,13 +173,13 @@ async function findUserModelChoice(uid: string, togetherModelName: string): Prom
 }
 
 async function rememberCompletedModel(uid: string, job: any, jobId: string): Promise<void> {
-  const store = await loadTrainingStore(uid);
   const togetherModelName = job?.model_output_name || job?.output_name || job?.model_object_name;
-  const hfRepoName = job?.hf_output_repo_name || store.jobHfRepos[jobId];
+  const hfRepoName = job?.hf_output_repo_name;
   const baseTrainingModel = store.jobTrainingModels[jobId]
     || Object.entries(TRAINING_CONFIGS).find(([, config]) => config.model === job?.model)?.[0];
   if (typeof togetherModelName !== "string" || typeof hfRepoName !== "string" || !baseTrainingModel) return;
 
+  const ref = adminDb.collection(MODEL_CHOICES_COLLECTION).doc(uid);
   const choice: UserModelChoice = {
     togetherModelName,
     hfRepoName,
@@ -125,11 +187,12 @@ async function rememberCompletedModel(uid: string, job: any, jobId: string): Pro
     jobId,
     createdAt: job?.updated_at || new Date().toISOString(),
   };
-  await updateTrainingRecord<{ models: UserModelChoice[] }>(uid, "models", current => {
-    const existing = current?.models || [];
+  await adminDb.runTransaction(async transaction => {
+    const snapshot = await transaction.get(ref);
+    const existing = Array.isArray(snapshot.data()?.models) ? snapshot.data()!.models : [];
     const models = existing.filter((model: any) => model?.togetherModelName !== togetherModelName);
     models.push(choice);
-    return { models };
+    transaction.set(ref, { models });
   });
 }
 
@@ -242,9 +305,8 @@ router.post("/finetune/preflight", async (req: AuthRequest, res) => {
       error: "Server API credentials are not fully configured yet.",
     });
   }
-  await updateTrainingStore(uid, store => {
-    store.sessions[uid] = { ...store.sessions[uid], preflightAt: new Date().toISOString(), preflightModel: config.model };
-  });
+  store.sessions[uid] = { ...store.sessions[uid], preflightAt: new Date().toISOString(), preflightModel: config.model };
+  saveStore(store);
   return res.json({
     success: true,
     credentials: { together: true, huggingFace: true },
@@ -262,7 +324,6 @@ router.post("/finetune/upload", async (req: AuthRequest, res) => {
   const config = getTrainingConfig(req.body?.trainingModel);
   if (!config) return res.status(400).json({ success: false, error: "Unsupported training model." });
   const { trainingJsonl, validationJsonl, suffix, confirmUpload } = req.body || {};
-  const store = await loadTrainingStore(uid);
   if (confirmUpload !== true) {
     return res.status(400).json({ success: false, error: "Dataset upload requires explicit approval." });
   }
@@ -282,8 +343,8 @@ router.post("/finetune/upload", async (req: AuthRequest, res) => {
     const valFile = await uploadFineTuneFile(validation.lines.join("\n"), `${safeSuffix}-validation.jsonl`);
     await waitForFileProcessing(trainFile.id);
     await waitForFileProcessing(valFile.id);
-    await updateTrainingStore(uid, current => { current.sessions[uid] = {
-      ...current.sessions[uid],
+    store.sessions[uid] = {
+      ...store.sessions[uid],
       upload: {
         trainingFileId: trainFile.id,
         validationFileId: valFile.id,
@@ -292,7 +353,8 @@ router.post("/finetune/upload", async (req: AuthRequest, res) => {
         at: new Date().toISOString(),
       },
       estimate: undefined,
-    }; });
+    };
+    saveStore(store);
     return res.json({
       success: true,
       trainingFileId: trainFile.id,
@@ -319,7 +381,6 @@ router.post("/finetune/estimate", async (req: AuthRequest, res) => {
     return res.status(403).json({ success: false, error: "That saved model is not available for this training run." });
   }
   const { trainingFileId, validationFileId } = req.body || {};
-  const store = await loadTrainingStore(uid);
   const upload = store.sessions[uid]?.upload;
   if (!upload || upload.trainingFileId !== trainingFileId || upload.validationFileId !== validationFileId) {
     return res.status(403).json({ success: false, error: "Cost estimates are only available for your own uploaded datasets." });
@@ -343,10 +404,11 @@ router.post("/finetune/estimate", async (req: AuthRequest, res) => {
     if (!estimate || estimate.estimation_available === false) {
       return res.status(422).json({ success: false, error: "Together AI could not produce a price estimate for this configuration." });
     }
-    await updateTrainingStore(uid, current => { current.sessions[uid] = {
-      ...current.sessions[uid],
+    store.sessions[uid] = {
+      ...store.sessions[uid],
       estimate: { trainingFileId, validationFileId, model: config.model, fromCheckpoint: fromCheckpoint || undefined, estimate, at: new Date().toISOString() },
-    }; });
+    };
+    saveStore(store);
     return res.json({ success: true, estimate });
   } catch (error: any) {
     logger.warn({ error: error?.message }, "Fine-tune price estimate failed");
@@ -370,7 +432,6 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
   if (confirmSubmit !== true) {
     return res.status(400).json({ success: false, error: "Job submission requires explicit approval." });
   }
-  const store = await loadTrainingStore(uid);
   const session = store.sessions[uid];
   if (!session?.upload || session.upload.trainingFileId !== trainingFileId || session.upload.validationFileId !== validationFileId) {
     return res.status(403).json({ success: false, error: "Jobs can only be created from your own uploaded datasets." });
@@ -428,11 +489,9 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
       }),
     });
     if (!job?.id) throw new Error("Together AI did not return a job ID.");
-    await updateTrainingStore(uid, current => {
-      current.jobOwners[job.id] = uid;
-      current.jobTrainingModels[job.id] = trainingSelection;
-      current.jobHfRepos[job.id] = repoName;
-    });
+    store.jobOwners[job.id] = uid;
+    store.jobTrainingModels[job.id] = trainingSelection;
+    saveStore(store);
     return res.json({
       success: true,
       job: {
@@ -440,7 +499,6 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
         status: job.status,
         model: job.model,
         outputName: job.output_name || null,
-        hfRepoName: repoName,
       },
     });
   } catch (error: any) {
@@ -450,10 +508,10 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
 });
 
 // Restore the latest owned run after a reload; this does not submit or resume training.
-router.get("/finetune/latest", async (req: AuthRequest, res) => {
+router.get("/finetune/latest", (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
-  const jobId = await latestOwnedJob(uid);
+  const jobId = Object.entries(store.jobOwners).filter(([, owner]) => owner === uid).at(-1)?.[0] || null;
   return res.json({ success: true, jobId });
 });
 
@@ -461,7 +519,7 @@ router.get("/finetune/model-choices", async (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
   try {
-    const latestJobId = await latestOwnedJob(uid);
+    const latestJobId = Object.entries(store.jobOwners).filter(([, owner]) => owner === uid).at(-1)?.[0];
     if (latestJobId) {
       try {
         const latestJob = await togetherRequest(`/fine-tunes/${encodeURIComponent(latestJobId)}`);
@@ -484,7 +542,6 @@ router.get("/finetune/jobs/:id", async (req: AuthRequest, res) => {
   if (!uid) return;
   const jobId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
   if (!jobId) return res.status(400).json({ success: false, error: "Missing job ID." });
-  const store = await loadTrainingStore(uid);
   if (store.jobOwners[jobId] !== uid) {
     return res.status(404).json({ success: false, error: "Job not found." });
   }
@@ -510,7 +567,7 @@ router.get("/finetune/jobs/:id", async (req: AuthRequest, res) => {
       job: {
         id: job.id,
         status: job.status,
-        hfRepoName: job.hf_output_repo_name || store.jobHfRepos[jobId] || null,
+        hfRepoName: job.hf_output_repo_name || null,
         model: job.model,
         outputName: job.model_output_name || job.output_name || null,
         modelOutputPath: job.model_output_path || null,
@@ -533,7 +590,6 @@ router.post("/finetune/jobs/:id/download", async (req: AuthRequest, res) => {
   if (!uid) return;
   const jobId = Array.isArray(req.params.id) ? req.params.id[0] ?? "" : req.params.id;
   if (!jobId) return res.status(400).json({ success: false, error: "Missing job ID." });
-  const store = await loadTrainingStore(uid);
   if (store.jobOwners[jobId] !== uid) {
     return res.status(404).json({ success: false, error: "Job not found." });
   }

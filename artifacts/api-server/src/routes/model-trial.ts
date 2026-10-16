@@ -1,10 +1,14 @@
 import { Router, type IRouter } from "express";
+import fs from "node:fs";
+import path from "node:path";
 import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
-import { loadTrainingStore, readTrainingRecord, updateTrainingRecord } from "../lib/training-store.ts";
+import { adminDb } from "../lib/firebase-admin.ts";
 
 const TOGETHER_V1 = "https://api.together.ai/v1";
 const TOGETHER_V2 = "https://api.together.ai/v2";
+const TRIAL_COLLECTION = "modelTrialSessions";
 const TRIAL_LENGTH_MS = 15 * 60 * 1000;
+const JOB_STORE = path.join(process.cwd(), ".data", "finetune-sessions.json");
 
 type TrialSession = {
   state: "starting" | "ready" | "expired" | "failed";
@@ -32,11 +36,8 @@ function userId(req: AuthRequest, res: any): string | null {
   return uid;
 }
 
-async function updateTrial(uid: string, patch: Partial<TrialSession>): Promise<void> {
-  await updateTrainingRecord<TrialSession>(uid, "trial", current => {
-    if (!current) throw new Error("Model chat session is missing.");
-    return { ...current, ...patch };
-  });
+function trialRef(uid: string) {
+  return adminDb.collection(TRIAL_COLLECTION).doc(uid);
 }
 
 async function togetherRequest(base: string, route: string, init: RequestInit = {}) {
@@ -58,23 +59,31 @@ async function togetherRequest(base: string, route: string, init: RequestInit = 
   return body;
 }
 
-async function loadLatestCompletedModel(uid: string) {
-  const store = await loadTrainingStore(uid);
-  const jobs = Object.entries(store.jobOwners).filter(([, owner]) => owner === uid).reverse();
-  for (const [jobId] of jobs) {
-    const job = await togetherRequest(TOGETHER_V1, `/fine-tunes/${encodeURIComponent(jobId)}`);
-    if (String(job?.status || "").toLowerCase() !== "completed") continue;
-    const modelId = job?.model_object_id;
-    const projectId = job?.project_id || job?.projectId;
-    if (typeof modelId !== "string" || typeof projectId !== "string") {
-      throw new Error("Training is complete, but the trained model's chat deployment identifiers are not available yet.");
-    }
-    return {
-      jobId, modelId, projectId,
-      modelName: String(job?.model_object_name || job?.model_output_name || job?.output_name || "Trained model"),
-    };
+function latestOwnedJob(uid: string): string | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(JOB_STORE, "utf8"));
+    return Object.entries(parsed?.jobOwners || {})
+      .filter(([, owner]) => owner === uid)
+      .at(-1)?.[0] as string || null;
+  } catch {
+    return null;
   }
-  return null;
+}
+
+async function loadLatestCompletedModel(uid: string) {
+  const jobId = latestOwnedJob(uid);
+  if (!jobId) return null;
+  const job = await togetherRequest(TOGETHER_V1, `/fine-tunes/${encodeURIComponent(jobId)}`);
+  if (String(job?.status || "").toLowerCase() !== "completed") return null;
+  const modelId = job?.model_object_id;
+  const projectId = job?.project_id || job?.projectId;
+  if (typeof modelId !== "string" || typeof projectId !== "string") return null;
+  return {
+    jobId,
+    modelId,
+    projectId,
+    modelName: String(job?.model_object_name || job?.model_output_name || job?.output_name || "Trained model"),
+  };
 }
 
 function selectConfig(configs: any[]) {
@@ -90,9 +99,11 @@ router.get("/finetune/model-trial/status", async (req: AuthRequest, res) => {
   const uid = userId(req, res);
   if (!uid) return;
   try {
-    let trial = await readTrainingRecord<TrialSession>(uid, "trial");
-    // An existing trial must remain readable even if the training provider is unavailable.
-    const latest = trial ? null : await loadLatestCompletedModel(uid);
+    const [snapshot, latest] = await Promise.all([
+      trialRef(uid).get(),
+      loadLatestCompletedModel(uid),
+    ]);
+    const trial = snapshot.exists ? snapshot.data() as TrialSession : null;
     if (trial?.state === "starting" && trial.endpointId && trial.deploymentId) {
       try {
         const deployment = await togetherRequest(
@@ -102,14 +113,14 @@ router.get("/finetune/model-trial/status", async (req: AuthRequest, res) => {
         if (String(deployment?.status?.state || deployment?.state || "").includes("READY")) {
           const now = new Date();
           const expiresAt = new Date(now.getTime() + TRIAL_LENGTH_MS);
-          trial = await updateTrainingRecord<TrialSession>(uid, "trial", current =>
-            current?.state === "starting"
-              ? { ...current, state: "ready", readyAt: now.toISOString(), expiresAt: expiresAt.toISOString() }
-              : current);
+          await trialRef(uid).update({ state: "ready", readyAt: now.toISOString(), expiresAt: expiresAt.toISOString() });
+          trial.state = "ready";
+          trial.readyAt = now.toISOString();
+          trial.expiresAt = expiresAt.toISOString();
         }
         if (String(deployment?.status?.state || deployment?.state || "").includes("FAILED")) {
-          trial = await updateTrainingRecord<TrialSession>(uid, "trial", current =>
-            current?.state === "starting" ? { ...current, state: "failed" } : current);
+          await trialRef(uid).update({ state: "failed" });
+          trial.state = "failed";
         }
       } catch {
         // Keep the persisted status and let the next poll retry.
@@ -127,10 +138,8 @@ router.get("/finetune/model-trial/status", async (req: AuthRequest, res) => {
         remainingMs: trial.state === "ready" && expires ? Math.max(0, expires - Date.now()) : null,
       } : null,
     });
-  } catch (error: any) {
-    const message = error?.message?.startsWith("Training is complete,")
-      ? error.message : "Could not load model chat status.";
-    return res.status(502).json({ success: false, error: message });
+  } catch {
+    return res.status(502).json({ success: false, error: "Could not load model chat status." });
   }
 });
 
@@ -153,18 +162,20 @@ router.post("/finetune/model-trial/start", async (req: AuthRequest, res) => {
     const config = selectConfig(Array.isArray(modelConfigs?.data) ? modelConfigs.data : []);
     if (!config) return res.status(422).json({ success: false, error: "This model is not available for chat yet." });
 
-    await updateTrainingRecord<TrialSession>(uid, "trial", current => {
-      if (current) throw new Error("TRIAL_ALREADY_USED");
-      return {
+    const ref = trialRef(uid);
+    await adminDb.runTransaction(async (transaction) => {
+      const current = await transaction.get(ref);
+      if (current.exists) throw new Error("TRIAL_ALREADY_USED");
+      transaction.create(ref, {
         state: "starting",
         used: true,
         jobId: model.jobId,
         modelName: model.modelName,
         projectId,
         createdAt: new Date().toISOString(),
-      };
+      } satisfies TrialSession);
+      reserved = true;
     });
-    reserved = true;
 
     const endpoint = await togetherRequest(TOGETHER_V2, `/projects/${encodeURIComponent(projectId)}/endpoints`, {
       method: "POST",
@@ -173,7 +184,7 @@ router.post("/finetune/model-trial/start", async (req: AuthRequest, res) => {
     endpointId = endpoint?.id;
     if (!endpointId) throw new Error("Endpoint setup failed.");
     const endpointName = endpoint?.name;
-    await updateTrial(uid, { endpointId, endpointName });
+    await ref.update({ endpointId, endpointName });
 
     const deployment = await togetherRequest(
       TOGETHER_V2,
@@ -190,7 +201,7 @@ router.post("/finetune/model-trial/start", async (req: AuthRequest, res) => {
     );
     deploymentId = deployment?.id;
     if (!deploymentId) throw new Error("Endpoint setup failed.");
-    await updateTrial(uid, { deploymentId });
+    await ref.update({ deploymentId });
 
     await togetherRequest(
       TOGETHER_V2,
@@ -203,6 +214,7 @@ router.post("/finetune/model-trial/start", async (req: AuthRequest, res) => {
       return res.status(409).json({ success: false, error: "Your one-time model chat session has already been used." });
     }
     if (reserved) {
+      const ref = trialRef(uid);
       try {
         if (endpointId && deploymentId) {
           await togetherRequest(
@@ -214,9 +226,9 @@ router.post("/finetune/model-trial/start", async (req: AuthRequest, res) => {
         if (endpointId) {
           await togetherRequest(TOGETHER_V2, `/projects/${encodeURIComponent(projectId)}/endpoints/${encodeURIComponent(endpointId)}`, { method: "DELETE" });
         }
-        await updateTrainingRecord<TrialSession>(uid, "trial", () => null);
+        await ref.delete();
       } catch {
-        await updateTrial(uid, { state: "failed", used: true, projectId, endpointId, deploymentId });
+        await ref.set({ state: "failed", used: true, projectId, endpointId, deploymentId, createdAt: new Date().toISOString() }, { merge: true });
       }
     }
     return res.status(502).json({ success: false, error: "Model chat could not be started. The session was not charged." });
@@ -234,7 +246,8 @@ router.post("/finetune/model-trial/chat", async (req: AuthRequest, res) => {
     return res.status(400).json({ success: false, error: "Enter a message to continue." });
   }
   try {
-    const trial = await readTrainingRecord<TrialSession>(uid, "trial");
+    const snapshot = await trialRef(uid).get();
+    const trial = snapshot.data() as TrialSession | undefined;
     if (!trial || trial.state !== "ready" || !trial.endpointName || !trial.expiresAt || Date.now() >= Date.parse(trial.expiresAt)) {
       return res.status(410).json({ success: false, error: "Your model chat session has ended." });
     }
