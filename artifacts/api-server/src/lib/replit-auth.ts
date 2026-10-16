@@ -42,17 +42,27 @@ function existingUidForEmail(email: string | null): string | null {
 // The owner's Replit login email maps to the owner's existing account.
 const EMAIL_ALIASES: Record<string, string> = { "dubsteph47@gmail.com": "thekloakedsignal@gmail.com" };
 
+// This is the existing owner account used by the saved projects and owner profile.
+// Never let an ephemeral users.json file change its identity between sign-ins.
+function stableAccountIdentity(user: AppUser): AppUser {
+  if (!user.email_verified || !user.email) return user;
+  const email = EMAIL_ALIASES[user.email.toLowerCase()] || user.email.toLowerCase();
+  return email === "thekloakedsignal@gmail.com"
+    ? { ...user, uid: "izaaUGzC28eM6FJcisbfKhGrwaF3", email }
+    : user;
+}
+
 export function userFromClaims(claims: Record<string, unknown>): AppUser {
   const rawEmail = typeof claims.email === "string" ? claims.email : null;
   const email = rawEmail ? EMAIL_ALIASES[rawEmail.toLowerCase()] || rawEmail : null;
   const name = [claims.first_name, claims.last_name].filter(v => typeof v === "string" && v).join(" ");
-  return {
+  return stableAccountIdentity({
     uid: existingUidForEmail(email) || String(claims.sub),
     email,
     email_verified: Boolean(email) && claims.email_verified !== false,
     displayName: name || null,
     photoURL: (claims.profile_image_url || claims.picture || null) as string | null,
-  };
+  });
 }
 
 export async function createSession(user: AppUser): Promise<string> {
@@ -69,7 +79,15 @@ export async function getSessionUser(req: Request): Promise<AppUser | null> {
     if (row) await db.delete(sessionsTable).where(eq(sessionsTable.sid, sid));
     return null;
   }
-  return ((row.sess as any)?.user as AppUser) || null;
+  const user = (row.sess as any)?.user as AppUser | undefined;
+  if (!user) return null;
+  const resolvedUser = stableAccountIdentity(user);
+  if (resolvedUser.uid !== user.uid || resolvedUser.email !== user.email) {
+    await db.update(sessionsTable)
+      .set({ sess: { ...(row.sess as any), user: resolvedUser } })
+      .where(eq(sessionsTable.sid, sid));
+  }
+  return resolvedUser;
 }
 
 export async function clearSession(req: Request, res: Response): Promise<void> {

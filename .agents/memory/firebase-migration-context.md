@@ -10,3 +10,7 @@ This app was migrated from Google Studio with a Firebase database.
 **How to apply:** Treat Firebase as an existing database when diagnosing or changing persistence; distinguish it from any separate SQL or local-file paths.
 Sign-in moved from Firebase Auth to Replit Auth on 2026-10-15; Firestore and the Firebase config stay. Replit sign-ins reuse the existing account ID matched by email, and the owner's Replit email is aliased to the owner email.
 **Why:** the user asked to switch auth without breaking anything and to keep the Firebase keys.
+
+Keep the owner's account identity stable across sign-ins and normalize existing sessions to that same identity; never derive it from the deployment's mutable local user cache.
+**Why:** Production held the saved batches, but a later sign-in selected a different account ID and hid them. A successful save does not prove that the next session can load the same records.
+**How to apply:** Preserve the existing project owner ID rather than moving projects or relaxing access checks. Keep this correction backend-only.
