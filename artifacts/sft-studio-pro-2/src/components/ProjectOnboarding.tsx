@@ -419,8 +419,9 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const conversationRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const conversation = conversationRef.current;
-    if (conversation) conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
-  }, [step, assistantReply, error]);
+    if (conversation) conversation.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 });
+  }, [step]);
 
   const modelNameInstruction = rememberName === "yes" && modelRememberedName.trim()
     ? `Your name is ${modelRememberedName.trim()}.`
@@ -526,6 +527,8 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const buildProjectDefinition = (): ProjectSettings => {
     const targetPersona = [
       goal.trim(),
+      voiceDescription.trim() ? `Voice instructions: ${voiceDescription.trim()}` : "",
+      modelNameInstruction,
       `Approved target voice (${voiceSource === "ai" ? "AI draft approved by user" : "user supplied"}; follow this voice in generated responses):\n${voiceSample}`,
     ].filter(Boolean).join("\n\n");
     return {
@@ -890,6 +893,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             <div className="space-y-3">
               <p className="border border-purple-500 bg-purple-300 px-4 py-3 text-sm font-bold !text-[#000000]">
                 {approvedProjectDefinition ? "This project definition is approved and locked." : "Review the completed project definition, then approve it to lock these settings."}
+                <br />Next: on the main page, click Save &amp; Lock to lock the definition, then open the Batch Generator and click the AI Guide button to continue the guided setup.
               </p>
               {[
                 ["Project name", approvedProjectDefinition?.name ?? projectName],
@@ -913,6 +917,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             <div className="space-y-3">
               <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200">
                 <li>In the Synthesizer, select a recommended topic and click Copy to Synthesizer above the recommendation to fill the generator fields.</li>
+                <li>Start with a sample batch of 5. You must generate and approve a sample of 5 before larger batch sizes unlock.</li>
                 <li>Generate one batch at a time.</li>
                 <li>Review each generated batch and approve or reject it before generating another.</li>
                 <li>{trainingModel === "Llama 3.1 70B"

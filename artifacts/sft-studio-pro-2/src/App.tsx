@@ -3855,6 +3855,7 @@ export default function App() {
             type: "success"
           });
           setShowProjectOnboarding(false);
+          window.scrollTo({ top: 0 });
         }}
       />
     );
