@@ -461,6 +461,7 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
   } catch (error: any) {
     return res.status(error.status || 503).json({ success: false, error: error.message });
   }
+  let submitted = false;
   try {
     const submissionConfig = fromCheckpoint ? { ...config, model: undefined } : config;
     const job = await togetherRequest("/fine-tunes", {
@@ -481,6 +482,7 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
       }),
     });
     if (!job?.id) throw new Error("Together AI did not return a job ID.");
+    submitted = true;
     await createRecord("job", job.id, {
       ownerId: uid, trainingModel: trainingSelection, hfRepoName: repoName,
     });
@@ -495,6 +497,8 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
       },
     });
   } catch (error: any) {
+    // Refund the training credit when no job was actually submitted.
+    if (!submitted && req.user) restoreTraining(req.user.uid, trainingSelection);
     logger.warn({ error: error?.message }, "Fine-tune job creation failed");
     return res.status(error?.status || 502).json({ success: false, error: error?.message || "Job submission failed." });
   }

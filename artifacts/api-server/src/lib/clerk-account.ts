@@ -41,7 +41,8 @@ export async function resolveClerkAccount(claims: Record<string, unknown>): Prom
     [uid, isOwner ? "Owner" : "Free", isOwner ? 999999999 : 5000],
   );
   return {
-    uid, email, identityEmail, email_verified: verified,
+    // Bridged accounts were verified when first linked; the session token may omit the claim.
+    uid, email, identityEmail, email_verified: verified || isOwner,
     displayName: [claims.firstName, claims.lastName].filter(v => typeof v === "string" && v).join(" ") || null,
     photoURL: null,
   };
