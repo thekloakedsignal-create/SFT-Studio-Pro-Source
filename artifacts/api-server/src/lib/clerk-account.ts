@@ -19,11 +19,15 @@ export async function resolveClerkAccount(claims: Record<string, unknown>): Prom
   if (!subject) throw new Error("The signed-in session is missing its application identity.");
   const identityEmail = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : null;
   const verified = claims.email_verified === true || claims.emailVerified === true;
-  const isOwner = verified && (identityEmail === TARGET_EMAIL || identityEmail === OWNER_EMAIL);
-  const email = isOwner ? OWNER_EMAIL : identityEmail;
   const pool = trainingPool();
+  // Session tokens may omit the email claim; fall back to the email already bridged to this account.
+  const bridged = await pool.query("SELECT uid, email FROM users WHERE uid = $1", [subject]);
+  const bridgedEmail = typeof bridged.rows[0]?.email === "string" ? bridged.rows[0].email.trim().toLowerCase() : null;
+  const knownEmail = identityEmail ?? bridgedEmail;
+  const isOwner = (verified || bridged.rowCount > 0) && (knownEmail === TARGET_EMAIL || knownEmail === OWNER_EMAIL);
+  const email = isOwner ? OWNER_EMAIL : identityEmail;
   let uid = isOwner ? OWNER_UID : subject;
-  let existing = await pool.query("SELECT uid FROM users WHERE uid = $1", [uid]);
+  let existing = bridged.rowCount ? bridged : await pool.query("SELECT uid FROM users WHERE uid = $1", [uid]);
   // Existing accounts were bridged by email; preserve that lookup for migrated users.
   if (!existing.rowCount && verified && email && !isOwner) {
     existing = await pool.query("SELECT uid FROM users WHERE lower(email) = $1 LIMIT 2", [email]);
