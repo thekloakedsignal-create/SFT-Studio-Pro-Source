@@ -297,9 +297,11 @@ app.post("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
     const saved = await db.transaction(async (tx: any) => {
       const [stored] = await tx.select().from(projects).where(eq(projects.id, id)).for("update");
       if (stored && !projectBelongsTo(stored, userId)) return null;
+      const legacyProject = !stored ? getLocalProjects().find(project => project.id === id) : undefined;
+      if (legacyProject && !projectBelongsTo(legacyProject, userId)) return null;
       const batchRows = await tx.select().from(batches).where(eq(batches.projectId, id));
       const effectiveBatches = mergeProjectSnapshot(
-        stored?.batches,
+        stored?.batches ?? legacyProject?.batches,
         batchList, sqlBatchData(batchRows, id)
       );
       const project = {
@@ -344,7 +346,22 @@ app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest,
       return res.json({ success: true, batchId: batch.id, storage: "local" });
     }
     const saved = await db.transaction(async (tx: any) => {
-      const [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("update");
+      let [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("update");
+      if (!project) {
+        // An explicit save transfers an existing file-backed project into SQL.
+        // Keep the project and its batch write in the same database transaction.
+        const legacyProject = getLocalProjects().find(item => item.id === projectId);
+        if (!projectBelongsTo(legacyProject, ownerId)) return null;
+        await tx.insert(projects).values({
+          id: projectId,
+          userId: ownerId,
+          name: legacyProject.name,
+          settings: legacyProject.settings || {},
+          batches: legacyProject.batches || [],
+          updatedAt: new Date()
+        }).onConflictDoNothing({ target: projects.id });
+        [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("update");
+      }
       if (!projectBelongsTo(project, ownerId)) return null;
       const [existingBatch] = await tx.select().from(batches).where(eq(batches.id, batch.id));
       if (existingBatch && existingBatch.projectId !== projectId) {
