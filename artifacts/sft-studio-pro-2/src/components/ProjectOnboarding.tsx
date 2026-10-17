@@ -307,7 +307,6 @@ interface Props {
   onSkip: () => void;
   startAtBatchInterview?: boolean;
   initialProjectSettings?: ProjectSettings;
-  initialRecommendations?: BatchRecommendation[];
 }
 
 const PROMPTS: Record<Step, string> = {
@@ -399,9 +398,9 @@ function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; a
   }
 }
 
-export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = false, initialProjectSettings, initialRecommendations = [] }: Props) {
+export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = false, initialProjectSettings }: Props) {
   const [showWorkshopChoice, setShowWorkshopChoice] = useState(!startAtBatchInterview);
-  const [step, setStep] = useState<Step>(startAtBatchInterview ? (initialRecommendations.length ? "batch-recommendations" : "batch-skills") : "name");
+  const [step, setStep] = useState<Step>(startAtBatchInterview ? "batch-skills" : "name");
   const [projectName, setProjectName] = useState(initialProjectSettings?.name || "");
   const [goal, setGoal] = useState(initialProjectSettings?.targetTask || "");
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
@@ -418,7 +417,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [systemPrompt, setSystemPrompt] = useState("");
   const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
   const [specialSkills, setSpecialSkills] = useState("");
-  const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>(initialRecommendations);
+  const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
   const [sampleExplained, setSampleExplained] = useState(false);
   const [approvedProjectDefinition, setApprovedProjectDefinition] = useState<ProjectSettings | null>(initialProjectSettings || null);
   const [error, setError] = useState("");
