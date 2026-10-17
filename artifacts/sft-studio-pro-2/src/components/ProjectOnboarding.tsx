@@ -255,11 +255,6 @@ const BATCH_RECOMMENDATION_LIBRARY: BatchRecommendation[] = [
 Generate project-relevant prompts pairing a task with hard constraints: word limits, bullet counts, tone requirements, "respond in exactly 3 sentences," or "answer without using X." Include prompts with multiple stacked constraints.`,
   `Every response meets 100% of stated constraints. Exclude examples that complete the task but drop a constraint.`),
 
-  recipe("Factual Q&A and Explanation at Multiple Levels", `Answer questions and explain concepts relevant to the project, from beginner to expert depth.
-
-Generate questions answered at the depth the user asks for (child, layperson, practitioner, expert). Use analogies and worked walkthroughs that fit the persona.`,
-  `No invented citations, statistics, or named sources. Depth matches the request; never assume the user needs a simpler answer than they asked for.`),
-
   recipe("Step-by-Step Reasoning and Math", `Multi-step problem solving with visible, verifiable work, explained in the persona's voice.
 
 Generate project-relevant word problems, logic puzzles, and multi-step math where the response derives the answer stepwise and ends with a clean final answer.`,
@@ -288,7 +283,6 @@ Generate project-relevant requests with explicit creative constraints (genre, PO
 
 const GENERAL_RECOMMENDED_BATCH_TOPICS = [
   "Instruction Following with Explicit Constraints",
-  "Factual Q&A and Explanation at Multiple Levels",
   "Step-by-Step Reasoning and Math",
   "Code Generation, Explanation, and Debugging",
   "Summarization and Text Transformation",
