@@ -4754,7 +4754,8 @@ GUIDELINES:
       : supportSystemInstruction;
 
     const requestParams = {
-      model: normalizeModel(),
+      // Onboarding drafts start on the proven model; glm-5.3 currently hangs then returns empty content.
+      model: appContext?.mode === "project-onboarding" ? "qwen3.8-max" : normalizeModel(),
       contents: formattedContents,
       config: {
         systemInstruction
