@@ -366,7 +366,10 @@ function parseGoldenExample(raw: string) {
 }
 
 function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; additionalBatches: SkillBatchDraft[] } | null {
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  // Models often wrap the JSON in prose or code fences: keep only the outermost object.
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  const cleaned = start >= 0 && end > start ? raw.slice(start, end + 1) : raw;
   try {
     const parsed = JSON.parse(cleaned);
     if (!Array.isArray(parsed.libraryTopics) || !Array.isArray(parsed.additionalBatches)) return null;
@@ -427,10 +430,9 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     const conversation = conversationRef.current;
     const target = (assistantReply && assistantReplyRef.current) || currentPromptRef.current;
     // Scroll so the most recent response sits at the top of the conversation pane.
-    if (conversation && target) {
-      conversation.scrollTo({ top: target.getBoundingClientRect().top - conversation.getBoundingClientRect().top + conversation.scrollTop });
+    if (target) {
+      target.scrollIntoView({ block: "start" });
     } else if (conversation) conversation.scrollTo({ top: 0 });
-    window.scrollTo({ top: 0 });
   }, [step, assistantReply]);
 
   const modelNameInstruction = rememberName === "yes" && modelRememberedName.trim()
@@ -590,7 +592,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       .map(item => item.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").replace(/^(?:and|&)\s+/i, "").trim())
       .filter(item => item && !/^(?:none|none specified|no special skills?)\.?$/i.test(item))
       .filter((item, index, all) => all.findIndex(candidate => candidate.toLowerCase() === item.toLowerCase()) === index);
-    const draft = await askAI(
+    const planInstruction =
       `You are the Project Onboarding batch-recommendation assistant. Analyze the approved project goal, constraints, selected model, and every skill the user named. ` +
       `Choose relevant recipe topics from the curated library by topic name only; do not rewrite or return any library recipe instructions or constraints. ` +
       `For every separate item in the required user-skill list, provide one matching additional batch, unless a selected library recipe directly covers it. For each additional batch, copy that exact skill item into "skill" and provide a specific topic, special instructions, and temporary constraints that make the skill observable in examples for this project. Never omit a listed skill. Do not use generic instructions. ` +
@@ -600,10 +602,18 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       `Do not create training examples or actual batches. Return only valid JSON: {"libraryTopics":["exact topic name"],"additionalBatches":[{"skill":"exact user skill item","topic":"...","specialInstructions":"...","temporaryConstraints":"..."}]}. ` +
       `Available curated topic names: ${JSON.stringify(eligibleLibrary.map(item => item.topic))}\n` +
       `Project name: ${approvedProjectDefinition.name}\nProject goal: ${approvedProjectDefinition.targetTask}\nProject constraints: ${approvedProjectDefinition.constraints || "none"}\nSelected base model: ${trainingModel}\nExact user-skill items to cover: ${JSON.stringify(skillItems)}`
-    );
-    const plan = draft ? parseBatchRecommendationPlan(draft) : null;
-    if (draft && !plan) {
-      setError("I couldn’t read the AI’s recommendation plan, so curated recommendations will be sent to the batch generator.");
+    ;
+    const draft = await askAI(planInstruction);
+    if (!draft) return;
+    let plan = parseBatchRecommendationPlan(draft);
+    if (!plan) {
+      // One automatic retry before asking the user to try again.
+      const retry = await askAI(`Return only the JSON object, with no explanation or code fences, for this request:\n\n${planInstruction}`);
+      plan = retry ? parseBatchRecommendationPlan(retry) : null;
+    }
+    if (!plan) {
+      setError("I couldn’t read the recommendation plan. Click Generate recommendations again to retry.");
+      return;
     }
     const findLibraryRecipe = (topic: string) =>
       eligibleLibrary.find(item => item.topic.toLowerCase() === topic.trim().toLowerCase());
