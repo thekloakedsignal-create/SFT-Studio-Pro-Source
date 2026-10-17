@@ -13,6 +13,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { optionalAuth, requireAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { reserveExamples, settleExamples } from "./src/routes/whop.ts";
 import { logger } from "./src/lib/logger.ts";
+import { loadPipeline, claimPipeline, checkpointPipeline } from "./src/lib/pipeline-store.ts";
 import { auditTemplateFormat } from "./src/lib/quality-format.ts";
 import {
   ChatCompletionsHttpError, isProviderOverload, normalizeText,
@@ -4799,6 +4800,7 @@ async function pipelineCall(userId: string, path: string, init: any = {}) {
   const port = process.env.PORT || 8080;
   const res = await fetch(`http://127.0.0.1:${port}${path}`, {
     ...init,
+    signal: AbortSignal.timeout(init.method === "POST" ? 600000 : 30000),
     headers: { "Content-Type": "application/json", "X-Device-ID": userId, ...(init.headers || {}) }
   });
   const data = await res.json().catch(() => ({}));
@@ -4806,22 +4808,56 @@ async function pipelineCall(userId: string, path: string, init: any = {}) {
   return { ok: res.ok, status: res.status, data };
 }
 
-async function pipelineRunJob(userId: string, startPath: string, startBody: any, statusPath: (jobId: string) => string, label: string) {
+async function pipelineRunJob(userId: string, startPath: string, startBody: any, statusPath: (jobId: string) => string, label: string, job?: any, key?: string) {
+  if (job && key) {
+    job.steps ??= {};
+    if (job.steps[key]?.result) return job.steps[key].result;
+  }
+  let saved = job && key ? job.steps[key] : undefined;
+  if (!saved?.jobId) {
+  if (job && key) {
+    job.steps[key] = { state: "starting" };
+    await checkpointPipeline(job);
+  }
   const start = await pipelineCall(userId, startPath, { method: "POST", body: JSON.stringify(startBody) });
   if (!start.ok || !start.data?.success) throw new Error(start.data?.error || `${label} failed to start (${start.status}).`);
-  const jobId = start.data.jobId;
+  if (job && key && !start.data.jobId && (Array.isArray(start.data.examples) || Array.isArray(start.data.regeneratedExamples))) {
+    job.steps[key] = { result: start.data };
+    await checkpointPipeline(job);
+    return start.data;
+  }
+  saved = { jobId: start.data.jobId, state: "running" };
+  if (job && key) { job.steps[key] = saved; await checkpointPipeline(job); }
+  }
+  const jobId = saved?.jobId;
   if (typeof jobId !== "string" || !jobId) {
-    if (start.data && (Array.isArray(start.data.examples) || Array.isArray(start.data.regeneratedExamples))) return start.data;
     throw new Error(`${label} did not return a job id.`);
   }
+  let pollFailures = 0;
   while (true) {
     await new Promise(resolve => setTimeout(resolve, 2000));
-    const st = await pipelineCall(userId, statusPath(jobId));
+    let st;
+    try {
+      st = await pipelineCall(userId, statusPath(jobId));
+      if (st.status >= 500) throw new Error("Status temporarily unavailable.");
+      pollFailures = 0;
+    } catch (error) {
+      if (++pollFailures < 5) continue;
+      throw error;
+    }
     if (!st.ok || !st.data?.success) throw new Error(st.data?.error || `${label} status check failed.`);
+    if (job && key) {
+      job.currentOperation = { label, completed: st.data.progress?.completed || 0, total: st.data.progress?.total || startBody.count || 0 };
+    }
     if (st.data.status === "running") continue;
     if (st.data.status === "error") throw new Error(st.data.error || `${label} failed.`);
     const result = st.data.result;
     if (!result?.success) throw new Error(result?.error || `${label} failed.`);
+    if (job && key) {
+      job.steps[key] = { result };
+      job.currentOperation = null;
+      await checkpointPipeline(job);
+    }
     return result;
   }
 }

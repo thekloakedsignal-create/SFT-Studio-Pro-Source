@@ -1,5 +1,13 @@
 import { jsonb, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 
+export const automationRuns = pgTable("automation_runs", {
+  projectId: text("project_id").primaryKey(),
+  userId: text("user_id").notNull(),
+  data: jsonb("data").notNull(),
+  leaseOwner: text("lease_owner"),
+  leaseUntil: timestamp("lease_until", { withTimezone: true }),
+});
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   uid: text("uid").notNull().unique(),
