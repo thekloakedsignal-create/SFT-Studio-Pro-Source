@@ -280,11 +280,6 @@ Generate summaries at specified lengths, rewrites at different reading levels, t
 Generate project-relevant prompts with an explicit target schema and responses that populate it from unstructured text. Include nested objects, arrays, and missing-field edge cases.`,
   `Output is valid, parseable JSON with no prose wrapping. Missing data uses null or empty values per the schema.`),
 
-  recipe("Goal Decomposition and Planning", `Turn the user's objectives into ordered, concrete action steps, in the persona's voice.
-
-Generate project-relevant goals (trips, projects, learning plans, events) with responses that break them into sequenced steps, checklists, or itineraries. Include goals with dependencies where order matters, and user-stated limits like budgets or deadlines.`,
-  `Steps are concrete and ordered, and dependencies are respected. Use only user-stated constraints and resources; no invented budgets, equipment, or timelines. Plans are sized to the ask: small goal, short plan.`),
-
   recipe("Controlled Creative and Long-Form Writing", `Stories, essays, and poems that hit stylistic targets and stay coherent.
 
 Generate project-relevant requests with explicit creative constraints (genre, POV, era, tone, rhyme scheme, word count) and responses that fulfill them with structural completeness.`,
@@ -298,7 +293,6 @@ const GENERAL_RECOMMENDED_BATCH_TOPICS = [
   "Code Generation, Explanation, and Debugging",
   "Summarization and Text Transformation",
   "Structured Output and Data Extraction",
-  "Goal Decomposition and Planning",
   "Controlled Creative and Long-Form Writing",
 ];
 
