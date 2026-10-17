@@ -1080,7 +1080,9 @@ export default function App() {
       instructTemplate: project.instructTemplate || InstructTemplate.CHATML,
       customInstructionFormat: project.customInstructionFormat || "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
       representativePrompt: project.representativePrompt || "",
-      representativeCompletion: project.representativeCompletion || ""
+      representativeCompletion: project.representativeCompletion || "",
+      batchRecommendations,
+      completedRecommendedBatches
     };
 
     setSelectedProjectId(idToSave);
@@ -1312,8 +1314,14 @@ export default function App() {
 
     setSelectedProjectId(selectedId);
     const savedGuideState = readGuideState(selectedId);
-    setBatchRecommendations(Array.isArray(savedGuideState.recommendations) ? savedGuideState.recommendations : []);
-    setCompletedRecommendedBatches(Array.isArray(savedGuideState.completedRecommendedBatches) ? savedGuideState.completedRecommendedBatches : []);
+    setBatchRecommendations(
+      Array.isArray(selected.settings?.batchRecommendations) ? selected.settings.batchRecommendations
+      : Array.isArray(savedGuideState.recommendations) ? savedGuideState.recommendations : []
+    );
+    setCompletedRecommendedBatches(
+      Array.isArray(selected.settings?.completedRecommendedBatches) ? selected.settings.completedRecommendedBatches
+      : Array.isArray(savedGuideState.completedRecommendedBatches) ? savedGuideState.completedRecommendedBatches : []
+    );
     setActiveRecommendedBatchIndex(0);
     setGuidePage(null);
     setExpertMessages([]);
