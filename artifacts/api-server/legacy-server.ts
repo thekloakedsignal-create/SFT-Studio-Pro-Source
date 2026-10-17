@@ -5132,6 +5132,8 @@ async function runAutomationPipeline(job: any) {
       .filter((b: any) => b && b.id && Array.isArray(b.examples) && b.examples.length > 0 && !/triad/i.test(String(b.source || "")))
       .map((b: any) => b.id);
     for (const batchId of pendingIds) {
+      const batchName = allBatches.find((b: any) => b.id === batchId)?.name || batchId;
+      job.stage = `Quality audit: ${batchName}`;
       try {
         await runPipelineQaChain(job, batchId);
       } catch (err: any) {

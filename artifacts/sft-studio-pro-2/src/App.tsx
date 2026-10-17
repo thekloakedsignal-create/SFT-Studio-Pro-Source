@@ -578,7 +578,7 @@ export default function App() {
       });
       const data = await res.json();
       if (!res.ok || !data?.success) throw new Error(data?.error || "Automation could not start.");
-      setNotification({ text: "Automation started — generating the batches in the background.", type: "success" });
+      setNotification({ text: answers.qa === "audit" ? "Quality audit started — running in the background." : "Automation started — generating the batches in the background.", type: "success" });
     } catch (err: any) {
       setNotification({ text: err?.message || "Automation could not start.", type: "error" });
     }
@@ -3999,7 +3999,7 @@ export default function App() {
             if (autoGenerate !== undefined) {
               answerAutomation("generate", autoGenerate ? "yes" : "no");
               if (autoGenerate) {
-                void startAutomationPipeline({ ...automationAnswers, generate: "yes" }, recommendations ?? [], settings, trainingModel);
+                void startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }, recommendations ?? [], settings, trainingModel);
               }
             }
             return;
@@ -4030,7 +4030,7 @@ export default function App() {
           if (autoGenerate !== undefined) {
             answerAutomation("generate", autoGenerate ? "yes" : "no");
             if (autoGenerate) {
-              void startAutomationPipeline({ ...automationAnswers, generate: "yes" }, recommendations ?? [], settings, trainingModel);
+              void startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }, recommendations ?? [], settings, trainingModel);
             }
           }
           setShowProjectOnboarding(false);
@@ -4264,7 +4264,7 @@ export default function App() {
                   {pipelineStatus.stage === "awaiting-gate" ? "Your sample of 5 is ready — review and approve it to start automated generation"
                     : pipelineStatus.stage === "interrupted" ? "Generation was interrupted"
                     : pipelineStatus.stage === "error" ? "That didn't work! Please try again."
-                    : `Generating batches: ${pipelineStatus.stage}`}
+                    : pipelineStatus.stage}
                 </p>
                 <span className="text-xs text-slate-400 shrink-0">{pipelineStatus.stage === "awaiting-gate" ? "Awaiting approval" : `${percent}%`}</span>
               </div>
@@ -7485,7 +7485,7 @@ export default function App() {
                         <p className="text-sm text-slate-200 font-semibold">Would you like to automatically generate suggested batches?</p>
                         <p className="text-[11px] text-slate-400 leading-relaxed">I'll build the batches in the background in a balanced mix of single-turn, multi-turn, and reasoning.</p>
                         <div className="flex gap-2">
-                          <button type="button" onClick={() => { answerAutomation("generate", "yes"); void startAutomationPipeline({ ...automationAnswers, generate: "yes" }); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Yes, generate them</button>
+                          <button type="button" onClick={() => { answerAutomation("generate", "yes"); void startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Yes, generate them</button>
                           <button type="button" onClick={() => answerAutomation("generate", "no")} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">No, I'll do it myself</button>
                         </div>
                       </div>
@@ -7561,7 +7561,7 @@ export default function App() {
                         <p className="text-sm text-slate-200 font-semibold">Would you like me to run the quality audit, or do you prefer to oversee it yourself?</p>
                         <p className="text-[11px] text-slate-400 leading-relaxed">Automated audit: each batch is assessed once, flagged examples are regenerated once, the batch is deduplicated, then approved into the registry.</p>
                         <div className="flex gap-2">
-                          <button type="button" onClick={() => answerAutomation("qa", "audit")} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Run the audit for me</button>
+                          <button type="button" onClick={() => { answerAutomation("qa", "audit"); void startAutomationPipeline({ generate: "no", docs: "no", qa: "audit" }); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Run the audit for me</button>
                           <button type="button" onClick={() => answerAutomation("qa", "manual")} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">I'll oversee it myself</button>
                         </div>
                       </div>
