@@ -763,7 +763,7 @@ function normalizeModel(modelName?: string): string {
   if (candidate && !/^(?:gemini|vertex|google)(?:$|[\s:/_-])/i.test(candidate)) {
     return candidate;
   }
-  return process.env.DO_MODEL || "glm-5.3";
+  return process.env.DO_MODEL || "qwen3.8-max";
 }
 
 function isTemporaryInferenceOverload(err: any): boolean {
