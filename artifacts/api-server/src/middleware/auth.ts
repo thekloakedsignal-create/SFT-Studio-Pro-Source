@@ -2,6 +2,10 @@ import { Request, Response, NextFunction } from "express";
 import { getAuth } from "@clerk/express";
 import { resolveClerkAccount, type AppUser } from "../lib/clerk-account.ts";
 import { logger } from "../lib/logger.ts";
+import { randomUUID } from "node:crypto";
+
+// Loopback-only token so the background automation pipeline can act as the signed-in user.
+export const INTERNAL_PIPELINE_TOKEN = randomUUID();
 
 export interface AuthRequest extends Request {
   user?: AppUser;
@@ -20,6 +24,12 @@ export const optionalAuth = async (
 
   try {
     if (req.user) return next();
+    const internalUser = req.headers["x-pipeline-user"];
+    if (req.headers["x-pipeline-token"] === INTERNAL_PIPELINE_TOKEN && typeof internalUser === "string"
+      && ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress || "")) {
+      req.user = JSON.parse(internalUser) as AppUser;
+      return next();
+    }
     const auth = getAuth(req);
     if (auth.userId) {
       req.user = await resolveClerkAccount(auth.sessionClaims as unknown as Record<string, unknown>);

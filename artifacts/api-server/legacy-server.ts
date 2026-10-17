@@ -14,6 +14,7 @@ import { optionalAuth, requireAuth, AuthRequest } from "./src/middleware/auth.ts
 import { reserveExamples, settleExamples } from "./src/routes/whop.ts";
 import { logger } from "./src/lib/logger.ts";
 import { loadPipeline, claimPipeline, checkpointPipeline } from "./src/lib/pipeline-store.ts";
+import { INTERNAL_PIPELINE_TOKEN } from "./src/middleware/auth.ts";
 import { auditTemplateFormat } from "./src/lib/quality-format.ts";
 import {
   ChatCompletionsHttpError, isProviderOverload, normalizeText,
@@ -4796,12 +4797,16 @@ export default app;
 // Sits outside the manual flows: it calls the same public endpoints the UI uses.
 const pipelineJobs = new Map<string, any>();
 
-async function pipelineCall(userId: string, path: string, init: any = {}) {
+async function pipelineCall(userId: string, path: string, init: any = {}, user?: any) {
   const port = process.env.PORT || 8080;
   const res = await fetch(`http://127.0.0.1:${port}${path}`, {
     ...init,
     signal: AbortSignal.timeout(init.method === "POST" ? 600000 : 30000),
-    headers: { "Content-Type": "application/json", "X-Device-ID": userId, ...(init.headers || {}) }
+    headers: {
+      "Content-Type": "application/json", "X-Device-ID": userId,
+      ...(user ? { "X-Pipeline-Token": INTERNAL_PIPELINE_TOKEN, "X-Pipeline-User": JSON.stringify(user) } : {}),
+      ...(init.headers || {})
+    }
   });
   const data = await res.json().catch(() => ({}));
   if (res.status === 402) throw new Error("Credits exhausted — the pipeline stopped. Add credits and restart it.");
@@ -4819,7 +4824,7 @@ async function pipelineRunJob(userId: string, startPath: string, startBody: any,
     job.steps[key] = { state: "starting" };
     await checkpointPipeline(job);
   }
-  const start = await pipelineCall(userId, startPath, { method: "POST", body: JSON.stringify(startBody) });
+  const start = await pipelineCall(userId, startPath, { method: "POST", body: JSON.stringify(startBody) }, job?.user);
   if (!start.ok || !start.data?.success) throw new Error(start.data?.error || `${label} failed to start (${start.status}).`);
   if (job && key && !start.data.jobId && (Array.isArray(start.data.examples) || Array.isArray(start.data.regeneratedExamples))) {
     job.steps[key] = { result: start.data };
@@ -4838,7 +4843,7 @@ async function pipelineRunJob(userId: string, startPath: string, startBody: any,
     await new Promise(resolve => setTimeout(resolve, 2000));
     let st;
     try {
-      st = await pipelineCall(userId, statusPath(jobId));
+      st = await pipelineCall(userId, statusPath(jobId), {}, job?.user);
       if (st.status >= 500) throw new Error("Status temporarily unavailable.");
       pollFailures = 0;
     } catch (error) {
@@ -4909,7 +4914,7 @@ function pipelineBatch(config: any, result: any, opts: any) {
 async function pipelineSaveBatch(job: any, batch: any) {
   const save = await pipelineCall(job.userId, `/api/sql/projects/${encodeURIComponent(job.projectId)}/batches`, {
     method: "POST", body: JSON.stringify({ batch })
-  });
+  }, job.user);
   if (!save.ok || !save.data?.success) throw new Error(save.data?.error || "Pipeline could not save a batch.");
   return batch.id;
 }
@@ -4918,7 +4923,7 @@ async function runPipelineQaChain(job: any, batchId: string) {
   const { userId, projectId, config } = job;
   job.batchStatus[batchId] = { stage: "assessing" };
 
-  const projRes = await pipelineCall(userId, `/api/sql/projects/${encodeURIComponent(projectId)}`);
+  const projRes = await pipelineCall(userId, `/api/sql/projects/${encodeURIComponent(projectId)}`, {}, job.user);
   const batch = projRes.data?.project?.batches?.find((b: any) => b && b.id === batchId);
   if (!batch || !Array.isArray(batch.examples) || batch.examples.length === 0) throw new Error("Batch not found for QA.");
 
@@ -4932,7 +4937,7 @@ async function runPipelineQaChain(job: any, batchId: string) {
       templateType: batch.templateType,
       instructTemplate: config.isInstruction ? config.instructTemplate : undefined
     })
-  });
+  }, job.user);
   if (!analysis.ok || !analysis.data?.success || !analysis.data.report) throw new Error(analysis.data?.error || "Assessment failed.");
   let report = analysis.data.report;
   const examples = [...batch.examples];
@@ -5081,7 +5086,7 @@ async function runAutomationPipeline(job: any) {
       const analysis = await pipelineCall(userId, "/api/analyze-document", {
         method: "POST",
         body: JSON.stringify({ documentContent: doc.content, documentName: doc.name, docType, extractionModel: "glm-5.3" })
-      });
+      }, job.user);
       const estimatedCount = analysis.data?.estimatedCount;
       const result = await pipelineRunJob(userId, "/api/convert-document", {
         documentName: doc.name,
@@ -5120,7 +5125,7 @@ async function runAutomationPipeline(job: any) {
   // Every pending batch in the project goes through it — manual and pipeline-produced alike —
   // each as its own separate automation unit.
   if (config.autoQa) {
-    const projRes = await pipelineCall(userId, `/api/sql/projects/${encodeURIComponent(job.projectId)}`);
+    const projRes = await pipelineCall(userId, `/api/sql/projects/${encodeURIComponent(job.projectId)}`, {}, job.user);
     const allBatches = projRes.data?.project?.batches || [];
     // Only TRiAD generator batches arrive pre-approved; everything else goes through QA.
     const pendingIds = allBatches
@@ -5161,6 +5166,7 @@ app.post("/api/pipeline/start", optionalAuth, async (req: AuthRequest, res) => {
   }
   const job: any = {
     userId,
+    user: req.user || null,
     projectId,
     config: {
       autoGenerate: Boolean(autoGenerate),
