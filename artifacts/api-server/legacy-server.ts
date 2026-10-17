@@ -932,9 +932,10 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         ...(params.exactMessages
           ? { max_completion_tokens: maxTokensToUse }
           : { max_tokens: maxTokensToUse }),
-        ...(params.config?.reasoningEffort === null
-          ? {}
-          : { reasoning_effort: params.config?.reasoningEffort ?? "none" }),
+        // Only send reasoning_effort when explicitly configured; never default it.
+        ...(typeof params.config?.reasoningEffort === "string" && params.config.reasoningEffort
+          ? { reasoning_effort: params.config.reasoningEffort }
+          : {}),
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
       signal: abortSignal
@@ -1427,7 +1428,7 @@ ${JSON.stringify({ examples: [{ messages: [
           responseMimeType: "application/json",
           maxOutputTokens: 4096,
           temperature: 0.7,
-          reasoningEffort: "none",
+          reasoningEffort: null,
         },
           timeoutMs: Math.min(topicPlanTimeoutMs, Math.max(1, generationDeadline - Date.now())),
       })),
