@@ -811,7 +811,7 @@ export default function App() {
         setBatches(prev => {
           const next = [...prev];
           remote.forEach(rb => {
-            if (!rb?.id || !/automation/i.test(String(rb.source || ""))) return;
+            if (!rb?.id) return;
             const idx = next.findIndex(b => b.id === rb.id);
             if (idx === -1) next.unshift(sanitizeClientBatch(rb));
             else if (next[idx].status !== rb.status) next[idx] = sanitizeClientBatch(rb);
@@ -7556,7 +7556,7 @@ export default function App() {
                         ))}
                       </div>
                     )}
-                    {guidePage === "assess" && !automationAnswers.qa && (
+                    {guidePage === "assess" && (!pipelineStatus || ["complete", "stopped", "error", "interrupted"].includes(pipelineStatus.stage)) && (
                       <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-3">
                         <p className="text-sm text-slate-200 font-semibold">Would you like me to run the quality audit, or do you prefer to oversee it yourself?</p>
                         <p className="text-[11px] text-slate-400 leading-relaxed">Automated audit: each batch is assessed once, flagged examples are regenerated once, the batch is deduplicated, then approved into the registry.</p>
