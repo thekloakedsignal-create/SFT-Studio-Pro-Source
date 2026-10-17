@@ -228,16 +228,14 @@ export function ModelChatDeploymentOptions({ apiFetch }: { apiFetch: ModelChatAp
     }
   };
 
-  if (!trialFinished) return null;
-
   return (
     <section className="mx-auto w-full max-w-5xl space-y-5 rounded-xl border border-slate-800/60 bg-slate-950/30 p-6">
       <div>
-        <h2 className="text-lg font-bold text-slate-100">Your conversation and deployment options</h2>
-        <p className="mt-1 text-sm text-slate-400">Chat history is saved to your account and available across devices.</p>
+        <h2 className="text-lg font-bold text-slate-100">Model deployment options</h2>
+        <p className="mt-1 text-sm text-slate-400">Explore hosting and local deployment guides anytime. Prepaid chat becomes available after your free trial.</p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/70">
+      {trialFinished && <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/70">
         <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-3 text-sm font-semibold text-slate-100">
           <MessageSquare className="h-4 w-4 text-blue-400" /> Saved conversation
         </div>
@@ -262,18 +260,22 @@ export function ModelChatDeploymentOptions({ apiFetch }: { apiFetch: ModelChatAp
             </button>
           </form>
         )}
-      </div>
+      </div>}
 
       <section className="space-y-4 rounded-xl border border-blue-500/25 bg-blue-500/5 p-5">
         <div>
           <h3 className="font-bold text-slate-100">Keep chatting here with prepaid balance</h3>
           <p className="mt-1 text-sm text-slate-300">Qwen models: $0.25/minute. Llama: $0.50/minute. Billing starts when the endpoint is ready. Stop it whenever you want; leftover balance stays in your account.</p>
           <p className="mt-1 text-sm text-slate-400">
-            {ownerBypass ? "Owner access is enabled." : `Balance: ${balance === null ? "checking…" : `$${balance.toFixed(2)}`}${estimatedMinutes === null ? "" : ` · about ${estimatedMinutes.toFixed(1)} minutes at this model's rate`}`}
+            {!trialFinished
+              ? "Prepaid chat and balance loading are available after your free trial."
+              : ownerBypass
+                ? "Owner access is enabled."
+                : `Balance: ${balance === null ? "checking…" : `$${balance.toFixed(2)}`}${estimatedMinutes === null ? "" : ` · about ${estimatedMinutes.toFixed(1)} minutes at this model's rate`}`}
           </p>
         </div>
 
-        {!ownerBypass && (
+        {trialFinished && !ownerBypass && (
           <div className="flex flex-wrap items-end gap-2">
             <label className="text-sm text-slate-300">
               Load amount (minimum $5)
@@ -303,13 +305,13 @@ export function ModelChatDeploymentOptions({ apiFetch }: { apiFetch: ModelChatAp
           <p className="text-sm text-slate-300">The balance reached zero and the endpoint stopped. Load more balance to start another session.</p>
         )}
         {session?.state === "failed" && <p className="text-sm text-rose-200">The endpoint could not be started. Your balance was not charged.</p>}
-        {!paidReady && session?.state !== "starting" && !ownerBypass && (
+        {trialFinished && !paidReady && session?.state !== "starting" && !ownerBypass && (
           <button type="button" onClick={() => void startEndpoint()} disabled={busy || (balance ?? 0) <= 0}
             className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-800 disabled:opacity-50">
             Start prepaid chat
           </button>
         )}
-        {!paidReady && session?.state !== "starting" && ownerBypass && (
+        {trialFinished && !paidReady && session?.state !== "starting" && ownerBypass && (
           <button type="button" onClick={() => void startEndpoint()} disabled={busy}
             className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-800 disabled:opacity-50">
             Start chat

@@ -15,8 +15,8 @@ Do not change cleanup script logic when repairing automated training, job update
 
 **How to apply:** Preserve cleanup behavior and its access to trial records. The user subsequently authorized moving training and chat storage to SQL, including cleanup's database access, without changing workflows or cleanup timing/shutdown rules.
 
-Paid continuation is a separate endpoint and paygate; leave the free-trial route unchanged. Save conversation history through direct account-scoped UI requests so it follows the account across devices; do not intercept trial requests. Each balance load may be any amount of at least $5. Meter Qwen at $0.25/minute and Llama at $0.50/minute starting when the endpoint is ready. Users can stop it; automatically stop at zero, and keep any unused balance for later. Do not refund prepaid payments.
+Keep deployment guides in a separate, always-available tab; gate prepaid chat actions until the free trial ends. Paid continuation is a separate endpoint and paygate; leave the free-trial route unchanged. Save conversation history through direct account-scoped UI requests so it follows the account across devices; do not intercept trial requests. Each balance load may be any amount of at least $5. Meter Qwen at $0.25/minute and Llama at $0.50/minute starting when the endpoint is ready. Users can stop it; automatically stop at zero, and keep any unused balance for later. Do not refund prepaid payments.
 
-**Why:** The user explicitly corrected the fixed-$5-credit interpretation and prohibited edits to the existing trial code and middleware interception.
+**Why:** The user explicitly corrected the fixed-$5-credit interpretation, prohibited edits to the existing trial code and middleware interception, and asked for deployment options to remain available in their own tab.
 
-**How to apply:** Preserve the free trial independently. Keep billing usage-based against a persistent wallet, not a fixed purchase plan or up-front reservation.
+**How to apply:** Preserve the free trial independently. Keep external deployment guidance navigable before trial completion, but do not allow prepaid chat payment or startup until after it. Keep billing usage-based against a persistent wallet, not a fixed purchase plan or up-front reservation.
