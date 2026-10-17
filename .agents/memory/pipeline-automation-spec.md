@@ -7,7 +7,7 @@ The onboarding ends with four conversational questions (NOT toggles):
 1. "Would you like to automatically generate suggested batches?" — background generation of recommendations. Each batch's TOTAL is 200 examples (400 for user-specified-skill batches), mixed within the batch across single-turn, multi-turn, and reasoning (reasoning skipped for 70B projects). The converter sets its own per-document count via its analyzer — never impose a default there.
 2. "Do you have any documents to convert? Would you like me to process them for you?" — upload inline in onboarding, auto-convert when the pipeline starts.
 3. "Would you like me to run the quality audit or do you prefer to oversee it yourself?" — automated QA chain.
-4. "Do you want to train a model now or export your data set?" — exit routing only.
+4. "Do you want to train a model now or export your data set?" — ask only AFTER the existing QA process is complete for every batch, never at onboarding completion. Train opens the Automated Trainer; Export opens Data Registry. This is button timing and routing only, not authorization to change QA or automation workflows.
 
 QA chain order is fixed by the user: **assess once → regenerate flagged once → deduplicate → approve.** No post-regen re-assessment, no conditional approve gate, no skipped steps. Only a step *failure* halts a batch at "needs review" with the error shown.
 

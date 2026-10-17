@@ -638,6 +638,7 @@ export default function App() {
   const [completedRecommendedBatches, setCompletedRecommendedBatches] = useState<string[]>([]);
   const [pipelineStatus, setPipelineStatus] = useState<any>(null);
   const [automationAnswers, setAutomationAnswers] = useState<Record<string, any>>({});
+  const [dismissedQaExit, setDismissedQaExit] = useState("");
   const [batchSize, setBatchSize] = useState<number>(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState<{ current: number; total: number; percent: number } | null>(null);
@@ -3111,6 +3112,23 @@ export default function App() {
   };
 
   // Registry Batch selections
+  const pipelineBatchStates = pipelineStatus?.batchStatus || {};
+  const batchQaComplete = (id: string) => Boolean(
+    reports[id]
+    || batches.find(batch => batch.id === id)?.qualityReport
+    || batches.find(batch => batch.id === id)?.source === "TRiAD Alignment"
+    || pipelineBatchStates[id]?.stage === "approved"
+  );
+  const allBatchesQaComplete =
+    (batches.length > 0 || Object.keys(pipelineBatchStates).length > 0)
+    && batches.every(batch => batchQaComplete(batch.id))
+    && (!pipelineStatus || pipelineStatus.stage === "complete")
+    && Object.values(pipelineBatchStates).every((state: any) =>
+      state.stage === "approved"
+      || (state.stage === "generated" && state.batchId && batchQaComplete(state.batchId))
+    );
+  const qaExitKey = JSON.stringify([selectedProjectId, batches.map(batch => batch.id).sort(), pipelineStatus?.startedAt]);
+
   const isRegistryEligible = (batch: SFTBatch) =>
     batch.status !== "Rejected"
     && (batch.source === "TRiAD Alignment" || Boolean(reports[batch.id] || batch.qualityReport));
@@ -4144,6 +4162,17 @@ export default function App() {
 
         </div>
       </header>
+
+      {allBatchesQaComplete && dismissedQaExit !== qaExitKey && (
+        <div className="fixed bottom-4 right-4 z-50 w-80 rounded-2xl border border-emerald-500/30 bg-slate-950/95 p-4 shadow-xl space-y-3">
+          <p className="text-sm font-semibold text-slate-100">Do you want to train a model now or export your data set?</p>
+          <div className="flex gap-2 items-center">
+            <button type="button" onClick={() => { setDismissedQaExit(qaExitKey); setSectionGuide(null); setActiveTab("trainer"); setShowRunTrainingModal(true); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Train a model</button>
+            <button type="button" onClick={() => { setDismissedQaExit(qaExitKey); setSectionGuide(null); setActiveTab("registry"); }} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">Export data set</button>
+            <button type="button" onClick={() => setDismissedQaExit(qaExitKey)} className="ml-auto text-slate-500 hover:text-slate-300 text-xs transition cursor-pointer">Later</button>
+          </div>
+        </div>
+      )}
 
       {/* Global Notifications */}
       <AnimatePresence>
