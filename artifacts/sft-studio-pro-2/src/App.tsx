@@ -5028,12 +5028,15 @@ export default function App() {
                               { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Multi-turn Dialogue" },
                             ].map(({ type, label, sub }) => {
                               const isSelected = batchTemplate === type;
+                              const isReasoningBlocked = type === TemplateType.REASONING && trainerHandoff.model === "Llama 3.1 70B";
                               return (
                                 <button
                                   key={type}
                                   type="button"
-                                  onClick={() => setBatchTemplate(type)}
-                                  className={`p-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
+                                  disabled={isReasoningBlocked}
+                                  title={isReasoningBlocked ? "Reasoning is not available for Llama 3.1 70B" : undefined}
+                                  onClick={() => { if (!isReasoningBlocked) setBatchTemplate(type); }}
+                                  className={`p-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center gap-0.5 transition-all ${isReasoningBlocked ? "opacity-40 cursor-not-allowed" : "cursor-pointer"} ${
                                     isSelected
                                       ? "bg-purple-500/20 border-purple-500/50 text-purple-300 font-bold shadow-sm"
                                       : "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-300 hover:border-slate-700"
@@ -5062,12 +5065,15 @@ export default function App() {
                               { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Dialogue" },
                             ].map(({ type, label, sub }) => {
                               const isSelected = batchTemplate === type;
+                              const isReasoningBlocked = type === TemplateType.REASONING && trainerHandoff.model === "Llama 3.1 70B";
                               return (
                                 <button
                                   key={type}
                                   type="button"
-                                  onClick={() => setBatchTemplate(type)}
-                                  className={`p-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
+                                  disabled={isReasoningBlocked}
+                                  title={isReasoningBlocked ? "Reasoning is not available for Llama 3.1 70B" : undefined}
+                                  onClick={() => { if (!isReasoningBlocked) setBatchTemplate(type); }}
+                                  className={`p-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center gap-0.5 transition-all ${isReasoningBlocked ? "opacity-40 cursor-not-allowed" : "cursor-pointer"} ${
                                     isSelected
                                       ? "bg-green-500/10 border-green-500/40 text-green-400 font-bold shadow-sm"
                                       : "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-300 hover:border-slate-700"

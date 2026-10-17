@@ -65,6 +65,8 @@ export function RunTrainingModal({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const splits = open ? getSerializedSplits() : { training: [], validation: [] };
+  const is70B = trainingModel === "Llama 3.1 70B";
+  const hasReasoning = is70B && [...splits.training, ...splits.validation].some(r => /<think>|sft_reasoning/.test(JSON.stringify(r)));
   const trainingValid = splits.training.length > 0 && !validateRegistryOutput(splits.training, exportFormat);
   const validationValid = splits.validation.length > 0 && !validateRegistryOutput(splits.validation, exportFormat);
 
@@ -187,6 +189,12 @@ export function RunTrainingModal({
     setError(null);
     try {
       const current = getSerializedSplits();
+      if (trainingModel === "Llama 3.1 70B") {
+        // Reasoning batches cannot be uploaded for this model.
+        const stripReasoning = (records: unknown[]) => records.filter(r => !/<think>|sft_reasoning/.test(JSON.stringify(r)));
+        current.training = stripReasoning(current.training);
+        current.validation = stripReasoning(current.validation);
+      }
       const trainErr = validateRegistryOutput(current.training, exportFormat);
       const valErr = validateRegistryOutput(current.validation, exportFormat);
       if (current.training.length === 0 || current.validation.length === 0 || trainErr || valErr) {
@@ -380,6 +388,12 @@ export function RunTrainingModal({
                       </optgroup>
                     )}
                   </select>
+                  {hasReasoning && (
+                    <div className="mt-2 flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
+                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <span>Reasoning batches cannot be uploaded for Llama 3.1 70B. All reasoning examples will be excluded from this training run.</span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <PaymentGate key={trainingModel} apiFetch={apiFetch} planKey={trainingPlan[trainingModel]}
