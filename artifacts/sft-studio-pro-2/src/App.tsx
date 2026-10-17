@@ -4270,12 +4270,22 @@ export default function App() {
                     : pipelineStatus.stage === "error" ? "That didn't work! Please try again."
                     : pipelineStatus.stage}
                 </p>
-                <span className="text-xs text-slate-400 shrink-0">{pipelineStatus.stage === "awaiting-gate" ? "Awaiting approval" : `${percent}%`}</span>
+                <span className="text-xs text-slate-400 shrink-0">{pipelineStatus.stage === "awaiting-gate" ? "Awaiting approval" : topics.length > 0 ? `${doneTopics} of ${topics.length} batches` : `${percent}%`}</span>
               </div>
               <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
                 <div className="h-full bg-emerald-500 transition-all" style={{ width: `${percent}%` }} />
               </div>
-              {op && op.total > 0 && <p className="text-[11px] text-slate-400">{op.completed} of {op.total} examples in the current step</p>}
+              {op && op.total > 0 && (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[11px] text-slate-400">Current batch</p>
+                    <span className="text-[11px] text-slate-400 shrink-0">{op.completed} of {op.total} examples</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                    <div className="h-full bg-purple-400 transition-all" style={{ width: `${Math.round(opFraction * 100)}%` }} />
+                  </div>
+                </>
+              )}
               {pipelineStatus.stage === "awaiting-gate" && Array.isArray(pipelineStatus.gatePreview) && (
                 <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
                   {pipelineStatus.gatePreview.map((preview: string, i: number) => (
