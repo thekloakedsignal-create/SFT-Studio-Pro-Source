@@ -1911,7 +1911,7 @@ ${projectFidelityRule}`
             }
             prompt += `\nASSIGNED TOPIC FOR THIS EXAMPLE:\n${JSON.stringify(topic)}\nUse this subject within the batch description. Preserve all required template, style, and output-format instructions.`;
             if (turnMode === "Multi Turn") {
-              prompt += `\nASSIGNED USER–ASSISTANT EXCHANGES: ${turnCount}.\nFor the assigned topic, generate exactly ${turnCount} user messages and ${turnCount} assistant replies, alternating user then assistant. This exact count overrides any other turn-count guidance. Do not include the assignment label in the output.`;
+              prompt += `\nASSIGNED USER–ASSISTANT EXCHANGES: ${turnCount}.\nFor the assigned topic, generate exactly ${turnCount} user messages and ${turnCount} assistant replies, alternating user then assistant. This exact count overrides any other turn-count guidance. Do not include the assignment label in the output.\nEVERY assistant turn must stay in the golden exemplar's voice and the target persona for the entire conversation. The persona does not soften, reset, or drift into generic assistant speak on later turns — the last reply must sound as much like the exemplar as the first.`;
             }
             prompt += `\n${projectFidelityRule}\n`;
             const requestConfig = turnMode === "Reasoning"
