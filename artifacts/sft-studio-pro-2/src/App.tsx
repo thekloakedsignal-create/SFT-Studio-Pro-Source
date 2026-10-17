@@ -781,6 +781,8 @@ export default function App() {
     void startAutomationPipeline(pending.answers, pending.recommendations, pending.settings, pending.model);
   }, [selectedProjectId]);
 
+  const pipelineBatchesRef = useRef<SFTBatch[]>([]);
+  pipelineBatchesRef.current = batches;
   // Poll automation pipeline status for the open project
   useEffect(() => {
     if (!selectedProjectId) return;
@@ -789,7 +791,33 @@ export default function App() {
       try {
         const res = await projectApiFetch(`/api/pipeline/${encodeURIComponent(selectedProjectId)}`);
         const data = await res.json();
-        if (!stopped && data?.success) setPipelineStatus(data.pipeline || null);
+        if (stopped || !data?.success) return;
+        setPipelineStatus(data.pipeline || null);
+        // Pull batches the background pipeline saved (generated or QA'd) into the open project
+        // so they appear as Pending in the Data Registry and QA dropdown without a reload.
+        const statuses = Object.entries(data.pipeline?.batchStatus || {}) as [string, any][];
+        const stale = statuses.some(([key, st]) => {
+          const id = st?.batchId || key;
+          const local = pipelineBatchesRef.current.find(b => b.id === id);
+          if (st?.stage === "generated") return !local;
+          if (st?.stage === "approved") return !local || local.status !== "Approved";
+          return false;
+        });
+        if (!stale) return;
+        const projRes = await projectApiFetch(`/api/sql/projects/${encodeURIComponent(selectedProjectId)}`);
+        const projData = await projRes.json();
+        const remote: SFTBatch[] = projData?.project?.batches || [];
+        if (stopped || !Array.isArray(remote)) return;
+        setBatches(prev => {
+          const next = [...prev];
+          remote.forEach(rb => {
+            if (!rb?.id || !/automation/i.test(String(rb.source || ""))) return;
+            const idx = next.findIndex(b => b.id === rb.id);
+            if (idx === -1) next.unshift(sanitizeClientBatch(rb));
+            else if (next[idx].status !== rb.status) next[idx] = sanitizeClientBatch(rb);
+          });
+          return next;
+        });
       } catch {}
     };
     poll();
