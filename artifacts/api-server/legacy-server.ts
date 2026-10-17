@@ -5100,8 +5100,15 @@ async function runAutomationPipeline(job: any) {
   }
 
   // QA chain: assess once -> regenerate flagged once -> deduplicate -> approve. No steps skipped.
+  // Every pending batch in the project goes through it — manual and pipeline-produced alike —
+  // each as its own separate automation unit.
   if (config.autoQa) {
-    for (const batchId of job.producedBatches) {
+    const projRes = await pipelineCall(userId, `/api/sql/projects/${encodeURIComponent(job.projectId)}`);
+    const allBatches = projRes.data?.project?.batches || [];
+    const pendingIds = allBatches
+      .filter((b: any) => b && b.id && b.status !== "Approved" && Array.isArray(b.examples) && b.examples.length > 0)
+      .map((b: any) => b.id);
+    for (const batchId of pendingIds) {
       try {
         await runPipelineQaChain(job, batchId);
       } catch (err: any) {

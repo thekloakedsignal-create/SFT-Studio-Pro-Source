@@ -12,4 +12,6 @@ The onboarding ends with four conversational questions (NOT toggles):
 QA chain order is fixed by the user: **assess once → regenerate flagged once → deduplicate → approve.** No post-regen re-assessment, no conditional approve gate, no skipped steps. Only a step *failure* halts a batch at "needs review" with the error shown.
 
 **Why:** The user corrected two deviations explicitly: approval is unconditional after the full chain (not gated on a second assessment), and the controls are questions, not toggles.
-**How to apply:** When building the pipeline, do not add re-assessment after regen, do not make approval conditional on cleanliness, and keep the QA chain scoped to pipeline-produced batches (manual batches stay manual).
+QA scope: the automated QA chain covers EVERY pending batch in the project — manual and pipeline-produced alike (skip only already-Approved ones). Each batch's automation runs as its own separate unit; one batch's failure never affects another.
+
+**How to apply:** When building or changing the pipeline, do not add re-assessment after regen, do not make approval conditional on cleanliness, and do not restrict QA automation to pipeline-produced batches.
