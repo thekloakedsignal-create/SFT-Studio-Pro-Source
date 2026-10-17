@@ -61,7 +61,6 @@ import { motion, AnimatePresence } from "motion/react";
 import { AboutModal } from "./components/AboutModal";
 import { RunTrainingModal } from "./components/RunTrainingModal";
 import { ModelChatTab } from "./components/ModelChatTab";
-import { ModelChatDeploymentOptions } from "./components/ModelChatDeploymentOptions";
 import { PaymentGate, trainingPlan } from "./components/PaymentGate";
 import { ProjectOnboarding, type BatchRecommendation } from "./components/ProjectOnboarding";
 import { PricingModal } from "./components/PricingModal";
@@ -456,7 +455,7 @@ function ProgressiveScrollList<T>({
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"define" | "synthesizer" | "convert" | "triad" | "assess" | "registry" | "expert" | "trainer" | "modelChat" | "modelDeployment">("define");
+  const [activeTab, setActiveTab] = useState<"define" | "synthesizer" | "convert" | "triad" | "assess" | "registry" | "expert" | "trainer" | "modelChat">("define");
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [activeTab]);
@@ -4567,22 +4566,6 @@ export default function App() {
               <span>9. Model Chat</span>
             </button>
 
-            <button
-              id="tab-model-deployment"
-              onClick={() => {
-                setActiveTab("modelDeployment");
-                setIsMobileNavOpen(false);
-              }}
-              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 ${
-                activeTab === "modelDeployment"
-                  ? "bg-blue-500/15 text-blue-300 border border-blue-500/25 shadow-sm"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
-              }`}
-            >
-              <Cloud className="h-4 w-4 shrink-0" />
-              <span>10. Deployment Options</span>
-            </button>
-
           </div>
 
           <div className="rounded-xl border border-slate-800/60 bg-slate-950/30 p-3">
@@ -7784,7 +7767,6 @@ export default function App() {
             )}
 
             {activeTab === "modelChat" && <ModelChatTab apiFetch={projectApiFetch} />}
-            {activeTab === "modelDeployment" && <ModelChatDeploymentOptions apiFetch={projectApiFetch} />}
 
           </AnimatePresence>
         </div>

@@ -2724,14 +2724,14 @@ function extractSpeakerAndContent(
   // 1. Direct match with user-provided turn labels from interface
   if (userTag && userTag.trim()) {
     const escU = escapeRegex(userTag.trim());
-    const uRegex = new RegExp(`^\\s*(?:\\[|\\*\\*|<v\\s+)?(${escU})(?:\\]|\\*\\*)?(?:\\s*\\([^)]*\\))?\\s*(?:[:\\-–—]\\s*|$)(.*)$`, "i");
+    const uRegex = new RegExp(`^\\s*(?:\\[|\\*\\*|<v\\s+)?(${escU})(?:\\]|\\*\\*)?(?:\\s*\\([^)]*\\))?\\s*[:\\-–—]?\\s*(.*)$`, "i");
     const m = l.match(uRegex);
     if (m) return { speaker: m[1].trim(), content: m[2].trim() };
   }
 
   if (assistantTag && assistantTag.trim()) {
     const escA = escapeRegex(assistantTag.trim());
-    const aRegex = new RegExp(`^\\s*(?:\\[|\\*\\*|<v\\s+)?(${escA})(?:\\]|\\*\\*)?(?:\\s*\\([^)]*\\))?\\s*(?:[:\\-–—]\\s*|$)(.*)$`, "i");
+    const aRegex = new RegExp(`^\\s*(?:\\[|\\*\\*|<v\\s+)?(${escA})(?:\\]|\\*\\*)?(?:\\s*\\([^)]*\\))?\\s*[:\\-–—]?\\s*(.*)$`, "i");
     const m = l.match(aRegex);
     if (m) return { speaker: m[1].trim(), content: m[2].trim() };
   }
@@ -2784,15 +2784,16 @@ function parseUniversalTranscript(
   const customAsstLower = customAsstTrim.toLowerCase();
 
   // Robust tag matcher to handle speaker tags like "Alice" matching "Alice (Host)" or "Speaker 1" matching "SPEAKER_01"
-  const normalizeTag = (value: string): string => value
-    .toLowerCase()
-    .trim()
-    .replace(/\s*\([^)]*\)\s*$/, "")
-    .replace(/[_\s\-]+/g, "");
-
   const matchesTag = (speaker: string, tagLower: string): boolean => {
     if (!tagLower) return false;
-    return normalizeTag(speaker) === normalizeTag(tagLower);
+    const s = speaker.toLowerCase().trim();
+    if (s === tagLower) return true;
+    if (s.startsWith(tagLower) || tagLower.startsWith(s)) return true;
+    if (s.includes(tagLower)) return true;
+    const sNorm = s.replace(/[_\s\-]+/g, "");
+    const tNorm = tagLower.replace(/[_\s\-]+/g, "");
+    if (sNorm === tNorm || sNorm.startsWith(tNorm) || tNorm.startsWith(sNorm)) return true;
+    return false;
   };
 
   const isUserSpeaker = (speaker: string): boolean => {
@@ -2808,8 +2809,6 @@ function parseUniversalTranscript(
     const l = lineText.trim().toLowerCase();
     if (!l) return true;
     if (/^[=\-_*#\s]{3,}$/.test(l)) return true;
-    const metadataField = l.replace(/^[-*]\s*/, "").replace(/^["']/, "");
-    if (/^(?:metadata|meta\s*data|(?:document|transcript|conversation|file)\s+metadata|author|file(?: name| type)?|document(?: name| title| type| id)?|created(?: at)?|updated(?: at)?|modified(?: at)?|last modified|exported(?: at| by)?|generated(?: at| by)?|version|language|keywords?|category|project|organization|company|department|owner|tags?|source|url|recording id|transcript id)\s*[:=]/i.test(metadataField)) return true;
     if (/^(?:meeting|call|webinar|conference)\s+(?:id|topic|date|duration|ended|summary|notes|agenda)/i.test(l)) return true;
     if (/^(?:date|time|duration|attendees|participants|host|organizer|recording|transcript|location|call id|audio file)\s*[:\-]/i.test(l)) return true;
     if (/^\[?\s*(?:meeting ended|call ended|recording stopped|recording paused|transcript ended|end of transcript|left the meeting|joined the meeting|reconnected)\s*\]?$/i.test(l)) return true;
@@ -3179,7 +3178,7 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
       requestedCount: groups.length, partial: false,
       examples: groups.map(messages => ({
         id: randomUUID(), templateType: transcriptTemplate, verbatimTranscript: true,
-         messages: systemPrompt ? [{ role: "system", content: systemPrompt }, ...messages] : messages
+        messages: systemPrompt ? [{ role: "system", content: systemPrompt }, ...messages] : messages
       }))
     });
   }

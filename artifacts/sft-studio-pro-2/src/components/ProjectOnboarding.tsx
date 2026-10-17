@@ -255,6 +255,11 @@ const BATCH_RECOMMENDATION_LIBRARY: BatchRecommendation[] = [
 Generate project-relevant prompts pairing a task with hard constraints: word limits, bullet counts, tone requirements, "respond in exactly 3 sentences," or "answer without using X." Include prompts with multiple stacked constraints.`,
   `Every response meets 100% of stated constraints. Exclude examples that complete the task but drop a constraint.`),
 
+  recipe("Factual Q&A and Explanation at Multiple Levels", `Answer questions and explain concepts relevant to the project, from beginner to expert depth.
+
+Generate questions answered at the depth the user asks for (child, layperson, practitioner, expert). Use analogies and worked walkthroughs that fit the persona.`,
+  `No invented citations, statistics, or named sources. Depth matches the request; never assume the user needs a simpler answer than they asked for.`),
+
   recipe("Step-by-Step Reasoning and Math", `Multi-step problem solving with visible, verifiable work, explained in the persona's voice.
 
 Generate project-relevant word problems, logic puzzles, and multi-step math where the response derives the answer stepwise and ends with a clean final answer.`,
@@ -275,6 +280,11 @@ Generate summaries at specified lengths, rewrites at different reading levels, t
 Generate project-relevant prompts with an explicit target schema and responses that populate it from unstructured text. Include nested objects, arrays, and missing-field edge cases.`,
   `Output is valid, parseable JSON with no prose wrapping. Missing data uses null or empty values per the schema.`),
 
+  recipe("Goal Decomposition and Planning", `Turn the user's objectives into ordered, concrete action steps, in the persona's voice.
+
+Generate project-relevant goals (trips, projects, learning plans, events) with responses that break them into sequenced steps, checklists, or itineraries. Include goals with dependencies where order matters, and user-stated limits like budgets or deadlines.`,
+  `Steps are concrete and ordered, and dependencies are respected. Use only user-stated constraints and resources; no invented budgets, equipment, or timelines. Plans are sized to the ask: small goal, short plan.`),
+
   recipe("Controlled Creative and Long-Form Writing", `Stories, essays, and poems that hit stylistic targets and stay coherent.
 
 Generate project-relevant requests with explicit creative constraints (genre, POV, era, tone, rhyme scheme, word count) and responses that fulfill them with structural completeness.`,
@@ -283,10 +293,12 @@ Generate project-relevant requests with explicit creative constraints (genre, PO
 
 const GENERAL_RECOMMENDED_BATCH_TOPICS = [
   "Instruction Following with Explicit Constraints",
+  "Factual Q&A and Explanation at Multiple Levels",
   "Step-by-Step Reasoning and Math",
   "Code Generation, Explanation, and Debugging",
   "Summarization and Text Transformation",
   "Structured Output and Data Extraction",
+  "Goal Decomposition and Planning",
   "Controlled Creative and Long-Form Writing",
 ];
 
@@ -583,7 +595,6 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     const planInstruction =
       `You are the Project Onboarding batch-recommendation assistant. Analyze the approved project goal, constraints, selected model, and every skill the user named. ` +
       `Choose relevant recipe topics from the curated library by topic name only; do not rewrite or return any library recipe instructions or constraints. ` +
-      `Assess each project from its own approved goal, constraints, persona, and golden exemplar. Every project must receive a mix of relational/persona-centered and instructional/utility batches; do not omit either category. For persona-centered, companion, or personal-AI projects, emphasize the relevant relational/persona-centered recipes and include fewer generic utility recipes, while still including utility batches that serve the project. For task-focused projects, emphasize relevant utility recipes while retaining applicable relational/persona-centered batches. ` +
       `For every separate item in the required user-skill list, provide one matching additional batch, unless a selected library recipe directly covers it. For each additional batch, copy that exact skill item into "skill" and provide a specific topic, special instructions, and temporary constraints that make the skill observable in examples for this project. Never omit a listed skill. Do not use generic instructions. ` +
       `Every additional batch must teach its skill through the project's target voice and golden exemplar and in service of the project goal; treat the user as a capable equal; never add disclaimers, moralizing, therapy-speak, pathologizing, reframing of the user's perception, lecturing, or condescension. ` +
       `Always include the library topics that fit the project, and recommend these broadly useful topics when suitable: ${recommendedTopics.join(", ")}. ` +
@@ -723,7 +734,6 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     const draft = await askAI(
       `Write a concise identity/persona-only system prompt for this SFT project. It must identify the model's name, persona, and purpose based on the project goal. ` +
       `Do not include task-specific instructions, rules, constraints, policies, examples, formatting requirements, or other behavioral directions. ` +
-      `Do not include, quote, or paraphrase any system/developer instructions or instructions about writing this prompt. ` +
       `${modelNameInstruction ? "The app will prepend the model's remembered name; do not repeat or invent a name. " : "Do not invent a model name. "}` +
       `HARD LIMIT: the complete prompt must have no more than five sentences total. ` +
       `${modelNameInstruction ? `The app will prepend the user's remembered-name sentence, which counts toward the five-sentence maximum. Do not write a name sentence; write at most ${remainingSentenceLimit} additional sentences. ` : "Write at most five sentences. "}` +
