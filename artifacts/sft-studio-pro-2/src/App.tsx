@@ -1460,12 +1460,9 @@ export default function App() {
 
     setSelectedProjectId(selectedId);
     const savedGuideState = readGuideState(selectedId);
-    const projectRecommendations = selected.settings?.batchRecommendations;
-    const guideRecommendations = savedGuideState.recommendations;
     setBatchRecommendations(
-      Array.isArray(guideRecommendations) && guideRecommendations.length > 0 ? guideRecommendations
-      : Array.isArray(projectRecommendations) ? projectRecommendations
-      : Array.isArray(guideRecommendations) ? guideRecommendations : []
+      Array.isArray(selected.settings?.batchRecommendations) ? selected.settings.batchRecommendations
+      : Array.isArray(savedGuideState.recommendations) ? savedGuideState.recommendations : []
     );
     setCompletedRecommendedBatches(
       Array.isArray(selected.settings?.completedRecommendedBatches) ? selected.settings.completedRecommendedBatches
@@ -4028,16 +4025,9 @@ export default function App() {
             }));
           }
           if (showBatchRecommendationInterview) {
-            const approvedRecommendations = recommendations ?? [];
-            setBatchRecommendations(approvedRecommendations);
+            setBatchRecommendations(recommendations ?? []);
             setCompletedRecommendedBatches([]);
             setActiveRecommendedBatchIndex(0);
-            if (selectedProjectId) {
-              writeGuideState(selectedProjectId, {
-                recommendations: approvedRecommendations,
-                completedRecommendedBatches: []
-              });
-            }
             setShowBatchRecommendationInterview(false);
             setActiveTab("synthesizer");
             if (autoGenerate !== undefined) {
