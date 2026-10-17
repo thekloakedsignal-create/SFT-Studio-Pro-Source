@@ -10,6 +10,7 @@ const plans: Record<string, string | undefined> = {
   train_9b: process.env.WHOP_PLAN_ID_TRAIN_9B,
   train_70b: process.env.WHOP_PLAN_ID_TRAIN_70B,
   usage_10k: process.env.WHOP_PLAN_ID_USAGE_10K,
+  model_chat: process.env.WHOP_PLAN_ID_MODEL_CHAT,
 };
 export const TRAINING_MODEL_PLANS: Record<string, string> = {
   "Qwen3.5 4B Base": "train_4b", "Qwen3.5 9 Base": "train_9b", "Llama 3.1 70B": "train_70b",
@@ -18,7 +19,7 @@ export const TRAINING_MODEL_PLANS: Record<string, string> = {
 function isOwner(user: AuthRequest["user"]) {
   return user?.email_verified === true && user.email?.toLowerCase() === "thekloakedsignal@gmail.com";
 }
-type Account = { used: number; extra: number; training: Record<string, number> };
+type Account = { used: number; extra: number; training: Record<string, number>; modelChatCreditTicks?: number };
 type Checkout = { uid: string; planKey: string; checkoutId: string; at: string; paymentId?: string };
 type Reservation = { uid: string; count: number };
 type Store = { accounts: Record<string, Account>; checkouts: Record<string, Checkout>; reservations: Record<string, Reservation> };
@@ -39,7 +40,9 @@ function change<T>(fn: (draft: Store) => T): T {
   return result;
 }
 function account(s: Store, uid: string): Account {
-  return s.accounts[uid] ??= { used: 0, extra: 0, training: {} };
+  const result = s.accounts[uid] ??= { used: 0, extra: 0, training: {}, modelChatCreditTicks: 0 };
+  result.modelChatCreditTicks ??= 0;
+  return result;
 }
 function remaining(s: Store, uid: string) {
   const a = account(s, uid);
@@ -82,6 +85,24 @@ export function restoreTraining(uid: string, model: string) {
   change(s => { const a = account(s, uid); const key = TRAINING_MODEL_PLANS[model]; a.training[key] = (a.training[key] || 0) + 1; });
 }
 
+export function reserveModelChatCredits(user: AuthRequest["user"]) {
+  if (isOwner(user)) return { ticks: 0, bypass: true };
+  const uid = user?.uid;
+  if (!uid) throw Object.assign(new Error("Please sign in."), { status: 401 });
+  return change(s => {
+    const a = account(s, uid);
+    const ticks = a.modelChatCreditTicks || 0;
+    if (ticks <= 0) throw Object.assign(new Error("Buy at least $5 of prepaid model chat credit to continue."), { status: 402 });
+    a.modelChatCreditTicks = 0;
+    return { ticks, bypass: false };
+  });
+}
+
+export function refundModelChatCredits(uid: string, ticks: number) {
+  if (!Number.isFinite(ticks) || ticks <= 0) return;
+  change(s => { account(s, uid).modelChatCreditTicks! += Math.floor(ticks); });
+}
+
 const router: IRouter = Router();
 // Scope auth to billing paths, not unrelated routes.
 router.use("/whop", optionalAuth, (req: AuthRequest, res, next) => {
@@ -89,9 +110,13 @@ router.use("/whop", optionalAuth, (req: AuthRequest, res, next) => {
   next();
 });
 function payload(uid: string, user?: AuthRequest["user"]) {
-  if (isOwner(user)) return { success: true, bypass: true, usageUsed: 0, allowance: null, remaining: null, training: {} };
+  if (isOwner(user)) return { success: true, bypass: true, usageUsed: 0, allowance: null, remaining: null, training: {}, modelChatCreditTicks: null };
   const a = account(store, uid);
-  return { success: true, bypass: false, usageUsed: a.used, allowance: 5000 + a.extra, remaining: remaining(store, uid), training: a.training };
+  return {
+    success: true, bypass: false, usageUsed: a.used, allowance: 5000 + a.extra,
+    remaining: remaining(store, uid), training: a.training,
+    modelChatCreditTicks: a.modelChatCreditTicks || 0,
+  };
 }
 router.get("/whop/entitlements", (req: AuthRequest, res) => { res.json(payload(req.user!.uid, req.user)); });
 
@@ -147,6 +172,7 @@ router.post("/whop/verify", async (req: AuthRequest, res) => {
           if (s.checkouts[id].paymentId || Object.values(s.checkouts).some(x => x.paymentId === p.id)) return;
           const a = account(s, uid);
           if (c.planKey === "usage_10k") a.extra += 10000;
+          else if (c.planKey === "model_chat") a.modelChatCreditTicks = (a.modelChatCreditTicks || 0) + 30000;
           else a.training[c.planKey] = (a.training[c.planKey] || 0) + 1;
           s.checkouts[id].paymentId = p.id;
           credited++;

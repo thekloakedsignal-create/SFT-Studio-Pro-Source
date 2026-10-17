@@ -61,6 +61,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { AboutModal } from "./components/AboutModal";
 import { RunTrainingModal } from "./components/RunTrainingModal";
 import { ModelChatTab } from "./components/ModelChatTab";
+import { ModelChatDeploymentOptions } from "./components/ModelChatDeploymentOptions";
 import { PaymentGate, trainingPlan } from "./components/PaymentGate";
 import { ProjectOnboarding, type BatchRecommendation } from "./components/ProjectOnboarding";
 import { PricingModal } from "./components/PricingModal";
@@ -7766,7 +7767,12 @@ export default function App() {
               </section>
             )}
 
-            {activeTab === "modelChat" && <ModelChatTab apiFetch={projectApiFetch} />}
+            {activeTab === "modelChat" && (
+              <>
+                <ModelChatTab apiFetch={projectApiFetch} />
+                <ModelChatDeploymentOptions apiFetch={projectApiFetch} />
+              </>
+            )}
 
           </AnimatePresence>
         </div>
