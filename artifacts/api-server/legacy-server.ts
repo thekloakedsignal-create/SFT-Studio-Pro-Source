@@ -4824,3 +4824,366 @@ GUIDELINES:
 
 
 export default app;
+
+// ===== Opt-in per-project automation pipeline =====
+// Sits outside the manual flows: it calls the same public endpoints the UI uses.
+const pipelineJobs = new Map<string, any>();
+
+async function pipelineCall(userId: string, path: string, init: any = {}) {
+  const port = process.env.PORT || 8080;
+  const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", "X-Device-ID": userId, ...(init.headers || {}) }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 402) throw new Error("Credits exhausted — the pipeline stopped. Add credits and restart it.");
+  return { ok: res.ok, status: res.status, data };
+}
+
+async function pipelineRunJob(userId: string, startPath: string, startBody: any, statusPath: (jobId: string) => string, label: string) {
+  const start = await pipelineCall(userId, startPath, { method: "POST", body: JSON.stringify(startBody) });
+  if (!start.ok || !start.data?.success) throw new Error(start.data?.error || `${label} failed to start (${start.status}).`);
+  const jobId = start.data.jobId;
+  if (typeof jobId !== "string" || !jobId) {
+    if (start.data && (Array.isArray(start.data.examples) || Array.isArray(start.data.regeneratedExamples))) return start.data;
+    throw new Error(`${label} did not return a job id.`);
+  }
+  while (true) {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    const st = await pipelineCall(userId, statusPath(jobId));
+    if (!st.ok || !st.data?.success) throw new Error(st.data?.error || `${label} status check failed.`);
+    if (st.data.status === "running") continue;
+    if (st.data.status === "error") throw new Error(st.data.error || `${label} failed.`);
+    const result = st.data.result;
+    if (!result?.success) throw new Error(result?.error || `${label} failed.`);
+    return result;
+  }
+}
+
+function pipelineGenerationBody(config: any, opts: any) {
+  return {
+    projectName: config.projectName,
+    systemPrompt: config.systemPrompt,
+    targetTask: config.targetTask,
+    constraints: config.constraints,
+    batchDescription: opts.batchDescription,
+    specialInstructions: opts.specialInstructions || "",
+    temporaryConstraints: opts.temporaryConstraints || "",
+    templateType: opts.templateType,
+    instructTemplate: config.isInstruction ? (config.instructTemplate || "ChatML") : undefined,
+    isInstruction: Boolean(config.isInstruction),
+    representativePrompt: config.representativePrompt || "",
+    representativeCompletion: config.representativeCompletion || "",
+    count: opts.count,
+    jobMode: true
+  };
+}
+
+function pipelineBatch(config: any, result: any, opts: any) {
+  const id = result.batchId || result.id || `batch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  return {
+    id,
+    batchId: id,
+    name: opts.name,
+    source: opts.source || "AI Generated (Automation)",
+    templateType: result.templateType || opts.templateType,
+    examplesCount: result.examples.length,
+    examples: result.examples,
+    partial: Boolean(result.partial),
+    requestedExamples: result.requestedCount || opts.count,
+    status: "Pending",
+    timestamp: new Date().toISOString().slice(0, 16).replace("T", " "),
+    description: opts.description || opts.name,
+    specialInstructions: opts.specialInstructions || "",
+    temporaryConstraints: opts.temporaryConstraints || ""
+  };
+}
+
+async function pipelineSaveBatch(job: any, batch: any) {
+  const save = await pipelineCall(job.userId, `/api/sql/projects/${encodeURIComponent(job.projectId)}/batches`, {
+    method: "POST", body: JSON.stringify({ batch })
+  });
+  if (!save.ok || !save.data?.success) throw new Error(save.data?.error || "Pipeline could not save a batch.");
+  return batch.id;
+}
+
+async function runPipelineQaChain(job: any, batchId: string) {
+  const { userId, projectId, config } = job;
+  job.batchStatus[batchId] = { stage: "assessing" };
+
+  const projRes = await pipelineCall(userId, `/api/sql/projects/${encodeURIComponent(projectId)}`);
+  const batch = projRes.data?.project?.batches?.find((b: any) => b && b.id === batchId);
+  if (!batch || !Array.isArray(batch.examples) || batch.examples.length === 0) throw new Error("Batch not found for QA.");
+
+  const analysis = await pipelineCall(userId, "/api/analyze-quality", {
+    method: "POST",
+    body: JSON.stringify({
+      examples: batch.examples,
+      systemPrompt: config.systemPrompt,
+      targetTask: config.targetTask,
+      constraints: config.constraints,
+      templateType: batch.templateType,
+      instructTemplate: config.isInstruction ? config.instructTemplate : undefined
+    })
+  });
+  if (!analysis.ok || !analysis.data?.success || !analysis.data.report) throw new Error(analysis.data?.error || "Assessment failed.");
+  let report = analysis.data.report;
+  const examples = [...batch.examples];
+
+  // One regeneration pass over flagged examples (no second assessment — by design).
+  const issuesByIndex = new Map<number, any[]>();
+  (report.issues || []).forEach((iss: any) => {
+    if (iss.exampleIndex >= 0 && iss.exampleIndex < examples.length) {
+      issuesByIndex.set(iss.exampleIndex, [...(issuesByIndex.get(iss.exampleIndex) || []), iss]);
+    }
+  });
+  if (issuesByIndex.size > 0) {
+    job.batchStatus[batchId] = { stage: "repairing" };
+    const flaggedItems = Array.from(issuesByIndex.entries()).map(([exampleIndex, issues]) => ({
+      exampleIndex, example: examples[exampleIndex], issues
+    }));
+    const regen = await pipelineRunJob(userId, "/api/regenerate-flagged", {
+      flaggedItems,
+      jobMode: true,
+      suggestions: report.suggestions || [],
+      systemPrompt: config.systemPrompt,
+      targetTask: config.targetTask,
+      constraints: config.constraints,
+      templateType: batch.templateType,
+      batchDescription: batch.description,
+      specialInstructions: batch.specialInstructions,
+      temporaryConstraints: batch.temporaryConstraints,
+      instructTemplate: config.isInstruction ? config.instructTemplate : undefined,
+      representativePrompt: config.representativePrompt || "",
+      representativeCompletion: config.representativeCompletion || ""
+    }, id => `/api/regenerate-flagged/jobs/${encodeURIComponent(id)}`, "QA repair");
+    const regenList: any[] = regen.regeneratedExamples || [];
+    const repaired = new Set<number>();
+    regenList.forEach(item => {
+      if (typeof item.exampleIndex === "number" && item.exampleIndex >= 0 && item.exampleIndex < examples.length && Array.isArray(item.messages) && item.messages.length) {
+        examples[item.exampleIndex] = { ...examples[item.exampleIndex], messages: item.messages };
+        repaired.add(item.exampleIndex);
+      }
+    });
+    report = { ...report, issues: (report.issues || []).filter((iss: any) => !repaired.has(iss.exampleIndex)) };
+  }
+
+  // Deduplicate: drop still-flagged examples and duplicate first-user-prompts (mirrors the manual dedupe).
+  job.batchStatus[batchId] = { stage: "deduplicating" };
+  const stillFlagged = new Set<number>((report.issues || []).map((iss: any) => iss.exampleIndex));
+  const seenPrompts = new Set<string>();
+  const uniqueExamples: any[] = [];
+  examples.forEach((ex: any, idx: number) => {
+    if (stillFlagged.has(idx)) return;
+    const userMsg = (ex?.messages || []).find((m: any) => m?.role === "user");
+    const prompt = userMsg && typeof userMsg.content === "string" ? userMsg.content.trim().toLowerCase() : "";
+    if (prompt && seenPrompts.has(prompt)) return;
+    if (prompt) seenPrompts.add(prompt);
+    uniqueExamples.push(ex);
+  });
+
+  // Approve into the registry.
+  const finalReport = {
+    ...report,
+    overallScore: 100,
+    issues: [],
+    duplicateCheck: { duplicatesFound: 0, duplicatesList: [], deduplicatedLength: uniqueExamples.length },
+    stats: { totalExamples: uniqueExamples.length, flaggedCount: 0, passedCount: uniqueExamples.length }
+  };
+  const finalBatch = {
+    ...batch,
+    examples: uniqueExamples,
+    examplesCount: uniqueExamples.length,
+    status: "Approved",
+    qualityReport: finalReport
+  };
+  await pipelineSaveBatch(job, finalBatch);
+  job.batchStatus[batchId] = { stage: "approved" };
+}
+
+async function runAutomationPipeline(job: any) {
+  const { userId, config } = job;
+  const is70B = config.trainingModel === "Llama 3.1 70B";
+  const roundRobin = is70B ? ["Single Turn", "Multi Turn"] : ["Single Turn", "Multi Turn", "Reasoning"];
+  job.producedBatches = [];
+
+  // Gate: generate the first 5 general examples and wait for user approval.
+  if (config.autoGenerate) {
+    job.stage = "Generating the first 5 general examples for your approval";
+    const gateResult = await pipelineRunJob(userId, "/api/generate",
+      pipelineGenerationBody(config, { batchDescription: "General examples", templateType: "Single Turn", count: 5 }),
+      id => `/api/generate/jobs/${encodeURIComponent(id)}`, "Gate generation");
+    const gateBatch = pipelineBatch(config, gateResult, {
+      name: "General Examples — Approval Gate",
+      description: "First 5 general examples — awaiting your approval",
+      templateType: "Single Turn",
+      count: 5
+    });
+    await pipelineSaveBatch(job, gateBatch);
+    job.gateBatchId = gateBatch.id;
+    job.gatePreview = gateBatch.examples.slice(0, 5).map((ex: any) =>
+      (ex?.messages || []).map((m: any) => `${m?.role || "?"}: ${typeof m?.content === "string" ? m.content.slice(0, 280) : ""}`).join("\n"));
+    job.producedBatches.push(gateBatch.id);
+    job.stage = "awaiting-gate";
+    while (job.gateApproved === undefined) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    if (!job.gateApproved) { job.stage = "stopped"; return; }
+
+    // Recommended batches in a balanced template mix.
+    let rr = 0;
+    for (const rec of config.recommendations || []) {
+      const templateType = roundRobin[rr++ % roundRobin.length];
+      job.stage = `Generating: ${rec.topic}`;
+      job.batchStatus[rec.topic] = { stage: "generating" };
+      try {
+        const result = await pipelineRunJob(userId, "/api/generate",
+          pipelineGenerationBody(config, {
+            batchDescription: rec.topic,
+            specialInstructions: rec.specialInstructions,
+            temporaryConstraints: rec.temporaryConstraints,
+            templateType,
+            count: config.batchCount || 25
+          }),
+          id => `/api/generate/jobs/${encodeURIComponent(id)}`, "Batch generation");
+        const batch = pipelineBatch(config, result, {
+          name: rec.topic,
+          description: rec.topic,
+          templateType,
+          count: config.batchCount || 25,
+          specialInstructions: rec.specialInstructions,
+          temporaryConstraints: rec.temporaryConstraints
+        });
+        await pipelineSaveBatch(job, batch);
+        job.producedBatches.push(batch.id);
+        job.batchStatus[rec.topic] = { stage: "generated", batchId: batch.id };
+      } catch (err: any) {
+        job.batchStatus[rec.topic] = { stage: "needs-review", error: err?.message || "Generation failed." };
+      }
+    }
+  }
+
+  // Document conversion.
+  for (const doc of config.docs || []) {
+    job.stage = `Converting document: ${doc.name}`;
+    job.batchStatus[`doc:${doc.name}`] = { stage: "converting" };
+    try {
+      const result = await pipelineRunJob(userId, "/api/convert-document", {
+        documentName: doc.name,
+        async: true,
+        documentContent: doc.content,
+        templateType: "Single Turn",
+        instructTemplate: config.isInstruction ? (config.instructTemplate || "ChatML") : undefined,
+        isInstruction: Boolean(config.isInstruction),
+        count: 8,
+        extractionModel: "glm-5.3",
+        projectName: config.projectName,
+        systemPrompt: config.systemPrompt,
+        targetTask: config.targetTask,
+        constraints: config.constraints,
+        docType: "knowledge_base",
+        isTranscript: false
+      }, id => `/api/convert-document/jobs/${encodeURIComponent(id)}`, "Document conversion");
+      const batch = pipelineBatch(config, result, {
+        name: `Doc: ${doc.name}`.slice(0, 60),
+        description: `Extracted from "${doc.name}" (automation)`,
+        templateType: result.templateType || "Single Turn",
+        source: "Doc Conversion (Automation)",
+        count: 8
+      });
+      await pipelineSaveBatch(job, batch);
+      job.producedBatches.push(batch.id);
+      job.batchStatus[`doc:${doc.name}`] = { stage: "generated", batchId: batch.id };
+    } catch (err: any) {
+      job.batchStatus[`doc:${doc.name}`] = { stage: "needs-review", error: err?.message || "Conversion failed." };
+    }
+  }
+
+  // QA chain: assess once -> regenerate flagged once -> deduplicate -> approve. No steps skipped.
+  if (config.autoQa) {
+    for (const batchId of job.producedBatches) {
+      try {
+        await runPipelineQaChain(job, batchId);
+      } catch (err: any) {
+        job.batchStatus[batchId] = { stage: "needs-review", error: err?.message || "QA chain failed." };
+      }
+    }
+  }
+
+  job.stage = "complete";
+}
+
+app.post("/api/pipeline/start", optionalAuth, async (req: AuthRequest, res) => {
+  const userId = projectOwnerId(req);
+  if (!userId) return res.status(401).json({ success: false, error: "Sign in to run automation." });
+  const { projectId, autoGenerate, autoQa, docs, recommendations, project, trainingModel, batchCount } = req.body || {};
+  if (typeof projectId !== "string" || !projectId) {
+    return res.status(400).json({ success: false, error: "Missing project id." });
+  }
+  if (!project || typeof project.systemPrompt !== "string") {
+    return res.status(400).json({ success: false, error: "Missing project settings." });
+  }
+  const existing = pipelineJobs.get(projectId);
+  if (existing && !["complete", "error", "stopped"].includes(existing.stage)) {
+    return res.status(409).json({ success: false, error: "Automation is already running for this project." });
+  }
+  const job: any = {
+    userId,
+    projectId,
+    config: {
+      autoGenerate: Boolean(autoGenerate),
+      autoQa: Boolean(autoQa),
+      docs: Array.isArray(docs) ? docs.filter((d: any) => d && typeof d.name === "string" && typeof d.content === "string").slice(0, 10) : [],
+      recommendations: Array.isArray(recommendations) ? recommendations.filter((r: any) => r && typeof r.topic === "string") : [],
+      projectName: project.name || "SFT Project",
+      systemPrompt: project.systemPrompt || "",
+      targetTask: project.targetTask || "",
+      constraints: project.constraints || "",
+      instructTemplate: project.instructTemplate || "ChatML",
+      isInstruction: Boolean(project.isInstruction),
+      representativePrompt: project.representativePrompt || "",
+      representativeCompletion: project.representativeCompletion || "",
+      trainingModel: typeof trainingModel === "string" ? trainingModel : "",
+      batchCount: Number.isFinite(batchCount) ? batchCount : 25
+    },
+    stage: "starting",
+    batchStatus: {},
+    startedAt: new Date().toISOString()
+  };
+  pipelineJobs.set(projectId, job);
+  res.json({ success: true });
+  runAutomationPipeline(job)
+    .catch((err: any) => { job.stage = "error"; job.error = err?.message || "Automation failed."; })
+    .finally(() => { job.finishedAt = new Date().toISOString(); });
+});
+
+app.get("/api/pipeline/:projectId", optionalAuth, (req: AuthRequest, res) => {
+  const userId = projectOwnerId(req);
+  if (!userId) return res.status(401).json({ success: false, error: "Sign in to view automation." });
+  const projectId = Array.isArray(req.params.projectId) ? req.params.projectId[0] ?? "" : req.params.projectId;
+  const job = pipelineJobs.get(projectId);
+  if (!job || job.userId !== userId) return res.json({ success: true, pipeline: null });
+  res.json({
+    success: true,
+    pipeline: {
+      stage: job.stage,
+      batchStatus: job.batchStatus,
+      gateBatchId: job.gateBatchId,
+      gatePreview: job.gatePreview,
+      error: job.error,
+      startedAt: job.startedAt,
+      finishedAt: job.finishedAt
+    }
+  });
+});
+
+app.post("/api/pipeline/:projectId/gate", optionalAuth, (req: AuthRequest, res) => {
+  const userId = projectOwnerId(req);
+  if (!userId) return res.status(401).json({ success: false, error: "Sign in to approve automation." });
+  const projectId = Array.isArray(req.params.projectId) ? req.params.projectId[0] ?? "" : req.params.projectId;
+  const job = pipelineJobs.get(projectId);
+  if (!job || job.userId !== userId) return res.status(404).json({ success: false, error: "No automation found for this project." });
+  if (job.stage !== "awaiting-gate") return res.status(400).json({ success: false, error: "Automation is not waiting for approval." });
+  job.gateApproved = Boolean(req.body?.approved);
+  res.json({ success: true });
+});

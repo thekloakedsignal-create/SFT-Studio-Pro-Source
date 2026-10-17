@@ -517,6 +517,75 @@ export default function App() {
     const current = readGuideState(projectId);
     localStorage.setItem(guideStorageKey(projectId), JSON.stringify({ ...current, ...update }));
   };
+
+  // Automation pipeline helpers (opt-in; attaches to the section AI guides)
+  const answerAutomation = (key: string, value: any) => {
+    const projectId = selectedProjectId || "";
+    const current = readGuideState(projectId).automation || {};
+    const next = { ...current, [key]: value };
+    writeGuideState(projectId, { automation: next });
+    setAutomationAnswers(next);
+  };
+  const handleAutomationDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const docs = [...(automationAnswers.docFiles || [])];
+    for (const file of files) {
+      if (file.size > 150 * 1024) {
+        setNotification({ text: `"${file.name}" is over 150 KB — too large for automatic processing.`, type: "error" });
+        continue;
+      }
+      docs.push({ name: file.name, content: await file.text() });
+    }
+    answerAutomation("docFiles", docs);
+    e.target.value = "";
+  };
+  const startAutomationPipeline = async (answers: Record<string, any>) => {
+    if (!selectedProjectId) {
+      setNotification({ text: "Save your project first, then start automation.", type: "info" });
+      return;
+    }
+    try {
+      const res = await projectApiFetch("/api/pipeline/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: selectedProjectId,
+          autoGenerate: answers.generate === "yes",
+          autoQa: answers.qa === "audit",
+          docs: answers.docs === "yes" ? (answers.docFiles || []) : [],
+          recommendations: batchRecommendations,
+          trainingModel: trainerHandoff.model,
+          project: {
+            name: project.name,
+            systemPrompt: project.systemPrompt,
+            targetTask: project.targetTask,
+            constraints: project.constraints,
+            instructTemplate: project.instructTemplate,
+            isInstruction: project.projectFormat === ProjectFormat.INSTRUCTION,
+            representativePrompt: project.representativePrompt,
+            representativeCompletion: project.representativeCompletion
+          }
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw new Error(data?.error || "Automation could not start.");
+      setNotification({ text: "Automation started — generating the first 5 general examples for your approval.", type: "success" });
+    } catch (err: any) {
+      setNotification({ text: err?.message || "Automation could not start.", type: "error" });
+    }
+  };
+  const answerAutomationGate = async (approved: boolean) => {
+    if (!selectedProjectId) return;
+    await projectApiFetch(`/api/pipeline/${encodeURIComponent(selectedProjectId)}/gate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approved })
+    }).catch(() => {});
+    setNotification({
+      text: approved ? "Approved — automation is now running in the background." : "Automation stopped.",
+      type: approved ? "success" : "info"
+    });
+  };
   const openAiGuide = (page: "synthesizer" | "convert" | "triad" | "assess") => {
     if (page === "convert") {
       const saved = readGuideState(selectedProjectId || "").documentWalkthrough;
@@ -561,6 +630,9 @@ export default function App() {
   const [activeRecommendedBatchIndex, setActiveRecommendedBatchIndex] = useState(0);
   const activeRecommendedBatch = batchRecommendations[activeRecommendedBatchIndex];
   const [completedRecommendedBatches, setCompletedRecommendedBatches] = useState<string[]>([]);
+  const [pipelineStatus, setPipelineStatus] = useState<any>(null);
+  const [automationAnswers, setAutomationAnswers] = useState<Record<string, any>>({});
+  const [showExitChoice, setShowExitChoice] = useState(false);
   const [batchSize, setBatchSize] = useState<number>(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState<{ current: number; total: number; percent: number } | null>(null);
@@ -622,6 +694,22 @@ export default function App() {
       setSelectedBatchId(batches[0].id);
     }
   }, [batches, selectedBatchId]);
+
+  // Poll automation pipeline status for the open project
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const res = await projectApiFetch(`/api/pipeline/${encodeURIComponent(selectedProjectId)}`);
+        const data = await res.json();
+        if (!stopped && data?.success) setPipelineStatus(data.pipeline || null);
+      } catch {}
+    };
+    poll();
+    const timer = setInterval(poll, 5000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [selectedProjectId]);
   
   // SFT Example Editing states (Modal or inline)
   const [editingExampleIndex, setEditingExampleIndex] = useState<number | null>(null);
@@ -1322,6 +1410,8 @@ export default function App() {
       Array.isArray(selected.settings?.completedRecommendedBatches) ? selected.settings.completedRecommendedBatches
       : Array.isArray(savedGuideState.completedRecommendedBatches) ? savedGuideState.completedRecommendedBatches : []
     );
+    setAutomationAnswers(readGuideState(selectedId).automation || {});
+    setPipelineStatus(null);
     setActiveRecommendedBatchIndex(0);
     setGuidePage(null);
     setExpertMessages([]);
@@ -3832,6 +3922,7 @@ export default function App() {
             setActiveRecommendedBatchIndex(0);
             setShowBatchRecommendationInterview(false);
             setActiveTab("synthesizer");
+            setShowExitChoice(true);
             return;
           }
           setProject(settings);
@@ -3858,6 +3949,7 @@ export default function App() {
             type: "success"
           });
           setShowProjectOnboarding(false);
+          setShowExitChoice(true);
           window.scrollTo({ top: 0 });
         }}
       />
@@ -4043,6 +4135,18 @@ export default function App() {
 
         </div>
       </header>
+
+      {/* Post-onboarding exit choice */}
+      {showExitChoice && (
+        <div className="fixed bottom-4 right-4 z-50 w-80 rounded-2xl border border-emerald-500/30 bg-slate-950/95 p-4 shadow-xl space-y-3">
+          <p className="text-sm font-semibold text-slate-100">Do you want to train a model now or export your data set?</p>
+          <div className="flex gap-2 items-center">
+            <button type="button" onClick={() => { setShowExitChoice(false); setActiveTab("trainer"); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Train a model</button>
+            <button type="button" onClick={() => { setShowExitChoice(false); setActiveTab("registry"); }} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">Export data set</button>
+            <button type="button" onClick={() => setShowExitChoice(false)} className="ml-auto text-slate-500 hover:text-slate-300 text-xs transition cursor-pointer">Later</button>
+          </div>
+        </div>
+      )}
 
       {/* Global Notifications */}
       <AnimatePresence>
@@ -7250,6 +7354,79 @@ export default function App() {
 
                   {/* Messages Scroll Area */}
                   <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 custom-scrollbar">
+                    {/* Automation questions attach to each section guide */}
+                    {guidePage === "synthesizer" && !automationAnswers.generate && (
+                      <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-3">
+                        <p className="text-sm text-slate-200 font-semibold">Would you like to automatically generate suggested batches?</p>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">I'll generate the first 5 general examples for your approval, then build the rest in the background in a balanced mix of single-turn, multi-turn, and reasoning.</p>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => { answerAutomation("generate", "yes"); void startAutomationPipeline({ ...automationAnswers, generate: "yes" }); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Yes, generate them</button>
+                          <button type="button" onClick={() => answerAutomation("generate", "no")} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">No, I'll do it myself</button>
+                        </div>
+                      </div>
+                    )}
+                    {guidePage === "synthesizer" && pipelineStatus && (
+                      <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-4 space-y-3">
+                        <p className="text-xs font-bold text-purple-300 uppercase tracking-wide">Automation</p>
+                        <p className="text-sm text-slate-200">{pipelineStatus.stage === "awaiting-gate" ? "Waiting for your approval of the first 5 general examples" : pipelineStatus.stage}</p>
+                        {pipelineStatus.stage === "awaiting-gate" && Array.isArray(pipelineStatus.gatePreview) && (
+                          <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+                            {pipelineStatus.gatePreview.map((preview: string, i: number) => (
+                              <pre key={i} className="whitespace-pre-wrap text-[11px] text-slate-300 bg-slate-950/60 border border-slate-800 rounded-lg p-2 font-sans">{preview}</pre>
+                            ))}
+                          </div>
+                        )}
+                        {pipelineStatus.stage === "awaiting-gate" ? (
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => void answerAutomationGate(true)} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Approve & start</button>
+                            <button type="button" onClick={() => void answerAutomationGate(false)} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">Stop</button>
+                          </div>
+                        ) : Object.keys(pipelineStatus.batchStatus || {}).length > 0 && (
+                          <ul className="space-y-1">
+                            {Object.entries(pipelineStatus.batchStatus).map(([key, s]: [string, any]) => (
+                              <li key={key} className="text-[11px] flex justify-between gap-2">
+                                <span className="truncate text-slate-400">{key}</span>
+                                <span className={s.stage === "approved" ? "text-emerald-400" : s.stage === "needs-review" ? "text-amber-400" : "text-slate-500"}>
+                                  {s.stage}{s.error ? ` — ${s.error}` : ""}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    {guidePage === "convert" && !automationAnswers.docs && (
+                      <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-3">
+                        <p className="text-sm text-slate-200 font-semibold">Do you have any documents to convert? Would you like me to process them for you?</p>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => answerAutomation("docs", "yes")} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Yes — I'll upload them</button>
+                          <button type="button" onClick={() => answerAutomation("docs", "no")} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">No documents</button>
+                        </div>
+                      </div>
+                    )}
+                    {guidePage === "convert" && automationAnswers.docs === "yes" && (
+                      <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4 space-y-2">
+                        <p className="text-xs font-semibold text-slate-300">Documents for automatic conversion (up to 150 KB each)</p>
+                        <input type="file" multiple accept=".txt,.md,.json,.csv,.log" onChange={handleAutomationDocUpload} className="block w-full text-xs text-slate-400 file:mr-3 file:rounded-lg file:border file:border-slate-700 file:bg-slate-900 file:px-3 file:py-1.5 file:text-xs file:text-slate-300 file:cursor-pointer" />
+                        {(automationAnswers.docFiles || []).length > 0 && (
+                          <ul className="space-y-1">
+                            {(automationAnswers.docFiles || []).map((d: any, i: number) => (
+                              <li key={i} className="text-[11px] text-slate-400">{d.name}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    {guidePage === "assess" && !automationAnswers.qa && (
+                      <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-3">
+                        <p className="text-sm text-slate-200 font-semibold">Would you like me to run the quality audit, or do you prefer to oversee it yourself?</p>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">Automated audit: each batch is assessed once, flagged examples are regenerated once, the batch is deduplicated, then approved into the registry.</p>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => answerAutomation("qa", "audit")} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Run the audit for me</button>
+                          <button type="button" onClick={() => answerAutomation("qa", "manual")} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">I'll oversee it myself</button>
+                        </div>
+                      </div>
+                    )}
                     {expertMessages.length === 0 && (
                       <div className="h-full min-h-[320px] flex flex-col items-center justify-center text-center p-8 space-y-3">
                         <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl text-emerald-400 shadow-sm">
