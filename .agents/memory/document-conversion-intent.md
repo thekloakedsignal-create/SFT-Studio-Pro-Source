@@ -9,11 +9,11 @@ Knowledge and literature synthesize grounded training examples. Transcript mode 
 
 **How to apply:** Keep Transcript exact and separate converter changes from batch generation. Do not apply transcript-copy behavior to Knowledge or Literature.
 
-Transcript examples contain only the matched dialogue; do not prepend the project system prompt as a synthetic transcript turn. Explicit speaker tags must match complete labels, not partial prefixes.
+Filter document metadata before inferring transcript speaker roles. Explicit speaker tags must match complete labels, not partial prefixes.
 
-**Why:** The user reported that transcript conversion was adding metadata as its first turn and misclassifying speaker labels.
+**Why:** The user clarified that document metadata—not the project system prompt—was being added as the first transcript turn.
 
-**How to apply:** Keep project system prompts on Knowledge and Literature examples, but not Transcript output. Apply user/assistant roles only when the provided labels match the full speaker label.
+**How to apply:** Ignore metadata fields before speaker detection and role assignment. Preserve the existing project system prompt behavior for transcripts unless the user asks otherwise.
 
 The Document Guide is instructions-only: ask about transcripts, explain what to do using the existing conversion instructions, then close. Do not upload or handle documents inside the guide. Transcripts need speaker labels, not instructions.
 

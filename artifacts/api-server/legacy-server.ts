@@ -2808,6 +2808,8 @@ function parseUniversalTranscript(
     const l = lineText.trim().toLowerCase();
     if (!l) return true;
     if (/^[=\-_*#\s]{3,}$/.test(l)) return true;
+    const metadataField = l.replace(/^[-*]\s*/, "").replace(/^["']/, "");
+    if (/^(?:metadata|meta\s*data|(?:document|transcript|conversation|file)\s+metadata|author|file(?: name| type)?|document(?: name| title| type| id)?|created(?: at)?|updated(?: at)?|modified(?: at)?|last modified|exported(?: at| by)?|generated(?: at| by)?|version|language|keywords?|category|project|organization|company|department|owner|tags?|source|url|recording id|transcript id)\s*[:=]/i.test(metadataField)) return true;
     if (/^(?:meeting|call|webinar|conference)\s+(?:id|topic|date|duration|ended|summary|notes|agenda)/i.test(l)) return true;
     if (/^(?:date|time|duration|attendees|participants|host|organizer|recording|transcript|location|call id|audio file)\s*[:\-]/i.test(l)) return true;
     if (/^\[?\s*(?:meeting ended|call ended|recording stopped|recording paused|transcript ended|end of transcript|left the meeting|joined the meeting|reconnected)\s*\]?$/i.test(l)) return true;
@@ -3177,7 +3179,7 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
       requestedCount: groups.length, partial: false,
       examples: groups.map(messages => ({
         id: randomUUID(), templateType: transcriptTemplate, verbatimTranscript: true,
-         messages
+         messages: systemPrompt ? [{ role: "system", content: systemPrompt }, ...messages] : messages
       }))
     });
   }
