@@ -5014,32 +5014,7 @@ async function runAutomationPipeline(job: any) {
   const roundRobin = is70B ? ["Single Turn", "Multi Turn"] : ["Single Turn", "Multi Turn", "Reasoning"];
   job.producedBatches ??= [];
 
-  // Gate: generate the first 5 general examples and wait for user approval.
   if (config.autoGenerate) {
-    job.stage = "Generating the first 5 general examples for your approval";
-    const gateResult = await pipelineRunJob(userId, "/api/generate",
-      pipelineGenerationBody(config, { batchDescription: "General examples", templateType: "Single Turn", count: 5 }),
-      id => `/api/generate/jobs/${encodeURIComponent(id)}`, "Gate generation", job, "gate");
-    const gateBatch = pipelineBatch(config, gateResult, {
-      name: "General Examples — Approval Gate",
-      description: "First 5 general examples — awaiting your approval",
-      templateType: "Single Turn",
-      count: 5
-    });
-    if (!job.gateBatchId) {
-      await pipelineSaveBatch(job, gateBatch);
-      job.gateBatchId = gateBatch.id;
-    }
-    job.gatePreview = gateBatch.examples.slice(0, 5).map((ex: any) =>
-      (ex?.messages || []).map((m: any) => `${m?.role || "?"}: ${typeof m?.content === "string" ? m.content.slice(0, 280) : ""}`).join("\n"));
-    if (!job.producedBatches.includes(job.gateBatchId)) job.producedBatches.push(job.gateBatchId);
-    job.stage = "awaiting-gate";
-    await checkpointPipeline(job);
-    while (job.gateApproved === undefined) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      await checkpointPipeline(job);
-    }
-    if (!job.gateApproved) { job.stage = "stopped"; return; }
 
     // Recommended batches: each batch's total is mixed across single-turn, multi-turn,
     // and reasoning (reasoning skipped for 70B), merged into one batch.

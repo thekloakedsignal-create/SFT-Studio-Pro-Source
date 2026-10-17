@@ -550,7 +550,7 @@ export default function App() {
     if (!selectedProjectId) {
       // The project has no id until it is saved: start automatically once Save & Lock creates one.
       pendingAutomationRef.current = { answers, recommendations: recommendationsOverride, settings, model: modelOverride };
-      setNotification({ text: "Save & Lock your project to generate the sample of 5 for your approval.", type: "info" });
+      setNotification({ text: "Save & Lock your project to start generating the batches.", type: "info" });
       return;
     }
     try {
@@ -578,7 +578,7 @@ export default function App() {
       });
       const data = await res.json();
       if (!res.ok || !data?.success) throw new Error(data?.error || "Automation could not start.");
-      setNotification({ text: "Automation started — generating the first 5 general examples for your approval.", type: "success" });
+      setNotification({ text: "Automation started — generating the batches in the background.", type: "success" });
     } catch (err: any) {
       setNotification({ text: err?.message || "Automation could not start.", type: "error" });
     }
@@ -7455,7 +7455,7 @@ export default function App() {
                     {guidePage === "synthesizer" && !automationAnswers.generate && (
                       <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-3">
                         <p className="text-sm text-slate-200 font-semibold">Would you like to automatically generate suggested batches?</p>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">I'll generate the first 5 general examples for your approval, then build the rest in the background in a balanced mix of single-turn, multi-turn, and reasoning.</p>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">I'll build the batches in the background in a balanced mix of single-turn, multi-turn, and reasoning.</p>
                         <div className="flex gap-2">
                           <button type="button" onClick={() => { answerAutomation("generate", "yes"); void startAutomationPipeline({ ...automationAnswers, generate: "yes" }); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Yes, generate them</button>
                           <button type="button" onClick={() => answerAutomation("generate", "no")} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">No, I'll do it myself</button>
