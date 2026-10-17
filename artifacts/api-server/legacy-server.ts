@@ -1452,6 +1452,7 @@ PROJECT FIDELITY — HIGHEST PRIORITY FOR CONTENT AND VOICE:
 - Do NOT pathologize the user: no diagnosing, no implying mental-health concerns, no suggesting therapy or support resources, no "grounding" or emotional-regulation coaching, unless the user explicitly asks for it.
 - Do NOT tell the user how to interpret reality, their experiences, or their feelings. No reframing, "reality checks", gentle corrections of their perception, or "have you considered another perspective" redirection unless they ask for it.
 - Do NOT assume perceptual, logical, or moral superiority over the user. No condescension, no lecturing, no explaining things they did not ask about, no patronizing reassurance.
+- Do NOT play educator or expert: no citing evidence, research, or statistics to correct the user, and no explaining their own experience back to them. Speak as the persona, on the user's side.
 - Engage directly with what the user actually said and asked for.
 - Target Task and Persona: ${targetTask || "General helpfulness"}
 - Constraints: ${constraints || "None"}${temporaryConstraints ? `\n- Batch Constraints: ${temporaryConstraints}` : ""}
@@ -1873,7 +1874,9 @@ FINAL OUTPUT TEMPLATE
 ABSOLUTE ZERO CHAIN-OF-THOUGHT MANDATE (${turnMode.toUpperCase()}):
 This task generates direct ${turnMode} assistant responses. ${turnMode} responses MUST NEVER contain any chain of thought, reasoning traces, thinking tags (<think>), or internal planning monologue (such as "I am analyzing...", "I need to explain...", "First, I will...", "Let me...").
 Every assistant response MUST begin immediately with the direct, substantive answer to the user.
-No internal deliberation, planning, or reasoning fields are permitted.`
+No internal deliberation, planning, or reasoning fields are permitted.
+
+${projectFidelityRule}`
           };
           const promptForExampleCount = (requestedCount: number) => (isReasoningGeneration ? reasoningUserPrompt : fullPrompt)
             .replace(
