@@ -3920,7 +3920,6 @@ app.post("/api/analyze-quality", async (req, res) => {
     type: string;
     message: string;
   }> = [];
-  const aiSuggestions: string[] = [];
 
   try {
     if (client) {
@@ -3937,6 +3936,9 @@ app.post("/api/analyze-quality", async (req, res) => {
           }))
         });
       }
+
+      // Primary audit model plus backups, tried in order when one fails
+      const QA_AUDIT_MODELS = ["qwen3.8-max", "deepseek-3.2", "llama-4-maverick", "mistral-3-14B"];
 
       // Execute chunks in parallel with a strict 14-second timeout race
       await Promise.allSettled(chunks.map(async (chunk) => {
@@ -3989,17 +3991,25 @@ app.post("/api/analyze-quality", async (req, res) => {
               - "severity": "High" | "Medium"
               - "type": Short category name (e.g., "Template Anomaly", "Corrupted Text", "Formatting Error", "Direct Constraint Violation")
               - "message": Specific evidence and explanation of the objective defect or exact definition violated.
-            - "suggestions": Array of 0 to 3 optional, non-blocking recommendations for recurring improvements. Suggestions must not imply that examples fail QA.
           `;
 
-          const response = await callDigitalOceanAI({
-            model: "qwen3.8-max",
-            contents: chunkPrompt,
-            config: {
-              temperature: 0.1,
-              responseMimeType: "application/json"
+          let response: any = null;
+          for (const auditModel of QA_AUDIT_MODELS) {
+            try {
+              response = await callDigitalOceanAI({
+                model: auditModel,
+                contents: chunkPrompt,
+                config: {
+                  temperature: 0.1,
+                  responseMimeType: "application/json"
+                }
+              });
+              break;
+            } catch (modelErr: any) {
+              console.warn(`Quality audit chunk ${chunk.startIndex} model ${auditModel} notice:`, modelErr?.message || modelErr);
             }
-          });
+          }
+          if (!response) throw new Error("All QA audit models failed for this chunk.");
 
           const parsed = JSON.parse(extractResponseText(response) || "{}");
           if (Array.isArray(parsed.issues)) {
@@ -4017,13 +4027,6 @@ app.post("/api/analyze-quality", async (req, res) => {
                   type: iss.type || "AI Audit Finding",
                   message: iss.message
                 });
-              }
-            }
-          }
-          if (Array.isArray(parsed.suggestions)) {
-            for (const sug of parsed.suggestions) {
-              if (typeof sug === "string" && sug.trim().length > 0 && !aiSuggestions.includes(sug)) {
-                aiSuggestions.push(sug);
               }
             }
           }
@@ -4111,11 +4114,6 @@ app.post("/api/analyze-quality", async (req, res) => {
   }
   if (combinedIssues.some(i => i.type.includes("Constraint") || i.type.includes("Persona") || i.type.includes("Boilerplate"))) {
     finalSuggestions.push("Realign with system prompt: Enforce all negative constraints, eliminate AI disclaimers, and verify tone rules.");
-  }
-  for (const sug of aiSuggestions) {
-    if (!finalSuggestions.includes(sug) && finalSuggestions.length < 5) {
-      finalSuggestions.push(sug);
-    }
   }
   if (finalSuggestions.length === 0) {
     finalSuggestions.push("Dataset passed structural and semantic QA checks. Ready for fine-tuning validation.");
