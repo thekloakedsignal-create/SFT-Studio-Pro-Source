@@ -7528,26 +7528,26 @@ export default function App() {
                     )}
                     {guidePage === "synthesizer" && pipelineStatus && (
                       <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-4 space-y-3">
-                        <p className="text-xs font-bold text-purple-300 uppercase tracking-wide">Automation</p>
-                        <p className="text-sm text-slate-200">{pipelineStatus.stage === "awaiting-gate" ? "Waiting for your approval of the first 5 general examples" : pipelineStatus.stage}</p>
+                        <p className="text-xs font-bold text-white uppercase tracking-wide">Automation</p>
+                        <p className="text-sm text-white">{pipelineStatus.stage === "awaiting-gate" ? "Waiting for your approval of the first 5 general examples" : pipelineStatus.stage}</p>
                         {pipelineStatus.stage === "awaiting-gate" && Array.isArray(pipelineStatus.gatePreview) && (
                           <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
                             {pipelineStatus.gatePreview.map((preview: string, i: number) => (
-                              <pre key={i} className="whitespace-pre-wrap text-[11px] text-slate-300 bg-slate-950/60 border border-slate-800 rounded-lg p-2 font-sans">{preview}</pre>
+                              <pre key={i} className="whitespace-pre-wrap text-[11px] text-white bg-slate-950/60 border border-slate-800 rounded-lg p-2 font-sans">{preview}</pre>
                             ))}
                           </div>
                         )}
                         {pipelineStatus.stage === "awaiting-gate" ? (
                           <div className="flex gap-2">
                             <button type="button" onClick={() => void answerAutomationGate(true)} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Approve & start</button>
-                            <button type="button" onClick={() => void answerAutomationGate(false)} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">Stop</button>
+                            <button type="button" onClick={() => void answerAutomationGate(false)} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white text-xs font-medium transition cursor-pointer">Stop</button>
                           </div>
                         ) : Object.keys(pipelineStatus.batchStatus || {}).length > 0 && (
                           <ul className="space-y-1">
                             {Object.entries(pipelineStatus.batchStatus).map(([key, s]: [string, any]) => (
                               <li key={key} className="text-[11px] flex justify-between gap-2">
-                                <span className="truncate text-slate-400">{key}</span>
-                                <span className={s.stage === "approved" ? "text-emerald-400" : s.stage === "needs-review" ? "text-amber-400" : "text-slate-500"}>
+                                <span className="truncate text-white">{key}</span>
+                                <span className={s.stage === "approved" ? "text-emerald-400" : s.stage === "needs-review" ? "text-amber-400" : "text-white"}>
                                   {s.stage}{s.error ? ` — ${s.error}` : ""}
                                 </span>
                               </li>
