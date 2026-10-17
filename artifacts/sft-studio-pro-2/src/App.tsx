@@ -1225,6 +1225,7 @@ export default function App() {
       customInstructionFormat: project.customInstructionFormat || "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
       representativePrompt: project.representativePrompt || "",
       representativeCompletion: project.representativeCompletion || "",
+      trainingModel: trainerHandoff.model,
       batchRecommendations,
       completedRecommendedBatches
     };
@@ -1489,7 +1490,11 @@ export default function App() {
       customInstructionFormat: loadedCustomFormat,
       representativePrompt: selected.settings?.representativePrompt || "",
       representativeCompletion: selected.settings?.representativeCompletion || "",
+      trainingModel: selected.settings?.trainingModel,
     });
+    if (typeof selected.settings?.trainingModel === "string" && selected.settings.trainingModel) {
+      setTrainerHandoff(current => ({ ...current, model: selected.settings.trainingModel }));
+    }
     setBatchTemplate(loadedTemplateType);
     setDocTemplate(loadedTemplateType);
     setTriadTemplate(loadedTemplateType);
@@ -4010,11 +4015,12 @@ export default function App() {
           }
         }}
         onComplete={(settings, recommendations, trainingModel, autoGenerate) => {
+          if (trainingModel) setTrainerHandoff(current => ({ ...current, model: trainingModel }));
           if (!showBatchRecommendationInterview) {
-            setTrainerHandoff({
-              model: trainingModel || "Qwen3.5 9 Base",
+            setTrainerHandoff(current => ({
+              ...current,
               template: `${settings.instructTemplate || "ChatML"} (<|im_start|>)`,
-            });
+            }));
           }
           if (showBatchRecommendationInterview) {
             setBatchRecommendations(recommendations ?? []);
@@ -4030,7 +4036,7 @@ export default function App() {
             }
             return;
           }
-          setProject(settings);
+          setProject({ ...settings, trainingModel: trainingModel || settings.trainingModel });
           setIsFieldsUnlocked(true);
           setBatchTemplate(settings.templateType || TemplateType.SINGLE_TURN);
           setDocTemplate(settings.templateType || TemplateType.SINGLE_TURN);

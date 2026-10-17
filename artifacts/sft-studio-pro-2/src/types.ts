@@ -49,6 +49,7 @@ export interface ProjectSettings {
   customInstructionFormat?: string;
   representativePrompt?: string;
   representativeCompletion?: string;
+  trainingModel?: string;
 }
 
 export interface SFTBatch {
