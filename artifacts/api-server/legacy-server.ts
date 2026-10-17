@@ -4968,7 +4968,7 @@ async function runPipelineQaChain(job: any, batchId: string) {
       instructTemplate: config.isInstruction ? config.instructTemplate : undefined,
       representativePrompt: config.representativePrompt || "",
       representativeCompletion: config.representativeCompletion || ""
-    }, id => `/api/regenerate-flagged/jobs/${encodeURIComponent(id)}`, "QA repair");
+    }, id => `/api/regenerate-flagged/jobs/${encodeURIComponent(id)}`, "QA repair", job, `qa:${batchId}`);
     const regenList: any[] = regen.regeneratedExamples || [];
     const repaired = new Set<number>();
     regenList.forEach(item => {
@@ -5105,7 +5105,7 @@ async function runAutomationPipeline(job: any) {
         docType,
         isTranscript: docType === "transcript",
         converterInstructions: typeof doc.instructions === "string" ? doc.instructions : ""
-      }, id => `/api/convert-document/jobs/${encodeURIComponent(id)}`, "Document conversion");
+      }, id => `/api/convert-document/jobs/${encodeURIComponent(id)}`, "Document conversion", job, `doc:${doc.name}`);
       const batch = pipelineBatch(config, result, {
         name: `Doc: ${doc.name}`.slice(0, 60),
         description: `Extracted from "${doc.name}" (automation)`,
