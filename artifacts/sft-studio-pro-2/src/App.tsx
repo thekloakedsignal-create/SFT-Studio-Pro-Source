@@ -4264,13 +4264,13 @@ export default function App() {
           return (
             <div className="mb-4 rounded-xl border border-purple-500/30 bg-purple-950/20 p-4 space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-slate-200">
+                <p className="text-sm font-semibold text-white">
                   {pipelineStatus.stage === "awaiting-gate" ? "Your sample of 5 is ready — review and approve it to start automated generation"
                     : pipelineStatus.stage === "interrupted" ? "Generation was interrupted"
                     : pipelineStatus.stage === "error" ? "That didn't work! Please try again."
                     : pipelineStatus.stage}
                 </p>
-                <span className="text-xs text-slate-400 shrink-0">{pipelineStatus.stage === "awaiting-gate" ? "Awaiting approval" : topics.length > 0 ? `${doneTopics} of ${topics.length} batches` : `${percent}%`}</span>
+                <span className="text-xs text-white shrink-0">{pipelineStatus.stage === "awaiting-gate" ? "Awaiting approval" : topics.length > 0 ? `${doneTopics} of ${topics.length} batches` : `${percent}%`}</span>
               </div>
               <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
                 <div className="h-full bg-emerald-500 transition-all" style={{ width: `${percent}%` }} />
@@ -4278,8 +4278,8 @@ export default function App() {
               {op && op.total > 0 && (
                 <>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-[11px] text-slate-400">Current batch</p>
-                    <span className="text-[11px] text-slate-400 shrink-0">{op.completed} of {op.total} examples</span>
+                    <p className="text-[11px] text-white">Current batch</p>
+                    <span className="text-[11px] text-white shrink-0">{op.completed} of {op.total} examples</span>
                   </div>
                   <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
                     <div className="h-full bg-purple-400 transition-all" style={{ width: `${Math.round(opFraction * 100)}%` }} />
@@ -4289,7 +4289,7 @@ export default function App() {
               {pipelineStatus.stage === "awaiting-gate" && Array.isArray(pipelineStatus.gatePreview) && (
                 <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
                   {pipelineStatus.gatePreview.map((preview: string, i: number) => (
-                    <pre key={i} className="whitespace-pre-wrap text-[11px] text-slate-300 bg-slate-950/60 border border-slate-800 rounded-lg p-2 font-sans">{preview}</pre>
+                    <pre key={i} className="whitespace-pre-wrap text-[11px] text-white bg-slate-950/60 border border-slate-800 rounded-lg p-2 font-sans">{preview}</pre>
                   ))}
                 </div>
               )}
