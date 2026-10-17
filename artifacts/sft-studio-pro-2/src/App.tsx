@@ -3977,6 +3977,12 @@ export default function App() {
             text: "Congratulations—Project Definition is complete. Review the prefilled page and Save & Lock it when ready. Use the menu or purple arrow to open Batch Synthesizer, then AI Guide for Section 2.",
             type: "success"
           });
+          if (autoGenerate !== undefined) {
+            answerAutomation("generate", autoGenerate ? "yes" : "no");
+            if (autoGenerate) {
+              void startAutomationPipeline({ ...automationAnswers, generate: "yes" }, recommendations ?? []);
+            }
+          }
           setShowProjectOnboarding(false);
           window.scrollTo({ top: 0 });
         }}
