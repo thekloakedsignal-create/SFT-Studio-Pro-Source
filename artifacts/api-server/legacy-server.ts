@@ -5148,7 +5148,7 @@ async function runAutomationPipeline(job: any) {
     const allBatches = projRes.data?.project?.batches || [];
     // Only TRiAD generator batches arrive pre-approved; everything else goes through QA.
     const pendingIds = allBatches
-      .filter((b: any) => b && b.id && Array.isArray(b.examples) && b.examples.length > 0 && b.status !== "Approved" && !/triad/i.test(String(b.source || "")))
+      .filter((b: any) => b && b.id && Array.isArray(b.examples) && b.examples.length > 0 && !/triad/i.test(String(b.source || "")))
       .map((b: any) => b.id);
     for (const batchId of pendingIds) {
       try {
