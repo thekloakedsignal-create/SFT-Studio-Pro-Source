@@ -5014,6 +5014,8 @@ async function runAutomationPipeline(job: any) {
     // Three batches generate concurrently; the rest queue behind them.
     const recommendations = config.recommendations || [];
     const generateRecommendation = async (rec: any) => {
+      // Already produced (e.g. before a resume): never generate or save it a second time.
+      if (job.batchStatus[rec.topic]?.stage === "generated") return;
       job.stage = `Generating: ${rec.topic}`;
       job.batchStatus[rec.topic] = { stage: "generating" };
       try {
@@ -5046,7 +5048,8 @@ async function runAutomationPipeline(job: any) {
         if (mergedExamples.length === 0) throw new Error("All template parts failed.");
         const batch = pipelineBatch(config, {
           examples: mergedExamples,
-          batchId: mergedBatchId,
+          // Stable id per run + topic so a retry/resume overwrites the same batch instead of adding a duplicate.
+          batchId: mergedBatchId || `auto-${job.projectId}-${String(job.startedAt || "").replace(/\D/g, "")}-${rec.topic.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60)}`,
           requestedCount: total,
           partial: anyPartFailed
         }, {
