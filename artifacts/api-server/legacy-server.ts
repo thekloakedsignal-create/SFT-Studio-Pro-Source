@@ -888,9 +888,6 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         model: targetModel,
         messages: baseMessages,
         temperature: params.config?.temperature ?? 0.7,
-        ...(params.applySftSamplingPenalties
-          ? { frequency_penalty: 0.7, presence_penalty: 0.6 }
-          : {}),
         ...(params.exactMessages
           ? { max_completion_tokens: maxTokensToUse }
           : { max_tokens: maxTokensToUse }),
