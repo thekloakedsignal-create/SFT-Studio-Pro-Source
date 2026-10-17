@@ -7,4 +7,4 @@ Never display model, provider, or backend information anywhere in the interface.
 
 **Why:** The user explicitly said never to add model information to the interface.
 
-**How to apply:** Use generic progress and status wording without exposing model/provider/backend details. Do not rename batches or change generation models.
+**How to apply:** Use generic progress and status wording without exposing model/provider/backend details. Do not rename batches or change generation models. When a model call fails, the UI says only "That didn't work! Please try again." — never the model name or backend logic (formatAIErrorMessage enforces this).

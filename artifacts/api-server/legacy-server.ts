@@ -774,49 +774,9 @@ function isTemporaryInferenceOverload(err: any): boolean {
 }
 
 // Clean human-readable error formatting for DigitalOcean inference errors
-function formatAIErrorMessage(err: any): string {
-  if (!err) return "An unknown AI generation error occurred.";
-  const raw = typeof err === "string" ? err : err?.message || JSON.stringify(err);
-
-  if (/backup model .* failed:/i.test(raw)) {
-    return raw.replace(/^(?:Error:\s*)+/, "").trim();
-  }
-
-  if (
-    raw.includes("Prefill queue overloaded") ||
-    raw.includes("overloaded") ||
-    raw.includes("high demand") ||
-    raw.includes("Spikes in demand") ||
-    raw.includes("503") ||
-    raw.includes("UNAVAILABLE")
-  ) {
-    return "The DigitalOcean AI inference engine is currently experiencing temporary high traffic. Please wait a moment and click Generate again.";
-  }
-  if (
-    raw.includes("RESOURCE_EXHAUSTED") ||
-    raw.includes('"code":429') ||
-    raw.includes("code 429")
-  ) {
-    return "DigitalOcean Inference quota limit reached (429). Verify the configured DigitalOcean inference credential.";
-  }
-  if (
-    raw.includes("UNAUTHENTICATED") ||
-    raw.includes("API key not valid") ||
-    raw.includes('"code":401') ||
-    raw.includes("code 401")
-  ) {
-    return "DigitalOcean Inference authentication failed (401). Verify DIGITALOCEAN_TOKEN or GRADIENT_MODEL_ACCESS_KEY in the app environment.";
-  }
-
-  // Attempt to extract clean message field if raw is a JSON string
-  try {
-    const jsonMatch = raw.match(/\{[\s\S]*"message"\s*:\s*"([^"]+)"[\s\S]*\}/);
-    if (jsonMatch && jsonMatch[1]) {
-      return jsonMatch[1];
-    }
-  } catch (e) {}
-
-  return raw.replace(/^(Error:\s*)+/, "").trim();
+function formatAIErrorMessage(_err: any): string {
+  // Never expose model names or backend logic to the UI.
+  return "That didn't work! Please try again.";
 }
 
 // DigitalOcean Chat Completions through the existing OpenAI-compatible endpoint.
@@ -4804,15 +4764,20 @@ GUIDELINES:
     try {
       response = await callDigitalOceanAI(client, requestParams);
     } catch (error) {
-      const fallbackModel = "qwen3.8-max";
-      if (
-        appContext?.mode !== "project-onboarding" ||
-        !isTemporaryInferenceOverload(error) ||
-        requestParams.model.toLowerCase() === fallbackModel
-      ) {
-        throw error;
+      if (appContext?.mode !== "project-onboarding") throw error;
+      const fallbackModels = ["qwen3.8-max", "deepseek-3.2", "llama-4-maverick", "mistral-3-14B"];
+      let lastError: any = error;
+      for (const fallbackModel of fallbackModels) {
+        if (requestParams.model.toLowerCase() === fallbackModel.toLowerCase()) continue;
+        try {
+          response = await callDigitalOceanAI(client, { ...requestParams, model: fallbackModel });
+          lastError = null;
+          break;
+        } catch (fallbackError) {
+          lastError = fallbackError;
+        }
       }
-      response = await callDigitalOceanAI(client, { ...requestParams, model: fallbackModel });
+      if (lastError) throw lastError;
     }
 
     return res.json({ success: true, text: extractResponseText(response) });
