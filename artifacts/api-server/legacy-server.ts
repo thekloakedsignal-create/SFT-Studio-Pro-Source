@@ -1025,6 +1025,7 @@ const DEFAULT_GENERATION_MODEL_GROUPS = [
 ];
 const SUPPORTED_GENERATION_BATCH_SIZES = [5, 10, 25, 50, 100, 200, 250] as const;
 const SFT_SINGLE_EXAMPLE_TIMEOUT_MS = 20_000;
+const SFT_MULTI_TURN_EXAMPLE_TIMEOUT_MS = 60_000;
 const SFT_TOPIC_PLAN_TIMEOUT_MS = 120_000;
 const SFT_REASONING_EXAMPLE_TIMEOUT_MS = 120_000;
 const SFT_BATCH_TIMEOUT_PER_50_EXAMPLES_MS = 180_000;
@@ -1893,7 +1894,7 @@ ${projectFidelityRule}`
             model: string,
             requestedCount = currentChunkSize,
             prompt = isReasoningGeneration ? reasoningUserPrompt : fullPrompt,
-            requestedTimeoutMs = isReasoningGeneration ? SFT_REASONING_EXAMPLE_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS,
+            requestedTimeoutMs = isReasoningGeneration ? SFT_REASONING_EXAMPLE_TIMEOUT_MS : (turnMode === "Multi Turn" || turnMode === "Mixed") ? SFT_MULTI_TURN_EXAMPLE_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS,
             ignoreModelAbort = false,
             mixedTurn: MixedTurn = assignedMixedTurn,
             topic: string = generationTopics[c][modelIndex],
@@ -2126,7 +2127,8 @@ ${projectFidelityRule}`
       recoveryTurnCounts[slot] = 2 + slot % 3;
       mixedRecoveryTurns[slot] = slot % 2 === 0 ? "Single Turn" : "Multi Turn";
     });
-    const concurrency = Math.min(countNum, Math.max(...generationStacks.map(stack => stack.length)));
+    // 20-worker stacked cycle: idle workers immediately pick up slow or failed slots, first valid result wins.
+    const concurrency = Math.min(countNum, 20);
     let finishBatch!: () => void;
     const batchFinished = new Promise<void>(resolve => { finishBatch = resolve; });
     const workers = Array.from({ length: concurrency }, async () => {
@@ -2144,7 +2146,7 @@ ${projectFidelityRule}`
             await item.task();
           } else {
             const examples = await requestExamplesForMissingBatch!(
-              model, 1, SFT_SINGLE_EXAMPLE_TIMEOUT_MS, item.slot);
+              model, 1, (turnMode === "Multi Turn" || turnMode === "Mixed") ? SFT_MULTI_TURN_EXAMPLE_TIMEOUT_MS : SFT_SINGLE_EXAMPLE_TIMEOUT_MS, item.slot);
             if (!generationAbort.signal.aborted && !taskOutputs[item.stackIndex][item.modelIndex]?.length) {
               taskOutputs[item.stackIndex][item.modelIndex] = examples;
               completedExampleCount += examples.length;
