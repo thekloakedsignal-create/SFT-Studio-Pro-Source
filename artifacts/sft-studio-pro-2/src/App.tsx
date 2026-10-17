@@ -545,9 +545,12 @@ export default function App() {
     docs[index] = { ...docs[index], ...patch };
     answerAutomation("docFiles", docs);
   };
-  const startAutomationPipeline = async (answers: Record<string, any>, recommendationsOverride?: BatchRecommendation[]) => {
+  const startAutomationPipeline = async (answers: Record<string, any>, recommendationsOverride?: BatchRecommendation[], projectOverride?: ProjectSettings, modelOverride?: string) => {
+    const settings = projectOverride ?? project;
     if (!selectedProjectId) {
-      setNotification({ text: "Save your project first, then start automation.", type: "info" });
+      // The project has no id until it is saved: start automatically once Save & Lock creates one.
+      pendingAutomationRef.current = { answers, recommendations: recommendationsOverride, settings, model: modelOverride };
+      setNotification({ text: "Save & Lock your project to generate the sample of 5 for your approval.", type: "info" });
       return;
     }
     try {
@@ -560,16 +563,16 @@ export default function App() {
           autoQa: answers.qa === "audit",
           docs: answers.docs === "yes" ? (answers.docFiles || []) : [],
           recommendations: recommendationsOverride ?? batchRecommendations,
-          trainingModel: trainerHandoff.model,
+          trainingModel: modelOverride ?? trainerHandoff.model,
           project: {
-            name: project.name,
-            systemPrompt: project.systemPrompt,
-            targetTask: project.targetTask,
-            constraints: project.constraints,
-            instructTemplate: project.instructTemplate,
-            isInstruction: project.projectFormat === ProjectFormat.INSTRUCTION,
-            representativePrompt: project.representativePrompt,
-            representativeCompletion: project.representativeCompletion
+            name: settings.name,
+            systemPrompt: settings.systemPrompt,
+            targetTask: settings.targetTask,
+            constraints: settings.constraints,
+            instructTemplate: settings.instructTemplate,
+            isInstruction: settings.projectFormat === ProjectFormat.INSTRUCTION,
+            representativePrompt: settings.representativePrompt,
+            representativeCompletion: settings.representativeCompletion
           }
         })
       });
@@ -769,6 +772,14 @@ export default function App() {
   const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
   const activeProjectId = useRef<string | null>(null);
   const projectLoadVersion = useRef(0);
+
+  const pendingAutomationRef = useRef<{ answers: Record<string, any>; recommendations?: BatchRecommendation[]; settings: ProjectSettings; model?: string } | null>(null);
+  useEffect(() => {
+    const pending = pendingAutomationRef.current;
+    if (!selectedProjectId || !pending) return;
+    pendingAutomationRef.current = null;
+    void startAutomationPipeline(pending.answers, pending.recommendations, pending.settings, pending.model);
+  }, [selectedProjectId]);
 
   // Poll automation pipeline status for the open project
   useEffect(() => {
@@ -3960,7 +3971,7 @@ export default function App() {
             if (autoGenerate !== undefined) {
               answerAutomation("generate", autoGenerate ? "yes" : "no");
               if (autoGenerate) {
-                void startAutomationPipeline({ ...automationAnswers, generate: "yes" }, recommendations ?? []);
+                void startAutomationPipeline({ ...automationAnswers, generate: "yes" }, recommendations ?? [], settings, trainingModel);
               }
             }
             return;
@@ -3991,7 +4002,7 @@ export default function App() {
           if (autoGenerate !== undefined) {
             answerAutomation("generate", autoGenerate ? "yes" : "no");
             if (autoGenerate) {
-              void startAutomationPipeline({ ...automationAnswers, generate: "yes" }, recommendations ?? []);
+              void startAutomationPipeline({ ...automationAnswers, generate: "yes" }, recommendations ?? [], settings, trainingModel);
             }
           }
           setShowProjectOnboarding(false);
