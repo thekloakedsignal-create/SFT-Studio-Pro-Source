@@ -4277,14 +4277,14 @@ export default function App() {
       <main className={`flex-1 ${["define", "convert", "assess"].includes(activeTab) ? "max-w-[1920px]" : "max-w-[1720px]"} mx-auto w-full px-4 sm:px-6 lg:px-8 py-5`}>
         {pipelineStatus && !["complete", "stopped"].includes(pipelineStatus.stage) && (() => {
           const topics = Object.values(pipelineStatus.batchStatus || {}) as any[];
-          const doneTopics = topics.filter(s => s?.stage !== "generating" && s?.stage !== "converting").length;
+          const doneTopics = topics.filter(s => ["generated", "approved", "needs-review"].includes(s?.stage)).length;
           const op = pipelineStatus.currentOperation;
           const opFraction = op && op.total > 0 ? Math.min(1, op.completed / op.total) : 0;
           const percent = pipelineStatus.stage === "awaiting-gate"
             ? 0
             : topics.length > 0 ? Math.round(((doneTopics + opFraction) / topics.length) * 100) : Math.round(opFraction * 100);
           return (
-            <div className="mb-4 rounded-xl border border-purple-500/30 bg-purple-950/20 p-4 space-y-2">
+            <div className="kk-automation-progress mb-4 rounded-xl border border-purple-500/30 bg-purple-950/20 p-4 space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-white">
                   {pipelineStatus.stage === "awaiting-gate" ? "Your sample of 5 is ready — review and approve it to start automated generation"
@@ -6735,7 +6735,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {sectionGuide === "assess" && <AlignmentQaGuide key="assess" page="assess" onClose={() => setSectionGuide(null)} />}
+                  {sectionGuide === "assess" && <AlignmentQaGuide key="assess" page="assess" onClose={() => setSectionGuide(null)} onAutomate={() => { answerAutomation("qa", "audit"); void startAutomationPipeline({ generate: "no", docs: "no", qa: "audit" }); }} automationBusy={Boolean(pipelineStatus && !["complete", "stopped", "error", "interrupted"].includes(pipelineStatus.stage))} />}
 
                   {/* Quality Audit Stats & Buttons */}
                   {currentBatch ? (
@@ -7592,17 +7592,7 @@ export default function App() {
                         ))}
                       </div>
                     )}
-                    {guidePage === "assess" && (!pipelineStatus || ["complete", "stopped", "error", "interrupted"].includes(pipelineStatus.stage)) && (
-                      <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-3">
-                        <p className="text-sm text-slate-200 font-semibold">Would you like me to run the quality audit, or do you prefer to oversee it yourself?</p>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">Automated audit: each batch is assessed once, flagged examples are regenerated once, the batch is deduplicated, then approved into the registry.</p>
-                        <div className="flex gap-2">
-                          <button type="button" onClick={() => { answerAutomation("qa", "audit"); void startAutomationPipeline({ generate: "no", docs: "no", qa: "audit" }); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Run the audit for me</button>
-                          <button type="button" onClick={() => answerAutomation("qa", "manual")} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">I'll oversee it myself</button>
-                        </div>
-                      </div>
-                    )}
-                    {expertMessages.length === 0 && (
+                                        {expertMessages.length === 0 && (
                       <div className="h-full min-h-[320px] flex flex-col items-center justify-center text-center p-8 space-y-3">
                         <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl text-emerald-400 shadow-sm">
                           <MessageSquare className="h-6 w-6" />

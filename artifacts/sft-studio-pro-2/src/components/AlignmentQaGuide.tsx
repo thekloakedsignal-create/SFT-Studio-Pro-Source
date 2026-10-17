@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, X } from "lucide-react";
 type Props = {
   page: "triad" | "assess";
   onClose: () => void;
+  onAutomate?: () => void;
+  automationBusy?: boolean;
 };
 
 const guides: Record<Props["page"], { title: string; documentation: string; steps: { title: string; content: ReactNode }[] }> = {
@@ -106,8 +108,9 @@ const guides: Record<Props["page"], { title: string; documentation: string; step
   },
 };
 
-export function AlignmentQaGuide({ page, onClose }: Props) {
+export function AlignmentQaGuide({ page, onClose, onAutomate, automationBusy }: Props) {
   const [step, setStep] = useState(0);
+  const [mode, setMode] = useState<"ask" | "manual">(page === "assess" && onAutomate ? "ask" : "manual");
   const guide = guides[page];
   const current = guide.steps[step];
   const buttonClass = "rounded-lg border border-purple-400 bg-purple-300 px-3 py-2 text-sm !font-bold !text-black hover:bg-purple-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-700";
@@ -121,13 +124,26 @@ export function AlignmentQaGuide({ page, onClose }: Props) {
         </div>
         <button type="button" onClick={onClose} aria-label="Close guide" className="rounded-lg p-2 !text-black hover:bg-purple-200"><X className="h-4 w-4" /></button>
       </div>
+      {mode === "ask" ? (
+        <div className="rounded-lg border border-[#c4c4c4] bg-[#e5e5e5] p-4 text-sm leading-relaxed !text-black space-y-3">
+          <p>Would you like me to run the Quality Audit on each batch for you, or would you like to run the quality analysis yourself?</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={automationBusy} onClick={() => { onAutomate?.(); onClose(); }} className={`${buttonClass} disabled:opacity-50`}>Run the Quality Audit for me</button>
+            <button type="button" onClick={() => setMode("manual")} className={buttonClass}>I’ll run the quality analysis myself</button>
+          </div>
+          {automationBusy && <p className="text-xs">Automation is already running; wait for it to finish before starting the audit.</p>}
+        </div>
+      ) : (
       <div className="rounded-lg border border-[#c4c4c4] bg-[#e5e5e5] p-4 text-sm leading-relaxed !text-black space-y-3">{current.content}</div>
+      )}
+      {mode === "manual" && (
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button type="button" disabled={step === 0} onClick={() => setStep(step - 1)} className={`${buttonClass} inline-flex items-center gap-1 disabled:opacity-50`}><ArrowLeft className="h-4 w-4" /> Back</button>
         {step < guide.steps.length - 1
           ? <button type="button" onClick={() => setStep(step + 1)} className={`${buttonClass} inline-flex items-center gap-1`}>Next <ArrowRight className="h-4 w-4" /></button>
           : <button type="button" onClick={onClose} className={buttonClass}>Done</button>}
       </div>
+      )}
       <a href={`https://thekloakedsignal-create.github.io/sft-pro-docs/${guide.documentation}`} target="_blank" rel="noopener noreferrer" className="inline-block text-xs !font-bold !text-purple-900 underline">Read the {page === "triad" ? "TRiAD Alignment" : "QA"} documentation</a>
     </section>
   );

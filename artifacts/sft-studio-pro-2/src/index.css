@@ -629,3 +629,6 @@ main [class~="opacity-45"] { opacity: .72; }
 #root input:is([type="checkbox"], [type="radio"]) {
   accent-color: #9f70b8;
 }
+
+/* Automated batch progress panel: always white text on its dark background. */
+.kk-automation-progress, .kk-automation-progress :is(p, span, pre) { color: #ffffff !important; }
