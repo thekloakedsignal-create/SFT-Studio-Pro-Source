@@ -888,9 +888,16 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         model: targetModel,
         messages: baseMessages,
         temperature: params.config?.temperature ?? 0.7,
+        ...(params.applySftSamplingPenalties
+          ? { frequency_penalty: 0.7, presence_penalty: 0.6 }
+          : {}),
         ...(params.exactMessages
           ? { max_completion_tokens: maxTokensToUse }
           : { max_tokens: maxTokensToUse }),
+        // Only send reasoning_effort when explicitly configured; never default it.
+        ...(typeof params.config?.reasoningEffort === "string" && params.config.reasoningEffort
+          ? { reasoning_effort: params.config.reasoningEffort }
+          : {}),
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
       signal: abortSignal
@@ -1384,6 +1391,7 @@ ${JSON.stringify({ examples: [{ messages: [
           responseMimeType: "application/json",
           maxOutputTokens: 4096,
           temperature: 0.7,
+          reasoningEffort: null,
         },
           timeoutMs: Math.min(topicPlanTimeoutMs, Math.max(1, generationDeadline - Date.now())),
       })),
@@ -1804,6 +1812,7 @@ FINAL OUTPUT TEMPLATE
           const configObj: any = {
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
+            reasoningEffort: null,
             ...(turnMode === "Reasoning"
               ? {
                   responseSchema: {
@@ -1821,6 +1830,7 @@ FINAL OUTPUT TEMPLATE
                   }
                 }
               : {}),
+            ...(turnMode !== "Reasoning" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
             systemInstruction: turnMode === "Reasoning"
               ? reasoningSystemPrompt
               : `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
@@ -1895,6 +1905,7 @@ ${projectFidelityRule}`
                     systemInstruction: encodeReasoningProviderText(prompt),
                     maxOutputTokens: requestConfig.maxOutputTokens,
                     temperature: 0.7,
+                    reasoningEffort: null
                   }
                 : requestConfig,
               timeoutMs,
@@ -3433,6 +3444,7 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
           config: {
             maxOutputTokens: 4096,
             responseMimeType: "application/json",
+            ...(format !== "reasoning" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
             systemInstruction: format === "reasoning"
               ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis and conversion engine.
 
@@ -5014,8 +5026,6 @@ async function runAutomationPipeline(job: any) {
     // Three batches generate concurrently; the rest queue behind them.
     const recommendations = config.recommendations || [];
     const generateRecommendation = async (rec: any) => {
-      // Already produced (e.g. before a resume): never generate or save it a second time.
-      if (job.batchStatus[rec.topic]?.stage === "generated") return;
       job.stage = `Generating: ${rec.topic}`;
       job.batchStatus[rec.topic] = { stage: "generating" };
       try {
@@ -5048,8 +5058,7 @@ async function runAutomationPipeline(job: any) {
         if (mergedExamples.length === 0) throw new Error("All template parts failed.");
         const batch = pipelineBatch(config, {
           examples: mergedExamples,
-          // Stable id per run + topic so a retry/resume overwrites the same batch instead of adding a duplicate.
-          batchId: mergedBatchId || `auto-${job.projectId}-${String(job.startedAt || "").replace(/\D/g, "")}-${rec.topic.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60)}`,
+          batchId: mergedBatchId,
           requestedCount: total,
           partial: anyPartFailed
         }, {
@@ -5067,7 +5076,6 @@ async function runAutomationPipeline(job: any) {
         job.batchStatus[rec.topic] = { stage: "needs-review", error: err?.message || "Generation failed." };
       }
     };
-    for (const rec of recommendations) job.batchStatus[rec.topic] ??= { stage: "pending" };
     for (let i = 0; i < recommendations.length; i += 3) {
       await Promise.all(recommendations.slice(i, i + 3).map(generateRecommendation));
     }
