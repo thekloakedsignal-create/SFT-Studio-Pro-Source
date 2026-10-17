@@ -5023,10 +5023,11 @@ async function runAutomationPipeline(job: any) {
       job.batchStatus[rec.topic] = { stage: "generating" };
       try {
         const total = rec.skill ? 400 : 200;
-        const perTemplate = Math.floor(total / roundRobin.length);
-        const parts = roundRobin
-          .map((templateType, i) => ({ templateType, count: perTemplate + (i < total % roundRobin.length ? 1 : 0) }))
-          .filter(part => part.count > 0);
+        // The generator only accepts supported batch sizes, so split into supported sizes:
+        // 200 -> 100/50/50 (or 100/100 for 70B); 400 -> 200/100/100 (or 200/200 for 70B).
+        const half = total / 2;
+        const counts = roundRobin.length === 3 ? [half, half / 2, half / 2] : [half, half];
+        const parts = roundRobin.map((templateType, i) => ({ templateType, count: counts[i] }));
         const mergedExamples: any[] = [];
         let mergedBatchId: string | undefined;
         let anyPartFailed = false;
