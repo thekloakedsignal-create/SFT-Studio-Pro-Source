@@ -5030,27 +5030,48 @@ async function runAutomationPipeline(job: any) {
     }
     if (!job.gateApproved) { job.stage = "stopped"; return; }
 
-    // Recommended batches in a balanced template mix.
-    let rr = 0;
+    // Recommended batches: each batch's total is mixed across single-turn, multi-turn,
+    // and reasoning (reasoning skipped for 70B), merged into one batch.
     for (const rec of config.recommendations || []) {
-      const templateType = roundRobin[rr++ % roundRobin.length];
       job.stage = `Generating: ${rec.topic}`;
       job.batchStatus[rec.topic] = { stage: "generating" };
       try {
-        const result = await pipelineRunJob(userId, "/api/generate",
-          pipelineGenerationBody(config, {
-            batchDescription: rec.topic,
-            specialInstructions: rec.specialInstructions,
-            temporaryConstraints: rec.temporaryConstraints,
-            templateType,
-            count: rec.skill ? 400 : 200
-          }),
-          id => `/api/generate/jobs/${encodeURIComponent(id)}`, "Batch generation");
-        const batch = pipelineBatch(config, result, {
+        const total = rec.skill ? 400 : 200;
+        const perTemplate = Math.floor(total / roundRobin.length);
+        const parts = roundRobin
+          .map((templateType, i) => ({ templateType, count: perTemplate + (i < total % roundRobin.length ? 1 : 0) }))
+          .filter(part => part.count > 0);
+        const mergedExamples: any[] = [];
+        let mergedBatchId: string | undefined;
+        let anyPartFailed = false;
+        for (const part of parts) {
+          try {
+            const result = await pipelineRunJob(userId, "/api/generate",
+              pipelineGenerationBody(config, {
+                batchDescription: rec.topic,
+                specialInstructions: rec.specialInstructions,
+                temporaryConstraints: rec.temporaryConstraints,
+                templateType: part.templateType,
+                count: part.count
+              }),
+              id => `/api/generate/jobs/${encodeURIComponent(id)}`, "Batch generation");
+            if (Array.isArray(result.examples)) mergedExamples.push(...result.examples);
+            if (!mergedBatchId && (result.batchId || result.id)) mergedBatchId = result.batchId || result.id;
+          } catch {
+            anyPartFailed = true;
+          }
+        }
+        if (mergedExamples.length === 0) throw new Error("All template parts failed.");
+        const batch = pipelineBatch(config, {
+          examples: mergedExamples,
+          batchId: mergedBatchId,
+          requestedCount: total,
+          partial: anyPartFailed
+        }, {
           name: rec.topic,
           description: rec.topic,
-          templateType,
-          count: rec.skill ? 400 : 200,
+          templateType: roundRobin.length > 1 ? "Mixed" : roundRobin[0],
+          count: total,
           specialInstructions: rec.specialInstructions,
           temporaryConstraints: rec.temporaryConstraints
         });
