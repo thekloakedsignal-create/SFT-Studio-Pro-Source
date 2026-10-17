@@ -1571,10 +1571,14 @@ export default function App() {
     setExpertMessages([]);
   };
 
-  // Auto-scroll chat assistant to bottom on new messages
+  // Scroll so the most recent message sits at the top of the chat pane
+  const lastExpertMessageRef = useRef<HTMLDivElement | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (activeTab === "expert") {
-      chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const pane = chatScrollRef.current;
+    const target = lastExpertMessageRef.current;
+    if (activeTab === "expert" && pane && target) {
+      pane.scrollTo({ top: target.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop, behavior: "smooth" });
     }
   }, [expertMessages, isExpertSending, activeTab]);
 
@@ -7478,7 +7482,7 @@ export default function App() {
                   </div>
 
                   {/* Messages Scroll Area */}
-                  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 custom-scrollbar">
+                  <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-4 custom-scrollbar">
                     {/* Automation questions attach to each section guide */}
                     {guidePage === "synthesizer" && !automationAnswers.generate && (
                       <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-3">
@@ -7583,6 +7587,7 @@ export default function App() {
                     {expertMessages.map((msg, idx) => (
                       <div
                         key={idx}
+                        ref={idx === expertMessages.length - 1 ? lastExpertMessageRef : undefined}
                         className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                       >
                         {msg.role !== "user" && (

@@ -421,11 +421,17 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [assistantReply, setAssistantReply] = useState("");
   const [pending, setPending] = useState(false);
   const conversationRef = useRef<HTMLDivElement>(null);
+  const currentPromptRef = useRef<HTMLDivElement>(null);
+  const assistantReplyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const conversation = conversationRef.current;
-    if (conversation) conversation.scrollTo({ top: 0 });
+    const target = (assistantReply && assistantReplyRef.current) || currentPromptRef.current;
+    // Scroll so the most recent response sits at the top of the conversation pane.
+    if (conversation && target) {
+      conversation.scrollTo({ top: target.getBoundingClientRect().top - conversation.getBoundingClientRect().top + conversation.scrollTop });
+    } else if (conversation) conversation.scrollTo({ top: 0 });
     window.scrollTo({ top: 0 });
-  }, [step]);
+  }, [step, assistantReply]);
 
   const modelNameInstruction = rememberName === "yes" && modelRememberedName.trim()
     ? `Your name is ${modelRememberedName.trim()}.`
@@ -806,7 +812,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             </div>
           ))}
 
-          <div className="flex justify-start">
+          <div ref={currentPromptRef} className="flex justify-start">
             <div className="max-w-[90%] border border-[#c4c4c4] bg-[#e5e5e5] px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]">
               <MarkdownText>{step === "goal-followup" ? adaptiveQuestion : PROMPTS[step]}</MarkdownText>
               {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "batch-skills"].includes(step) && (
@@ -970,7 +976,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
           )}
 
           {error && <p role="alert" className="border border-[#c4c4c4] bg-[#e5e5e5] px-3 py-2 text-sm font-bold !text-[#000000]">{error}</p>}
-          {assistantReply && <div className="flex justify-start"><div className="max-w-[90%] border border-[#c4c4c4] bg-[#e5e5e5] px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]"><MarkdownText>{assistantReply}</MarkdownText></div></div>}
+          {assistantReply && <div ref={assistantReplyRef} className="flex justify-start"><div className="max-w-[90%] border border-[#c4c4c4] bg-[#e5e5e5] px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]"><MarkdownText>{assistantReply}</MarkdownText></div></div>}
         </div>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-5 py-4 sm:px-7">
