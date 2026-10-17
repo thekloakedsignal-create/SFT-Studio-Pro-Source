@@ -50,7 +50,7 @@ function MarkdownText({ children }: { children: string }) {
 type Step =
   | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
   | "voice-own" | "voice-review" | "golden-generation" | "golden-review" | "remember-name-choice" | "remember-model-name" | "system-choice" | "system-review"
-  | "definition-review" | "batch-skills" | "batch-recommendations" | "batch-automation";
+  | "definition-review" | "batch-skills" | "batch-recommendations" | "batch-automation" | "batch-manual";
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B";
 export interface BatchRecommendation {
@@ -329,6 +329,7 @@ const PROMPTS: Record<Step, string> = {
   "batch-skills": "A batch is a group of training examples focused on one topic. The topic, special instructions, and constraints tell the Synthesizer what examples to create; you then review the examples before accepting them. What specific skills or abilities should this AI demonstrate? List each one on a separate line so I can include them all in the recommendations.",
   "batch-recommendations": "Here are the batch topics I recommend for your project. Is this list OK, or would you like to add more topics?",
   "batch-automation": "Would you like me to generate the batches?",
+  "batch-manual": "Here is how to use the batch generator yourself.",
 };
 
 async function requestDraft(instruction: string, appContext: Record<string, unknown>) {
@@ -434,7 +435,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     ? "For every topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning templates for Llama 3.1 70B."
     : "For every topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples.";
 
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "batch-automation"];
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "batch-automation", "batch-manual"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
@@ -492,7 +493,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       "remember-model-name": "remember-name-choice",
       "system-choice": rememberName === "yes" ? "remember-model-name" : "remember-name-choice",
       "system-review": "system-choice", "definition-review": "system-review",
-      "batch-skills": "definition-review", "batch-recommendations": "batch-skills", "batch-automation": "batch-recommendations",
+      "batch-skills": "definition-review", "batch-recommendations": "batch-skills", "batch-automation": "batch-recommendations", "batch-manual": "batch-automation",
     };
     setError("");
     if (step === "definition-review" && approvedProjectDefinition) {
@@ -917,29 +918,28 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             </div>
           )}
           {step === "batch-recommendations" && (
+            <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-slate-200">
+              {batchRecommendations.map((batch, index) => <li key={`${index}-${batch.topic}`}>{batch.topic}</li>)}
+            </ul>
+          )}
+          {step === "batch-manual" && (
             <div className="space-y-3">
-              <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-slate-200">
-                {batchRecommendations.map(item => <li key={item.topic}>{item.topic}</li>)}
-              </ul>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className={buttonClass} onClick={() => setStep("batch-automation")}>The list looks good</button>
-                <button type="button" className={buttonClass} onClick={() => setStep("batch-skills")}>Add more topics</button>
-              </div>
+              <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200">
+                <li>In the Synthesizer, select a recommended topic and click Copy to Synthesizer above the recommendation to fill the generator fields.</li>
+                <li>Start with a sample batch of 5. You must generate and approve a sample of 5 before larger batch sizes unlock.</li>
+                <li>Generate one batch at a time.</li>
+                <li>Review each generated batch and approve or reject it before generating another.</li>
+                <li>{trainingModel === "Llama 3.1 70B"
+                  ? "For each topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning examples when training Llama 3.1 70B."
+                  : "For each topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples."}</li>
+                <li>You can generate as many batches as you wish. Aim for 3,000–5,000 total examples for a personal-use AI, or 10,000–20,000 total examples for an enterprise AI with specialized skills.</li>
+              </ol>
             </div>
           )}
-          {step === "batch-automation" && !sampleExplained && (
+          {step === "batch-automation" && (
             <div className="flex flex-wrap gap-2">
-              <button type="button" className={buttonClass} onClick={() => setSampleExplained(true)}>Yes, generate them</button>
-              <button type="button" className={buttonClass} onClick={() => finish(false)}>No, I’ll review them myself</button>
-            </div>
-          )}
-          {step === "batch-automation" && sampleExplained && (
-            <div className="space-y-3">
-              <p className="text-sm leading-relaxed text-slate-200">To begin automated generation, you first view and approve a sample of 5 examples. Once you approve that sample, automated generation of the full batches begins.</p>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className={buttonClass} onClick={() => finish(true)}>Got it — create my sample</button>
-                <button type="button" className={buttonClass} onClick={() => setSampleExplained(false)}>Back</button>
-              </div>
+              <button type="button" className={buttonClass} onClick={() => finish(true)}>Yes, generate them</button>
+              <button type="button" className={buttonClass} onClick={() => setStep("batch-manual")}>No, I’ll review them myself</button>
             </div>
           )}
           {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "remember-model-name", "batch-skills"].includes(step) && (
@@ -989,6 +989,11 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm & finish Project Definition" : "Approve & finish Project Definition"}</button>}
             {["name", "goal", "constraints", "remember-model-name", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
+            {step === "batch-recommendations" && <>
+              <button type="button" className={buttonClass} onClick={() => setStep("batch-skills")}>Add more topics</button>
+              <button type="button" className={buttonClass} onClick={() => setStep("batch-automation")}>The list looks good <ArrowRight className="h-4 w-4" /></button>
+            </>}
+            {step === "batch-manual" && <button type="button" className={buttonClass} onClick={() => finish(false)}>Go to Batch generator <ArrowRight className="h-4 w-4" /></button>}
           </div>
         </footer>
       </section>
