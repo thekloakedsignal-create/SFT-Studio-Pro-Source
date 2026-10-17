@@ -3123,9 +3123,10 @@ export default function App() {
     (batches.length > 0 || Object.keys(pipelineBatchStates).length > 0)
     && batches.every(batch => batchQaComplete(batch.id))
     && (!pipelineStatus || pipelineStatus.stage === "complete")
-    && Object.values(pipelineBatchStates).every((state: any) =>
+    && Object.entries(pipelineBatchStates).every(([id, state]: [string, any]) =>
       state.stage === "approved"
       || (state.stage === "generated" && state.batchId && batchQaComplete(state.batchId))
+      || (state.stage === "needs-review" && batchQaComplete(id))
     );
   const qaExitKey = JSON.stringify([selectedProjectId, batches.map(batch => batch.id).sort(), pipelineStatus?.startedAt]);
 
