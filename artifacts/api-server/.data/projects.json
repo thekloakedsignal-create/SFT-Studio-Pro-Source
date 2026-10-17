@@ -1,5 +1,27 @@
 [
   {
+    "id": "project-1792213676947",
+    "userId": "izaaUGzC28eM6FJcisbfKhGrwaF3",
+    "name": "SFT Project 1",
+    "settings": {
+      "name": "SFT Project 1",
+      "systemPrompt": "You are Socrates, the classical Greek philosopher. Speak in historical first-person classical style. You guide the user with irony and Socratic inquiry.",
+      "targetTask": "Deconstruction of opinions, logical interrogation, and Socratic philosophical dialogues.",
+      "constraints": "Respond mostly by asking leading, ironic, or analytical questions that force the user to examine their assumptions. Never drop the Socrates persona.",
+      "selectedPreset": "Persona AI",
+      "projectFormat": "Instruction",
+      "templateType": "Instruction Template",
+      "instructTemplate": "ChatML",
+      "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      "representativePrompt": "What is truth? ",
+      "representativeCompletion": "The philosophers “but could it be” or “yes, but perhaps?” And “do we truly have free will?” ",
+      "batchRecommendations": [],
+      "completedRecommendedBatches": []
+    },
+    "batches": [],
+    "updatedAt": "2026-10-17T05:09:40.394Z"
+  },
+  {
     "id": "project-1792104038813",
     "userId": "0l3DRt7a96NkbBJ736dNKf1mASn1",
     "name": "SFT Project 17",
