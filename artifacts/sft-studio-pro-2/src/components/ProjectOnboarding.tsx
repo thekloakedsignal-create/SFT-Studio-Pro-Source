@@ -853,9 +853,9 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
                       : "border-slate-500 bg-slate-900 !text-white hover:border-purple-300 hover:bg-slate-800"
                   }`}
                 >
-                  <span className="flex items-start justify-between gap-2 font-bold !text-[#000000]">
+                  <span className={`flex items-start justify-between gap-2 font-bold ${trainingModel === model.value ? "!text-[#000000]" : "!text-white"}`}>
                     {model.value}
-                    {model.recommended && <span className="shrink-0 rounded bg-purple-200 px-2 py-0.5 text-xs font-bold !text-[#000000]">Recommended</span>}
+                    {model.recommended && <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-bold ${trainingModel === model.value ? "bg-purple-200 !text-[#000000]" : "border border-slate-500 !text-white"}`}>Recommended</span>}
                   </span>
                 </button>
               ))}
