@@ -592,6 +592,17 @@ export default function App() {
       type: approved ? "success" : "info"
     });
   };
+  const resumeAutomationPipeline = async () => {
+    if (!selectedProjectId) return;
+    try {
+      const res = await projectApiFetch(`/api/pipeline/${encodeURIComponent(selectedProjectId)}/resume`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw new Error(data?.error || "Generation could not resume.");
+      setNotification({ text: "Generation resumed in the background.", type: "success" });
+    } catch (err: any) {
+      setNotification({ text: err?.message || "Generation could not resume.", type: "error" });
+    }
+  };
   const openAiGuide = (page: "synthesizer" | "convert" | "triad" | "assess") => {
     if (page === "convert") {
       const saved = readGuideState(selectedProjectId || "").documentWalkthrough;
@@ -4199,6 +4210,48 @@ export default function App() {
       </AnimatePresence>
 
       <main className={`flex-1 ${["define", "convert", "assess"].includes(activeTab) ? "max-w-[1920px]" : "max-w-[1720px]"} mx-auto w-full px-4 sm:px-6 lg:px-8 py-5`}>
+        {pipelineStatus && !["complete", "stopped"].includes(pipelineStatus.stage) && (() => {
+          const topics = Object.values(pipelineStatus.batchStatus || {}) as any[];
+          const doneTopics = topics.filter(s => s?.stage !== "generating" && s?.stage !== "converting").length;
+          const op = pipelineStatus.currentOperation;
+          const opFraction = op && op.total > 0 ? Math.min(1, op.completed / op.total) : 0;
+          const percent = pipelineStatus.stage === "awaiting-gate"
+            ? 0
+            : topics.length > 0 ? Math.round(((doneTopics + opFraction) / topics.length) * 100) : Math.round(opFraction * 100);
+          return (
+            <div className="mb-4 rounded-xl border border-purple-500/30 bg-purple-950/20 p-4 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-slate-200">
+                  {pipelineStatus.stage === "awaiting-gate" ? "Your sample of 5 is ready — review and approve it to start automated generation"
+                    : pipelineStatus.stage === "interrupted" ? "Generation was interrupted"
+                    : pipelineStatus.stage === "error" ? "That didn't work! Please try again."
+                    : `Generating batches: ${pipelineStatus.stage}`}
+                </p>
+                <span className="text-xs text-slate-400 shrink-0">{pipelineStatus.stage === "awaiting-gate" ? "Awaiting approval" : `${percent}%`}</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+                <div className="h-full bg-emerald-500 transition-all" style={{ width: `${percent}%` }} />
+              </div>
+              {op && op.total > 0 && <p className="text-[11px] text-slate-400">{op.completed} of {op.total} examples in the current step</p>}
+              {pipelineStatus.stage === "awaiting-gate" && Array.isArray(pipelineStatus.gatePreview) && (
+                <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+                  {pipelineStatus.gatePreview.map((preview: string, i: number) => (
+                    <pre key={i} className="whitespace-pre-wrap text-[11px] text-slate-300 bg-slate-950/60 border border-slate-800 rounded-lg p-2 font-sans">{preview}</pre>
+                  ))}
+                </div>
+              )}
+              {pipelineStatus.stage === "awaiting-gate" && (
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => void answerAutomationGate(true)} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Approve & start</button>
+                  <button type="button" onClick={() => void answerAutomationGate(false)} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">Stop</button>
+                </div>
+              )}
+              {["interrupted", "error"].includes(pipelineStatus.stage) && (
+                <button type="button" onClick={() => void resumeAutomationPipeline()} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Resume generation</button>
+              )}
+            </div>
+          );
+        })()}
         <div className="mb-3 lg:hidden">
           <button
             type="button"

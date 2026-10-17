@@ -937,10 +937,17 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             </div>
           )}
           {step === "batch-automation" && (
+            sampleExplained ? (
+              <div className="space-y-3">
+                <p className="text-sm leading-relaxed text-slate-200">Before automated generation begins, I’ll generate a sample of 5 examples for you to view and approve. Once you approve the sample, the remaining batches are generated automatically in the background and a progress bar shows how far along they are.</p>
+                <button type="button" className={buttonClass} onClick={() => finish(true)}><Check className="h-4 w-4" /> Generate the sample of 5</button>
+              </div>
+            ) : (
             <div className="flex flex-wrap gap-2">
-              <button type="button" className={buttonClass} onClick={() => finish(true)}>Yes, generate them</button>
+              <button type="button" className={buttonClass} onClick={() => setSampleExplained(true)}>Yes, generate them</button>
               <button type="button" className={buttonClass} onClick={() => setStep("batch-manual")}>No, I’ll review them myself</button>
             </div>
+            )
           )}
           {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "remember-model-name", "batch-skills"].includes(step) && (
             <div className="flex gap-2">

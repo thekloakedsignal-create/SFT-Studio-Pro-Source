@@ -17,3 +17,8 @@ QA chain order is fixed by the user: **assess once → regenerate flagged once �
 QA scope: the automated QA chain covers EVERY pending batch in the project — manual and pipeline-produced alike (skip only already-Approved ones). Each batch's automation runs as its own separate unit; one batch's failure never affects another.
 
 **How to apply:** When building or changing the pipeline, do not add re-assessment after regen, do not make approval conditional on cleanliness, and do not restrict QA automation to pipeline-produced batches.
+
+## Sample approval + progress + resilience (Oct 2026)
+- Onboarding "Yes, generate them" first explains the sample-of-5 approval, then a confirm button starts the pipeline; automation begins only after the gate is approved.
+- Pipeline progress bar lives at the top of `<main>` (outside AI Guide), driven by polled pipeline status (`currentOperation` {label, completed, total}).
+- Pipeline runs are checkpointed in Postgres `automation_runs` with a lease; each generate step is keyed so a restart resumes from the last finished step. Interrupted/error runs expose a "Resume generation" button (POST /api/pipeline/:id/resume); gate answers after a restart reload and relaunch from the checkpoint.

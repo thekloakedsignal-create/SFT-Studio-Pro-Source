@@ -4845,6 +4845,11 @@ async function pipelineRunJob(userId: string, startPath: string, startBody: any,
       if (++pollFailures < 5) continue;
       throw error;
     }
+    if (st.status === 404 && job && key) {
+      // The underlying job was lost (server restart): restart this step from its checkpoint.
+      delete job.steps[key];
+      return pipelineRunJob(userId, startPath, startBody, statusPath, label, job, key);
+    }
     if (!st.ok || !st.data?.success) throw new Error(st.data?.error || `${label} status check failed.`);
     if (job && key) {
       job.currentOperation = { label, completed: st.data.progress?.completed || 0, total: st.data.progress?.total || startBody.count || 0 };
@@ -5007,28 +5012,32 @@ async function runAutomationPipeline(job: any) {
   const { userId, config } = job;
   const is70B = config.trainingModel === "Llama 3.1 70B";
   const roundRobin = is70B ? ["Single Turn", "Multi Turn"] : ["Single Turn", "Multi Turn", "Reasoning"];
-  job.producedBatches = [];
+  job.producedBatches ??= [];
 
   // Gate: generate the first 5 general examples and wait for user approval.
   if (config.autoGenerate) {
     job.stage = "Generating the first 5 general examples for your approval";
     const gateResult = await pipelineRunJob(userId, "/api/generate",
       pipelineGenerationBody(config, { batchDescription: "General examples", templateType: "Single Turn", count: 5 }),
-      id => `/api/generate/jobs/${encodeURIComponent(id)}`, "Gate generation");
+      id => `/api/generate/jobs/${encodeURIComponent(id)}`, "Gate generation", job, "gate");
     const gateBatch = pipelineBatch(config, gateResult, {
       name: "General Examples — Approval Gate",
       description: "First 5 general examples — awaiting your approval",
       templateType: "Single Turn",
       count: 5
     });
-    await pipelineSaveBatch(job, gateBatch);
-    job.gateBatchId = gateBatch.id;
+    if (!job.gateBatchId) {
+      await pipelineSaveBatch(job, gateBatch);
+      job.gateBatchId = gateBatch.id;
+    }
     job.gatePreview = gateBatch.examples.slice(0, 5).map((ex: any) =>
       (ex?.messages || []).map((m: any) => `${m?.role || "?"}: ${typeof m?.content === "string" ? m.content.slice(0, 280) : ""}`).join("\n"));
-    job.producedBatches.push(gateBatch.id);
+    if (!job.producedBatches.includes(job.gateBatchId)) job.producedBatches.push(job.gateBatchId);
     job.stage = "awaiting-gate";
+    await checkpointPipeline(job);
     while (job.gateApproved === undefined) {
       await new Promise(resolve => setTimeout(resolve, 2000));
+      await checkpointPipeline(job);
     }
     if (!job.gateApproved) { job.stage = "stopped"; return; }
 
@@ -5056,7 +5065,7 @@ async function runAutomationPipeline(job: any) {
                 templateType: part.templateType,
                 count: part.count
               }),
-              id => `/api/generate/jobs/${encodeURIComponent(id)}`, "Batch generation");
+              id => `/api/generate/jobs/${encodeURIComponent(id)}`, "Batch generation", job, `gen:${rec.topic}:${part.templateType}`);
             if (Array.isArray(result.examples)) mergedExamples.push(...result.examples);
             if (!mergedBatchId && (result.batchId || result.id)) mergedBatchId = result.batchId || result.id;
           } catch {
@@ -5153,6 +5162,13 @@ async function runAutomationPipeline(job: any) {
   job.stage = "complete";
 }
 
+function launchPipeline(job: any) {
+  pipelineJobs.set(job.projectId, job);
+  runAutomationPipeline(job)
+    .catch((err: any) => { job.stage = "error"; job.error = err?.message || "Automation failed."; })
+    .finally(() => { job.finishedAt = new Date().toISOString(); checkpointPipeline(job, true).catch(() => {}); });
+}
+
 app.post("/api/pipeline/start", optionalAuth, async (req: AuthRequest, res) => {
   const userId = projectOwnerId(req);
   if (!userId) return res.status(401).json({ success: false, error: "Sign in to run automation." });
@@ -5190,24 +5206,51 @@ app.post("/api/pipeline/start", optionalAuth, async (req: AuthRequest, res) => {
     batchStatus: {},
     startedAt: new Date().toISOString()
   };
-  pipelineJobs.set(projectId, job);
+  try {
+    if (!(await claimPipeline(job))) {
+      return res.status(409).json({ success: false, error: "Automation is already running for this project." });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Automation could not start." });
+  }
   res.json({ success: true });
-  runAutomationPipeline(job)
-    .catch((err: any) => { job.stage = "error"; job.error = err?.message || "Automation failed."; })
-    .finally(() => { job.finishedAt = new Date().toISOString(); });
+  launchPipeline(job);
 });
 
-app.get("/api/pipeline/:projectId", optionalAuth, (req: AuthRequest, res) => {
+app.post("/api/pipeline/:projectId/resume", optionalAuth, async (req: AuthRequest, res) => {
+  const userId = projectOwnerId(req);
+  if (!userId) return res.status(401).json({ success: false, error: "Sign in to run automation." });
+  const projectId = Array.isArray(req.params.projectId) ? req.params.projectId[0] ?? "" : req.params.projectId;
+  const inMemory = pipelineJobs.get(projectId);
+  if (inMemory && !["complete", "error", "stopped", "interrupted"].includes(inMemory.stage)) {
+    return res.status(409).json({ success: false, error: "Automation is already running for this project." });
+  }
+  try {
+    const job = await loadPipeline(projectId, userId);
+    if (!job) return res.status(404).json({ success: false, error: "No automation found for this project." });
+    if (!["interrupted", "error"].includes(job.stage)) return res.status(400).json({ success: false, error: "Automation is not interrupted." });
+    job.stage = "resuming"; job.error = undefined; job.finishedAt = undefined; job.currentOperation = null;
+    if (!(await claimPipeline(job))) return res.status(409).json({ success: false, error: "Automation is already running for this project." });
+    res.json({ success: true });
+    launchPipeline(job);
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Automation could not resume." });
+  }
+});
+
+app.get("/api/pipeline/:projectId", optionalAuth, async (req: AuthRequest, res) => {
   const userId = projectOwnerId(req);
   if (!userId) return res.status(401).json({ success: false, error: "Sign in to view automation." });
   const projectId = Array.isArray(req.params.projectId) ? req.params.projectId[0] ?? "" : req.params.projectId;
-  const job = pipelineJobs.get(projectId);
+  let job = pipelineJobs.get(projectId);
+  if (!job || job.userId !== userId) job = await loadPipeline(projectId, userId).catch(() => null);
   if (!job || job.userId !== userId) return res.json({ success: true, pipeline: null });
   res.json({
     success: true,
     pipeline: {
       stage: job.stage,
       batchStatus: job.batchStatus,
+      currentOperation: job.currentOperation || null,
       gateBatchId: job.gateBatchId,
       gatePreview: job.gatePreview,
       error: job.error,
@@ -5217,13 +5260,22 @@ app.get("/api/pipeline/:projectId", optionalAuth, (req: AuthRequest, res) => {
   });
 });
 
-app.post("/api/pipeline/:projectId/gate", optionalAuth, (req: AuthRequest, res) => {
+app.post("/api/pipeline/:projectId/gate", optionalAuth, async (req: AuthRequest, res) => {
   const userId = projectOwnerId(req);
   if (!userId) return res.status(401).json({ success: false, error: "Sign in to approve automation." });
   const projectId = Array.isArray(req.params.projectId) ? req.params.projectId[0] ?? "" : req.params.projectId;
   const job = pipelineJobs.get(projectId);
-  if (!job || job.userId !== userId) return res.status(404).json({ success: false, error: "No automation found for this project." });
-  if (job.stage !== "awaiting-gate") return res.status(400).json({ success: false, error: "Automation is not waiting for approval." });
-  job.gateApproved = Boolean(req.body?.approved);
+  if (job && job.userId === userId) {
+    if (job.stage !== "awaiting-gate") return res.status(400).json({ success: false, error: "Automation is not waiting for approval." });
+    job.gateApproved = Boolean(req.body?.approved);
+    return res.json({ success: true });
+  }
+  // Server restarted while waiting at the gate: resume from the checkpoint with the answer.
+  const saved = await loadPipeline(projectId, userId).catch(() => null);
+  if (!saved) return res.status(404).json({ success: false, error: "No automation found for this project." });
+  if (saved.stage !== "awaiting-gate") return res.status(400).json({ success: false, error: "Automation is not waiting for approval." });
+  saved.gateApproved = Boolean(req.body?.approved);
+  if (!(await claimPipeline(saved))) return res.status(409).json({ success: false, error: "Automation is already running for this project." });
   res.json({ success: true });
+  launchPipeline(saved);
 });
