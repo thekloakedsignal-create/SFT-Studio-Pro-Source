@@ -327,8 +327,8 @@ const PROMPTS: Record<Step, string> = {
   "system-review": "Review the full system prompt below. Edit it if you want, then explicitly approve it. It will be saved to the project and included in every generated example.",
   "definition-review": "Your project definition is complete. Review the summary and give final approval. Approval locks these settings for batch generation; use Edit answer if anything needs changing.",
   "batch-skills": "A batch is a group of training examples focused on one topic. The topic, special instructions, and constraints tell the Synthesizer what examples to create; you then review the examples before accepting them. What specific skills or abilities should this AI demonstrate? List each one on a separate line so I can include them all in the recommendations.",
-  "batch-recommendations": "Your recommended batches are ready. Continue to choose whether to generate them automatically.",
-  "batch-automation": "Would you like to automatically generate suggested batches?",
+  "batch-recommendations": "Here are the batch topics I recommend for your project. Is this list OK, or would you like to add more topics?",
+  "batch-automation": "Would you like me to generate the batches?",
 };
 
 async function requestDraft(instruction: string, appContext: Record<string, unknown>) {
@@ -414,6 +414,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
   const [specialSkills, setSpecialSkills] = useState("");
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
+  const [sampleExplained, setSampleExplained] = useState(false);
   const [approvedProjectDefinition, setApprovedProjectDefinition] = useState<ProjectSettings | null>(initialProjectSettings || null);
   const [error, setError] = useState("");
   const [assistantReply, setAssistantReply] = useState("");
@@ -917,22 +918,28 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
           )}
           {step === "batch-recommendations" && (
             <div className="space-y-3">
-              <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200">
-                <li>In the Synthesizer, select a recommended topic and click Copy to Synthesizer above the recommendation to fill the generator fields.</li>
-                <li>Start with a sample batch of 5. You must generate and approve a sample of 5 before larger batch sizes unlock.</li>
-                <li>Generate one batch at a time.</li>
-                <li>Review each generated batch and approve or reject it before generating another.</li>
-                <li>{trainingModel === "Llama 3.1 70B"
-                  ? "For each topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning examples when training Llama 3.1 70B."
-                  : "For each topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples."}</li>
-                <li>You can generate as many batches as you wish. Aim for 3,000–5,000 total examples for a personal-use AI, or 10,000–20,000 total examples for an enterprise AI with specialized skills.</li>
-              </ol>
+              <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-slate-200">
+                {batchRecommendations.map(item => <li key={item.topic}>{item.topic}</li>)}
+              </ul>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={buttonClass} onClick={() => setStep("batch-automation")}>The list looks good</button>
+                <button type="button" className={buttonClass} onClick={() => setStep("batch-skills")}>Add more topics</button>
+              </div>
             </div>
           )}
-          {step === "batch-automation" && (
+          {step === "batch-automation" && !sampleExplained && (
             <div className="flex flex-wrap gap-2">
-              <button type="button" className={buttonClass} onClick={() => finish(true)}>Yes, generate them</button>
+              <button type="button" className={buttonClass} onClick={() => setSampleExplained(true)}>Yes, generate them</button>
               <button type="button" className={buttonClass} onClick={() => finish(false)}>No, I’ll review them myself</button>
+            </div>
+          )}
+          {step === "batch-automation" && sampleExplained && (
+            <div className="space-y-3">
+              <p className="text-sm leading-relaxed text-slate-200">To begin automated generation, you first view and approve a sample of 5 examples. Once you approve that sample, automated generation of the full batches begins.</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={buttonClass} onClick={() => finish(true)}>Got it — create my sample</button>
+                <button type="button" className={buttonClass} onClick={() => setSampleExplained(false)}>Back</button>
+              </div>
             </div>
           )}
           {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "remember-model-name", "batch-skills"].includes(step) && (
@@ -982,7 +989,6 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm & finish Project Definition" : "Approve & finish Project Definition"}</button>}
             {["name", "goal", "constraints", "remember-model-name", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
-            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("batch-automation")}>Continue <ArrowRight className="h-4 w-4" /></button>}
           </div>
         </footer>
       </section>
