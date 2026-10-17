@@ -102,7 +102,7 @@ export function RunTrainingModal({
         try {
           const data = await readApi(await apiFetch("/api/finetune/latest", { cache: "no-store", signal: AbortSignal.timeout(25000) }));
           if (!cancelled && data.jobId) {
-            setJob({ id: data.jobId });
+            setJob({ id: data.jobId, restored: true });
             setStep("progress");
           }
         } catch {
@@ -127,9 +127,16 @@ export function RunTrainingModal({
           cache: "no-store", signal: AbortSignal.timeout(25000),
         }));
         if (cancelled) return;
-        setJob((current: any) => ({ ...current, ...data.job }));
-        setError(null);
         const status = String(data.job?.status || "").trim().toLowerCase();
+        if (job?.restored && terminalStatuses.has(status)) {
+          // A previous run that already finished is not shown again; start from a clean trainer.
+          stopPolling();
+          setJob(null);
+          setStep("configure");
+          return;
+        }
+        setJob((current: any) => ({ ...current, ...data.job, restored: false }));
+        setError(null);
         if (terminalStatuses.has(status) && (status !== "completed" || data.job?.modelReady)) {
           stopPolling();
           if (String(data.job?.status || "").trim().toLowerCase() === "completed") {
