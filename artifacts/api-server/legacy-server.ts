@@ -4728,7 +4728,6 @@ YOUR IDENTITY & ROLE:
 COMPLETE KNOWLEDGE OF SFT STUDIO PRO:
 1. TAB 1: DEFINE & GENERATE (Project Setup & Synthetic Generator)
    - Setup project name, target task/objective, domain persona & system prompt, and negative constraints.
-   - Presets available: General Use, Coding Specialist, Reasoning / CoT, Creative Writing, Customer Support, etc.
    - Templates: Single Turn (user -> assistant), Multi Turn (alternating dialog), Reasoning (thinking trace + answer).
    - AI Generator: Generates synthetic batches matching the project specs using DigitalOcean GenAI Inference.
    - Approval Policy: All newly generated or imported batches start as "Pending" and must be reviewed before entering the active Data Registry.

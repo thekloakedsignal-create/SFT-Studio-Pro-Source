@@ -486,8 +486,8 @@ export default function App() {
     templateType: TemplateType.SINGLE_TURN,
     instructTemplate: InstructTemplate.CHATML,
     customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
-    representativePrompt: PROJECT_PRESETS[PresetType.GENERAL_USE].examples[0]?.prompt || "",
-    representativeCompletion: PROJECT_PRESETS[PresetType.GENERAL_USE].examples[0]?.completion || "",
+    representativePrompt: "",
+    representativeCompletion: "",
   });
 
   // Persistent device ID for guest/unauthenticated users to ensure Firestore persistence
@@ -553,9 +553,9 @@ export default function App() {
   });
 
   // Batch Generator Form Settings
-  const [batchDesc, setBatchDesc] = useState(PROJECT_PRESETS[PresetType.GENERAL_USE].batchDesc);
-  const [batchInstructions, setBatchInstructions] = useState(PROJECT_PRESETS[PresetType.GENERAL_USE].batchInstructions);
-  const [batchTempConstraints, setBatchTempConstraints] = useState(PROJECT_PRESETS[PresetType.GENERAL_USE].batchTempConstraints);
+  const [batchDesc, setBatchDesc] = useState("");
+  const [batchInstructions, setBatchInstructions] = useState("");
+  const [batchTempConstraints, setBatchTempConstraints] = useState("");
   const [batchTemplate, setBatchTemplate] = useState<TemplateType>(TemplateType.SINGLE_TURN);
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
   const [activeRecommendedBatchIndex, setActiveRecommendedBatchIndex] = useState(0);
@@ -1333,8 +1333,8 @@ export default function App() {
       templateType: loadedTemplateType,
       instructTemplate: loadedInstructTemplate,
       customInstructionFormat: loadedCustomFormat,
-      representativePrompt: selected.settings?.representativePrompt || (PROJECT_PRESETS[selected.settings?.selectedPreset as PresetType || PresetType.GENERAL_USE]?.examples[0]?.prompt || ""),
-      representativeCompletion: selected.settings?.representativeCompletion || (PROJECT_PRESETS[selected.settings?.selectedPreset as PresetType || PresetType.GENERAL_USE]?.examples[0]?.completion || ""),
+      representativePrompt: selected.settings?.representativePrompt || "",
+      representativeCompletion: selected.settings?.representativeCompletion || "",
     });
     setBatchTemplate(loadedTemplateType);
     setDocTemplate(loadedTemplateType);
@@ -1439,21 +1439,6 @@ export default function App() {
     const newProjId = `project-${Date.now()}`;
     
     const presetConfig = PROJECT_PRESETS[newProjPreset] || PROJECT_PRESETS[PresetType.GENERAL_USE];
-    
-    const exemplarMap: Record<string, { prompt: string; completion: string }> = {
-      [InstructTemplate.CHATML]: {
-        prompt: "Explain why the sky appears blue.",
-        completion: "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
-      },
-      [InstructTemplate.ALPACA]: {
-        prompt: "### Instruction:\nExplain why the sky appears blue.\n\n### Input:\nContext: Atmospheric light scattering.",
-        completion: "### Response:\nThe sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
-      },
-      [InstructTemplate.MISTRAL]: {
-        prompt: "[INST] Explain why the sky appears blue. [/INST]",
-        completion: "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
-      }
-    };
 
     const isInstruction = newProjFormat === ProjectFormat.INSTRUCTION;
     const defaultSettings: ProjectSettings = {
@@ -1466,8 +1451,8 @@ export default function App() {
       templateType: isInstruction ? TemplateType.INSTRUCTION_TEMPLATE : TemplateType.SINGLE_TURN,
       instructTemplate: newProjInstructTemplate,
       customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
-      representativePrompt: isInstruction ? (exemplarMap[newProjInstructTemplate]?.prompt || "") : (presetConfig.examples[0]?.prompt || ""),
-      representativeCompletion: isInstruction ? (exemplarMap[newProjInstructTemplate]?.completion || "") : (presetConfig.examples[0]?.completion || ""),
+      representativePrompt: "",
+      representativeCompletion: "",
     };
     
     // Clear active workspace and synthesis states immediately
@@ -1640,9 +1625,9 @@ export default function App() {
           setEditingExampleBatchId(null);
           setEditingMessages([]);
           setExportedPreview("");
-          setBatchDesc(PROJECT_PRESETS[PresetType.GENERAL_USE].batchDesc);
-          setBatchInstructions(PROJECT_PRESETS[PresetType.GENERAL_USE].batchInstructions);
-          setBatchTempConstraints(PROJECT_PRESETS[PresetType.GENERAL_USE].batchTempConstraints);
+          setBatchDesc("");
+          setBatchInstructions("");
+          setBatchTempConstraints("");
           setBatchTemplate(TemplateType.SINGLE_TURN);
           setBatchSize(5);
           setDocName("");
@@ -1705,10 +1690,6 @@ export default function App() {
       representativePrompt: prev.representativePrompt,
       representativeCompletion: prev.representativeCompletion,
     }));
-    // Prefill the batch simulator fields on the first tab
-    setBatchDesc(defaults.batchDesc);
-    setBatchInstructions(defaults.batchInstructions);
-    setBatchTempConstraints(defaults.batchTempConstraints);
 
     setNotification({
       text: `Loaded defaults and simulator parameters for: ${preset}`,
@@ -4601,10 +4582,6 @@ export default function App() {
                                   ...prev,
                                   projectFormat: ProjectFormat.CONVERSATION,
                                   templateType: TemplateType.SINGLE_TURN,
-                                  ...(prev.representativePrompt?.startsWith("### Instruction:\n") || prev.representativePrompt?.startsWith("<|im_start|>") || prev.representativePrompt?.startsWith("[INST]") ? {
-                                    representativePrompt: PROJECT_PRESETS[prev.selectedPreset as PresetType || PresetType.GENERAL_USE]?.examples[0]?.prompt || "",
-                                    representativeCompletion: PROJECT_PRESETS[prev.selectedPreset as PresetType || PresetType.GENERAL_USE]?.examples[0]?.completion || ""
-                                  } : {})
                                 }));
                                 setBatchTemplate(TemplateType.SINGLE_TURN);
                                 setDocTemplate(TemplateType.SINGLE_TURN);
@@ -4641,28 +4618,11 @@ export default function App() {
                               type="button"
                               disabled={isLocked}
                               onClick={() => {
-                                const currentTmpl = project.instructTemplate || InstructTemplate.CHATML;
-                                const exemplarMap: Record<string, { prompt: string; completion: string }> = {
-                                  [InstructTemplate.CHATML]: {
-                                    prompt: "Explain why the sky appears blue.",
-                                    completion: "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
-                                  },
-                                  [InstructTemplate.ALPACA]: {
-                                    prompt: "### Instruction:\nExplain why the sky appears blue.\n\n### Input:\nContext: Atmospheric light scattering.",
-                                    completion: "### Response:\nThe sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
-                                  },
-                                  [InstructTemplate.MISTRAL]: {
-                                    prompt: "[INST] Explain why the sky appears blue. [/INST]",
-                                    completion: "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
-                                  }
-                                };
                                 setProject(prev => ({
                                   ...prev,
                                   projectFormat: ProjectFormat.INSTRUCTION,
                                   templateType: TemplateType.INSTRUCTION_TEMPLATE,
                                   instructTemplate: prev.instructTemplate || InstructTemplate.CHATML,
-                                  representativePrompt: exemplarMap[currentTmpl]?.prompt || "Explain why the sky appears blue.",
-                                  representativeCompletion: exemplarMap[currentTmpl]?.completion || "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
                                 }));
                                 setBatchTemplate(TemplateType.INSTRUCTION_TEMPLATE);
                                 setDocTemplate(TemplateType.INSTRUCTION_TEMPLATE);
@@ -4721,25 +4681,9 @@ export default function App() {
                                     type="button"
                                     disabled={isLocked}
                                     onClick={() => {
-                                      const exemplarMap: Record<string, { prompt: string; completion: string }> = {
-                                        [InstructTemplate.CHATML]: {
-                                          prompt: "Explain why the sky appears blue.",
-                                          completion: "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
-                                        },
-                                        [InstructTemplate.ALPACA]: {
-                                          prompt: "### Instruction:\nExplain why the sky appears blue.\n\n### Input:\nContext: Atmospheric light scattering.",
-                                          completion: "### Response:\nThe sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
-                                        },
-                                        [InstructTemplate.MISTRAL]: {
-                                          prompt: "[INST] Explain why the sky appears blue. [/INST]",
-                                          completion: "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."
-                                        }
-                                      };
                                       setProject(prev => ({
                                         ...prev,
                                         instructTemplate: tmpl.id,
-                                        representativePrompt: exemplarMap[tmpl.id].prompt,
-                                        representativeCompletion: exemplarMap[tmpl.id].completion
                                       }));
                                     }}
                                     className={`p-2.5 rounded-lg border text-left transition flex flex-col justify-between min-w-0 overflow-hidden ${
@@ -4770,9 +4714,9 @@ export default function App() {
                                   <div className="text-purple-400 font-bold break-all">&lt;|im_start|&gt;system</div>
                                   <div className="pl-2 text-slate-300 break-words [overflow-wrap:anywhere]">{project.systemPrompt || "You are a helpful assistant."}<span className="text-purple-400 font-bold">&lt;|im_end|&gt;</span></div>
                                   <div className="text-blue-400 font-bold mt-1.5 break-all">&lt;|im_start|&gt;user</div>
-                                  <div className="pl-2 text-slate-300 break-words [overflow-wrap:anywhere]">{project.representativePrompt || "Explain why the sky appears blue."}<span className="text-blue-400 font-bold">&lt;|im_end|&gt;</span></div>
+                                  <div className="pl-2 text-slate-300 break-words [overflow-wrap:anywhere]">{project.representativePrompt}<span className="text-blue-400 font-bold">&lt;|im_end|&gt;</span></div>
                                   <div className="text-emerald-400 font-bold mt-1.5 break-all">&lt;|im_start|&gt;assistant</div>
-                                  <div className="pl-2 text-slate-300 break-words [overflow-wrap:anywhere]">{project.representativeCompletion || "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."}<span className="text-emerald-400 font-bold">&lt;|im_end|&gt;</span></div>
+                                  <div className="pl-2 text-slate-300 break-words [overflow-wrap:anywhere]">{project.representativeCompletion}<span className="text-emerald-400 font-bold">&lt;|im_end|&gt;</span></div>
                                 </div>
                               )}
                               {(project.instructTemplate) === InstructTemplate.ALPACA && (
@@ -4789,9 +4733,9 @@ export default function App() {
                                 <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-slate-300 text-[11px] leading-relaxed font-mono min-w-0">
                                   <div className="break-words [overflow-wrap:anywhere]">
                                     <span className="text-amber-400 font-bold">&lt;s&gt;[INST] </span>
-                                    <span>{project.representativePrompt || "Explain why the sky appears blue."} </span>
+                                    <span>{project.representativePrompt} </span>
                                     <span className="text-amber-400 font-bold">[/INST] </span>
-                                    <span>{project.representativeCompletion || "The sky appears blue because molecules in Earth's atmosphere scatter shorter wavelengths of sunlight more strongly than longer wavelengths."} </span>
+                                    <span>{project.representativeCompletion} </span>
                                     <span className="text-amber-400 font-bold">&lt;/s&gt;</span>
                                   </div>
                                 </div>
