@@ -4016,7 +4016,7 @@ export default function App() {
             setShowProjectOnboarding(false);
           }
         }}
-        onComplete={async (settings, recommendations, trainingModel, autoGenerate) => {
+        onComplete={(settings, recommendations, trainingModel, autoGenerate) => {
           if (trainingModel) setTrainerHandoff(current => ({ ...current, model: trainingModel }));
           if (!showBatchRecommendationInterview) {
             setTrainerHandoff(current => ({
@@ -4028,14 +4028,14 @@ export default function App() {
             setBatchRecommendations(recommendations ?? []);
             setCompletedRecommendedBatches([]);
             setActiveRecommendedBatchIndex(0);
+            setShowBatchRecommendationInterview(false);
+            setActiveTab("synthesizer");
             if (autoGenerate !== undefined) {
               answerAutomation("generate", autoGenerate ? "yes" : "no");
               if (autoGenerate) {
-                await startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }, recommendations ?? [], settings, trainingModel);
+                void startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }, recommendations ?? [], settings, trainingModel);
               }
             }
-            setShowBatchRecommendationInterview(false);
-            setActiveTab("synthesizer");
             return;
           }
           setProject({ ...settings, trainingModel: trainingModel || settings.trainingModel });

@@ -303,7 +303,7 @@ const GENERAL_RECOMMENDED_BATCH_TOPICS = [
 ];
 
 interface Props {
-  onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[], trainingModel?: string, autoGenerate?: boolean) => void | Promise<void>;
+  onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[], trainingModel?: string, autoGenerate?: boolean) => void;
   onSkip: () => void;
   startAtBatchInterview?: boolean;
   initialProjectSettings?: ProjectSettings;
@@ -566,13 +566,13 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     onComplete(definition, undefined, trainingModel);
   };
 
-  const finish = async (autoGenerate: boolean) => {
+  const finish = (autoGenerate: boolean) => {
     if (!approvedProjectDefinition) {
       setError("Approve the completed project definition before continuing to the Batch generator.");
       setStep("definition-review");
       return;
     }
-    await onComplete(approvedProjectDefinition, batchRecommendations, trainingModel, autoGenerate);
+    onComplete(approvedProjectDefinition, batchRecommendations, trainingModel, autoGenerate);
   };
 
   const generateBatchRecommendations = async () => {
