@@ -303,10 +303,11 @@ const GENERAL_RECOMMENDED_BATCH_TOPICS = [
 ];
 
 interface Props {
-  onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[], trainingModel?: string, autoGenerate?: boolean) => void;
+  onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[], trainingModel?: string, autoGenerate?: boolean) => void | Promise<void>;
   onSkip: () => void;
   startAtBatchInterview?: boolean;
   initialProjectSettings?: ProjectSettings;
+  initialRecommendations?: BatchRecommendation[];
 }
 
 const PROMPTS: Record<Step, string> = {
@@ -398,9 +399,9 @@ function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; a
   }
 }
 
-export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = false, initialProjectSettings }: Props) {
+export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = false, initialProjectSettings, initialRecommendations = [] }: Props) {
   const [showWorkshopChoice, setShowWorkshopChoice] = useState(!startAtBatchInterview);
-  const [step, setStep] = useState<Step>(startAtBatchInterview ? "batch-skills" : "name");
+  const [step, setStep] = useState<Step>(startAtBatchInterview ? (initialRecommendations.length ? "batch-recommendations" : "batch-skills") : "name");
   const [projectName, setProjectName] = useState(initialProjectSettings?.name || "");
   const [goal, setGoal] = useState(initialProjectSettings?.targetTask || "");
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
@@ -417,7 +418,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [systemPrompt, setSystemPrompt] = useState("");
   const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
   const [specialSkills, setSpecialSkills] = useState("");
-  const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
+  const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>(initialRecommendations);
   const [sampleExplained, setSampleExplained] = useState(false);
   const [approvedProjectDefinition, setApprovedProjectDefinition] = useState<ProjectSettings | null>(initialProjectSettings || null);
   const [error, setError] = useState("");
@@ -565,13 +566,13 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     onComplete(definition, undefined, trainingModel);
   };
 
-  const finish = (autoGenerate: boolean) => {
+  const finish = async (autoGenerate: boolean) => {
     if (!approvedProjectDefinition) {
       setError("Approve the completed project definition before continuing to the Batch generator.");
       setStep("definition-review");
       return;
     }
-    onComplete(approvedProjectDefinition, batchRecommendations, trainingModel, autoGenerate);
+    await onComplete(approvedProjectDefinition, batchRecommendations, trainingModel, autoGenerate);
   };
 
   const generateBatchRecommendations = async () => {

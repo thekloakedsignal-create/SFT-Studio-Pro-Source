@@ -4006,6 +4006,7 @@ export default function App() {
       <ProjectOnboarding
         startAtBatchInterview={showBatchRecommendationInterview}
         initialProjectSettings={showBatchRecommendationInterview ? project : undefined}
+        initialRecommendations={showBatchRecommendationInterview ? batchRecommendations : undefined}
         onSkip={() => {
           if (showBatchRecommendationInterview) {
             setShowBatchRecommendationInterview(false);
@@ -4015,7 +4016,7 @@ export default function App() {
             setShowProjectOnboarding(false);
           }
         }}
-        onComplete={(settings, recommendations, trainingModel, autoGenerate) => {
+        onComplete={async (settings, recommendations, trainingModel, autoGenerate) => {
           if (trainingModel) setTrainerHandoff(current => ({ ...current, model: trainingModel }));
           if (!showBatchRecommendationInterview) {
             setTrainerHandoff(current => ({
@@ -4027,14 +4028,14 @@ export default function App() {
             setBatchRecommendations(recommendations ?? []);
             setCompletedRecommendedBatches([]);
             setActiveRecommendedBatchIndex(0);
-            setShowBatchRecommendationInterview(false);
-            setActiveTab("synthesizer");
             if (autoGenerate !== undefined) {
               answerAutomation("generate", autoGenerate ? "yes" : "no");
               if (autoGenerate) {
-                void startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }, recommendations ?? [], settings, trainingModel);
+                await startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }, recommendations ?? [], settings, trainingModel);
               }
             }
+            setShowBatchRecommendationInterview(false);
+            setActiveTab("synthesizer");
             return;
           }
           setProject({ ...settings, trainingModel: trainingModel || settings.trainingModel });
