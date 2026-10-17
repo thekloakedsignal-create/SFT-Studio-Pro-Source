@@ -5137,7 +5137,8 @@ async function runAutomationPipeline(job: any) {
       .filter((b: any) => b && b.id && Array.isArray(b.examples) && b.examples.length > 0 && !/triad/i.test(String(b.source || "")))
       .map((b: any) => b.id);
     for (const batchId of pendingIds) job.batchStatus[batchId] = { stage: "pending" };
-    for (const batchId of pendingIds) {
+    // Four batches audit concurrently; the rest queue behind them.
+    const auditBatch = async (batchId: string) => {
       const batchName = allBatches.find((b: any) => b.id === batchId)?.name || batchId;
       job.stage = `Quality audit: ${batchName}`;
       try {
@@ -5145,6 +5146,9 @@ async function runAutomationPipeline(job: any) {
       } catch (err: any) {
         job.batchStatus[batchId] = { stage: "needs-review", error: err?.message || "QA chain failed." };
       }
+    };
+    for (let i = 0; i < pendingIds.length; i += 4) {
+      await Promise.all(pendingIds.slice(i, i + 4).map(auditBatch));
     }
   }
 
