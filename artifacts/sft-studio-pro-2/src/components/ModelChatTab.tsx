@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { LoaderCircle, MessageSquare, Send } from "lucide-react";
+import { loadModelChatHistory, saveModelChatHistory } from "./modelChatHistory";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type TrialStatus = {
@@ -21,6 +22,8 @@ export function ModelChatTab({ apiFetch }: Props) {
   apiFetchRef.current = apiFetch;
   const [status, setStatus] = useState<TrialStatus | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historySaveEnabled, setHistorySaveEnabled] = useState(false);
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -46,6 +49,20 @@ export function ModelChatTab({ apiFetch }: Props) {
     const timer = window.setInterval(() => void refresh(), 15000);
     return () => window.clearInterval(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    let active = true;
+    void loadModelChatHistory(apiFetchRef.current)
+      .then(saved => {
+        if (active) {
+          setMessages(saved);
+          setHistorySaveEnabled(true);
+        }
+      })
+      .catch(err => { if (active) setError(err instanceof Error ? err.message : "Could not load saved chat history."); })
+      .finally(() => { if (active) setHistoryLoaded(true); });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (remainingMs === null || !status?.trial?.expiresAt) return;
@@ -78,7 +95,7 @@ export function ModelChatTab({ apiFetch }: Props) {
   const send = async (event: FormEvent) => {
     event.preventDefault();
     const content = input.trim();
-    if (!content || busy || remainingMs === 0) return;
+    if (!content || busy || remainingMs === 0 || !historySaveEnabled) return;
     const nextMessages: ChatMessage[] = [...messages, { role: "user", content }];
     setMessages(nextMessages);
     setInput("");
@@ -92,7 +109,13 @@ export function ModelChatTab({ apiFetch }: Props) {
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.error || "The model could not respond.");
-      setMessages([...nextMessages, { role: "assistant", content: result.content }]);
+      const savedMessages = [...nextMessages, { role: "assistant", content: result.content }];
+      setMessages(savedMessages);
+      try {
+        await saveModelChatHistory(apiFetchRef.current, savedMessages);
+      } catch {
+        setError("The response arrived, but chat history could not be saved.");
+      }
     } catch (err) {
       setMessages(messages);
       setInput(content);
@@ -110,6 +133,7 @@ export function ModelChatTab({ apiFetch }: Props) {
       <header>
         <h2 className="text-lg font-bold text-slate-100">Model Chat</h2>
         <p className="mt-1 text-sm text-slate-400">Try a conversation with your trained model.</p>
+        <p className="mt-1 text-xs text-slate-500">Your chat is saved to your account and available across devices.</p>
       </header>
 
       {status?.availableModelName && !trial && (
@@ -190,7 +214,7 @@ export function ModelChatTab({ apiFetch }: Props) {
             />
             <button
               type="submit"
-              disabled={!input.trim() || busy || remainingMs === 0}
+              disabled={!input.trim() || busy || remainingMs === 0 || !historyLoaded || !historySaveEnabled}
               aria-label="Send message"
               className="inline-flex items-center justify-center rounded-lg bg-blue-500 px-4 text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
             >

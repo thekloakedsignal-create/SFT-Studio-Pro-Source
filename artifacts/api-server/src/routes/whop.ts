@@ -10,7 +10,6 @@ const plans: Record<string, string | undefined> = {
   train_9b: process.env.WHOP_PLAN_ID_TRAIN_9B,
   train_70b: process.env.WHOP_PLAN_ID_TRAIN_70B,
   usage_10k: process.env.WHOP_PLAN_ID_USAGE_10K,
-  model_chat: process.env.WHOP_PLAN_ID_MODEL_CHAT,
 };
 export const TRAINING_MODEL_PLANS: Record<string, string> = {
   "Qwen3.5 4B Base": "train_4b", "Qwen3.5 9 Base": "train_9b", "Llama 3.1 70B": "train_70b",
@@ -19,8 +18,8 @@ export const TRAINING_MODEL_PLANS: Record<string, string> = {
 function isOwner(user: AuthRequest["user"]) {
   return user?.email_verified === true && user.email?.toLowerCase() === "thekloakedsignal@gmail.com";
 }
-type Account = { used: number; extra: number; training: Record<string, number>; modelChatCreditTicks?: number };
-type Checkout = { uid: string; planKey: string; checkoutId: string; at: string; paymentId?: string };
+type Account = { used: number; extra: number; training: Record<string, number>; modelChatBalanceTicks?: number };
+type Checkout = { uid: string; planKey: string; checkoutId: string; at: string; paymentId?: string; planId?: string; amountCents?: number };
 type Reservation = { uid: string; count: number };
 type Store = { accounts: Record<string, Account>; checkouts: Record<string, Checkout>; reservations: Record<string, Reservation> };
 const storeFile = path.join(process.cwd(), ".data", "whop-store.json");
@@ -40,8 +39,8 @@ function change<T>(fn: (draft: Store) => T): T {
   return result;
 }
 function account(s: Store, uid: string): Account {
-  const result = s.accounts[uid] ??= { used: 0, extra: 0, training: {}, modelChatCreditTicks: 0 };
-  result.modelChatCreditTicks ??= 0;
+  const result = s.accounts[uid] ??= { used: 0, extra: 0, training: {}, modelChatBalanceTicks: 0 };
+  result.modelChatBalanceTicks ??= 0;
   return result;
 }
 function remaining(s: Store, uid: string) {
@@ -85,22 +84,21 @@ export function restoreTraining(uid: string, model: string) {
   change(s => { const a = account(s, uid); const key = TRAINING_MODEL_PLANS[model]; a.training[key] = (a.training[key] || 0) + 1; });
 }
 
-export function reserveModelChatCredits(user: AuthRequest["user"]) {
-  if (isOwner(user)) return { ticks: 0, bypass: true };
-  const uid = user?.uid;
-  if (!uid) throw Object.assign(new Error("Please sign in."), { status: 401 });
-  return change(s => {
-    const a = account(s, uid);
-    const ticks = a.modelChatCreditTicks || 0;
-    if (ticks <= 0) throw Object.assign(new Error("Buy at least $5 of prepaid model chat credit to continue."), { status: 402 });
-    a.modelChatCreditTicks = 0;
-    return { ticks, bypass: false };
-  });
+export function isModelChatBillingBypassed(user: AuthRequest["user"]) {
+  return isOwner(user);
 }
 
-export function refundModelChatCredits(uid: string, ticks: number) {
-  if (!Number.isFinite(ticks) || ticks <= 0) return;
-  change(s => { account(s, uid).modelChatCreditTicks! += Math.floor(ticks); });
+export function getModelChatBalanceTicks(uid: string) {
+  return account(store, uid).modelChatBalanceTicks || 0;
+}
+
+export function consumeModelChatTicks(uid: string, ticks: number) {
+  if (!Number.isFinite(ticks) || ticks <= 0) return getModelChatBalanceTicks(uid);
+  return change(s => {
+    const a = account(s, uid);
+    a.modelChatBalanceTicks = Math.max(0, (a.modelChatBalanceTicks || 0) - Math.ceil(ticks));
+    return a.modelChatBalanceTicks;
+  });
 }
 
 const router: IRouter = Router();
@@ -110,12 +108,12 @@ router.use("/whop", optionalAuth, (req: AuthRequest, res, next) => {
   next();
 });
 function payload(uid: string, user?: AuthRequest["user"]) {
-  if (isOwner(user)) return { success: true, bypass: true, usageUsed: 0, allowance: null, remaining: null, training: {}, modelChatCreditTicks: null };
+  if (isOwner(user)) return { success: true, bypass: true, usageUsed: 0, allowance: null, remaining: null, training: {}, modelChatBalance: null };
   const a = account(store, uid);
   return {
     success: true, bypass: false, usageUsed: a.used, allowance: 5000 + a.extra,
     remaining: remaining(store, uid), training: a.training,
-    modelChatCreditTicks: a.modelChatCreditTicks || 0,
+    modelChatBalance: (a.modelChatBalanceTicks || 0) / 6000,
   };
 }
 router.get("/whop/entitlements", (req: AuthRequest, res) => { res.json(payload(req.user!.uid, req.user)); });
@@ -124,8 +122,13 @@ router.post("/whop/checkout", async (req: AuthRequest, res) => {
   if (isOwner(req.user)) { res.json(payload(req.user!.uid, req.user)); return; }
   try {
     const key = req.body?.planKey;
+    const dynamicChatLoad = key === "model_chat";
+    const amountCents = dynamicChatLoad ? Number(req.body?.amountCents) : undefined;
     const planId = typeof key === "string" && Object.hasOwn(plans, key) ? plans[key] : undefined;
-    if (!planId) { res.status(400).json({ success: false, error: "Payment plan is not configured." }); return; }
+    if (dynamicChatLoad && (!Number.isSafeInteger(amountCents) || amountCents! < 500)) {
+      res.status(400).json({ success: false, error: "Load at least $5.00 of model chat balance." }); return;
+    }
+    if (!dynamicChatLoad && !planId) { res.status(400).json({ success: false, error: "Payment plan is not configured." }); return; }
     // Return only to the requesting app origin, never a client-supplied external destination.
     const origin = req.get("origin");
     if (!origin || !/^https?:\/\//.test(origin)) { res.status(400).json({ success: false, error: "Open checkout from the app." }); return; }
@@ -136,12 +139,22 @@ router.post("/whop/checkout", async (req: AuthRequest, res) => {
     const client = await getWhopClient();
     const checkout = await client.checkoutConfigurations.create({
       account_id: process.env.WHOP_COMPANY_ID,
-      plan_id: planId,
+      ...(dynamicChatLoad
+        ? { plan: { title: "Model Chat Balance", plan_type: "one_time", initial_price: amountCents! / 100, currency: "usd" } }
+        : { plan_id: planId }),
       redirect_url: returnUrl.toString(),
       metadata: { app_checkout: id },
-    });
+    } as any);
+    const checkoutPlanId = (checkout as any).plan?.id || (checkout as any).plan_id || planId;
     if (!checkout.id || !checkout.purchase_url) throw new Error("Checkout unavailable.");
-    change(s => { s.checkouts[id] = { uid: req.user!.uid, planKey: key, checkoutId: checkout.id, at: new Date().toISOString() }; });
+    if (dynamicChatLoad && !checkoutPlanId) throw new Error("Checkout plan unavailable.");
+    change(s => {
+      s.checkouts[id] = {
+        uid: req.user!.uid, planKey: key, checkoutId: checkout.id, at: new Date().toISOString(),
+        ...(checkoutPlanId ? { planId: checkoutPlanId } : {}),
+        ...(dynamicChatLoad ? { amountCents } : {}),
+      };
+    });
     res.json({ success: true, purchaseUrl: checkout.purchase_url });
   } catch {
     res.status(502).json({ success: false, error: "Unable to open checkout. Please try again." });
@@ -158,21 +171,25 @@ router.post("/whop/verify", async (req: AuthRequest, res) => {
     const client = await getWhopClient();
     let credited = 0;
     for (const [id, c] of pending) {
-      const payments = await client.payments.list({
-        account_id: process.env.WHOP_COMPANY_ID, plan_id: plans[c.planKey], status: "paid",
+      const planId = c.planKey === "model_chat" ? c.planId : plans[c.planKey];
+      const query: any = {
+        account_id: process.env.WHOP_COMPANY_ID, status: "paid",
         created_after: new Date(Date.parse(c.at) - 60000).toISOString(), first: 100,
-      });
+      };
+      if (planId) query.plan_id = planId;
+      const payments = await client.payments.list(query);
       for await (const p of payments) {
-        if (p.checkout_configuration_id !== c.checkoutId || p.plan_id !== plans[c.planKey]
+        if (p.checkout_configuration_id !== c.checkoutId || (planId && p.plan_id !== planId)
           || p.account_id !== process.env.WHOP_COMPANY_ID || p.status !== "paid"
           || p.currency !== "usd" || p.auto_refunded || p.refunded_at || p.dispute_alerted_at
           || Number(p.refunded_amount?.amount || 0) > 0) continue;
+        // The server-created checkout configuration fixes the requested top-up amount.
         change(s => {
           // Recheck AFTER the provider request to prevent concurrent double crediting.
           if (s.checkouts[id].paymentId || Object.values(s.checkouts).some(x => x.paymentId === p.id)) return;
           const a = account(s, uid);
           if (c.planKey === "usage_10k") a.extra += 10000;
-          else if (c.planKey === "model_chat") a.modelChatCreditTicks = (a.modelChatCreditTicks || 0) + 30000;
+          else if (c.planKey === "model_chat") a.modelChatBalanceTicks = (a.modelChatBalanceTicks || 0) + (c.amountCents || 0) * 60;
           else a.training[c.planKey] = (a.training[c.planKey] || 0) + 1;
           s.checkouts[id].paymentId = p.id;
           credited++;

@@ -1,48 +1,55 @@
 import { Router, type IRouter } from "express";
 import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
 import { getRecord, setRecord } from "../lib/training-records.mjs";
-import { logger } from "../lib/logger.ts";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
-
 const router: IRouter = Router();
+router.use(optionalAuth);
 
-router.get("/finetune/model-chat/history", optionalAuth, async (req: AuthRequest, res) => {
-  const uid = req.user?.uid;
-  if (!uid) return res.status(401).json({ success: false, error: "Sign in to view model chat history." });
+function userId(req: AuthRequest, res: any) {
+  const id = req.user?.uid;
+  if (!id) {
+    res.status(401).json({ success: false, error: "Sign in to access saved chat history." });
+    return null;
+  }
+  return id;
+}
+
+router.get("/finetune/model-chat/history", async (req: AuthRequest, res) => {
+  const id = userId(req, res);
+  if (!id) return;
   try {
-    const saved = await getRecord("model_chat_history", uid);
-    return res.json({ success: true, messages: Array.isArray(saved?.messages) ? saved.messages : [] });
+    const record = await getRecord("model_chat_history", id);
+    const messages = Array.isArray(record?.messages) ? record.messages : [];
+    return res.json({ success: true, messages });
   } catch {
-    return res.status(502).json({ success: false, error: "Could not load conversation history." });
+    return res.status(502).json({ success: false, error: "Could not load saved chat history." });
   }
 });
 
-// Observe successful trial replies without changing the existing trial endpoint.
-router.post("/finetune/model-trial/chat", optionalAuth, (req: AuthRequest, res, next) => {
-  const uid = req.user?.uid;
+router.put("/finetune/model-chat/history", async (req: AuthRequest, res) => {
+  const id = userId(req, res);
+  if (!id) return;
   const messages = req.body?.messages;
-  if (!uid || !Array.isArray(messages) || messages.length < 1 || messages.length > 30
+  if (!Array.isArray(messages) || messages.length > 500
     || messages.some((message: any) =>
       !message || !["user", "assistant"].includes(message.role)
-      || typeof message.content !== "string" || !message.content.trim() || message.content.length > 12000)) {
-    next();
-    return;
+      || typeof message.content !== "string" || message.content.length > 12000)) {
+    return res.status(400).json({ success: false, error: "Invalid chat history." });
   }
-
-  const sendJson = res.json.bind(res);
-  res.json = ((body: any) => {
-    if (!body?.success || typeof body.content !== "string") return sendJson(body);
-    const history: ChatMessage[] = [
-      ...messages.map((message: ChatMessage) => ({ role: message.role, content: message.content })),
-      { role: "assistant", content: body.content },
-    ];
-    void setRecord("model_chat_history", uid, { messages: history })
-      .catch(error => logger.warn({ error: String(error) }, "Model chat history could not be saved"))
-      .finally(() => sendJson(body));
-    return res;
-  }) as typeof res.json;
-  next();
+  const clean: ChatMessage[] = messages.map((message: ChatMessage) => ({
+    role: message.role,
+    content: message.content,
+  }));
+  if (Buffer.byteLength(JSON.stringify(clean), "utf8") > 1_000_000) {
+    return res.status(413).json({ success: false, error: "Chat history is too large to save." });
+  }
+  try {
+    await setRecord("model_chat_history", id, { messages: clean, updatedAt: new Date().toISOString() });
+    return res.json({ success: true });
+  } catch {
+    return res.status(502).json({ success: false, error: "Could not save chat history." });
+  }
 });
 
 export default router;

@@ -3,11 +3,10 @@ import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
 import { getRecord, listRecords, setRecord } from "../lib/training-records.mjs";
 import { ownedTrainingJobs, rememberJobStatus } from "../lib/training-jobs.ts";
 import { logger } from "../lib/logger.ts";
-import { refundModelChatCredits, reserveModelChatCredits } from "./whop.ts";
+import { consumeModelChatTicks, getModelChatBalanceTicks, isModelChatBillingBypassed } from "./whop.ts";
 
 const TOGETHER_V1 = "https://api.together.ai/v1";
 const TOGETHER_V2 = "https://api.together.ai/v2";
-type ChatMessage = { role: "user" | "assistant"; content: string };
 type PaidSession = {
   state: "starting" | "ready" | "stopping" | "stopped" | "expired" | "failed";
   jobId: string;
@@ -19,8 +18,8 @@ type PaidSession = {
   createdAt: string;
   readyAt?: string | null;
   expiresAt?: string | null;
+  lastBilledAt?: string | null;
   rateCentsPerMinute: number;
-  reservedTicks: number;
   billingBypass: boolean;
 };
 
@@ -28,6 +27,7 @@ const router: IRouter = Router();
 router.use(optionalAuth);
 const stopTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const readinessTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const refreshOperations = new Map<string, Promise<PaidSession | null>>();
 
 function uid(req: AuthRequest, res: any) {
   const id = req.user?.uid;
@@ -96,13 +96,14 @@ function scheduleStop(userId: string, session: PaidSession) {
   const old = stopTimers.get(userId);
   if (old) clearTimeout(old);
   if (!session.expiresAt) return;
+  const delay = Math.min(2147483647, Math.max(0, Date.parse(session.expiresAt) - Date.now()));
   stopTimers.set(userId, setTimeout(() => {
     stopTimers.delete(userId);
-    void stopSession(userId, true).catch(error => {
+    void refreshSession(userId).catch(error => {
       logger.warn({ error: String(error) }, "Prepaid model endpoint auto-stop failed");
       scheduleStop(userId, { ...session, expiresAt: new Date(Date.now() + 10000).toISOString() });
     });
-  }, Math.max(0, Date.parse(session.expiresAt) - Date.now())));
+  }, delay));
 }
 
 function scheduleReadiness(userId: string) {
@@ -135,23 +136,16 @@ async function stopSession(userId: string, exhausted: boolean) {
     if (session.endpointId) {
       await togetherRequest(TOGETHER_V2, `/projects/${encodeURIComponent(session.projectId)}/endpoints/${encodeURIComponent(session.endpointId)}`, { method: "DELETE" });
     }
-    const elapsedMs = session.readyAt ? Math.max(0, Date.now() - Date.parse(session.readyAt)) : 0;
-    const usedTicks = session.billingBypass || !session.readyAt
-      ? 0
-      : Math.min(session.reservedTicks, exhausted
-        ? session.reservedTicks
-        : Math.ceil(session.rateCentsPerMinute * elapsedMs / 1000));
-    if (!session.billingBypass) refundModelChatCredits(userId, Math.max(0, session.reservedTicks - usedTicks));
     const state = exhausted ? "expired" : "stopped";
-    await setRecord("paid_model_chat", userId, { state, reservedTicks: usedTicks, stoppedAt: new Date().toISOString() });
-    return { ...session, state, reservedTicks: usedTicks };
+    await setRecord("paid_model_chat", userId, { state, stoppedAt: new Date().toISOString() });
+    return { ...session, state };
   } catch (error) {
     await setRecord("paid_model_chat", userId, { state: session.state });
     throw error;
   }
 }
 
-async function refreshSession(userId: string) {
+async function refreshSessionInternal(userId: string): Promise<PaidSession | null> {
   const session = await getRecord("paid_model_chat", userId) as PaidSession | null;
   if (!session) return null;
   if (session.state === "starting" && session.endpointId && session.deploymentId) {
@@ -163,13 +157,17 @@ async function refreshSession(userId: string) {
       const deploymentState = String(deployment?.status?.state || deployment?.state || "");
       if (deploymentState.includes("READY")) {
         const readyAt = new Date();
-        const expiresAt = session.billingBypass
-          ? null
-          : new Date(readyAt.getTime() + session.reservedTicks / session.rateCentsPerMinute * 1000).toISOString();
-        const readySession = { ...session, state: "ready" as const, readyAt: readyAt.toISOString(), expiresAt };
-        await setRecord("paid_model_chat", userId, { state: "ready", readyAt: readySession.readyAt, expiresAt });
-        if (expiresAt) scheduleStop(userId, readySession);
-        return readySession;
+        const readySession = {
+          ...session,
+          state: "ready" as const,
+          readyAt: readyAt.toISOString(),
+          lastBilledAt: readyAt.toISOString(),
+          expiresAt: null,
+        };
+        await setRecord("paid_model_chat", userId, {
+          state: "ready", readyAt: readySession.readyAt, lastBilledAt: readySession.lastBilledAt, expiresAt: null,
+        });
+        return refreshSessionInternal(userId);
       }
       if (deploymentState.includes("FAILED")) {
         await stopSession(userId, false);
@@ -181,10 +179,27 @@ async function refreshSession(userId: string) {
     }
     scheduleReadiness(userId);
   }
-  if (session.state === "ready" && session.expiresAt && Date.now() >= Date.parse(session.expiresAt)) {
-    return stopSession(userId, true);
+  if (session.state === "ready" && !session.billingBypass) {
+    const now = new Date();
+    const lastBilledAt = session.lastBilledAt || session.readyAt || now.toISOString();
+    const elapsedMs = Math.max(0, now.getTime() - Date.parse(lastBilledAt));
+    const remainingTicks = consumeModelChatTicks(userId, session.rateCentsPerMinute * elapsedMs / 1000);
+    if (remainingTicks <= 0) return stopSession(userId, true);
+    const expiresAt = new Date(now.getTime() + remainingTicks / session.rateCentsPerMinute * 1000).toISOString();
+    const updated = { ...session, lastBilledAt: now.toISOString(), expiresAt };
+    await setRecord("paid_model_chat", userId, { lastBilledAt: updated.lastBilledAt, expiresAt });
+    scheduleStop(userId, updated);
+    return updated;
   }
   return session;
+}
+
+function refreshSession(userId: string): Promise<PaidSession | null> {
+  const ongoing = refreshOperations.get(userId);
+  if (ongoing) return ongoing;
+  const operation = refreshSessionInternal(userId).finally(() => refreshOperations.delete(userId));
+  refreshOperations.set(userId, operation);
+  return operation;
 }
 
 void listRecords("paid_model_chat").then(rows => {
@@ -202,6 +217,7 @@ router.get("/finetune/model-chat/prepaid/status", async (req: AuthRequest, res) 
     const session = await refreshSession(userId);
     return res.json({
       success: true,
+      balance: isModelChatBillingBypassed(req.user) ? null : getModelChatBalanceTicks(userId) / 6000,
       session: session ? {
         state: session.state,
         modelName: session.modelName,
@@ -224,7 +240,7 @@ router.post("/finetune/model-chat/prepaid/start", async (req: AuthRequest, res) 
   let projectId = "";
   let endpointId: string | undefined;
   let deploymentId: string | undefined;
-  let reservedTicks = 0;
+  let availableTicks = 0;
   let bypass = false;
   try {
     const trial = await getRecord("trial", userId);
@@ -246,9 +262,11 @@ router.post("/finetune/model-chat/prepaid/start", async (req: AuthRequest, res) 
     const config = selectConfig(Array.isArray(configs?.data) ? configs.data : []);
     if (!config) return res.status(422).json({ success: false, error: "This model is not available for chat yet." });
 
-    const reservation = reserveModelChatCredits(req.user);
-    reservedTicks = reservation.ticks;
-    bypass = reservation.bypass;
+    bypass = isModelChatBillingBypassed(req.user);
+    availableTicks = getModelChatBalanceTicks(userId);
+    if (!bypass && availableTicks <= 0) {
+      return res.status(402).json({ success: false, error: "Load at least $5 of model chat balance before starting an endpoint." });
+    }
     const rateCentsPerMinute = /llama/i.test(model.modelName) ? 50 : 25;
     await setRecord("paid_model_chat", userId, {
       state: "starting",
@@ -257,12 +275,12 @@ router.post("/finetune/model-chat/prepaid/start", async (req: AuthRequest, res) 
       projectId,
       createdAt: new Date().toISOString(),
       rateCentsPerMinute,
-      reservedTicks,
       billingBypass: bypass,
       endpointId: null,
       endpointName: null,
       deploymentId: null,
       readyAt: null,
+      lastBilledAt: null,
       expiresAt: null,
     });
 
@@ -310,10 +328,9 @@ router.post("/finetune/model-chat/prepaid/start", async (req: AuthRequest, res) 
     } catch {
       // Preserve retryable setup state if provider cleanup is temporarily unavailable.
     }
-    if (!bypass) refundModelChatCredits(userId, reservedTicks);
     if (error?.status) return res.status(error.status).json({ success: false, error: error.message });
     await setRecord("paid_model_chat", userId, { state: "failed", stoppedAt: new Date().toISOString() });
-    return res.status(502).json({ success: false, error: "Prepaid model chat could not be started. Your unused credit was returned." });
+    return res.status(502).json({ success: false, error: "Prepaid model chat could not be started. No credit was used." });
   }
 });
 
@@ -321,6 +338,7 @@ router.post("/finetune/model-chat/prepaid/stop", async (req: AuthRequest, res) =
   const userId = uid(req, res);
   if (!userId) return;
   try {
+    await refreshSession(userId);
     const session = await stopSession(userId, false);
     return res.json({ success: true, session: session ? { state: session.state } : null });
   } catch {
@@ -351,11 +369,6 @@ router.post("/finetune/model-chat/prepaid/chat", async (req: AuthRequest, res) =
     });
     const content = result?.choices?.[0]?.message?.content;
     if (typeof content !== "string") throw new Error("Invalid response.");
-    const previous = await getRecord("model_chat_history", userId);
-    const history: ChatMessage[] = Array.isArray(previous?.messages) ? previous.messages : [];
-    await setRecord("model_chat_history", userId, {
-      messages: [...history, messages.at(-1), { role: "assistant", content }],
-    });
     return res.json({ success: true, content });
   } catch {
     return res.status(502).json({ success: false, error: "The model could not respond. Try again." });
