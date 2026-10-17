@@ -534,10 +534,16 @@ export default function App() {
         setNotification({ text: `"${file.name}" is over 150 KB — too large for automatic processing.`, type: "error" });
         continue;
       }
-      docs.push({ name: file.name, content: await file.text() });
+      docs.push({ name: file.name, content: await file.text(), docType: "knowledge_base", instructions: "" });
     }
     answerAutomation("docFiles", docs);
     e.target.value = "";
+  };
+  const updateAutomationDoc = (index: number, patch: Record<string, any>) => {
+    const docs = [...(automationAnswers.docFiles || [])];
+    if (!docs[index]) return;
+    docs[index] = { ...docs[index], ...patch };
+    answerAutomation("docFiles", docs);
   };
   const startAutomationPipeline = async (answers: Record<string, any>) => {
     if (!selectedProjectId) {
@@ -7408,13 +7414,27 @@ export default function App() {
                       <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4 space-y-2">
                         <p className="text-xs font-semibold text-slate-300">Documents for automatic conversion (up to 150 KB each)</p>
                         <input type="file" multiple accept=".txt,.md,.json,.csv,.log" onChange={handleAutomationDocUpload} className="block w-full text-xs text-slate-400 file:mr-3 file:rounded-lg file:border file:border-slate-700 file:bg-slate-900 file:px-3 file:py-1.5 file:text-xs file:text-slate-300 file:cursor-pointer" />
-                        {(automationAnswers.docFiles || []).length > 0 && (
-                          <ul className="space-y-1">
-                            {(automationAnswers.docFiles || []).map((d: any, i: number) => (
-                              <li key={i} className="text-[11px] text-slate-400">{d.name}</li>
-                            ))}
-                          </ul>
-                        )}
+                        {(automationAnswers.docFiles || []).map((d: any, i: number) => (
+                          <div key={i} className="rounded-lg border border-slate-800 bg-slate-900/40 p-2.5 space-y-2">
+                            <p className="text-[11px] font-semibold text-slate-300 truncate">{d.name}</p>
+                            <select
+                              value={d.docType || "knowledge_base"}
+                              onChange={e => updateAutomationDoc(i, { docType: e.target.value })}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200"
+                            >
+                              <option value="knowledge_base">Knowledge</option>
+                              <option value="literature">Literature</option>
+                              <option value="transcript">Transcript</option>
+                            </select>
+                            <textarea
+                              value={d.instructions || ""}
+                              onChange={e => updateAutomationDoc(i, { instructions: e.target.value })}
+                              placeholder="Special instructions for this document (optional)"
+                              rows={2}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 resize-y"
+                            />
+                          </div>
+                        ))}
                       </div>
                     )}
                     {guidePage === "assess" && !automationAnswers.qa && (

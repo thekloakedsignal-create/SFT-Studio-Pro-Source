@@ -5043,14 +5043,14 @@ async function runAutomationPipeline(job: any) {
             specialInstructions: rec.specialInstructions,
             temporaryConstraints: rec.temporaryConstraints,
             templateType,
-            count: config.batchCount || 25
+            count: rec.skill ? 400 : 200
           }),
           id => `/api/generate/jobs/${encodeURIComponent(id)}`, "Batch generation");
         const batch = pipelineBatch(config, result, {
           name: rec.topic,
           description: rec.topic,
           templateType,
-          count: config.batchCount || 25,
+          count: rec.skill ? 400 : 200,
           specialInstructions: rec.specialInstructions,
           temporaryConstraints: rec.temporaryConstraints
         });
@@ -5068,28 +5068,37 @@ async function runAutomationPipeline(job: any) {
     job.stage = `Converting document: ${doc.name}`;
     job.batchStatus[`doc:${doc.name}`] = { stage: "converting" };
     try {
+      const docType = ["transcript", "knowledge_base", "literature"].includes(doc.docType) ? doc.docType : "knowledge_base";
+      // Run the converter's own process untouched: it analyzes the document and sets the count itself.
+      const analysis = await pipelineCall(userId, "/api/analyze-document", {
+        method: "POST",
+        body: JSON.stringify({ documentContent: doc.content, documentName: doc.name, docType, extractionModel: "glm-5.3" })
+      });
+      const estimatedCount = analysis.data?.estimatedCount;
       const result = await pipelineRunJob(userId, "/api/convert-document", {
         documentName: doc.name,
         async: true,
         documentContent: doc.content,
-        templateType: "Single Turn",
+        templateType: docType === "transcript" ? "Multi Turn" : "Single Turn",
+        transcriptLayout: docType === "transcript" ? "multi_turn" : "single_turn",
         instructTemplate: config.isInstruction ? (config.instructTemplate || "ChatML") : undefined,
         isInstruction: Boolean(config.isInstruction),
-        count: 8,
+        ...(Number.isFinite(estimatedCount) ? { count: estimatedCount } : {}),
         extractionModel: "glm-5.3",
         projectName: config.projectName,
         systemPrompt: config.systemPrompt,
         targetTask: config.targetTask,
         constraints: config.constraints,
-        docType: "knowledge_base",
-        isTranscript: false
+        docType,
+        isTranscript: docType === "transcript",
+        converterInstructions: typeof doc.instructions === "string" ? doc.instructions : ""
       }, id => `/api/convert-document/jobs/${encodeURIComponent(id)}`, "Document conversion");
       const batch = pipelineBatch(config, result, {
         name: `Doc: ${doc.name}`.slice(0, 60),
         description: `Extracted from "${doc.name}" (automation)`,
-        templateType: result.templateType || "Single Turn",
+        templateType: result.templateType || (docType === "transcript" ? "Multi Turn" : "Single Turn"),
         source: "Doc Conversion (Automation)",
-        count: 8
+        count: result.requestedCount || result.examples.length
       });
       await pipelineSaveBatch(job, batch);
       job.producedBatches.push(batch.id);
@@ -5105,8 +5114,9 @@ async function runAutomationPipeline(job: any) {
   if (config.autoQa) {
     const projRes = await pipelineCall(userId, `/api/sql/projects/${encodeURIComponent(job.projectId)}`);
     const allBatches = projRes.data?.project?.batches || [];
+    // Only TRiAD generator batches arrive pre-approved; everything else goes through QA.
     const pendingIds = allBatches
-      .filter((b: any) => b && b.id && b.status !== "Approved" && Array.isArray(b.examples) && b.examples.length > 0)
+      .filter((b: any) => b && b.id && Array.isArray(b.examples) && b.examples.length > 0 && !/triad/i.test(String(b.source || "")))
       .map((b: any) => b.id);
     for (const batchId of pendingIds) {
       try {
