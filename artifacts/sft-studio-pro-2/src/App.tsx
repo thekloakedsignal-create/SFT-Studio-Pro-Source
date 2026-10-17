@@ -545,7 +545,7 @@ export default function App() {
     docs[index] = { ...docs[index], ...patch };
     answerAutomation("docFiles", docs);
   };
-  const startAutomationPipeline = async (answers: Record<string, any>) => {
+  const startAutomationPipeline = async (answers: Record<string, any>, recommendationsOverride?: BatchRecommendation[]) => {
     if (!selectedProjectId) {
       setNotification({ text: "Save your project first, then start automation.", type: "info" });
       return;
@@ -559,7 +559,7 @@ export default function App() {
           autoGenerate: answers.generate === "yes",
           autoQa: answers.qa === "audit",
           docs: answers.docs === "yes" ? (answers.docFiles || []) : [],
-          recommendations: batchRecommendations,
+          recommendations: recommendationsOverride ?? batchRecommendations,
           trainingModel: trainerHandoff.model,
           project: {
             name: project.name,
@@ -638,7 +638,6 @@ export default function App() {
   const [completedRecommendedBatches, setCompletedRecommendedBatches] = useState<string[]>([]);
   const [pipelineStatus, setPipelineStatus] = useState<any>(null);
   const [automationAnswers, setAutomationAnswers] = useState<Record<string, any>>({});
-  const [showExitChoice, setShowExitChoice] = useState(false);
   const [batchSize, setBatchSize] = useState<number>(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState<{ current: number; total: number; percent: number } | null>(null);
@@ -3915,7 +3914,7 @@ export default function App() {
             setShowProjectOnboarding(false);
           }
         }}
-        onComplete={(settings, recommendations, trainingModel) => {
+        onComplete={(settings, recommendations, trainingModel, autoGenerate) => {
           if (!showBatchRecommendationInterview) {
             setTrainerHandoff({
               model: trainingModel || "Qwen3.5 9 Base",
@@ -3928,7 +3927,12 @@ export default function App() {
             setActiveRecommendedBatchIndex(0);
             setShowBatchRecommendationInterview(false);
             setActiveTab("synthesizer");
-            setShowExitChoice(true);
+            if (autoGenerate !== undefined) {
+              answerAutomation("generate", autoGenerate ? "yes" : "no");
+              if (autoGenerate) {
+                void startAutomationPipeline({ ...automationAnswers, generate: "yes" }, recommendations ?? []);
+              }
+            }
             return;
           }
           setProject(settings);
@@ -3955,7 +3959,6 @@ export default function App() {
             type: "success"
           });
           setShowProjectOnboarding(false);
-          setShowExitChoice(true);
           window.scrollTo({ top: 0 });
         }}
       />
@@ -4141,18 +4144,6 @@ export default function App() {
 
         </div>
       </header>
-
-      {/* Post-onboarding exit choice */}
-      {showExitChoice && (
-        <div className="fixed bottom-4 right-4 z-50 w-80 rounded-2xl border border-emerald-500/30 bg-slate-950/95 p-4 shadow-xl space-y-3">
-          <p className="text-sm font-semibold text-slate-100">Do you want to train a model now or export your data set?</p>
-          <div className="flex gap-2 items-center">
-            <button type="button" onClick={() => { setShowExitChoice(false); setActiveTab("trainer"); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Train a model</button>
-            <button type="button" onClick={() => { setShowExitChoice(false); setActiveTab("registry"); }} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">Export data set</button>
-            <button type="button" onClick={() => setShowExitChoice(false)} className="ml-auto text-slate-500 hover:text-slate-300 text-xs transition cursor-pointer">Later</button>
-          </div>
-        </div>
-      )}
 
       {/* Global Notifications */}
       <AnimatePresence>

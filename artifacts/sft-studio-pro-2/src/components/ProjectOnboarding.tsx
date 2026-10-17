@@ -50,7 +50,7 @@ function MarkdownText({ children }: { children: string }) {
 type Step =
   | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
   | "voice-own" | "voice-review" | "golden-generation" | "golden-review" | "remember-name-choice" | "remember-model-name" | "system-choice" | "system-review"
-  | "definition-review" | "batch-skills" | "batch-recommendations";
+  | "definition-review" | "batch-skills" | "batch-recommendations" | "batch-automation";
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B";
 export interface BatchRecommendation {
@@ -303,7 +303,7 @@ const GENERAL_RECOMMENDED_BATCH_TOPICS = [
 ];
 
 interface Props {
-  onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[], trainingModel?: string) => void;
+  onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[], trainingModel?: string, autoGenerate?: boolean) => void;
   onSkip: () => void;
   startAtBatchInterview?: boolean;
   initialProjectSettings?: ProjectSettings;
@@ -327,7 +327,8 @@ const PROMPTS: Record<Step, string> = {
   "system-review": "Review the full system prompt below. Edit it if you want, then explicitly approve it. It will be saved to the project and included in every generated example.",
   "definition-review": "Your project definition is complete. Review the summary and give final approval. Approval locks these settings for batch generation; use Edit answer if anything needs changing.",
   "batch-skills": "A batch is a group of training examples focused on one topic. The topic, special instructions, and constraints tell the Synthesizer what examples to create; you then review the examples before accepting them. What specific skills or abilities should this AI demonstrate? List each one on a separate line so I can include them all in the recommendations.",
-  "batch-recommendations": "Your recommendations will be sent to the project UI when you continue.",
+  "batch-recommendations": "Your recommended batches are ready. Continue to choose whether to generate them automatically.",
+  "batch-automation": "Would you like to automatically generate suggested batches?",
 };
 
 async function requestDraft(instruction: string, appContext: Record<string, unknown>) {
@@ -432,7 +433,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     ? "For every topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning templates for Llama 3.1 70B."
     : "For every topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples.";
 
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations"];
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "batch-automation"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
@@ -490,7 +491,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       "remember-model-name": "remember-name-choice",
       "system-choice": rememberName === "yes" ? "remember-model-name" : "remember-name-choice",
       "system-review": "system-choice", "definition-review": "system-review",
-      "batch-skills": "definition-review", "batch-recommendations": "batch-skills",
+      "batch-skills": "definition-review", "batch-recommendations": "batch-skills", "batch-automation": "batch-recommendations",
     };
     setError("");
     if (step === "definition-review" && approvedProjectDefinition) {
@@ -554,13 +555,13 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     onComplete(definition, undefined, trainingModel);
   };
 
-  const finish = () => {
+  const finish = (autoGenerate: boolean) => {
     if (!approvedProjectDefinition) {
       setError("Approve the completed project definition before continuing to the Batch generator.");
       setStep("definition-review");
       return;
     }
-    onComplete(approvedProjectDefinition, batchRecommendations, trainingModel);
+    onComplete(approvedProjectDefinition, batchRecommendations, trainingModel, autoGenerate);
   };
 
   const generateBatchRecommendations = async () => {
@@ -928,6 +929,12 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
               </ol>
             </div>
           )}
+          {step === "batch-automation" && (
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={buttonClass} onClick={() => finish(true)}>Yes, generate them</button>
+              <button type="button" className={buttonClass} onClick={() => finish(false)}>No, I’ll review them myself</button>
+            </div>
+          )}
           {["name", "goal", "goal-followup", "constraints", "voice-description", "voice-own", "remember-model-name", "batch-skills"].includes(step) && (
             <div className="flex gap-2">
               <textarea
@@ -975,7 +982,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm & finish Project Definition" : "Approve & finish Project Definition"}</button>}
             {["name", "goal", "constraints", "remember-model-name", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
-            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={finish}>Go to Batch generator <ArrowRight className="h-4 w-4" /></button>}
+            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("batch-automation")}>Continue <ArrowRight className="h-4 w-4" /></button>}
           </div>
         </footer>
       </section>
