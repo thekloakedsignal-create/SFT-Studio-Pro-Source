@@ -2792,6 +2792,30 @@ export default function App() {
   };
 
   // Regenerate flagged examples based on quality assessment feedback
+  // After QA repair, regenerated examples are NOT re-assessed by the AI audit. Only
+  // truncated, malformed, or corrupted templates are re-flagged via structural checks.
+  const findStructuralRepairIssues = (example: SFTExample, templateType?: string): { type: string; message: string }[] => {
+    const problems: { type: string; message: string }[] = [];
+    const messages = example?.messages || [];
+    const isInstructionTemplate = /instruction/i.test(templateType || "");
+    const validRoles = new Set(isInstructionTemplate ? ["instruction", "input", "output"] : ["system", "user", "assistant"]);
+    if (!Array.isArray(messages) || messages.length === 0) return [{ type: "malformed", message: "Example has no messages after regeneration." }];
+    if (messages.some(m => !m || typeof m.content !== "string" || !m.content.trim() || !validRoles.has(String(m.role)))) {
+      problems.push({ type: "corrupted", message: "A message has empty content or a role that does not fit this template." });
+    }
+    if (!isInstructionTemplate) {
+      const userCount = messages.filter(m => m?.role === "user").length;
+      const isMulti = /multi/i.test(templateType || "") || userCount > 1;
+      if (messages[messages.length - 1]?.role !== "assistant") problems.push({ type: "malformed", message: "The conversation does not end with an assistant response." });
+      if (!isMulti && userCount !== 1) problems.push({ type: "malformed", message: "The single-turn template requires exactly one user prompt." });
+    }
+    const lastContent = String(messages[messages.length - 1]?.content || "");
+    const openFences = (lastContent.match(/```/g) || []).length % 2 === 1;
+    const thinkOpen = (lastContent.match(/<think>/g) || []).length !== (lastContent.match(/<\/think>/g) || []).length;
+    if (openFences || thinkOpen) problems.push({ type: "truncated", message: "The response appears truncated (unclosed code fence or reasoning tag)." });
+    return problems;
+  };
+
   const handleRegenerateFlagged = async (batchId: string) => {
     const targetBatch = batches.find(b => b.id === batchId);
     const targetReport = reports[batchId] || targetBatch?.qualityReport;
@@ -2895,27 +2919,25 @@ export default function App() {
         }
       });
 
-      setNotification({ text: `Assessing only the ${regeneratedList.length} regenerated examples...`, type: "info" });
       const repairedIndices = regeneratedList.map(item => item.exampleIndex);
-      const assessmentResponse = await projectApiFetch("/api/analyze-quality", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(45000),
-        body: JSON.stringify({
-          examples: repairedIndices.map(index => newExamples[index]),
-          systemPrompt: originalSettings.systemPrompt,
-          targetTask: originalSettings.targetTask,
-          constraints: originalSettings.constraints,
-          templateType: targetBatch.templateType || originalSettings.templateType,
-          instructTemplate: originalSettings.projectFormat === ProjectFormat.INSTRUCTION
-            ? originalSettings.instructTemplate : undefined,
-        }),
+      // No AI re-assessment of regenerated responses. Each regeneration already received its
+      // specific flag issues as instructions; here only truncated/malformed/corrupted
+      // templates are re-flagged, and the passed numbers update immediately.
+      const structuralIssues: QualityIssue[] = [];
+      repairedIndices.forEach((originalIndex, localIndex) => {
+        findStructuralRepairIssues(newExamples[originalIndex], targetBatch.templateType).forEach(problem => {
+          structuralIssues.push({ exampleIndex: localIndex, severity: "High", type: problem.type, message: problem.message });
+        });
       });
-      const assessment = await assessmentResponse.json();
-      if (!assessmentResponse.ok || !assessment.success || !Array.isArray(assessment.report?.issues)) {
-        throw new Error(assessment.error || "Could not assess the regenerated examples. Existing flags were retained.");
-      }
-      const updatedReport = mergeRepairReport(targetReport, assessment.report, repairedIndices, newExamples.length);
+      const structurallyFlagged = new Set(structuralIssues.map(issue => issue.exampleIndex)).size;
+      const repairedOnlyReport: QualityReport = {
+        overallScore: structurallyFlagged ? 0 : 100,
+        stats: { totalExamples: repairedIndices.length, passedCount: repairedIndices.length - structurallyFlagged, flaggedCount: structurallyFlagged },
+        duplicateCheck: { duplicatesFound: 0, duplicatesList: [], deduplicatedLength: repairedIndices.length },
+        issues: structuralIssues,
+        suggestions: structurallyFlagged ? ["Some regenerated responses are still structurally broken; regenerate them again or edit them manually."] : []
+      };
+      const updatedReport = mergeRepairReport(targetReport, repairedOnlyReport, repairedIndices, newExamples.length);
       const updatedBatch: SFTBatch = {
         ...targetBatch,
         examples: newExamples,
