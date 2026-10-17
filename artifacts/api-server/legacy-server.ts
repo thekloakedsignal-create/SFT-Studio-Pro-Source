@@ -5076,6 +5076,7 @@ async function runAutomationPipeline(job: any) {
         job.batchStatus[rec.topic] = { stage: "needs-review", error: err?.message || "Generation failed." };
       }
     };
+    for (const rec of recommendations) job.batchStatus[rec.topic] ??= { stage: "pending" };
     for (let i = 0; i < recommendations.length; i += 3) {
       await Promise.all(recommendations.slice(i, i + 3).map(generateRecommendation));
     }
