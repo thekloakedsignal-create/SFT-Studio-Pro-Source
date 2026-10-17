@@ -6675,23 +6675,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Optimization Suggestions */}
-                      <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-2xl">
-                        <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-green-400" />
-                          AI Synthesis Suggestions
-                        </h3>
-                        <ul className="space-y-3">
-                          {activeReport.suggestions.map((sug, idx) => (
-                            <li key={idx} className="flex gap-2 text-xs leading-relaxed text-slate-300">
-                              <span className="h-5 w-5 rounded-full bg-green-500/10 text-green-400 flex items-center justify-center shrink-0 font-mono font-bold text-[10px]">
-                                {idx + 1}
-                              </span>
-                              <span className="mt-0.5">{sug}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
                     </div>
                   </>
                 )}
