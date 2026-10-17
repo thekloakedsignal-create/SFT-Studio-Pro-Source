@@ -3993,7 +3993,7 @@ app.post("/api/analyze-quality", async (req, res) => {
           `;
 
           const response = await callDigitalOceanAI({
-            model: normalizeModel(),
+            model: "qwen3.8-max",
             contents: chunkPrompt,
             config: {
               temperature: 0.1,
