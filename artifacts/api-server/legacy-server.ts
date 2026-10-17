@@ -5023,7 +5023,9 @@ async function runAutomationPipeline(job: any) {
 
     // Recommended batches: each batch's total is mixed across single-turn, multi-turn,
     // and reasoning (reasoning skipped for 70B), merged into one batch.
-    for (const rec of config.recommendations || []) {
+    // Three batches generate concurrently; the rest queue behind them.
+    const recommendations = config.recommendations || [];
+    const generateRecommendation = async (rec: any) => {
       job.stage = `Generating: ${rec.topic}`;
       job.batchStatus[rec.topic] = { stage: "generating" };
       try {
@@ -5073,6 +5075,9 @@ async function runAutomationPipeline(job: any) {
       } catch (err: any) {
         job.batchStatus[rec.topic] = { stage: "needs-review", error: err?.message || "Generation failed." };
       }
+    };
+    for (let i = 0; i < recommendations.length; i += 3) {
+      await Promise.all(recommendations.slice(i, i + 3).map(generateRecommendation));
     }
   }
 
