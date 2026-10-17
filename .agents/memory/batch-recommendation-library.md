@@ -21,6 +21,12 @@ Display selected library recipes verbatim. Keep the single-turn/multi-turn/reaso
 
 **How to apply:** Never append general format guidance to a library recipe field; show that guidance as a separate onboarding note.
 
+For companion or creative personas, prioritize applicable relational and creative library recipes; generic instructional/utility recipes are secondary and must directly serve the persona.
+
+**Why:** The user clarified that companion personas need relational skills represented rather than being swamped by instructional utility batches.
+
+**How to apply:** Reflect this priority in the onboarding batch-adjuster prompt without changing recommendation-selection logic.
+
 On 2026-10-15 the user asked me to rewrite the whole library so every recipe teaches its behavior through the project's target voice and goals. All recipes (including the always-added Red Teaming/Adversarial ones) carry a shared voice-first lead and a no-drift constraint (no disclaimers, moralizing, pathologizing, reframing, or condescension).
 **Why:** the user said the old recipes injected generic alignment behavior that ignored the project voice.
 **How to apply:** New recipes keep the voice-first lead and no-drift constraint; otherwise preserve user-supplied text.
