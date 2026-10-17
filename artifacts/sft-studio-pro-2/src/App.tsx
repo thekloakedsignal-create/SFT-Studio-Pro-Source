@@ -700,22 +700,6 @@ export default function App() {
       setSelectedBatchId(batches[0].id);
     }
   }, [batches, selectedBatchId]);
-
-  // Poll automation pipeline status for the open project
-  useEffect(() => {
-    if (!selectedProjectId) return;
-    let stopped = false;
-    const poll = async () => {
-      try {
-        const res = await projectApiFetch(`/api/pipeline/${encodeURIComponent(selectedProjectId)}`);
-        const data = await res.json();
-        if (!stopped && data?.success) setPipelineStatus(data.pipeline || null);
-      } catch {}
-    };
-    poll();
-    const timer = setInterval(poll, 5000);
-    return () => { stopped = true; clearInterval(timer); };
-  }, [selectedProjectId]);
   
   // SFT Example Editing states (Modal or inline)
   const [editingExampleIndex, setEditingExampleIndex] = useState<number | null>(null);
@@ -774,6 +758,22 @@ export default function App() {
   const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
   const activeProjectId = useRef<string | null>(null);
   const projectLoadVersion = useRef(0);
+
+  // Poll automation pipeline status for the open project
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const res = await projectApiFetch(`/api/pipeline/${encodeURIComponent(selectedProjectId)}`);
+        const data = await res.json();
+        if (!stopped && data?.success) setPipelineStatus(data.pipeline || null);
+      } catch {}
+    };
+    poll();
+    const timer = setInterval(poll, 5000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [selectedProjectId]);
   // Preserve completed/edited batches when an older project request resolves later.
   const sessionBatches = useRef(new Map<string, Map<string, SFTBatch>>());
   const setSelectedProjectId = (id: string | null) => {
