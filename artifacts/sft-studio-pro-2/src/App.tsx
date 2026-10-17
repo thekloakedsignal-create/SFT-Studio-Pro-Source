@@ -1576,8 +1576,8 @@ export default function App() {
         projectFormat: ProjectFormat.CONVERSATION,
         templateType: TemplateType.SINGLE_TURN,
         instructTemplate: InstructTemplate.CHATML,
-        representativePrompt: PROJECT_PRESETS[PresetType.GENERAL_USE].examples[0]?.prompt || "",
-        representativeCompletion: PROJECT_PRESETS[PresetType.GENERAL_USE].examples[0]?.completion || "",
+        representativePrompt: "",
+        representativeCompletion: "",
       };
       setSelectedProjectId(fallbackId);
       setProject(defaultSettings);
@@ -1629,8 +1629,8 @@ export default function App() {
             templateType: TemplateType.SINGLE_TURN,
             instructTemplate: InstructTemplate.CHATML,
             customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
-            representativePrompt: PROJECT_PRESETS[PresetType.GENERAL_USE].examples[0]?.prompt || "",
-            representativeCompletion: PROJECT_PRESETS[PresetType.GENERAL_USE].examples[0]?.completion || "",
+            representativePrompt: "",
+            representativeCompletion: "",
           });
           setBatches([]);
           initSelectedRegistryBatches([]);
@@ -1689,6 +1689,8 @@ export default function App() {
 
   // Sync preset changes
   const handlePresetSelect = (preset: PresetType) => {
+    // A locked project definition is never rewritten by a preset or anything else.
+    if (selectedProjectId && !isFieldsUnlocked) return;
     const defaults = PROJECT_PRESETS[preset];
     setProject(prev => ({
       name: defaults.name,
@@ -1699,8 +1701,9 @@ export default function App() {
       projectFormat: prev.projectFormat || ProjectFormat.CONVERSATION,
       templateType: prev.projectFormat === ProjectFormat.INSTRUCTION ? TemplateType.INSTRUCTION_TEMPLATE : (prev.templateType || TemplateType.SINGLE_TURN),
       customInstructionFormat: prev.customInstructionFormat || "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
-      representativePrompt: defaults.examples[0]?.prompt || "",
-      representativeCompletion: defaults.examples[0]?.completion || "",
+      // The golden exemplar is never seeded from preset stock text; it stays exactly as the user locked it.
+      representativePrompt: prev.representativePrompt,
+      representativeCompletion: prev.representativeCompletion,
     }));
     // Prefill the batch simulator fields on the first tab
     setBatchDesc(defaults.batchDesc);

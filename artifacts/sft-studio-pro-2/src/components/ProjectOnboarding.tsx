@@ -656,8 +656,8 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       templateType: TemplateType.SINGLE_TURN,
       instructTemplate: InstructTemplate.CHATML,
       customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
-      representativePrompt: "Explain photosynthesis in simple terms.",
-      representativeCompletion: "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar.",
+      representativePrompt: "",
+      representativeCompletion: "",
     });
   };
 
