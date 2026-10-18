@@ -2711,6 +2711,7 @@ function cleanTranscriptContent(text: string): string {
   cleaned = cleaned.replace(/^WEBVTT[^\n]*\n+/i, "");
   cleaned = cleaned.replace(/^(?:Kind|Language):[^\n]*\n+/gmi, "");
   cleaned = cleaned.replace(/^NOTE[^\n]*\n+/gmi, "");
+  cleaned = cleaned.replace(/^(?:STYLE|REGION)\s*\n[\s\S]*?(?:\n{2,}|$)/gmi, "");
   // Remove SRT / VTT timestamp arrow lines (e.g. 00:00:01.000 --> 00:00:04.000) and standalone subtitle indices
   cleaned = cleaned.replace(/^\d+\s*\n\d{1,2}:\d{2}(?::\d{2})?[,\.]\d{3}\s*-->\s*\d{1,2}:\d{2}(?::\d{2})?[,\.]\d{3}[^\n]*\n/gm, "");
   cleaned = cleaned.replace(/^\d{1,2}:\d{2}(?::\d{2})?[,\.]\d{3}\s*-->\s*\d{1,2}:\d{2}(?::\d{2})?[,\.]\d{3}[^\n]*\n?/gm, "");
@@ -2722,6 +2723,68 @@ function cleanTranscriptContent(text: string): string {
   cleaned = cleaned.replace(audioArtifactParenRegex, "");
 
   return cleaned;
+}
+
+function transcriptSpeakerLabel(line: string): string {
+  return line
+    .trim()
+    .replace(/^\uFEFF/, "")
+    .replace(/^(?:\*\*|__|\[|<v\s+)/i, "")
+    .replace(/(?:\*\*|__|\])\s*$/, "")
+    .replace(/\s*(?:\[\s*\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?\s*\]|\(\s*\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?\s*\)|\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?)\s*$/, "")
+    .replace(/\s*[:：]\s*$/, "")
+    .trim();
+}
+
+function structuredTranscriptText(text: string): string | null {
+  const toRecords = (value: any): any[] | null => {
+    if (Array.isArray(value)) return value;
+    if (!value || typeof value !== "object") return null;
+    for (const key of ["messages", "turns", "segments", "utterances", "transcript", "data"]) {
+      if (Array.isArray(value[key])) return value[key];
+      if (value[key] && typeof value[key] === "object") {
+        const nested = toRecords(value[key]);
+        if (nested) return nested;
+      }
+    }
+    return null;
+  };
+  const roleText = (value: any): string =>
+    typeof value === "string" ? value :
+      Array.isArray(value) ? value.map(item => typeof item === "string" ? item : item?.text || item?.content || "").join("") :
+        typeof value?.text === "string" ? value.text :
+          typeof value?.content === "string" ? value.content : "";
+  const convert = (records: any[]): string | null => {
+    const lines: string[] = [];
+    for (const record of records) {
+      if (!record || typeof record !== "object") continue;
+      if (Array.isArray(record.messages)) {
+        const nested = convert(record.messages);
+        if (nested) lines.push(nested);
+        continue;
+      }
+      const speaker = String(record.speaker ?? record.role ?? record.name ?? record.participant ?? "").trim();
+      if (/^(?:system|developer|tool|metadata)$/i.test(speaker)) continue;
+      const content = roleText(record.content ?? record.text ?? record.transcript ?? record.utterance);
+      if (speaker && content.trim()) lines.push(`${speaker}: ${content}`);
+    }
+    return lines.length >= 2 ? lines.join("\n\n") : null;
+  };
+
+  try {
+    const parsed = JSON.parse(text.replace(/^\uFEFF/, ""));
+    if (typeof parsed?.transcript === "string") return parsed.transcript;
+    if (typeof parsed?.text === "string" && !Array.isArray(parsed.messages)) return parsed.text;
+    const records = toRecords(parsed);
+    const converted = records && convert(records);
+    if (converted) return converted;
+  } catch {
+    // Try common JSONL transcript exports below.
+  }
+  const jsonLines = text.split(/\r?\n/).map(line => {
+    try { return JSON.parse(line); } catch { return null; }
+  }).filter(Boolean);
+  return jsonLines.length > 1 ? convert(jsonLines) : null;
 }
 
 function extractSpeakerAndContent(
@@ -2759,12 +2822,18 @@ function extractSpeakerAndContent(
   m = l.match(/^\s*<v\s+([^>]+)>\s*(.*)$/i);
   if (m) return { speaker: m[1].trim(), content: m[2].trim() };
 
+  // Common diarized exports use tab, pipe, or greater-than separators.
+  m = l.match(/^\s*([^|>\t]{1,55}?)\s*[|>\t]\s*(.+)$/);
+  if (m && !/^(?:https?|www)$/i.test(m[1].trim())) {
+    return { speaker: m[1].trim(), content: m[2].trim() };
+  }
+
   // 5. Pattern C: [Speaker] (optional timestamp): content OR [Speaker]: content
   m = l.match(/^\s*\[\s*([^\]]+?)\s*\]\s*(?:\[\s*\d{1,2}:\d{2}[^\]]*\]|\(\s*\d{1,2}:\d{2}[^)]*\)|\d{1,2}:\d{2}(?::\d{2})?)?\s*[:\-–—]?\s*(.*)$/);
   if (m && m[1].length <= 35) return { speaker: m[1].trim(), content: m[2].trim() };
 
   // 6. Pattern D: Speaker (optional timestamp/role) : or - content
-  m = l.match(/^\s*([A-Za-z0-9_.\s\-]{1,35}?)(?:\s*\([^)]*\))?\s*[:\-–—]\s*(.*)$/);
+  m = l.match(/^\s*([\p{L}\p{M}0-9_.'’\s\-]{1,55}?)(?:\s*\([^)]*\))?\s*[:\-–—]\s*(.*)$/u);
   if (m) {
     const spk = m[1].trim();
     const isExcluded = /^(?:meeting|date|topic|attendees|agenda|duration|location|call id|call|id|subject|title|organizer|recording|transcript|status|notes|summary|description|note|warning|tip|caution|step|page|http|https|file|source|url|email|time|start|end|info|platform)$/i.test(spk);
@@ -2786,7 +2855,7 @@ function parseUniversalTranscript(
   userTag?: string,
   assistantTag?: string
 ): { turns: DialogueTurn[]; detectedUser: string; detectedAssistant: string } {
-  const cleaned = cleanTranscriptContent(text);
+  const cleaned = cleanTranscriptContent(structuredTranscriptText(text) || text);
   const lines = cleaned.split("\n");
 
   const customUserTrim = (userTag || "").trim();
@@ -2797,14 +2866,8 @@ function parseUniversalTranscript(
   // Robust tag matcher to handle speaker tags like "Alice" matching "Alice (Host)" or "Speaker 1" matching "SPEAKER_01"
   const matchesTag = (speaker: string, tagLower: string): boolean => {
     if (!tagLower) return false;
-    const s = speaker.toLowerCase().trim();
-    if (s === tagLower) return true;
-    if (s.startsWith(tagLower) || tagLower.startsWith(s)) return true;
-    if (s.includes(tagLower)) return true;
-    const sNorm = s.replace(/[_\s\-]+/g, "");
-    const tNorm = tagLower.replace(/[_\s\-]+/g, "");
-    if (sNorm === tNorm || sNorm.startsWith(tNorm) || tNorm.startsWith(sNorm)) return true;
-    return false;
+    const normalize = (value: string) => value.toLowerCase().replace(/[_\s\-]+/g, "").replace(/^speaker0+(\d)/, "speaker$1").trim();
+    return normalize(speaker) === normalize(tagLower);
   };
 
   const isUserSpeaker = (speaker: string): boolean => {
@@ -2820,16 +2883,22 @@ function parseUniversalTranscript(
     const l = lineText.trim().toLowerCase();
     if (!l) return true;
     if (/^[=\-_*#\s]{3,}$/.test(l)) return true;
+    if (/^(?:\d{1,4}|page\s+\d{1,4}|p{1,2}\.\s*\d{1,4})$/i.test(l)) return true;
+    if (/^(?:\[\s*)?\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?(?:\s*\])?$/.test(l)) return true;
     if (/^(?:meeting|call|webinar|conference)\s+(?:id|topic|date|duration|ended|summary|notes|agenda)/i.test(l)) return true;
-    if (/^(?:date|time|duration|attendees|participants|host|organizer|recording|transcript|location|call id|audio file)\s*[:\-]/i.test(l)) return true;
+    if (/^(?:date|time|duration|attendees|participants|participant list|host|organizer|recording|transcript|location|call id|audio file|video file|meeting id|event id|subject|title|source|file name|filename|language|timezone|exported by|created by|transcribed by|transcription by|transcribed at|recorded on|generated by|recording link|meeting link|join link|conference link|url|email|summary|notes|description|agenda|action items|key takeaways|purpose)\s*[:\-–—]/i.test(l)) return true;
     if (/^\[?\s*(?:meeting ended|call ended|recording stopped|recording paused|transcript ended|end of transcript|left the meeting|joined the meeting|reconnected)\s*\]?$/i.test(l)) return true;
-    if (/^(?:transcript generated by|otter\.ai|zoom transcript|teams transcript|webex transcript)/i.test(l)) return true;
+    if (/^(?:transcript generated by|transcribed by|transcription provided by|powered by|otter\.ai|zoom transcript|teams transcript|webex transcript|google meet transcript)/i.test(l)) return true;
+    if (/^(?:https?:\/\/|www\.)\S+$/i.test(l)) return true;
     return false;
   };
 
   // Helper to clean inline timestamps and artifacts from dialogue content word-for-word
   const cleanTurnContent = (rawText: string) => {
-    return rawText.trim();
+    return rawText
+      .replace(/^\s*(?:\[\s*\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?\s*\]|\(\s*\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?\s*\)|\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?\s*[-–—:]?)\s*/i, "")
+      .replace(/<\/?v(?:\s+[^>]*)?>|<\/?c(?:\.[^>]*)?>/gi, "")
+      .trim();
   };
 
   const excludedSpeakers = new Set([
@@ -2841,29 +2910,44 @@ function parseUniversalTranscript(
     "notes", "start", "end", "info", "platform"
   ]);
 
-  const speakerCounts = new Map<string, number>();
-  const firstSeenOrder: string[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line || isMetadataLine(line)) continue;
-
-    const res = extractSpeakerAndContent(line, customUserTrim, customAsstTrim);
-    if (res && res.speaker) {
-      const candLower = res.speaker.toLowerCase();
-      if (!excludedSpeakers.has(candLower) && candLower.length >= 1 && candLower.length <= 35) {
-        const currentCount = speakerCounts.get(candLower) || 0;
-        speakerCounts.set(candLower, currentCount + 1);
-        if (currentCount === 0) {
-          firstSeenOrder.push(candLower);
-        }
-      }
-    }
-  }
-
-  // Determine user speaker vs assistant speaker
   const userKeywords = ["user", "human", "client", "customer", "interviewer", "host", "questioner", "q", "speaker 1", "speaker1", "person 1", "person1", "caller", "patient", "person a", "speaker a", "inquisitor", "me"];
   const asstKeywords = ["assistant", "claude", "chatgpt", "ai", "bot", "model", "agent", "interviewee", "guest", "expert", "answer", "a", "speaker 2", "speaker2", "person 2", "person2", "dr", "doctor", "specialist", "person b", "speaker b", "respondent"];
+  const speakerCounts = new Map<string, number>();
+  const firstSeenOrder: string[] = [];
+  const bareLineCounts = new Map<string, number>();
+  const potentialBareSpeaker = (line: string) => {
+    const label = transcriptSpeakerLabel(line);
+    return label.length <= 55 && /^[\p{L}\p{M}][\p{L}\p{M}\d ._'’\-]{0,54}$/u.test(label) ? label : "";
+  };
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || isMetadataLine(line) || extractSpeakerAndContent(line, customUserTrim, customAsstTrim)) continue;
+    const label = potentialBareSpeaker(line);
+    if (label) bareLineCounts.set(label.toLowerCase(), (bareLineCounts.get(label.toLowerCase()) || 0) + 1);
+  }
+  const isBareSpeakerLine = (label: string) => {
+    const low = label.toLowerCase();
+    const conventional = /^(?:speaker|participant|person)\s*[_# -]?\s*[a-z0-9]+$/i.test(label)
+      || userKeywords.includes(low) || asstKeywords.includes(low);
+    return conventional || matchesTag(label, customUserLower) || matchesTag(label, customAsstLower)
+      || (bareLineCounts.get(low) || 0) >= 2;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || isMetadataLine(line)) continue;
+    const res = extractSpeakerAndContent(line, customUserTrim, customAsstTrim);
+    const speaker = res?.speaker || (() => {
+      const label = potentialBareSpeaker(line);
+      return label && isBareSpeakerLine(label) ? label : "";
+    })();
+    const candLower = speaker.toLowerCase();
+    if (speaker && !excludedSpeakers.has(candLower) && candLower.length <= 55) {
+      const currentCount = speakerCounts.get(candLower) || 0;
+      speakerCounts.set(candLower, currentCount + 1);
+      if (currentCount === 0) firstSeenOrder.push(candLower);
+    }
+  }
 
   let mappedUser = "";
   let mappedAssistant = "";
@@ -2875,7 +2959,6 @@ function parseUniversalTranscript(
         break;
       }
     }
-    if (!mappedUser) mappedUser = customUserLower;
   }
 
   if (customAsstLower) {
@@ -2885,7 +2968,6 @@ function parseUniversalTranscript(
         break;
       }
     }
-    if (!mappedAssistant) mappedAssistant = customAsstLower;
   }
 
   if (!mappedUser) {
@@ -2929,7 +3011,11 @@ function parseUniversalTranscript(
       continue;
     }
 
-    const extracted = extractSpeakerAndContent(trimmed, customUserTrim, customAsstTrim);
+    const extracted = extractSpeakerAndContent(trimmed, customUserTrim, customAsstTrim)
+      || (() => {
+        const label = potentialBareSpeaker(trimmed);
+        return label && isBareSpeakerLine(label) ? { speaker: label, content: "" } : null;
+      })();
 
     if (extracted && extracted.speaker) {
       const spk = extracted.speaker.toLowerCase();
@@ -2943,7 +3029,7 @@ function parseUniversalTranscript(
         role = "assistant";
       } else if (!customUserLower && userKeywords.some(k => spk.includes(k))) {
         role = "user";
-      } else if (!customUserLower && !customAsstLower && speakerCounts.has(spk)) {
+      } else if (speakerCounts.has(spk)) {
         role = spk === mappedUser ? "user" : "assistant";
       }
 
@@ -2986,6 +3072,18 @@ function parseUniversalTranscript(
   };
 }
 
+function sampleDocumentContent(content: string, maxChars = 48_000): string {
+  if (content.length <= maxChars) return content;
+  const excerptCount = 8;
+  const excerptLength = Math.floor(maxChars / excerptCount);
+  const lastStart = Math.max(0, content.length - excerptLength);
+  const excerpts = Array.from({ length: excerptCount }, (_, index) => {
+    const start = Math.floor(index * lastStart / (excerptCount - 1));
+    return `[Source excerpt ${index + 1} of ${excerptCount}]\n${content.slice(start, start + excerptLength)}`;
+  });
+  return `[Representative excerpts sampled across all ${content.length.toLocaleString()} characters of the document]\n${excerpts.join("\n\n")}`;
+}
+
 // 1.5 Document Analysis & Example Count Estimator
 app.post("/api/analyze-document", async (req, res) => {
   const { documentContent, documentName, docType, extractionModel } = req.body;
@@ -3008,7 +3106,8 @@ app.post("/api/analyze-document", async (req, res) => {
   }
 
   try {
-    const analysisPrompt = `
+  const analysisSample = sampleDocumentContent(documentContent);
+  const analysisPrompt = `
 You are an expert AI Data Engineering Architect and SFT Specialist.
 Perform a thorough, comprehensive architectural analysis across the entire provided document.
 Examine its full structure, narrative arcs, technical topics, chapters, concepts, or dialogue turns from beginning to end.
@@ -3017,9 +3116,9 @@ Document Name: "${documentName || "Unknown"}"
 Total Word Count: ~${words} words
 Total Character Length: ${documentContent.length} characters
 
-Full Document Content:
+Representative excerpts sampled across the complete document (do not assume omitted spans are empty):
 """
-${documentContent}
+${analysisSample}
 """
 
 Tasks:
@@ -3259,8 +3358,23 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
       documentSections.push(documentContent);
     }
 
-    // Analyze every section; do not silently omit the middle of a document.
-    const sectionsToProcess = documentSections;
+    // If a very large source has more chunks than requested examples, balance
+    // source regions across outputs instead of silently generating only from its beginning.
+    let sectionsToProcess = documentSections;
+    if (documentSections.length > requestedCount) {
+      const totalChars = documentSections.reduce((sum, section) => sum + section.length, 0);
+      const groups: string[][] = Array.from({ length: requestedCount }, () => []);
+      let consumedChars = 0;
+      for (const section of documentSections) {
+        const midpoint = consumedChars + section.length / 2;
+        const index = Math.min(requestedCount - 1, Math.floor(midpoint / totalChars * requestedCount));
+        groups[index].push(section);
+        consumedChars += section.length;
+      }
+      sectionsToProcess = groups
+        .filter(group => group.length > 0)
+        .map(group => sampleDocumentContent(group.join("\n\n"), maxSectionLength));
+    }
 
     const baseSectionCount = Math.floor(requestedCount / sectionsToProcess.length);
     const extraSectionExamples = requestedCount % sectionsToProcess.length;
@@ -4629,9 +4743,9 @@ app.post("/api/suggest-doc-count", async (req, res) => {
       
       DOCUMENT NAME: ${documentName || "Unnamed Document"}
       DOCUMENT SIZE: ${charCount} characters (${wordCount} words)
-      DOCUMENT CONTENT (truncated if extremely long):
+      REPRESENTATIVE EXCERPTS SAMPLED ACROSS THE COMPLETE DOCUMENT:
       --- START -----
-      ${documentContent.slice(0, 8000)}
+      ${sampleDocumentContent(documentContent, 48_000)}
       --- END -----
 
       Respond ONLY with a JSON object of this structure:

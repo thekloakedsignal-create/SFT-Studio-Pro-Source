@@ -9,6 +9,12 @@ Knowledge and literature synthesize grounded training examples. Transcript mode 
 
 **How to apply:** Keep Transcript exact and separate converter changes from batch generation. Do not apply transcript-copy behavior to Knowledge or Literature.
 
+Transcript parsing must accept common labeled transcript exports and remove platform, timestamp, header, and recording metadata without rewriting the spoken dialogue.
+
+**Why:** The user reported that ordinary transcripts are rejected and metadata is not removed reliably.
+
+**How to apply:** Improve speaker-label and metadata recognition within the transcript parser; keep transcript conversion verbatim and separate from AI synthesis.
+
 The Document Guide is instructions-only: ask about transcripts, explain what to do using the existing conversion instructions, then close. Do not upload or handle documents inside the guide. Transcripts need speaker labels, not instructions.
 
 **Why:** The user explicitly replaced the earlier upload-enabled guide request with “Just give the instructions for document conversion and don't upload them in the guide.”

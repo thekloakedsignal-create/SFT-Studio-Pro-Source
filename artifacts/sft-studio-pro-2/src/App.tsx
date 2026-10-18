@@ -529,12 +529,18 @@ export default function App() {
   const handleAutomationDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const docs = [...(automationAnswers.docFiles || [])];
+    let totalBytes = docs.reduce((sum: number, doc: any) => sum + new Blob([doc.content || ""]).size, 0);
     for (const file of files) {
-      if (file.size > 150 * 1024) {
-        setNotification({ text: `"${file.name}" is over 150 KB — too large for automatic processing.`, type: "error" });
+      if (file.size > 1024 * 1024) {
+        setNotification({ text: `"${file.name}" exceeds the 1 MB per-file limit for onboarding automation.`, type: "error" });
+        continue;
+      }
+      if (totalBytes + file.size > 2 * 1024 * 1024) {
+        setNotification({ text: "Onboarding automation documents are limited to 2 MB total. Use the Document Converter for larger files.", type: "error" });
         continue;
       }
       docs.push({ name: file.name, content: await file.text(), docType: "knowledge_base", instructions: "" });
+      totalBytes += file.size;
     }
     answerAutomation("docFiles", docs);
     e.target.value = "";
@@ -2226,6 +2232,10 @@ export default function App() {
   // Process uploaded document file (PDF, DOCX, Image, Text)
   const processUploadedDoc = async (file: File) => {
     setDocConversionProgress(null);
+    if (file.size > 32 * 1024 * 1024) {
+      setNotification({ text: `"${truncateFileName(file.name, 30)}" exceeds the 32 MB document limit.`, type: "error" });
+      return;
+    }
     const fileNameLower = file.name.toLowerCase();
     const isDocx = file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileNameLower.endsWith(".docx");
     const isPdf = file.type === "application/pdf" || fileNameLower.endsWith(".pdf");
@@ -7567,7 +7577,7 @@ export default function App() {
                     )}
                     {guidePage === "convert" && automationAnswers.docs === "yes" && (
                       <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4 space-y-2">
-                        <p className="text-xs font-semibold text-slate-300">Documents for automatic conversion (up to 150 KB each)</p>
+                        <p className="text-xs font-semibold text-slate-300">Documents for automatic conversion (up to 1 MB each, 2 MB total)</p>
                         <input type="file" multiple accept=".txt,.md,.json,.csv,.log" onChange={handleAutomationDocUpload} className="block w-full text-xs text-slate-400 file:mr-3 file:rounded-lg file:border file:border-slate-700 file:bg-slate-900 file:px-3 file:py-1.5 file:text-xs file:text-slate-300 file:cursor-pointer" />
                         {(automationAnswers.docFiles || []).map((d: any, i: number) => (
                           <div key={i} className="rounded-lg border border-slate-800 bg-slate-900/40 p-2.5 space-y-2">
