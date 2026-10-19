@@ -50,7 +50,7 @@ function MarkdownText({ children }: { children: string }) {
 type Step =
   | "name" | "goal" | "goal-followup" | "constraints" | "model" | "voice-choice" | "voice-description"
   | "voice-own" | "voice-review" | "golden-generation" | "golden-review" | "remember-name-choice" | "remember-model-name" | "system-choice" | "system-review"
-  | "definition-review" | "batch-skills" | "batch-recommendations" | "batch-automation" | "batch-manual";
+  | "definition-review" | "batch-skills" | "batch-custom-ask" | "batch-custom-form" | "batch-recommendations" | "batch-automation" | "batch-manual";
 
 type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B";
 export interface BatchRecommendation {
@@ -327,7 +327,9 @@ const PROMPTS: Record<Step, string> = {
   "system-review": "Review the full system prompt below. Edit it if you want, then explicitly approve it. It will be saved to the project and included in every generated example.",
   "definition-review": "Your project definition is complete. Review the summary and give final approval. Approval locks these settings for batch generation; use Edit answer if anything needs changing.",
   "batch-skills": "A batch is a group of training examples focused on one topic. The topic, special instructions, and constraints tell the Synthesizer what examples to create; you then review the examples before accepting them. What specific skills or abilities should this AI demonstrate? List each one on a separate line so I can include them all in the recommendations.",
-  "batch-recommendations": "Here are the batch topics I recommend for your project. Is this list OK, or would you like to add more topics?",
+  "batch-custom-ask": "Are there any custom batches (skills, abilities, or topics) you would like to add to the recommendations?",
+  "batch-custom-form": "Describe each custom batch. Click Save to keep it, Add another for the next one, and Done adding batches when you are finished.",
+  "batch-recommendations": "Here are the batch topics I recommend for your project. Remove any you don't want, then confirm the list or add more topics.",
   "batch-automation": "Would you like me to generate the batches?",
   "batch-manual": "Here is how to generate the batches yourself in the Batch generator.",
 };
@@ -418,6 +420,9 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [systemPromptSource, setSystemPromptSource] = useState<"own" | "ai" | null>(null);
   const [specialSkills, setSpecialSkills] = useState("");
   const [batchRecommendations, setBatchRecommendations] = useState<BatchRecommendation[]>([]);
+  const [customBatches, setCustomBatches] = useState<BatchRecommendation[]>([]);
+  const [customDraft, setCustomDraft] = useState<BatchRecommendation>({ topic: "", specialInstructions: "", temporaryConstraints: "" });
+  const [customEditingIndex, setCustomEditingIndex] = useState<number | null>(null);
   const [sampleExplained, setSampleExplained] = useState(false);
   const [approvedProjectDefinition, setApprovedProjectDefinition] = useState<ProjectSettings | null>(initialProjectSettings || null);
   const [error, setError] = useState("");
@@ -443,7 +448,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     ? "For every topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning templates for Llama 3.1 70B."
     : "For every topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples.";
 
-  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-recommendations", "batch-automation", "batch-manual"];
+  const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-custom-ask", "batch-custom-form", "batch-recommendations", "batch-automation", "batch-manual"];
   const currentStepPosition = stepOrder.indexOf(step);
   const priorAnswers = [
     { step: "name" as Step, label: "Project name", answer: projectName },
@@ -501,7 +506,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       "remember-model-name": "remember-name-choice",
       "system-choice": rememberName === "yes" ? "remember-model-name" : "remember-name-choice",
       "system-review": "system-choice", "definition-review": "system-review",
-      "batch-skills": "definition-review", "batch-recommendations": "batch-skills", "batch-automation": "batch-recommendations", "batch-manual": "batch-automation",
+      "batch-skills": "definition-review", "batch-custom-ask": "batch-skills", "batch-custom-form": "batch-custom-ask", "batch-recommendations": "batch-custom-ask", "batch-automation": "batch-recommendations", "batch-manual": "batch-automation",
     };
     setError("");
     if (step === "definition-review" && approvedProjectDefinition) {
@@ -657,6 +662,46 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       }
     }
     setBatchRecommendations(recommendations);
+    setStep("batch-custom-ask");
+  };
+
+  // Custom batch form: Save keeps the current batch, Add another starts a blank one, Done merges them into the list.
+  const saveCustomDraft = (): boolean => {
+    if (!customDraft.topic.trim()) return false;
+    const entry = { topic: customDraft.topic.trim(), specialInstructions: customDraft.specialInstructions.trim(), temporaryConstraints: customDraft.temporaryConstraints.trim() };
+    setCustomBatches(prev => {
+      const next = [...prev];
+      if (customEditingIndex !== null && next[customEditingIndex]) next[customEditingIndex] = entry;
+      else next.push(entry);
+      return next;
+    });
+    if (customEditingIndex === null) setCustomEditingIndex(customBatches.length);
+    setError("");
+    return true;
+  };
+  const addAnotherCustomBatch = () => {
+    if (customDraft.topic.trim()) saveCustomDraft();
+    setCustomDraft({ topic: "", specialInstructions: "", temporaryConstraints: "" });
+    setCustomEditingIndex(null);
+    setError("");
+  };
+  const finishCustomBatches = () => {
+    const pendingEntry = customDraft.topic.trim()
+      ? { topic: customDraft.topic.trim(), specialInstructions: customDraft.specialInstructions.trim(), temporaryConstraints: customDraft.temporaryConstraints.trim() }
+      : null;
+    const all = [...customBatches];
+    if (pendingEntry) {
+      if (customEditingIndex !== null && all[customEditingIndex]) all[customEditingIndex] = pendingEntry;
+      else all.push(pendingEntry);
+    }
+    setBatchRecommendations(prev => [
+      ...prev,
+      ...all.filter(item => !prev.some(existing => existing.topic.toLowerCase() === item.topic.toLowerCase())),
+    ]);
+    setCustomBatches([]);
+    setCustomDraft({ topic: "", specialInstructions: "", temporaryConstraints: "" });
+    setCustomEditingIndex(null);
+    setError("");
     setStep("batch-recommendations");
   };
 
@@ -933,9 +978,50 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
               ))}
             </div>
           )}
+          {step === "batch-custom-ask" && (
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={buttonClass} onClick={() => setStep("batch-custom-form")}>Yes, add custom batches</button>
+              <button type="button" className={buttonClass} onClick={() => setStep("batch-recommendations")}>No, show the list</button>
+            </div>
+          )}
+          {step === "batch-custom-form" && (
+            <div className="space-y-3">
+              {customBatches.length > 0 && (
+                <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-slate-200">
+                  {customBatches.map((batch, index) => (
+                    <li key={`custom-${index}-${batch.topic}`}>
+                      {batch.topic}{customEditingIndex === index ? " (editing)" : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <label className="block text-sm text-slate-200">
+                <span className="font-bold">Batch description</span>
+                <textarea aria-label="Batch description" className={textareaClass} rows={2} value={customDraft.topic} onChange={e => setCustomDraft({ ...customDraft, topic: e.target.value })} placeholder="The skill, ability, or topic this batch should teach" />
+              </label>
+              <label className="block text-sm text-slate-200">
+                <span className="font-bold">Special instructions</span>
+                <textarea aria-label="Special instructions" className={textareaClass} rows={3} value={customDraft.specialInstructions} onChange={e => setCustomDraft({ ...customDraft, specialInstructions: e.target.value })} placeholder="How the examples should demonstrate this batch" />
+              </label>
+              <label className="block text-sm text-slate-200">
+                <span className="font-bold">Batch-specific constraints</span>
+                <textarea aria-label="Batch-specific constraints" className={textareaClass} rows={3} value={customDraft.temporaryConstraints} onChange={e => setCustomDraft({ ...customDraft, temporaryConstraints: e.target.value })} placeholder="Rules that apply only to this batch" />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={buttonClass} disabled={!customDraft.topic.trim()} onClick={() => { if (!saveCustomDraft()) setError("Enter a batch description before saving."); }}><Check className="h-4 w-4" /> Save</button>
+                <button type="button" className={buttonClass} onClick={addAnotherCustomBatch}>Add another</button>
+                <button type="button" className={buttonClass} onClick={finishCustomBatches}>Done adding batches <ArrowRight className="h-4 w-4" /></button>
+              </div>
+            </div>
+          )}
           {step === "batch-recommendations" && (
-            <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-slate-200">
-              {batchRecommendations.map((batch, index) => <li key={`${index}-${batch.topic}`}>{batch.topic}</li>)}
+            <ul className="space-y-1 text-sm leading-relaxed text-slate-200">
+              {batchRecommendations.map((batch, index) => (
+                <li key={`${index}-${batch.topic}`} className="flex items-start justify-between gap-3">
+                  <span>• {batch.topic}</span>
+                  <button type="button" aria-label={`Remove batch ${batch.topic}`} className="shrink-0 rounded px-2 py-0.5 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white" onClick={() => setBatchRecommendations(prev => prev.filter((_, i) => i !== index))}>Delete</button>
+                </li>
+              ))}
             </ul>
           )}
           {step === "batch-manual" && (
