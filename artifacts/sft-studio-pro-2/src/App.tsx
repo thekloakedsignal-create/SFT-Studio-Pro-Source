@@ -2273,7 +2273,6 @@ export default function App() {
               text: `Successfully extracted ${data.pageCount ? `${data.pageCount} pages of ` : "full "}text from "${truncateFileName(file.name, 28)}" (${data.text.length.toLocaleString()} chars)!`,
               type: "success"
             });
-            handleSuggestDocCount(data.text, file.name);
           } else {
             throw new Error(data.error || "PDF text extraction failed");
           }
@@ -2309,7 +2308,6 @@ export default function App() {
             setDocContent(data.text);
             setDocName(file.name);
             setNotification({ text: `Successfully extracted text from "${truncateFileName(file.name, 28)}"!`, type: "success" });
-            handleSuggestDocCount(data.text, file.name);
           } else {
             throw new Error(data.error || "DOCX text extraction failed");
           }
@@ -2344,7 +2342,6 @@ export default function App() {
             setDocContent(data.text);
             setDocName(file.name);
             setNotification({ text: `OCR text extraction complete for "${truncateFileName(file.name, 28)}"!`, type: "success" });
-            handleSuggestDocCount(data.text, file.name);
           } else {
             throw new Error(data.error || "OCR failed");
           }
@@ -2365,7 +2362,6 @@ export default function App() {
         setDocContent(text);
         setDocName(file.name);
         setNotification({ text: `Successfully imported "${truncateFileName(file.name, 28)}" (${text.length} chars). Ready to parse.`, type: "success" });
-        handleSuggestDocCount(text, file.name);
       };
       reader.readAsText(file);
     }
@@ -5757,7 +5753,7 @@ export default function App() {
                             setDocConversionProgress(null);
                             setDocSuggestionExplanation(document.type === "transcript"
                               ? "Transcript conversion retains the matched labeled dialogue."
-                              : "Click Re-Analyze to estimate examples for this document before converting.");
+                              : "Click Analyze to estimate examples for this document before converting.");
                           }}
                         />
 
@@ -5983,40 +5979,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* AI Document Analysis & Example Count Estimation Readout */}
-                    <div className="mb-6 p-4 bg-slate-900/80 border border-slate-800 rounded-2xl">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-blue-400" />
-                          <span className="text-xs font-bold text-white">AI Example Estimation:</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleSuggestDocCount()}
-                          disabled={isAnalyzingDoc || !docContent.trim()}
-                          className="px-2.5 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition disabled:opacity-50 cursor-pointer"
-                        >
-                          <RefreshCw className={`h-3 w-3 ${isAnalyzingDoc ? "animate-spin" : ""}`} />
-                          <span>{isAnalyzingDoc ? "Analyzing..." : "Re-Analyze"}</span>
-                        </button>
-                      </div>
-
-                      <div className="flex items-baseline gap-2 mb-1">
-                        <span className="text-2xl font-black font-mono text-blue-400">{docCount}</span>
-                        <span className="text-xs font-semibold text-slate-300">Optimal SFT Examples Estimated</span>
-                      </div>
-
-                      {docSuggestionExplanation ? (
-                        <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
-                          {docSuggestionExplanation}
-                        </p>
-                      ) : (
-                        <p className="text-[11px] text-slate-500 leading-relaxed mt-1">
-                          AI automatically analyzes document length (~{docWordCount} words) and narrative depth to synthesize optimal training targets.
-                        </p>
-                      )}
-                    </div>
-
                     {/* Context Specific Settings based on Document Type */}
                     <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 mb-6 space-y-4">
                       {/* Literature Prompt & Sanitization Info */}
@@ -6185,6 +6147,40 @@ export default function App() {
                           </button>
                         </div>
                       </div>
+                    </div>
+
+                    {/* AI Document Analysis & Example Count Estimation Readout */}
+                    <div className="mt-6 p-4 bg-slate-900/80 border border-slate-800 rounded-2xl">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-blue-400" />
+                          <span className="text-xs font-bold text-white">AI Example Estimation:</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleSuggestDocCount()}
+                          disabled={isAnalyzingDoc || !docContent.trim()}
+                          className="px-2.5 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition disabled:opacity-50 cursor-pointer"
+                        >
+                          <RefreshCw className={`h-3 w-3 ${isAnalyzingDoc ? "animate-spin" : ""}`} />
+                          <span>{isAnalyzingDoc ? "Analyzing..." : "Analyze"}</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <span className="text-2xl font-black font-mono text-blue-400">{docCount}</span>
+                        <span className="text-xs font-semibold text-slate-300">Optimal SFT Examples Estimated</span>
+                      </div>
+
+                      {docSuggestionExplanation ? (
+                        <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
+                          {docSuggestionExplanation}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-slate-500 leading-relaxed mt-1">
+                          Enter any instructions above, then click Analyze to estimate the example count for this document (~{docWordCount} words).
+                        </p>
+                      )}
                     </div>
                   </div>
 
