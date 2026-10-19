@@ -3272,7 +3272,11 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
   const requestedCount = count === undefined ? 8 : Number(count);
   // Transcript mode is extraction, never synthesis. Do not truncate to an AI example count.
   if (actualDocType === "transcript") {
-    const { turns } = parseUniversalTranscript(documentContent, userTag, assistantTag);
+    const parsed = parseUniversalTranscript(documentContent, userTag, assistantTag);
+    // Training conversations must open with the user: drop anything captured before the first user turn
+    // (assistant greetings, or header/metadata misattributed to the assistant speaker).
+    const firstUserIndex = parsed.turns.findIndex(turn => turn.role === "user");
+    const turns = firstUserIndex > 0 ? parsed.turns.slice(firstUserIndex) : parsed.turns;
     if (!turns.length || !turns.some(turn => turn.role === "user") || !turns.some(turn => turn.role === "assistant")) {
       return res.status(400).json({ success: false, error: "No dialogue matched both speaker tags. Check the User and Assistant tags against your transcript." });
     }
