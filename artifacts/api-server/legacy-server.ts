@@ -3093,7 +3093,7 @@ app.post("/api/analyze-document", async (req, res) => {
 
   const client = getDigitalOceanClient();
   const words = documentContent.trim().split(/\s+/).length;
-  const heuristicCount = Math.max(3, Math.min(30, Math.ceil(words / 250)));
+  const heuristicCount = Math.max(3, Math.ceil(words / 250));
 
   if (!client) {
     return res.json({
@@ -3129,14 +3129,14 @@ ${analysisSample}
 
 Tasks:
 1. Conduct a deep architectural assessment of the document's content, breadth, and structural complexity across all chapters or sections.
-2. Estimate the optimal number of distinct, high-quality SFT examples required to thoroughly cover all key topics, chapters, concepts, or narrative arcs without redundancy or gaps (recommended count between 3 and 50).
+2. Estimate the optimal number of distinct, high-quality SFT examples required to thoroughly cover all key topics, chapters, concepts, or narrative arcs without redundancy or gaps (minimum 3; no upper limit — follow the user instructions if they specify a count).
 3. Identify the true document type: "transcript" (dialogues, interviews, chats, or speaker turns), "literature" (novels, stories, books, narrative prose), or "knowledge_base" (technical documentation, manuals, guides, policies, or domain knowledge).
 4. Identify the central title, theme, or subject domain (e.g. "Moby Dick", "The Great Gatsby", "Quantum Mechanics Fundamentals", or "Kubernetes Deployment Architecture").
 5. Provide a clear, professional architectural rationale for your recommendation, detailing how the estimated examples will comprehensively span the document's structure.
 
 Return ONLY a valid JSON object matching:
 {
-  "estimatedCount": <number between 3 and 50>,
+  "estimatedCount": <number, at least 3>,
   "recommendedDocType": "transcript" | "knowledge_base" | "literature",
   "titleOrTheme": "<detected book title, domain, or primary theme>",
   "explanation": "<detailed architectural rationale for example count and document structure>"
@@ -3170,7 +3170,7 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
     if (parsed && typeof parsed.estimatedCount === "number") {
       return res.json({
         success: true,
-        estimatedCount: Math.max(3, Math.min(35, Math.round(parsed.estimatedCount))),
+        estimatedCount: Math.max(3, Math.round(parsed.estimatedCount)),
         recommendedDocType: parsed.recommendedDocType || docType || "knowledge_base",
         titleOrTheme: parsed.titleOrTheme || documentName || "Document",
         explanation: parsed.explanation || `AI analyzed ~${words} words and recommended ${parsed.estimatedCount} SFT examples.`

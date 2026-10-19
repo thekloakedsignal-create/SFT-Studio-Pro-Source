@@ -2229,7 +2229,7 @@ export default function App() {
     } catch (err: any) {
       console.warn("Document analysis fallback:", err);
       const words = content.trim().split(/\s+/).length;
-      const count = Math.max(3, Math.min(30, Math.ceil(words / 250)));
+      const count = Math.max(3, Math.ceil(words / 250));
       setDocCount(count);
       setDocSuggestionExplanation(`Analyzed ~${words} words. Estimated ${count} SFT examples for optimal coverage.`);
     } finally {
