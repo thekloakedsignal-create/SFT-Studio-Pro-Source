@@ -31,7 +31,7 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-white tracking-tight">SFT Studio Pro Documentation & Guides</h2>
-            <p className="text-xs text-slate-400">Dataset specifications, reasoning tag formatting, and export schemas</p>
+            <p className="text-xs text-slate-400">Dataset specifications, reasoning tag formatting, and export schemas · <a href={`${import.meta.env.BASE_URL}docs.html`} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Public docs page</a></p>
           </div>
         </div>
 
