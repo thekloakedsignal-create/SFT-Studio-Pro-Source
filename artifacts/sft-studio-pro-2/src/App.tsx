@@ -4014,6 +4014,8 @@ export default function App() {
       <ProjectOnboarding
         startAtBatchInterview={showBatchRecommendationInterview}
         initialProjectSettings={showBatchRecommendationInterview ? project : undefined}
+        savedProjects={userProjects.map((p: any) => ({ id: p.id, name: p.name }))}
+        onOpenSaved={showBatchRecommendationInterview ? undefined : (id) => { void handleSelectProject(id); }}
         onSkip={() => {
           if (showBatchRecommendationInterview) {
             setShowBatchRecommendationInterview(false);

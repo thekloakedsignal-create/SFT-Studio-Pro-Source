@@ -307,6 +307,8 @@ interface Props {
   onSkip: () => void;
   startAtBatchInterview?: boolean;
   initialProjectSettings?: ProjectSettings;
+  savedProjects?: { id: string; name: string }[];
+  onOpenSaved?: (projectId: string) => void;
 }
 
 const PROMPTS: Record<Step, string> = {
@@ -400,8 +402,9 @@ function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; a
   }
 }
 
-export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = false, initialProjectSettings }: Props) {
+export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = false, initialProjectSettings, savedProjects = [], onOpenSaved }: Props) {
   const [showWorkshopChoice, setShowWorkshopChoice] = useState(!startAtBatchInterview);
+  const [showSavedPicker, setShowSavedPicker] = useState(false);
   const [step, setStep] = useState<Step>(startAtBatchInterview ? "batch-skills" : "name");
   const [projectName, setProjectName] = useState(initialProjectSettings?.name || "");
   const [goal, setGoal] = useState(initialProjectSettings?.targetTask || "");
@@ -830,6 +833,23 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
               >
                 Skip guide
               </button>
+              {onOpenSaved && (
+                <button type="button" className={buttonClass} onClick={() => setShowSavedPicker(true)}>
+                  Open saved project
+                </button>
+              )}
+              {showSavedPicker && onOpenSaved && (
+                <select
+                  aria-label="Saved projects"
+                  autoFocus
+                  defaultValue=""
+                  className="w-full max-w-xs rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-purple-400"
+                  onChange={e => { if (e.target.value) onOpenSaved(e.target.value); }}
+                >
+                  <option value="" disabled>{savedProjects.length ? "Select a saved project" : "No saved projects yet"}</option>
+                  {savedProjects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
+                </select>
+              )}
             </div>
           </div>
         </section>
