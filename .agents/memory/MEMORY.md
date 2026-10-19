@@ -17,4 +17,5 @@
 - [Training provider compatibility](training-provider-compatibility.md) — Completed jobs may omit project identity; avoid forcing filtered schema pushes that touch unrelated sequences.
 - [Generation voice fidelity](generation-voice-fidelity.md) — Project voice overrides provider alignment; never pathologize, reframe, or condescend to the user.
 - [Project definition immutability](project-definition-immutability.md) — A locked project definition is never rewritten by presets or anything else; the golden exemplar never comes from stock text.
+- [Generation request params](generation-request-params.md) — Never send or configure reasoning_effort, thinking budgets, or frequency/presence penalties, even gated or null.
 - [Pipeline automation spec](pipeline-automation-spec.md) — Onboarding ends with four questions (not toggles); QA chain is assess once → regen once → dedupe → approve, no re-assessment, no skipped steps.

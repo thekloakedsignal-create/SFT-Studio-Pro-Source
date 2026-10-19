@@ -888,16 +888,9 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
         model: targetModel,
         messages: baseMessages,
         temperature: params.config?.temperature ?? 0.7,
-        ...(params.applySftSamplingPenalties
-          ? { frequency_penalty: 0.7, presence_penalty: 0.6 }
-          : {}),
         ...(params.exactMessages
           ? { max_completion_tokens: maxTokensToUse }
           : { max_tokens: maxTokensToUse }),
-        // Only send reasoning_effort when explicitly configured; never default it.
-        ...(typeof params.config?.reasoningEffort === "string" && params.config.reasoningEffort
-          ? { reasoning_effort: params.config.reasoningEffort }
-          : {}),
         ...(jsonMode ? { response_format: { type: "json_object" } } : {})
       }),
       signal: abortSignal
@@ -1391,7 +1384,6 @@ ${JSON.stringify({ examples: [{ messages: [
           responseMimeType: "application/json",
           maxOutputTokens: 4096,
           temperature: 0.7,
-          reasoningEffort: null,
         },
           timeoutMs: Math.min(topicPlanTimeoutMs, Math.max(1, generationDeadline - Date.now())),
       })),
@@ -1812,7 +1804,6 @@ FINAL OUTPUT TEMPLATE
           const configObj: any = {
             maxOutputTokens: 65536,
             responseMimeType: "application/json",
-            reasoningEffort: null,
             ...(turnMode === "Reasoning"
               ? {
                   responseSchema: {
@@ -1830,7 +1821,6 @@ FINAL OUTPUT TEMPLATE
                   }
                 }
               : {}),
-            ...(turnMode !== "Reasoning" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
             systemInstruction: turnMode === "Reasoning"
               ? reasoningSystemPrompt
               : `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis engine.
@@ -1905,7 +1895,6 @@ ${projectFidelityRule}`
                     systemInstruction: encodeReasoningProviderText(prompt),
                     maxOutputTokens: requestConfig.maxOutputTokens,
                     temperature: 0.7,
-                    reasoningEffort: null
                   }
                 : requestConfig,
               timeoutMs,
