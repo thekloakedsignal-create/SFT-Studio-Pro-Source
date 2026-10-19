@@ -515,7 +515,13 @@ export default function App() {
   };
   const writeGuideState = (projectId: string, update: Record<string, unknown>) => {
     const current = readGuideState(projectId);
-    localStorage.setItem(guideStorageKey(projectId), JSON.stringify({ ...current, ...update }));
+    try {
+      localStorage.setItem(guideStorageKey(projectId), JSON.stringify({ ...current, ...update }));
+    } catch (err) {
+      // Browser storage can be full (guide answers include uploaded onboarding documents).
+      // Saving the answer is best-effort; it must never block the action the user just triggered.
+      console.warn("Guide state could not be saved to browser storage:", err);
+    }
   };
 
   // Automation pipeline helpers (opt-in; attaches to the section AI guides)
