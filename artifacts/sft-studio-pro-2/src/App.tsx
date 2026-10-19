@@ -2188,6 +2188,7 @@ export default function App() {
       const res = await fetch("/api/analyze-document", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(25_000),
         body: JSON.stringify({
           documentContent: content,
           documentName: name || docName || "Inline Document",

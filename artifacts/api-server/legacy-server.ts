@@ -3106,7 +3106,7 @@ app.post("/api/analyze-document", async (req, res) => {
   }
 
   try {
-  const analysisSample = sampleDocumentContent(documentContent);
+  const analysisSample = sampleDocumentContent(documentContent, 12_000);
   const analysisPrompt = `
 You are an expert AI Data Engineering Architect and SFT Specialist.
 Perform a thorough, comprehensive architectural analysis across the entire provided document.
@@ -3140,7 +3140,12 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
 
     const aiRes = await callDigitalOceanAI({
       model: normalizeModel(extractionModel),
-      contents: analysisPrompt
+      contents: analysisPrompt,
+      timeoutMs: 18_000,
+      config: {
+        temperature: 0.1,
+        maxOutputTokens: 1024
+      }
     });
 
     const rawText = extractResponseText(aiRes);
