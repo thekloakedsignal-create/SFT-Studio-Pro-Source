@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
-import { createRecord, deleteRecord, getRecord, setRecord } from "../lib/training-records.mjs";
+import { createRecord, deleteRecord, getRecord, listRecords, setRecord } from "../lib/training-records.mjs";
 import { ownedTrainingJobs, rememberJobStatus } from "../lib/training-jobs.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -63,6 +63,53 @@ async function togetherRequest(base: string, route: string, init: RequestInit = 
   try { body = text ? JSON.parse(text) : null; } catch { /* handled below */ }
   if (!response.ok) throw new Error(`Provider request failed (${response.status}).`);
   return body;
+}
+
+// Ending a trial deletes the provider endpoint outright (scaling to zero is not enough to stop billing).
+async function deleteTrialEndpoint(trial: Pick<TrialSession, "projectId" | "endpointId">) {
+  if (!trial.endpointId) return;
+  try {
+    await togetherRequest(TOGETHER_V2, `/projects/${encodeURIComponent(trial.projectId)}/endpoints/${encodeURIComponent(trial.endpointId)}`, { method: "DELETE" });
+  } catch (error: any) {
+    // Already gone counts as deleted.
+    if (!/\(404\)/.test(String(error?.message))) throw error;
+  }
+}
+
+async function endTrial(uid: string, trial: TrialSession) {
+  await deleteTrialEndpoint(trial);
+  await trialRef(uid).update({ state: "expired", stoppedAt: new Date().toISOString() });
+  trial.state = "expired";
+}
+
+// Runs every 10 minutes from the server process and on every status poll: any trial past its
+// 15-minute window, stuck starting, or failed has its endpoint deleted.
+export async function cleanupModelTrials() {
+  const now = Date.now();
+  const sessions = (await listRecords("trial")).filter((row: any) => ["starting", "ready", "failed"].includes(row.data?.state));
+  for (const row of sessions) {
+    const trial = row.data as TrialSession;
+    try {
+      if (trial.state === "ready" && trial.expiresAt && Date.parse(trial.expiresAt) <= now) {
+        await endTrial(row.id, trial);
+      } else if (trial.state === "failed") {
+        await endTrial(row.id, trial);
+      } else if (trial.state === "starting") {
+        const createdAt = Date.parse(trial.createdAt || "");
+        if (Number.isFinite(createdAt) && now - createdAt > 45 * 60 * 1000) await endTrial(row.id, trial);
+      }
+    } catch (error) {
+      logger.warn({ error: String(error), uid: row.id }, "Model trial cleanup failed; will retry");
+    }
+  }
+}
+
+let cleanupTimer: NodeJS.Timeout | null = null;
+export function startModelTrialCleanup() {
+  if (cleanupTimer) return;
+  cleanupTimer = setInterval(() => { cleanupModelTrials().catch(() => {}); }, 10 * 60 * 1000);
+  cleanupTimer.unref?.();
+  cleanupModelTrials().catch(() => {});
 }
 
 async function loadLatestCompletedModel(uid: string) {
@@ -132,6 +179,9 @@ router.get("/finetune/model-trial/status", async (req: AuthRequest, res) => {
       }
     }
     const expires = trial?.expiresAt ? Date.parse(trial.expiresAt) : null;
+    if (trial?.state === "ready" && expires && expires <= Date.now()) {
+      try { await endTrial(uid, trial); } catch (error) { logger.warn({ error: String(error) }, "Model trial endpoint could not be deleted; cleanup will retry"); }
+    }
     return res.json({
       success: true,
       availableModelName: latest?.modelName || null,
@@ -167,6 +217,13 @@ router.post("/finetune/model-trial/start", async (req: AuthRequest, res) => {
     );
     const config = selectConfig(Array.isArray(modelConfigs?.data) ? modelConfigs.data : []);
     if (!config) return res.status(422).json({ success: false, error: "This model is not available for chat yet." });
+
+    // Refuse to start if a chat endpoint already exists at the provider (covers every environment sharing the key).
+    const existingEndpoints = await togetherRequest(TOGETHER_V2, `/projects/${encodeURIComponent(projectId)}/endpoints`);
+    const existing = (Array.isArray(existingEndpoints?.data) ? existingEndpoints.data : []).find((ep: any) => /\/sft-chat-/.test(String(ep?.name || "")));
+    if (existing) {
+      return res.status(409).json({ success: false, error: "A model chat endpoint already exists. Wait for it to be removed before starting another." });
+    }
 
     const ref = trialRef(uid);
     const created = await createRecord("trial", uid, {
@@ -219,13 +276,6 @@ router.post("/finetune/model-trial/start", async (req: AuthRequest, res) => {
     if (reserved) {
       const ref = trialRef(uid);
       try {
-        if (endpointId && deploymentId) {
-          await togetherRequest(
-            TOGETHER_V2,
-            `/projects/${encodeURIComponent(projectId)}/endpoints/${encodeURIComponent(endpointId)}/deployments/${encodeURIComponent(deploymentId)}`,
-            { method: "PATCH", body: JSON.stringify({ autoscaling: { minReplicas: 0, maxReplicas: 0 } }) },
-          );
-        }
         if (endpointId) {
           await togetherRequest(TOGETHER_V2, `/projects/${encodeURIComponent(projectId)}/endpoints/${encodeURIComponent(endpointId)}`, { method: "DELETE" });
         }

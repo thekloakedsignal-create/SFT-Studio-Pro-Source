@@ -18,17 +18,15 @@ async function request(path, method = "GET", body) {
   const text = await response.text();
   let result = null;
   try { result = text ? JSON.parse(text) : null; } catch { /* response checked below */ }
+  if (response.status === 404 && method === "DELETE") return null; // already gone
   if (!response.ok) throw new Error(`Provider cleanup request failed (${response.status}).`);
   return result;
 }
 
 async function stopTrial(ref, trial) {
-  if (trial.endpointId && trial.deploymentId) {
-    await request(
-      `/projects/${encodeURIComponent(trial.projectId)}/endpoints/${encodeURIComponent(trial.endpointId)}/deployments/${encodeURIComponent(trial.deploymentId)}`,
-      "PATCH",
-      { autoscaling: { minReplicas: 0, maxReplicas: 0 } },
-    );
+  // Delete the endpoint outright; scaling to zero does not end billing.
+  if (trial.endpointId) {
+    await request(`/projects/${encodeURIComponent(trial.projectId)}/endpoints/${encodeURIComponent(trial.endpointId)}`, "DELETE");
   }
   await ref.update({ state: "expired", stoppedAt: new Date().toISOString() });
 }
