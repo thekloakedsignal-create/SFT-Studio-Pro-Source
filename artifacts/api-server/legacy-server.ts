@@ -2128,7 +2128,7 @@ ${projectFidelityRule}`
           recoveryFailureReason = formatAIErrorMessage(error);
           if (isReasoningGeneration) recoveryFailureCategory = getReasoningFailureCategory(error);
           logger.warn(
-            { model, slot: item.slot, batchId: generationBatchId, error: recoveryFailureReason },
+            { model, slot: item.slot, batchId: generationBatchId, error: recoveryFailureReason, status: error?.status ?? error?.statusCode, detail: String(error?.message || error).slice(0, 300) },
             "Generation slot failed; cycling to the next request"
           );
         }
