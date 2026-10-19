@@ -3086,7 +3086,7 @@ function sampleDocumentContent(content: string, maxChars = 48_000): string {
 
 // 1.5 Document Analysis & Example Count Estimator
 app.post("/api/analyze-document", async (req, res) => {
-  const { documentContent, documentName, docType, extractionModel } = req.body;
+  const { documentContent, documentName, docType, extractionModel, converterInstructions } = req.body;
   if (typeof documentContent !== "string" || !documentContent.trim()) {
     return res.status(400).json({ success: false, error: "Document content is required" });
   }
@@ -3113,9 +3113,15 @@ Perform a thorough, comprehensive architectural analysis across the entire provi
 Examine its full structure, narrative arcs, technical topics, chapters, concepts, or dialogue turns from beginning to end.
 
 Document Name: "${documentName || "Unknown"}"
+Selected Document Type: "${docType || "knowledge_base"}"
 Total Word Count: ~${words} words
 Total Character Length: ${documentContent.length} characters
-
+${typeof converterInstructions === "string" && converterInstructions.trim() ? `
+USER CONVERSION INSTRUCTIONS (authoritative for this analysis, including any requested example count, focus, or depth):
+"""
+${converterInstructions.trim()}
+"""
+` : ""}
 Representative excerpts sampled across the complete document (do not assume omitted spans are empty):
 """
 ${analysisSample}
@@ -3562,21 +3568,7 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
           timeoutMs: DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS,
           config: {
             maxOutputTokens: 4096,
-            responseMimeType: "application/json",
-            ...(format !== "reasoning" ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-            systemInstruction: format === "reasoning"
-              ? `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis and conversion engine.
-
-MANDATORY CHAIN-OF-THOUGHT DIRECTIVE (REASONING EXAMPLES ONLY):
-We want the models in training to learn reasoning chain of thought in the reasoning examples ONLY.
-You MUST write all thinking traces in the FIRST PERSON from the perspective of the trainee model working through the prompt (e.g., "The user is asking for... Let me first check... I need to verify... Therefore, the answer is...").
-ABSOLUTELY NO META REASONING FROM THE GENERATOR: Never include any generator meta commentary about dataset synthesis, writing prompts, or instructions. It must solely be the trainee model solving the problem.`
-              : `You are an expert Supervised Fine-Tuning (SFT) dataset synthesis and conversion engine.
-
-ABSOLUTE ZERO CHAIN-OF-THOUGHT MANDATE:
-This task generates direct assistant responses. Responses MUST NEVER contain any chain of thought, reasoning traces, thinking tags (<think>), or internal planning monologue (such as "I am analyzing...", "I need to explain...", "First, I will...", "Let me...").
-Every assistant response MUST begin immediately with the direct, substantive answer to the user.
-No internal deliberation, planning, or reasoning fields are permitted.`
+            responseMimeType: "application/json"
           }
         });
 

@@ -2193,7 +2193,8 @@ export default function App() {
           documentContent: content,
           documentName: name || docName || "Inline Document",
           docType,
-          extractionModel
+          extractionModel,
+          converterInstructions: converterInstructions.trim()
         })
       });
       const data = await res.json();
