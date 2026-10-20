@@ -95,6 +95,26 @@ function payload(uid: string, user?: AuthRequest["user"]) {
 }
 router.get("/whop/entitlements", (req: AuthRequest, res) => { res.json(payload(req.user!.uid, req.user)); });
 
+// Promo code: one free 9B training run per account. Grants training credit only (no model chat demo).
+const FREE_9B_TRAINING_CODE = "TRAIN9B-FREE";
+router.post("/whop/redeem-training", (req: AuthRequest, res) => {
+  const uid = req.user!.uid;
+  const code = String(req.body?.code || "").trim().toUpperCase();
+  if (code !== FREE_9B_TRAINING_CODE) { res.status(404).json({ success: false, error: "Invalid code." }); return; }
+  try {
+    change(s => {
+      const a = account(s, uid) as Account & { redeemedTrainingCodes?: string[] };
+      a.redeemedTrainingCodes ??= [];
+      if (a.redeemedTrainingCodes.includes(code)) throw Object.assign(new Error("This code has already been redeemed on your account."), { status: 409 });
+      a.redeemedTrainingCodes.push(code);
+      a.training.train_9b = (a.training.train_9b || 0) + 1;
+    });
+    res.json({ ...payload(uid, req.user), granted: "train_9b" });
+  } catch (error: any) {
+    res.status(error.status || 500).json({ success: false, error: error.message || "Unable to redeem code." });
+  }
+});
+
 router.post("/whop/checkout", async (req: AuthRequest, res) => {
   if (isOwner(req.user)) { res.json(payload(req.user!.uid, req.user)); return; }
   try {

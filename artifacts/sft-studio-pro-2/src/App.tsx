@@ -1047,6 +1047,25 @@ export default function App() {
     setNotification({ text: "Verifying student class code...", type: "info" });
     
     try {
+      // Training promo codes (e.g. one free 9B training run) are redeemed server-side.
+      const trainingRes = await projectApiFetch("/api/whop/redeem-training", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: enteredCode })
+      });
+      if (trainingRes.ok) {
+        setStudentCodeInput("");
+        setNotification({ text: "Success! One free 9B training run added to your account.", type: "success" });
+        setIsRedeemingCode(false);
+        return;
+      }
+      if (trainingRes.status !== 404) {
+        const trainingData = await trainingRes.json().catch(() => ({}));
+        setNotification({ text: trainingData.error || "Error redeeming code.", type: "error" });
+        setIsRedeemingCode(false);
+        return;
+      }
+
       // Query student codes from Postgres database
       const res = await fetch("/api/sql/student-codes");
       const data = await res.json();
