@@ -3988,6 +3988,10 @@ export default function App() {
               Docs &amp; Specs
             </button>
             <span className="text-slate-700">•</span>
+            <a href={`${import.meta.env.BASE_URL}manual.html`} className="hover:text-emerald-400 transition">
+              Full HTML Manual
+            </a>
+            <span className="text-slate-700">•</span>
             <button onClick={() => setShowCustomPackageModal(true)} className="hover:text-emerald-400 transition cursor-pointer flex items-center gap-1">
               <HelpCircle className="h-3 w-3 text-emerald-400" />
               Support
@@ -4130,6 +4134,9 @@ export default function App() {
               <button onClick={() => setShowDocsModal(true)} className="hover:text-emerald-400 transition cursor-pointer">
                 Docs
               </button>
+              <a href={`${import.meta.env.BASE_URL}manual.html`} className="hover:text-emerald-400 transition">
+                Manual
+              </a>
               <button 
                 onClick={() => setShowCustomPackageModal(true)} 
                 className="hover:text-emerald-300 transition cursor-pointer flex items-center gap-1.5 text-emerald-400 font-semibold"

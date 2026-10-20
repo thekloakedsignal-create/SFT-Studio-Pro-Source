@@ -127,9 +127,12 @@ function AccountBridge({ children }: { children: ReactNode }) {
 }
 
 function SignInPage() {
-  return <div className="flex min-h-[100dvh] items-center justify-center px-4">
+  return <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 px-4">
     <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}
       forceRedirectUrl={basePath || "/"} />
+    <a href={`${basePath}/manual.html`} className="text-sm text-emerald-400 underline underline-offset-4">
+      Read the SFT Studio Pro manual
+    </a>
   </div>;
 }
 function SignUpPage() {
