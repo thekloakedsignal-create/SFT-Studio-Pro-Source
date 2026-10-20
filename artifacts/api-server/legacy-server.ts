@@ -4926,7 +4926,7 @@ async function pipelineCall(userId: string, path: string, init: any = {}, user?:
       ...(init.headers || {})
     }
   });
-  const data = await res.json().catch(() => ({}));
+  const data: any = await res.json().catch(() => ({}));
   if (res.status === 402) throw new Error("Credits exhausted — the pipeline stopped. Add credits and restart it.");
   return { ok: res.ok, status: res.status, data };
 }
@@ -5280,7 +5280,7 @@ function launchPipeline(job: any) {
     .finally(() => { job.finishedAt = new Date().toISOString(); checkpointPipeline(job, true).catch(() => {}); });
 }
 
-app.post("/api/pipeline/start", optionalAuth, async (req: AuthRequest, res) => {
+app.post("/api/pipeline/start", optionalAuth, async (req: AuthRequest, res): Promise<any> => {
   const userId = projectOwnerId(req);
   if (!userId) return res.status(401).json({ success: false, error: "Sign in to run automation." });
   const { projectId, autoGenerate, autoQa, docs, recommendations, project, trainingModel, batchCount } = req.body || {};
@@ -5329,7 +5329,7 @@ app.post("/api/pipeline/start", optionalAuth, async (req: AuthRequest, res) => {
   launchPipeline(job);
 });
 
-app.post("/api/pipeline/:projectId/resume", optionalAuth, async (req: AuthRequest, res) => {
+app.post("/api/pipeline/:projectId/resume", optionalAuth, async (req: AuthRequest, res): Promise<any> => {
   const userId = projectOwnerId(req);
   if (!userId) return res.status(401).json({ success: false, error: "Sign in to run automation." });
   const projectId = Array.isArray(req.params.projectId) ? req.params.projectId[0] ?? "" : req.params.projectId;
@@ -5350,7 +5350,7 @@ app.post("/api/pipeline/:projectId/resume", optionalAuth, async (req: AuthReques
   }
 });
 
-app.get("/api/pipeline/:projectId", optionalAuth, async (req: AuthRequest, res) => {
+app.get("/api/pipeline/:projectId", optionalAuth, async (req: AuthRequest, res): Promise<any> => {
   const userId = projectOwnerId(req);
   if (!userId) return res.status(401).json({ success: false, error: "Sign in to view automation." });
   const projectId = Array.isArray(req.params.projectId) ? req.params.projectId[0] ?? "" : req.params.projectId;
@@ -5372,7 +5372,7 @@ app.get("/api/pipeline/:projectId", optionalAuth, async (req: AuthRequest, res) 
   });
 });
 
-app.post("/api/pipeline/:projectId/gate", optionalAuth, async (req: AuthRequest, res) => {
+app.post("/api/pipeline/:projectId/gate", optionalAuth, async (req: AuthRequest, res): Promise<any> => {
   const userId = projectOwnerId(req);
   if (!userId) return res.status(401).json({ success: false, error: "Sign in to approve automation." });
   const projectId = Array.isArray(req.params.projectId) ? req.params.projectId[0] ?? "" : req.params.projectId;
