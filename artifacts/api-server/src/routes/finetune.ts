@@ -177,6 +177,7 @@ const router: IRouter = Router();
 router.use(optionalAuth);
 router.use("/finetune", async (req: AuthRequest, res, next) => {
   if (!req.user?.uid) return next();
+  let submitted = false;
   try {
     res.locals.finetuneStore = await loadStore(req.user.uid);
     res.setHeader("Cache-Control", "no-store");
@@ -498,7 +499,6 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
       },
     });
   } catch (error: any) {
-    // Refund the training credit when no job was actually submitted.
     if (!submitted && req.user) restoreTraining(req.user.uid, trainingSelection, freePromoTraining);
     logger.warn({ error: error?.message }, "Fine-tune job creation failed");
     return res.status(error?.status || 502).json({ success: false, error: error?.message || "Job submission failed." });

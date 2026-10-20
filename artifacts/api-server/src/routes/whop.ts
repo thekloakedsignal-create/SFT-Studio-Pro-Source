@@ -96,7 +96,6 @@ export function restoreTraining(uid: string, model: string, freePromo = false) {
     }
   });
 }
-
 const router: IRouter = Router();
 // Scope auth to billing paths, not unrelated routes.
 router.use("/whop", optionalAuth, (req: AuthRequest, res, next) => {
