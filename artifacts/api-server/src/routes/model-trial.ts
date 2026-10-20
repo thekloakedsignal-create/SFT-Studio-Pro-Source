@@ -115,6 +115,7 @@ export function startModelTrialCleanup() {
 async function loadLatestCompletedModel(uid: string) {
   const jobs = await ownedTrainingJobs(uid);
   for (const { id: jobId, data: saved } of jobs.reverse()) {
+    if (saved.freePromoTraining === true) continue;
     if (["error", "user_error", "failed", "cancelled"].includes(saved.status)) continue;
     const job = await togetherRequest(TOGETHER_V1, `/fine-tunes/${encodeURIComponent(jobId)}`);
     await rememberJobStatus(uid, jobId, job);

@@ -456,8 +456,9 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
     }
   }
   const trainingSelection = req.body?.trainingModel ?? "Qwen3.5 9 Base";
+  let freePromoTraining = false;
   try {
-    consumeTraining(req.user, trainingSelection);
+    freePromoTraining = consumeTraining(req.user, trainingSelection);
   } catch (error: any) {
     return res.status(error.status || 503).json({ success: false, error: error.message });
   }
@@ -484,7 +485,7 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
     if (!job?.id) throw new Error("Together AI did not return a job ID.");
     submitted = true;
     await createRecord("job", job.id, {
-      ownerId: uid, trainingModel: trainingSelection, hfRepoName: repoName,
+      ownerId: uid, trainingModel: trainingSelection, hfRepoName: repoName, freePromoTraining,
     });
     await rememberJobStatus(uid, job.id, job);
     return res.json({
@@ -498,7 +499,7 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
     });
   } catch (error: any) {
     // Refund the training credit when no job was actually submitted.
-    if (!submitted && req.user) restoreTraining(req.user.uid, trainingSelection);
+    if (!submitted && req.user) restoreTraining(req.user.uid, trainingSelection, freePromoTraining);
     logger.warn({ error: error?.message }, "Fine-tune job creation failed");
     return res.status(error?.status || 502).json({ success: false, error: error?.message || "Job submission failed." });
   }
