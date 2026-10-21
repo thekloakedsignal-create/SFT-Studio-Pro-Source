@@ -67,8 +67,10 @@ export function settleExamples(id: string, produced: number) {
     delete s.reservations[id];
   });
 }
-export function consumeTraining(user: AuthRequest["user"], model: string): boolean {
-  if (isOwner(user)) return false;
+export type TrainingCreditSource = "paid" | "promo" | "owner";
+
+export function consumeTraining(user: AuthRequest["user"], model: string): TrainingCreditSource {
+  if (isOwner(user)) return "owner";
   const uid = user?.uid;
   if (!uid) throw Object.assign(new Error("Please sign in."), { status: 401 });
   const key = TRAINING_MODEL_PLANS[model];
@@ -79,18 +81,19 @@ export function consumeTraining(user: AuthRequest["user"], model: string): boole
     const freeCredits = a.freeTrainingCredits?.[key] || 0;
     if (freeCredits > 0) {
       a.freeTrainingCredits![key] = freeCredits - 1;
-      return true;
+      return "promo";
     }
-    return false;
+    return "paid";
   });
 }
-export function restoreTraining(uid: string, model: string, freePromo = false) {
+export function restoreTraining(uid: string, model: string, source: TrainingCreditSource) {
+  if (source === "owner") return;
   change(s => {
     const a = account(s, uid);
     const key = TRAINING_MODEL_PLANS[model];
     if (!key) return;
     a.training[key] = (a.training[key] || 0) + 1;
-    if (freePromo) {
+    if (source === "promo") {
       a.freeTrainingCredits ??= {};
       a.freeTrainingCredits[key] = (a.freeTrainingCredits[key] || 0) + 1;
     }

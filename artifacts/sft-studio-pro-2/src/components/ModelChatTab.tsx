@@ -132,7 +132,7 @@ export function ModelChatTab({ apiFetch }: Props) {
             Start model chat
           </button>
           {status && !status.available && (
-            <p className="mt-3 text-xs text-slate-400">Complete a training run before starting model chat.</p>
+            <p className="mt-3 text-xs text-slate-400">Complete a paid training run before starting model chat.</p>
           )}
         </div>
       )}
