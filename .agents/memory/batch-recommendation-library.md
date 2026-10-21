@@ -29,4 +29,4 @@ Batch recommendations must persist as soon as the user approves the list, withou
 
 **Why:** The user said, “Batch recommendations also need to persist once approved. Nothing more.”
 
-**How to apply:** Save approval in project-keyed guide storage and restore the approved list when reopening the project; preserve generation behavior.
+**How to apply:** Save approved recommendations to the account's server-side project record, not browser-only guide storage, so they persist in any browser. Await successful saving before proceeding; preserve generation behavior.

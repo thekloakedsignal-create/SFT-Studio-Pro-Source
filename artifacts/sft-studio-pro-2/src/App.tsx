@@ -1472,12 +1472,12 @@ export default function App() {
     setSelectedProjectId(selectedId);
     const savedGuideState = readGuideState(selectedId);
     setBatchRecommendations(
-      Array.isArray(savedGuideState.recommendations) ? savedGuideState.recommendations
-      : Array.isArray(selected.settings?.batchRecommendations) ? selected.settings.batchRecommendations : []
+      Array.isArray(selected.settings?.batchRecommendations) ? selected.settings.batchRecommendations
+      : Array.isArray(savedGuideState.recommendations) ? savedGuideState.recommendations : []
     );
     setCompletedRecommendedBatches(
-      Array.isArray(savedGuideState.completedRecommendedBatches) ? savedGuideState.completedRecommendedBatches
-      : Array.isArray(selected.settings?.completedRecommendedBatches) ? selected.settings.completedRecommendedBatches : []
+      Array.isArray(selected.settings?.completedRecommendedBatches) ? selected.settings.completedRecommendedBatches
+      : Array.isArray(savedGuideState.completedRecommendedBatches) ? savedGuideState.completedRecommendedBatches : []
     );
     setAutomationAnswers(readGuideState(selectedId).automation || {});
     setPipelineStatus(null);
@@ -4031,10 +4031,37 @@ export default function App() {
             setShowProjectOnboarding(false);
           }
         }}
-        onRecommendationsApproved={(recommendations) => {
-          if (selectedProjectId) {
-            writeGuideState(selectedProjectId, { recommendations, completedRecommendedBatches: [] });
+        onRecommendationsApproved={async (recommendations) => {
+          if (!selectedProjectId) throw new Error("Save the project before approving recommendations.");
+          const response = await projectApiFetch(`/api/sql/projects/${encodeURIComponent(selectedProjectId)}`);
+          const data = await response.json();
+          if (!response.ok || !data.success || !data.project) {
+            throw new Error("Could not load the saved project. Please retry.");
           }
+          const savedSettings = {
+            ...data.project.settings,
+            batchRecommendations: recommendations,
+            completedRecommendedBatches: [],
+          };
+          const saveResponse = await projectApiFetch("/api/sql/projects", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: selectedProjectId,
+              name: data.project.name,
+              settings: savedSettings,
+            }),
+          });
+          const result = await saveResponse.json();
+          if (!saveResponse.ok || !result.success) {
+            throw new Error(result.error || "Could not save approved recommendations. Please retry.");
+          }
+          setBatchRecommendations(recommendations);
+          setCompletedRecommendedBatches([]);
+          setUserProjects(current => current.map(saved =>
+            saved.id === selectedProjectId ? { ...saved, settings: savedSettings } : saved
+          ));
+          writeGuideState(selectedProjectId, { recommendations, completedRecommendedBatches: [] });
         }}
         onComplete={(settings, recommendations, trainingModel, autoGenerate) => {
           if (!showBatchRecommendationInterview) {
