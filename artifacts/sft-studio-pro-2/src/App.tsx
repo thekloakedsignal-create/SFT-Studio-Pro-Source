@@ -4030,12 +4030,10 @@ export default function App() {
           }
         }}
         onComplete={(settings, recommendations, trainingModel, autoGenerate) => {
-          if (!showBatchRecommendationInterview) {
-            setTrainerHandoff({
-              model: trainingModel || "Qwen3.5 9 Base",
-              template: `${settings.instructTemplate || "ChatML"} (<|im_start|>)`,
-            });
-          }
+          setTrainerHandoff({
+            model: trainingModel || "Qwen3.5 9 Base",
+            template: `${settings.instructTemplate || "ChatML"} (<|im_start|>)`,
+          });
           if (showBatchRecommendationInterview) {
             setBatchRecommendations(recommendations ?? []);
             setCompletedRecommendedBatches([]);
