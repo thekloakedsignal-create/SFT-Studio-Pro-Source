@@ -24,3 +24,9 @@ Display selected library recipes verbatim. Keep the single-turn/multi-turn/reaso
 On 2026-10-15 the user asked me to rewrite the whole library so every recipe teaches its behavior through the project's target voice and goals. All recipes (including the always-added Red Teaming/Adversarial ones) carry a shared voice-first lead and a no-drift constraint (no disclaimers, moralizing, pathologizing, reframing, or condescension).
 **Why:** the user said the old recipes injected generic alignment behavior that ignored the project voice.
 **How to apply:** New recipes keep the voice-first lead and no-drift constraint; otherwise preserve user-supplied text.
+
+Batch recommendations must persist as soon as the user approves the list, without requiring completion of later onboarding questions.
+
+**Why:** The user said, “Batch recommendations also need to persist once approved. Nothing more.”
+
+**How to apply:** Save approval in project-keyed guide storage and restore the approved list when reopening the project; preserve generation behavior.

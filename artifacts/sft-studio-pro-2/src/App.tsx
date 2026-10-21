@@ -1472,12 +1472,12 @@ export default function App() {
     setSelectedProjectId(selectedId);
     const savedGuideState = readGuideState(selectedId);
     setBatchRecommendations(
-      Array.isArray(selected.settings?.batchRecommendations) ? selected.settings.batchRecommendations
-      : Array.isArray(savedGuideState.recommendations) ? savedGuideState.recommendations : []
+      Array.isArray(savedGuideState.recommendations) ? savedGuideState.recommendations
+      : Array.isArray(selected.settings?.batchRecommendations) ? selected.settings.batchRecommendations : []
     );
     setCompletedRecommendedBatches(
-      Array.isArray(selected.settings?.completedRecommendedBatches) ? selected.settings.completedRecommendedBatches
-      : Array.isArray(savedGuideState.completedRecommendedBatches) ? savedGuideState.completedRecommendedBatches : []
+      Array.isArray(savedGuideState.completedRecommendedBatches) ? savedGuideState.completedRecommendedBatches
+      : Array.isArray(selected.settings?.completedRecommendedBatches) ? selected.settings.completedRecommendedBatches : []
     );
     setAutomationAnswers(readGuideState(selectedId).automation || {});
     setPipelineStatus(null);
@@ -4029,6 +4029,11 @@ export default function App() {
           } else {
             setActiveTab("define");
             setShowProjectOnboarding(false);
+          }
+        }}
+        onRecommendationsApproved={(recommendations) => {
+          if (selectedProjectId) {
+            writeGuideState(selectedProjectId, { recommendations, completedRecommendedBatches: [] });
           }
         }}
         onComplete={(settings, recommendations, trainingModel, autoGenerate) => {

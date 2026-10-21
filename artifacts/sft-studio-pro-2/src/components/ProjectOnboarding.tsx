@@ -304,6 +304,7 @@ const GENERAL_RECOMMENDED_BATCH_TOPICS = [
 
 interface Props {
   onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[], trainingModel?: string, autoGenerate?: boolean) => void;
+  onRecommendationsApproved?: (recommendations: BatchRecommendation[]) => void;
   onSkip: () => void;
   startAtBatchInterview?: boolean;
   initialProjectSettings?: ProjectSettings;
@@ -402,7 +403,7 @@ function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; a
   }
 }
 
-export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = false, initialProjectSettings, savedProjects = [], onOpenSaved }: Props) {
+export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSkip, startAtBatchInterview = false, initialProjectSettings, savedProjects = [], onOpenSaved }: Props) {
   const [showWorkshopChoice, setShowWorkshopChoice] = useState(!startAtBatchInterview);
   const [showSavedPicker, setShowSavedPicker] = useState(false);
   const [step, setStep] = useState<Step>(startAtBatchInterview ? "batch-skills" : "name");
@@ -1115,7 +1116,10 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             {["name", "goal", "constraints", "remember-model-name", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
             {step === "batch-recommendations" && <button type="button" className={buttonClass} disabled={pending} onClick={() => setStep("batch-skills")}>Add more topics</button>}
-            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("batch-automation")}>The list looks good <ArrowRight className="h-4 w-4" /></button>}
+            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => {
+              onRecommendationsApproved?.(batchRecommendations);
+              setStep("batch-automation");
+            }}>The list looks good <ArrowRight className="h-4 w-4" /></button>}
             {step === "batch-manual" && <button type="button" className={buttonClass} onClick={() => finish(false)}>Go to Batch generator <ArrowRight className="h-4 w-4" /></button>}
           </div>
         </footer>
