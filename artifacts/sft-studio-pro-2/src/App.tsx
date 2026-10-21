@@ -1218,7 +1218,10 @@ export default function App() {
   };
 
   // Save the SFT project to Firestore directly (incremental delta saving)
-  const handleSaveProject = async (projId: string | null = null) => {
+  const handleSaveProject = async (
+    projId: string | null = null,
+    overrides: { batchRecommendations?: BatchRecommendation[]; completedRecommendedBatches?: string[]; trainingModel?: string } = {}
+  ) => {
     const user = auth.currentUser;
     const userIdToUse = user ? user.uid : getDeviceId();
 
@@ -1237,8 +1240,9 @@ export default function App() {
       customInstructionFormat: project.customInstructionFormat || "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
       representativePrompt: project.representativePrompt || "",
       representativeCompletion: project.representativeCompletion || "",
-      batchRecommendations,
-      completedRecommendedBatches
+      batchRecommendations: overrides.batchRecommendations ?? batchRecommendations,
+      completedRecommendedBatches: overrides.completedRecommendedBatches ?? completedRecommendedBatches,
+      trainingModel: overrides.trainingModel ?? trainerHandoff.model
     };
 
     setSelectedProjectId(idToSave);
@@ -1478,6 +1482,9 @@ export default function App() {
       Array.isArray(selected.settings?.completedRecommendedBatches) ? selected.settings.completedRecommendedBatches
       : Array.isArray(savedGuideState.completedRecommendedBatches) ? savedGuideState.completedRecommendedBatches : []
     );
+    if (typeof selected.settings?.trainingModel === "string" && selected.settings.trainingModel) {
+      setTrainerHandoff(prev => ({ ...prev, model: selected.settings.trainingModel }));
+    }
     setAutomationAnswers(readGuideState(selectedId).automation || {});
     setPipelineStatus(null);
     setActiveRecommendedBatchIndex(0);
@@ -4038,6 +4045,14 @@ export default function App() {
             setBatchRecommendations(recommendations ?? []);
             setCompletedRecommendedBatches([]);
             setActiveRecommendedBatchIndex(0);
+            if (selectedProjectId) {
+              writeGuideState(selectedProjectId, { recommendations: recommendations ?? [], completedRecommendedBatches: [] });
+              void handleSaveProject(selectedProjectId, {
+                batchRecommendations: recommendations ?? [],
+                completedRecommendedBatches: [],
+                trainingModel: trainingModel || trainerHandoff.model
+              });
+            }
             setShowBatchRecommendationInterview(false);
             setActiveTab("synthesizer");
             if (autoGenerate !== undefined) {
