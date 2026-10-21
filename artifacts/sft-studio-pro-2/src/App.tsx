@@ -4091,6 +4091,25 @@ export default function App() {
           if (selectedProjectId && recommendations !== undefined) {
             writeGuideState(selectedProjectId, { recommendations, completedRecommendedBatches: [] });
           }
+          if (selectedProjectId) {
+            // Persist the onboarding result (definition, model, recommendations) to Postgres immediately.
+            const userIdToUse = auth.currentUser ? auth.currentUser.uid : getDeviceId();
+            void projectApiFetch("/api/sql/projects", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                id: selectedProjectId,
+                userId: userIdToUse,
+                name: settings.name || "My SFT Custom Assistant",
+                settings: {
+                  ...settings,
+                  batchRecommendations: completedRecommendations,
+                  completedRecommendedBatches: completedTopics,
+                  trainingModel: trainingModel || trainerHandoff.model
+                }
+              })
+            }).catch(error => console.warn("Onboarding save notice:", error));
+          }
           setActiveTab("define");
           setNotification({
             text: "Congratulations—Project Definition is complete. Review the prefilled page and Save & Lock it when ready. Use the menu or purple arrow to open Batch Synthesizer, then AI Guide for Section 2.",
