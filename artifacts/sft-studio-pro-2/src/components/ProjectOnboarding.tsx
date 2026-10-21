@@ -411,7 +411,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
   const [adaptiveQuestion, setAdaptiveQuestion] = useState("");
   const [constraints, setConstraints] = useState(initialProjectSettings?.constraints || "");
-  const [trainingModel, setTrainingModel] = useState<TrainingModel | "">("");
+  const [trainingModel, setTrainingModel] = useState<TrainingModel>("Qwen3.5 9 Base");
   const [voiceDescription, setVoiceDescription] = useState("");
   const [voiceSample, setVoiceSample] = useState("");
   const [voiceSource, setVoiceSource] = useState<"own" | "ai">("own");
@@ -512,8 +512,6 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       "batch-skills": "definition-review", "batch-custom-ask": "batch-skills", "batch-custom-form": "batch-custom-ask", "batch-recommendations": "batch-custom-ask", "batch-automation": "batch-recommendations", "batch-manual": "batch-automation",
     };
     setError("");
-    // A locked project definition can never be reopened from the batch interview.
-    if (startAtBatchInterview && previous[step] && stepOrder.indexOf(previous[step]!) < stepOrder.indexOf("batch-skills")) return;
     if (step === "definition-review" && approvedProjectDefinition) {
       setApprovedProjectDefinition(null);
       setBatchRecommendations([]);
@@ -878,13 +876,13 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
               <div className="max-w-[90%] border border-purple-500 bg-purple-300 px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]">
                 <p className="mb-1 text-xs font-bold !text-[#000000]">{item.label}</p>
                 <MarkdownText>{item.answer}</MarkdownText>
-                {!(startAtBatchInterview && stepOrder.indexOf(item.step) < stepOrder.indexOf("batch-skills")) && <button type="button" className="mt-2 text-xs font-bold !text-[#000000] underline underline-offset-2 hover:!text-[#222222]" onClick={() => {
+                <button type="button" className="mt-2 text-xs font-bold !text-[#000000] underline underline-offset-2 hover:!text-[#222222]" onClick={() => {
                   setApprovedProjectDefinition(null);
                   setBatchRecommendations([]);
                   setStep(item.step);
                 }}>
                   Edit answer
-                </button>}
+                </button>
               </div>
             </div>
           ))}
@@ -1112,11 +1110,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
             }}><Check className="h-4 w-4" /> Approve prompt &amp; continue</button>}
             {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm & finish Project Definition" : "Approve & finish Project Definition"}</button>}
             {["name", "goal", "constraints", "remember-model-name", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
-            {step === "model" && <button type="button" className={buttonClass} onClick={() => {
-              if (!trainingModel) { setError("Select a base model to continue."); return; }
-              setError("");
-              setStep("voice-choice");
-            }}>Continue <ArrowRight className="h-4 w-4" /></button>}
+            {step === "model" && <button type="button" className={buttonClass} onClick={() => setStep("voice-choice")}>Continue <ArrowRight className="h-4 w-4" /></button>}
             {step === "batch-recommendations" && <button type="button" className={buttonClass} disabled={pending} onClick={() => setStep("batch-skills")}>Add more topics</button>}
             {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("batch-automation")}>The list looks good <ArrowRight className="h-4 w-4" /></button>}
             {step === "batch-manual" && <button type="button" className={buttonClass} onClick={() => finish(false)}>Go to Batch generator <ArrowRight className="h-4 w-4" /></button>}

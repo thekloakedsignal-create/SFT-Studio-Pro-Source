@@ -115,7 +115,6 @@ export function startModelTrialCleanup() {
 async function loadLatestCompletedModel(uid: string) {
   const jobs = await ownedTrainingJobs(uid);
   for (const { id: jobId, data: saved } of jobs.reverse()) {
-    if (saved.paidTrainingRun !== true) continue;
     if (["error", "user_error", "failed", "cancelled"].includes(saved.status)) continue;
     const job = await togetherRequest(TOGETHER_V1, `/fine-tunes/${encodeURIComponent(jobId)}`);
     await rememberJobStatus(uid, jobId, job);
@@ -139,11 +138,6 @@ async function loadLatestCompletedModel(uid: string) {
   return null;
 }
 
-async function isPaidTrainingRun(uid: string, jobId: string) {
-  const job = await getRecord("job", jobId);
-  return job?.ownerId === uid && job?.paidTrainingRun === true;
-}
-
 function selectConfig(configs: any[]) {
   return configs
     .filter((config) => typeof config?.id === "string")
@@ -160,15 +154,6 @@ router.get("/finetune/model-trial/status", async (req: AuthRequest, res) => {
     res.setHeader("Cache-Control", "no-store");
     const snapshot = await trialRef(uid).get();
     const trial = snapshot.exists ? snapshot.data() as TrialSession : null;
-    if (trial && !(await isPaidTrainingRun(uid, trial.jobId))) {
-      try {
-        await endTrial(uid, trial);
-      } catch (error) {
-        await trialRef(uid).update({ state: "failed" });
-        trial.state = "failed";
-        logger.warn({ error: String(error), uid }, "Unpaid model-chat endpoint could not be deleted; cleanup will retry");
-      }
-    }
     // An existing chat session does not depend on the training API remaining up.
     const latest = trial ? null : await loadLatestCompletedModel(uid);
     if (trial?.state === "starting" && trial.endpointId && trial.deploymentId) {
@@ -223,7 +208,7 @@ router.post("/finetune/model-trial/start", async (req: AuthRequest, res) => {
   let reserved = false;
   try {
     const model = await loadLatestCompletedModel(uid);
-    if (!model) return res.status(403).json({ success: false, error: "Model chat requires a completed training run funded by a paid training credit." });
+    if (!model) return res.status(409).json({ success: false, error: "Complete a training run before starting model chat." });
     projectId = model.projectId;
 
     const modelConfigs = await togetherRequest(
@@ -318,15 +303,6 @@ router.post("/finetune/model-trial/chat", async (req: AuthRequest, res) => {
     const trial = snapshot.data() as TrialSession | undefined;
     if (!trial || trial.state !== "ready" || !trial.endpointName || !trial.expiresAt || Date.now() >= Date.parse(trial.expiresAt)) {
       return res.status(410).json({ success: false, error: "Your model chat session has ended." });
-    }
-    if (!(await isPaidTrainingRun(uid, trial.jobId))) {
-      try {
-        await endTrial(uid, trial);
-      } catch (error) {
-        await trialRef(uid).update({ state: "failed" });
-        logger.warn({ error: String(error), uid }, "Unpaid model-chat endpoint could not be deleted; cleanup will retry");
-      }
-      return res.status(403).json({ success: false, error: "Model chat requires a completed paid training run." });
     }
     const result = await togetherRequest("https://api-inference.together.ai/v1", "/chat/completions", {
       method: "POST",

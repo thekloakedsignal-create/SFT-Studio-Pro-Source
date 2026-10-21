@@ -3,7 +3,7 @@ import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
 import { logger } from "../lib/logger.ts";
 import { createRecord, getRecord, listRecords, setRecord } from "../lib/training-records.mjs";
 import { ownedTrainingJobs, rememberJobStatus } from "../lib/training-jobs.ts";
-import { consumeTraining, restoreTraining, type TrainingCreditSource } from "./whop.ts";
+import { consumeTraining, restoreTraining } from "./whop.ts";
 
 // Together AI full fine-tuning automation for the SFT Studio Data Registry.
 // All provider (Together AI) and Hugging Face credentials live exclusively in
@@ -177,7 +177,6 @@ const router: IRouter = Router();
 router.use(optionalAuth);
 router.use("/finetune", async (req: AuthRequest, res, next) => {
   if (!req.user?.uid) return next();
-  let submitted = false;
   try {
     res.locals.finetuneStore = await loadStore(req.user.uid);
     res.setHeader("Cache-Control", "no-store");
@@ -457,9 +456,8 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
     }
   }
   const trainingSelection = req.body?.trainingModel ?? "Qwen3.5 9 Base";
-  let trainingCreditSource: TrainingCreditSource = "owner";
   try {
-    trainingCreditSource = consumeTraining(req.user, trainingSelection);
+    consumeTraining(req.user, trainingSelection);
   } catch (error: any) {
     return res.status(error.status || 503).json({ success: false, error: error.message });
   }
@@ -486,11 +484,7 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
     if (!job?.id) throw new Error("Together AI did not return a job ID.");
     submitted = true;
     await createRecord("job", job.id, {
-      ownerId: uid,
-      trainingModel: trainingSelection,
-      hfRepoName: repoName,
-      freePromoTraining: trainingCreditSource === "promo",
-      paidTrainingRun: trainingCreditSource === "paid",
+      ownerId: uid, trainingModel: trainingSelection, hfRepoName: repoName,
     });
     await rememberJobStatus(uid, job.id, job);
     return res.json({
@@ -503,7 +497,8 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
       },
     });
   } catch (error: any) {
-    if (!submitted && req.user) restoreTraining(req.user.uid, trainingSelection, trainingCreditSource);
+    // Refund the training credit when no job was actually submitted.
+    if (!submitted && req.user) restoreTraining(req.user.uid, trainingSelection);
     logger.warn({ error: error?.message }, "Fine-tune job creation failed");
     return res.status(error?.status || 502).json({ success: false, error: error?.message || "Job submission failed." });
   }

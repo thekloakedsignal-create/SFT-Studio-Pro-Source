@@ -68,13 +68,7 @@ export function PaymentGate({ apiFetch, planKey, onReady }: {
       void refresh();
     });
     window.addEventListener("focus", refresh);
-    window.addEventListener("sft-training-entitlements-changed", refresh);
-    return () => {
-      disposed = true;
-      unsubscribe();
-      window.removeEventListener("focus", refresh);
-      window.removeEventListener("sft-training-entitlements-changed", refresh);
-    };
+    return () => { disposed = true; unsubscribe(); window.removeEventListener("focus", refresh); };
   }, [planKey]);
 
   const checkout = async () => {

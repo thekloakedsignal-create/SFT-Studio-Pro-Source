@@ -1047,6 +1047,25 @@ export default function App() {
     setNotification({ text: "Verifying student class code...", type: "info" });
     
     try {
+      // Training promo codes (e.g. one free 9B training run) are redeemed server-side.
+      const trainingRes = await projectApiFetch("/api/whop/redeem-training", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: enteredCode })
+      });
+      if (trainingRes.ok) {
+        setStudentCodeInput("");
+        setNotification({ text: "Success! One free 9B training run added to your account.", type: "success" });
+        setIsRedeemingCode(false);
+        return;
+      }
+      if (trainingRes.status !== 404) {
+        const trainingData = await trainingRes.json().catch(() => ({}));
+        setNotification({ text: trainingData.error || "Error redeeming code.", type: "error" });
+        setIsRedeemingCode(false);
+        return;
+      }
+
       // Query student codes from Postgres database
       const res = await fetch("/api/sql/student-codes");
       const data = await res.json();
@@ -1218,10 +1237,7 @@ export default function App() {
   };
 
   // Save the SFT project to Firestore directly (incremental delta saving)
-  const handleSaveProject = async (
-    projId: string | null = null,
-    overrides: { batchRecommendations?: BatchRecommendation[]; completedRecommendedBatches?: string[]; trainingModel?: string } = {}
-  ) => {
+  const handleSaveProject = async (projId: string | null = null) => {
     const user = auth.currentUser;
     const userIdToUse = user ? user.uid : getDeviceId();
 
@@ -1240,9 +1256,8 @@ export default function App() {
       customInstructionFormat: project.customInstructionFormat || "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
       representativePrompt: project.representativePrompt || "",
       representativeCompletion: project.representativeCompletion || "",
-      batchRecommendations: overrides.batchRecommendations ?? batchRecommendations,
-      completedRecommendedBatches: overrides.completedRecommendedBatches ?? completedRecommendedBatches,
-      trainingModel: overrides.trainingModel ?? trainerHandoff.model
+      batchRecommendations,
+      completedRecommendedBatches
     };
 
     setSelectedProjectId(idToSave);
@@ -1482,9 +1497,6 @@ export default function App() {
       Array.isArray(selected.settings?.completedRecommendedBatches) ? selected.settings.completedRecommendedBatches
       : Array.isArray(savedGuideState.completedRecommendedBatches) ? savedGuideState.completedRecommendedBatches : []
     );
-    if (typeof selected.settings?.trainingModel === "string" && selected.settings.trainingModel) {
-      setTrainerHandoff(prev => ({ ...prev, model: selected.settings.trainingModel }));
-    }
     setAutomationAnswers(readGuideState(selectedId).automation || {});
     setPipelineStatus(null);
     setActiveRecommendedBatchIndex(0);
@@ -3072,9 +3084,6 @@ export default function App() {
   // Update batch approval status
   const handleUpdateBatchStatus = (batchId: string, status: "Approved" | "Rejected" | "Pending") => {
     let targetName = "";
-    const existing = batches.find(b => b.id === batchId);
-    // Only TRiAD batches or batches with a completed QA check can enter the registry.
-    const registryReady = !!existing && (existing.source === "TRiAD Alignment" || Boolean(reports[batchId] || existing.qualityReport));
     setBatches(prev => prev.map(b => {
       if (b.id === batchId) {
         targetName = b.name;
@@ -3082,7 +3091,7 @@ export default function App() {
         if (selectedProjectId) {
           saveBatch(selectedProjectId, updated);
         }
-        if (status === "Approved" && registryReady) {
+        if (status === "Approved") {
           setSelectedRegistryBatches(prevReg => ({ ...prevReg, [batchId]: true }));
         } else {
           setSelectedRegistryBatches(prevReg => ({ ...prevReg, [batchId]: false }));
@@ -4040,22 +4049,16 @@ export default function App() {
           }
         }}
         onComplete={(settings, recommendations, trainingModel, autoGenerate) => {
-          setTrainerHandoff({
-            model: trainingModel || trainerHandoff.model,
-            template: `${settings.instructTemplate || "ChatML"} (<|im_start|>)`,
-          });
+          if (!showBatchRecommendationInterview) {
+            setTrainerHandoff({
+              model: trainingModel || "Qwen3.5 9 Base",
+              template: `${settings.instructTemplate || "ChatML"} (<|im_start|>)`,
+            });
+          }
           if (showBatchRecommendationInterview) {
             setBatchRecommendations(recommendations ?? []);
             setCompletedRecommendedBatches([]);
             setActiveRecommendedBatchIndex(0);
-            if (selectedProjectId) {
-              writeGuideState(selectedProjectId, { recommendations: recommendations ?? [], completedRecommendedBatches: [] });
-              void handleSaveProject(selectedProjectId, {
-                batchRecommendations: recommendations ?? [],
-                completedRecommendedBatches: [],
-                trainingModel: trainingModel || trainerHandoff.model
-              });
-            }
             setShowBatchRecommendationInterview(false);
             setActiveTab("synthesizer");
             if (autoGenerate !== undefined) {
@@ -4064,13 +4067,6 @@ export default function App() {
                 void startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }, recommendations ?? [], settings, trainingModel);
               }
             }
-            return;
-          }
-          if (selectedProjectId && !isFieldsUnlocked) {
-            // A locked project definition is permanent; changing it requires a new project.
-            setShowProjectOnboarding(false);
-            setActiveTab("define");
-            setNotification({ text: "This project's definition is locked. Start a new project to change it.", type: "error" });
             return;
           }
           setProject(settings);
@@ -4090,25 +4086,6 @@ export default function App() {
           setActiveRecommendedBatchIndex(0);
           if (selectedProjectId && recommendations !== undefined) {
             writeGuideState(selectedProjectId, { recommendations, completedRecommendedBatches: [] });
-          }
-          if (selectedProjectId) {
-            // Persist the onboarding result (definition, model, recommendations) to Postgres immediately.
-            const userIdToUse = auth.currentUser ? auth.currentUser.uid : getDeviceId();
-            void projectApiFetch("/api/sql/projects", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                id: selectedProjectId,
-                userId: userIdToUse,
-                name: settings.name || "My SFT Custom Assistant",
-                settings: {
-                  ...settings,
-                  batchRecommendations: completedRecommendations,
-                  completedRecommendedBatches: completedTopics,
-                  trainingModel: trainingModel || trainerHandoff.model
-                }
-              })
-            }).catch(error => console.warn("Onboarding save notice:", error));
           }
           setActiveTab("define");
           setNotification({
@@ -8259,10 +8236,7 @@ export default function App() {
         onClose={() => setShowRunTrainingModal(false)}
         exportFormat="chatml_token"
         trainingModel={trainerHandoff.model}
-        onTrainingModelChange={model => {
-          setTrainerHandoff(current => ({ ...current, model }));
-          if (selectedProjectId) void handleSaveProject(selectedProjectId, { trainingModel: model });
-        }}
+        onTrainingModelChange={model => setTrainerHandoff(current => ({ ...current, model }))}
         getSerializedSplits={() => ({
           training: compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, "chatml_token")),
           validation: compiledDataset.validationSet.map(ex => formatExampleForExport(ex, "chatml_token")),

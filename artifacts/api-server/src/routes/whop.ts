@@ -18,7 +18,7 @@ export const TRAINING_MODEL_PLANS: Record<string, string> = {
 function isOwner(user: AuthRequest["user"]) {
   return user?.email_verified === true && user.email?.toLowerCase() === "thekloakedsignal@gmail.com";
 }
-type Account = { used: number; extra: number; training: Record<string, number>; freeTrainingCredits?: Record<string, number> };
+type Account = { used: number; extra: number; training: Record<string, number> };
 type Checkout = { uid: string; planKey: string; checkoutId: string; at: string; paymentId?: string };
 type Reservation = { uid: string; count: number };
 type Store = { accounts: Record<string, Account>; checkouts: Record<string, Checkout>; reservations: Record<string, Reservation> };
@@ -67,38 +67,21 @@ export function settleExamples(id: string, produced: number) {
     delete s.reservations[id];
   });
 }
-export type TrainingCreditSource = "paid" | "promo" | "owner";
-
-export function consumeTraining(user: AuthRequest["user"], model: string): TrainingCreditSource {
-  if (isOwner(user)) return "owner";
+export function consumeTraining(user: AuthRequest["user"], model: string) {
+  if (isOwner(user)) return;
   const uid = user?.uid;
   if (!uid) throw Object.assign(new Error("Please sign in."), { status: 401 });
   const key = TRAINING_MODEL_PLANS[model];
-  return change(s => {
+  change(s => {
     const a = account(s, uid);
     if (!key || !(a.training[key] > 0)) throw Object.assign(new Error("Payment is required for this training run."), { status: 402 });
     a.training[key]--;
-    const freeCredits = a.freeTrainingCredits?.[key] || 0;
-    if (freeCredits > 0) {
-      a.freeTrainingCredits![key] = freeCredits - 1;
-      return "promo";
-    }
-    return "paid";
   });
 }
-export function restoreTraining(uid: string, model: string, source: TrainingCreditSource) {
-  if (source === "owner") return;
-  change(s => {
-    const a = account(s, uid);
-    const key = TRAINING_MODEL_PLANS[model];
-    if (!key) return;
-    a.training[key] = (a.training[key] || 0) + 1;
-    if (source === "promo") {
-      a.freeTrainingCredits ??= {};
-      a.freeTrainingCredits[key] = (a.freeTrainingCredits[key] || 0) + 1;
-    }
-  });
+export function restoreTraining(uid: string, model: string) {
+  change(s => { const a = account(s, uid); const key = TRAINING_MODEL_PLANS[model]; a.training[key] = (a.training[key] || 0) + 1; });
 }
+
 const router: IRouter = Router();
 // Scope auth to billing paths, not unrelated routes.
 router.use("/whop", optionalAuth, (req: AuthRequest, res, next) => {
@@ -111,6 +94,26 @@ function payload(uid: string, user?: AuthRequest["user"]) {
   return { success: true, bypass: false, usageUsed: a.used, allowance: 5000 + a.extra, remaining: remaining(store, uid), training: a.training };
 }
 router.get("/whop/entitlements", (req: AuthRequest, res) => { res.json(payload(req.user!.uid, req.user)); });
+
+// Promo code: one free 9B training run per account. Grants training credit only (no model chat demo).
+const FREE_9B_TRAINING_CODE = "TRAIN9B-FREE";
+router.post("/whop/redeem-training", (req: AuthRequest, res) => {
+  const uid = req.user!.uid;
+  const code = String(req.body?.code || "").trim().toUpperCase();
+  if (code !== FREE_9B_TRAINING_CODE) { res.status(404).json({ success: false, error: "Invalid code." }); return; }
+  try {
+    change(s => {
+      const a = account(s, uid) as Account & { redeemedTrainingCodes?: string[] };
+      a.redeemedTrainingCodes ??= [];
+      if (a.redeemedTrainingCodes.includes(code)) throw Object.assign(new Error("This code has already been redeemed on your account."), { status: 409 });
+      a.redeemedTrainingCodes.push(code);
+      a.training.train_9b = (a.training.train_9b || 0) + 1;
+    });
+    res.json({ ...payload(uid, req.user), granted: "train_9b" });
+  } catch (error: any) {
+    res.status(error.status || 500).json({ success: false, error: error.message || "Unable to redeem code." });
+  }
+});
 
 router.post("/whop/checkout", async (req: AuthRequest, res) => {
   if (isOwner(req.user)) { res.json(payload(req.user!.uid, req.user)); return; }
