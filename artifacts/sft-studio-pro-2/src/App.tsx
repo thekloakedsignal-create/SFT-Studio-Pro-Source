@@ -8259,7 +8259,10 @@ export default function App() {
         onClose={() => setShowRunTrainingModal(false)}
         exportFormat="chatml_token"
         trainingModel={trainerHandoff.model}
-        onTrainingModelChange={model => setTrainerHandoff(current => ({ ...current, model }))}
+        onTrainingModelChange={model => {
+          setTrainerHandoff(current => ({ ...current, model }));
+          if (selectedProjectId) void handleSaveProject(selectedProjectId, { trainingModel: model });
+        }}
         getSerializedSplits={() => ({
           training: compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, "chatml_token")),
           validation: compiledDataset.validationSet.map(ex => formatExampleForExport(ex, "chatml_token")),
