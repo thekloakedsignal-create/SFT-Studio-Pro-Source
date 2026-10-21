@@ -3072,6 +3072,9 @@ export default function App() {
   // Update batch approval status
   const handleUpdateBatchStatus = (batchId: string, status: "Approved" | "Rejected" | "Pending") => {
     let targetName = "";
+    const existing = batches.find(b => b.id === batchId);
+    // Only TRiAD batches or batches with a completed QA check can enter the registry.
+    const registryReady = !!existing && (existing.source === "TRiAD Alignment" || Boolean(reports[batchId] || existing.qualityReport));
     setBatches(prev => prev.map(b => {
       if (b.id === batchId) {
         targetName = b.name;
@@ -3079,7 +3082,7 @@ export default function App() {
         if (selectedProjectId) {
           saveBatch(selectedProjectId, updated);
         }
-        if (status === "Approved") {
+        if (status === "Approved" && registryReady) {
           setSelectedRegistryBatches(prevReg => ({ ...prevReg, [batchId]: true }));
         } else {
           setSelectedRegistryBatches(prevReg => ({ ...prevReg, [batchId]: false }));
