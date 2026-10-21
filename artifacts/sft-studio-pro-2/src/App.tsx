@@ -1242,7 +1242,7 @@ export default function App() {
       representativeCompletion: project.representativeCompletion || "",
       batchRecommendations: overrides.batchRecommendations ?? batchRecommendations,
       completedRecommendedBatches: overrides.completedRecommendedBatches ?? completedRecommendedBatches,
-      trainingModel: project.trainingModel
+      trainingModel: overrides.trainingModel ?? trainerHandoff.model
     };
 
     setSelectedProjectId(idToSave);
@@ -1508,7 +1508,6 @@ export default function App() {
       customInstructionFormat: loadedCustomFormat,
       representativePrompt: selected.settings?.representativePrompt || "",
       representativeCompletion: selected.settings?.representativeCompletion || "",
-      trainingModel: selected.settings?.trainingModel || "",
     });
     setBatchTemplate(loadedTemplateType);
     setDocTemplate(loadedTemplateType);
