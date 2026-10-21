@@ -411,7 +411,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
   const [adaptiveQuestion, setAdaptiveQuestion] = useState("");
   const [constraints, setConstraints] = useState(initialProjectSettings?.constraints || "");
-  const [trainingModel, setTrainingModel] = useState<TrainingModel | "">("");
+  const [trainingModel, setTrainingModel] = useState<TrainingModel | "">((initialProjectSettings?.trainingModel as TrainingModel) || "");
   const [voiceDescription, setVoiceDescription] = useState("");
   const [voiceSample, setVoiceSample] = useState("");
   const [voiceSource, setVoiceSource] = useState<"own" | "ai">("own");
@@ -565,6 +565,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
       representativePrompt: goldenPrompt.trim(),
       representativeCompletion: goldenCompletion.trim(),
+      trainingModel,
     };
   };
 
