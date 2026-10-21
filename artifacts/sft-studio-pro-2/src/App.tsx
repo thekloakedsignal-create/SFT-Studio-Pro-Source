@@ -8003,10 +8003,10 @@ export default function App() {
                     <div className="space-y-2.5 bg-slate-950/20 border border-slate-800 p-4 rounded-xl">
                       <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                         <Check className="h-3.5 w-3.5 text-purple-400" />
-                        Class Code / Training Coupon Redemption
+                        Student Class Code Redemption
                       </h4>
                       <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Redeem a course code for <span className="font-bold text-slate-200">5000 free generations</span>, or enter <span className="font-bold text-slate-200">TRAIN9B-FREE</span> for one free 9B training run. Model chat is not included.
+                        Are you currently enrolled in one of our university fine-tuning courses? Redeem your instructor code to unlock <span className="font-bold text-slate-200">5000 generations free</span> instantly.
                       </p>
                       
                       <div className="flex gap-2">
@@ -8014,7 +8014,7 @@ export default function App() {
                           type="text"
                           value={studentCodeInput}
                           onChange={(e) => setStudentCodeInput(e.target.value)}
-                          placeholder="ENTER CODE (E.G. COURSE-SFT101 OR TRAIN9B-FREE)"
+                          placeholder="ENTER COURSE CODE (E.G. COURSE-SFT101)"
                           disabled={isRedeemingCode}
                           className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 outline-none uppercase font-mono tracking-widest focus:border-green-500/50"
                         />
