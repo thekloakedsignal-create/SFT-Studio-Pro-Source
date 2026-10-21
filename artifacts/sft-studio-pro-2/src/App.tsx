@@ -1227,6 +1227,7 @@ export default function App() {
     
     const settingsPayload = {
       name: project.name,
+      onboardingModel: project.onboardingModel,
       systemPrompt: project.systemPrompt,
       targetTask: project.targetTask,
       constraints: project.constraints,
@@ -1501,6 +1502,7 @@ export default function App() {
       customInstructionFormat: loadedCustomFormat,
       representativePrompt: selected.settings?.representativePrompt || "",
       representativeCompletion: selected.settings?.representativeCompletion || "",
+      onboardingModel: selected.settings?.onboardingModel,
     });
     setBatchTemplate(loadedTemplateType);
     setDocTemplate(loadedTemplateType);

@@ -411,7 +411,9 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
   const [adaptiveQuestion, setAdaptiveQuestion] = useState("");
   const [constraints, setConstraints] = useState(initialProjectSettings?.constraints || "");
-  const [trainingModel, setTrainingModel] = useState<TrainingModel>("Qwen3.5 9 Base");
+  const [trainingModel, setTrainingModel] = useState<TrainingModel>(
+    TRAINING_MODELS.find(model => model.value === initialProjectSettings?.onboardingModel)?.value ?? "Qwen3.5 9 Base"
+  );
   const [voiceDescription, setVoiceDescription] = useState("");
   const [voiceSample, setVoiceSample] = useState("");
   const [voiceSource, setVoiceSource] = useState<"own" | "ai">("own");
@@ -553,6 +555,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     ].filter(Boolean).join("\n\n");
     return {
       name: projectName.trim(),
+      onboardingModel: trainingModel,
       systemPrompt: systemPrompt.trim(),
       targetTask: targetPersona,
       constraints: constraints.trim(),

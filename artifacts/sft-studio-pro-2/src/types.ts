@@ -39,6 +39,7 @@ export interface SFTExample {
 
 export interface ProjectSettings {
   name: string;
+  onboardingModel?: string;
   systemPrompt: string;
   targetTask: string;
   constraints: string;
