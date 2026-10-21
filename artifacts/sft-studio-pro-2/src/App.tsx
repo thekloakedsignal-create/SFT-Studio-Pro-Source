@@ -3967,9 +3967,9 @@ export default function App() {
         {/* Footer info */}
         <footer className="py-6 px-4 text-center text-xs text-slate-500 border-t border-slate-900/60 bg-slate-950/40">
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mb-3 font-semibold text-slate-400">
-            <button onClick={() => setShowDocsModal(true)} className="hover:text-emerald-400 transition cursor-pointer">
+            <a href={`${import.meta.env.BASE_URL}manual.html`} className="hover:text-emerald-400 transition cursor-pointer">
               Docs &amp; Specs
-            </button>
+            </a>
             <span className="text-slate-700">•</span>
             <a href={`${import.meta.env.BASE_URL}manual.html`} className="hover:text-emerald-400 transition">
               Full HTML Manual
