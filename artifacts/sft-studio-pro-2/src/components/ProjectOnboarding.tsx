@@ -512,6 +512,8 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       "batch-skills": "definition-review", "batch-custom-ask": "batch-skills", "batch-custom-form": "batch-custom-ask", "batch-recommendations": "batch-custom-ask", "batch-automation": "batch-recommendations", "batch-manual": "batch-automation",
     };
     setError("");
+    // A locked project definition can never be reopened from the batch interview.
+    if (startAtBatchInterview && previous[step] && stepOrder.indexOf(previous[step]!) < stepOrder.indexOf("batch-skills")) return;
     if (step === "definition-review" && approvedProjectDefinition) {
       setApprovedProjectDefinition(null);
       setBatchRecommendations([]);
@@ -876,13 +878,13 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
               <div className="max-w-[90%] border border-purple-500 bg-purple-300 px-4 py-3 text-sm leading-relaxed font-bold !text-[#000000]">
                 <p className="mb-1 text-xs font-bold !text-[#000000]">{item.label}</p>
                 <MarkdownText>{item.answer}</MarkdownText>
-                <button type="button" className="mt-2 text-xs font-bold !text-[#000000] underline underline-offset-2 hover:!text-[#222222]" onClick={() => {
+                {!(startAtBatchInterview && stepOrder.indexOf(item.step) < stepOrder.indexOf("batch-skills")) && <button type="button" className="mt-2 text-xs font-bold !text-[#000000] underline underline-offset-2 hover:!text-[#222222]" onClick={() => {
                   setApprovedProjectDefinition(null);
                   setBatchRecommendations([]);
                   setStep(item.step);
                 }}>
                   Edit answer
-                </button>
+                </button>}
               </div>
             </div>
           ))}

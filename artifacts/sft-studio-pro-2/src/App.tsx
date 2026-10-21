@@ -4063,6 +4063,13 @@ export default function App() {
             }
             return;
           }
+          if (selectedProjectId && !isFieldsUnlocked) {
+            // A locked project definition is permanent; changing it requires a new project.
+            setShowProjectOnboarding(false);
+            setActiveTab("define");
+            setNotification({ text: "This project's definition is locked. Start a new project to change it.", type: "error" });
+            return;
+          }
           setProject(settings);
           setIsFieldsUnlocked(true);
           setBatchTemplate(settings.templateType || TemplateType.SINGLE_TURN);
