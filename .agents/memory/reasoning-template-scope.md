@@ -3,6 +3,12 @@ name: Reasoning template scope
 description: User-defined boundary for changes to SFT Reasoning batch generation.
 ---
 
+Automated generation for a Llama project must not add reasoning tags or include Reasoning examples.
+
+**Why:** The user explicitly said, “The llama should not have reasoning tags added” in automated generation.
+
+**How to apply:** Use the model saved in Project Definition to select the automation mix. Preserve Reasoning for other supported models and do not change Model Trainer.
+
 For Reasoning-generation work, change only the Reasoning template and its tests. Do not alter Single Turn or Multi Turn prompts, schemas, or behavior. Keep the shared concurrent model schedule.
 
 Reasoning initial generation uses the user's ten-model list, not one repeated model. Keep recovery model selection separate; a generation-slot name replacement does not authorize changing refill routing. Keep shared model configuration shared, even where QA also uses it.
