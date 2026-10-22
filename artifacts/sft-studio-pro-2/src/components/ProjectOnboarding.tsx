@@ -412,7 +412,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
   const [adaptiveQuestion, setAdaptiveQuestion] = useState("");
   const [constraints, setConstraints] = useState(initialProjectSettings?.constraints || "");
-  const [trainingModel, setTrainingModel] = useState<TrainingModel | "">(initialProjectSettings?.trainingModel || "");
+  const [trainingModel, setTrainingModel] = useState<string>(initialProjectSettings?.onboardingModel || "");
   const [voiceDescription, setVoiceDescription] = useState("");
   const [voiceSample, setVoiceSample] = useState("");
   const [voiceSource, setVoiceSource] = useState<"own" | "ai">("own");
@@ -566,7 +566,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
       customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
       representativePrompt: goldenPrompt.trim(),
       representativeCompletion: goldenCompletion.trim(),
-      trainingModel,
+      onboardingModel: trainingModel,
     };
   };
 
