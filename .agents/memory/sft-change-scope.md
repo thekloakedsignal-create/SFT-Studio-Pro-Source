@@ -17,7 +17,7 @@ Keep requests within Project Onboarding, except that onboarding recommendations 
 
 Save the Project Onboarder model selection permanently in the locked Project Definition only. Do not touch Model Trainer.
 
-**Why:** The user explicitly corrected the scope: “Just fucking save it in the locked project definition” and “don't fucking touch the model trainer.”
+**Why:** The user explicitly corrected the scope: “Just fucking save it in the locked project definition” and “don't fucking touch the model trainer.” The onboarding model controls recommendation compatibility; users may reuse the same dataset to train a different model, so the trainer model must remain independent and unlocked.
 
 **How to apply:** Preserve the onboarder choice when saving and reopening Project Definition. Do not add trainer behavior, trainer restrictions, or changes to batch settings.
 

@@ -1505,10 +1505,6 @@ export default function App() {
       representativeCompletion: selected.settings?.representativeCompletion || "",
       onboardingModel: selected.settings?.onboardingModel,
     });
-    setTrainerHandoff(prev => ({
-      ...prev,
-      model: selected.settings?.onboardingModel || "Qwen3.5 9 Base",
-    }));
     setBatchTemplate(loadedTemplateType);
     setDocTemplate(loadedTemplateType);
     setTriadTemplate(loadedTemplateType);
