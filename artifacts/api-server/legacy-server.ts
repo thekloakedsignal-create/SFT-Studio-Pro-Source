@@ -5133,7 +5133,7 @@ async function runPipelineQaChain(job: any, batchId: string) {
 
 async function runAutomationPipeline(job: any) {
   const { userId, config } = job;
-  const is70B = config.trainingModel === "Llama 3.1 70B";
+  const is70B = /llama/i.test(String(config.trainingModel || ""));
   const roundRobin = is70B ? ["Single Turn", "Multi Turn"] : ["Single Turn", "Multi Turn", "Reasoning"];
   job.producedBatches ??= [];
 
