@@ -21,3 +21,4 @@
 - [Pipeline automation spec](pipeline-automation-spec.md) — Onboarding ends with four questions (not toggles); QA chain is assess once → regen once → dedupe → approve, no re-assessment, no skipped steps.
 - [Standalone documentation manual](standalone-documentation-manual.md) — Keep the existing GitHub Pages iframe in place; offer a separate scrapeable manual from sign-in and in-app.
 - [Training provider direction](training-provider-direction.md) — Use Fireworks for Muse training; defer Nebius until later.
+- [Onboarding prompt boundary](onboarding-system-prompt-boundary.md) — Never change the onboarding system prompt without explicit approval.
