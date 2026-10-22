@@ -9,11 +9,11 @@ For this app, follow the user's instructions directly and literally. Ask before 
 
 **How to apply:** If the requested page, exclusion, or behavior is unclear, ask before changing code.
 
-Work only inside Project Onboarding. Do not inspect or edit the main app, backend, or Model Trainer. Use the existing save callbacks for onboarding persistence; do not duplicate or replace their save path.
+Keep work in Project Onboarding. The only permitted main-app changes are its existing project-definition/recommendation handoff and save paths. The actual batch generator, its UI, backend, APIs, and Model Trainer are strictly off-limits. Do not change lock behavior.
 
-**Why:** The user repeatedly clarified that this work is strictly onboarding and that persistence procedures already exist; the main app and backend are out of scope.
+**Why:** The user clarified that the requested work is the batch recommender, not the actual batch generator, and that project model persistence should use the existing definition and save procedures.
 
-**How to apply:** Keep recommendation logic in ProjectOnboarding and await its existing save callbacks. Do not inspect or edit App.tsx, APIs, backend, batch-generation UI, or Trainer unless the user explicitly changes scope.
+**How to apply:** Keep recommendation logic in ProjectOnboarding. Touch app code only when required to pass or save the locked Project Definition and approved recommendations. Do not change actual generation behavior, template UI, lock flow, or Trainer.
 
 Save the Project Onboarder model selection permanently in the locked Project Definition only. Do not touch Model Trainer.
 

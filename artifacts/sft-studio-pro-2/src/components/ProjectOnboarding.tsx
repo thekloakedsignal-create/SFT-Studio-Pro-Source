@@ -605,8 +605,12 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
       .filter(item => item && !/^(?:none|none specified|no special skills?)\.?$/i.test(item))
       .filter(item => allowReasoning || !/\breasoning\b|chain[- ]of[- ]thought|\bcot\b/i.test(item))
       .filter((item, index, all) => all.findIndex(candidate => candidate.toLowerCase() === item.toLowerCase()) === index);
+    const projectDefinitionContext = {
+      ...approvedProjectDefinition,
+      onboardingModel: trainingModel,
+    };
     const planInstruction =
-      `You are the Project Onboarding batch-recommendation assistant. Analyze the approved project goal, constraints, selected model, and every skill the user named. ` +
+      `You are the Project Onboarding batch-recommendation assistant. Analyze the full approved Project Definition, selected model, and eligible user-skill list below. ` +
       `Choose relevant recipe topics from the curated library by topic name only; do not rewrite or return any library recipe instructions or constraints. ` +
       `For every separate item in the required user-skill list, provide one matching additional batch, unless a selected library recipe directly covers it. For each additional batch, copy that exact skill item into "skill" and provide a specific topic, special instructions, and temporary constraints that make the skill observable in examples for this project. Never omit a listed skill. Do not use generic instructions. ` +
       `Every additional batch must teach its skill through the project's target voice and golden exemplar and in service of the project goal; treat the user as a capable equal; never add disclaimers, moralizing, therapy-speak, pathologizing, reframing of the user's perception, lecturing, or condescension. ` +
@@ -614,7 +618,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
       `${mixGuidance} Do not make separate format-only batches. ` +
       `Do not create training examples or actual batches. Return only valid JSON: {"libraryTopics":["exact topic name"],"additionalBatches":[{"skill":"exact user skill item","topic":"...","specialInstructions":"...","temporaryConstraints":"..."}]}. ` +
       `Available curated topic names: ${JSON.stringify(eligibleLibrary.map(item => item.topic))}\n` +
-      `Project name: ${approvedProjectDefinition.name}\nProject goal: ${approvedProjectDefinition.targetTask}\nProject constraints: ${approvedProjectDefinition.constraints || "none"}\nSelected base model: ${trainingModel}\nExact user-skill items to cover: ${JSON.stringify(skillItems)}`
+      `Approved Project Definition (all saved fields; source of truth): ${JSON.stringify(projectDefinitionContext)}\nSelected base model: ${trainingModel}\nEligible user-skill items to cover: ${JSON.stringify(skillItems)}`
     ;
     const draft = await askAI(planInstruction);
     if (!draft) return;
