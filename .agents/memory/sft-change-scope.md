@@ -9,11 +9,11 @@ For this app, follow the user's instructions directly and literally. Ask before 
 
 **How to apply:** If the requested page, exclusion, or behavior is unclear, ask before changing code.
 
-Keep requests within Project Onboarding, except that onboarding recommendations may be passed to the existing main app for UI display. Never modify backend behavior, batch generation, batch settings, or batch data.
+Work only inside Project Onboarding. Do not inspect or edit the main app, backend, or Model Trainer. Use the existing save callbacks for onboarding persistence; do not duplicate or replace their save path.
 
-**Why:** The user permits only a display-only main-app handoff for the recommendations and prohibits changes to the app's actual functions.
+**Why:** The user repeatedly clarified that this work is strictly onboarding and that persistence procedures already exist; the main app and backend are out of scope.
 
-**How to apply:** Keep recipe logic in ProjectOnboarding. In App.tsx, limit changes to displaying and navigating the handed-off recommendations; preserve all existing generation and application behavior.
+**How to apply:** Keep recommendation logic in ProjectOnboarding and await its existing save callbacks. Do not inspect or edit App.tsx, APIs, backend, batch-generation UI, or Trainer unless the user explicitly changes scope.
 
 Save the Project Onboarder model selection permanently in the locked Project Definition only. Do not touch Model Trainer.
 

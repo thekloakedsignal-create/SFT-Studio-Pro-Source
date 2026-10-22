@@ -603,6 +603,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
       .split(/\r?\n|[,;]/)
       .map(item => item.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").replace(/^(?:and|&)\s+/i, "").trim())
       .filter(item => item && !/^(?:none|none specified|no special skills?)\.?$/i.test(item))
+      .filter(item => allowReasoning || !/\breasoning\b|chain[- ]of[- ]thought|\bcot\b/i.test(item))
       .filter((item, index, all) => all.findIndex(candidate => candidate.toLowerCase() === item.toLowerCase()) === index);
     const planInstruction =
       `You are the Project Onboarding batch-recommendation assistant. Analyze the approved project goal, constraints, selected model, and every skill the user named. ` +
