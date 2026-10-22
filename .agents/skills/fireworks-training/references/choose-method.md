@@ -1,0 +1,238 @@
+# Choosing a fine-tuning method + preparing data
+
+*Source of truth: [Fine-tuning intro](https://docs.fireworks.ai/fine-tuning/finetuning-intro.md) — defer to the live docs for current dataset schemas + method support.*
+
+Pick the method that matches the *signal you have*, not the one that sounds most advanced. Start simple (SFT); escalate only when your data demands it. Source: https://docs.fireworks.ai/fine-tuning/finetuning-intro
+
+## Intake for a vague request
+
+If the request is vague ("my chatbot gives bad answers", "make my model better"), do not guess a method or start a job. First confirm fine-tuning is even the right tool — a prompt, RAG, or base-model change is often cheaper — then ask the discriminating questions that determine the route:
+
+1. **What does "bad" mean** — wrong facts, wrong tone/format, bad tool calls, refusals? (Is this a fine-tuning problem at all?)
+2. **What supervision do you have?** labeled ideal outputs (→ SFT), only "A is better than B" pairs (→ DPO/ORPO), or a way to score/verify an answer 0.0–1.0 (→ RFT). **This is the single routing question.**
+3. **How many examples** (roughly >1000 / 100–1000 / <100)?
+4. **Is correctness programmatically verifiable**, or subjective quality/tone?
+5. **Which base model**, and is it `Tunable`?
+6. **Held-out eval set + success metric** — how will we know it improved?
+7. **Standard config, or custom loss/reward/rollout** (managed vs Training API)?
+
+Route only once the supervision signal (question 2) is known. Until then, ask — do not default to SFT and start.
+
+## Decision tree
+
+```
+Do you have labeled ground-truth outputs?
+├─ Yes, >1000 examples ............................ SFT
+├─ Yes, 100–1000 + reasoning helps ................ RFT
+├─ Yes, 100–1000 + no reasoning needed ............ SFT
+├─ Only "A is better than B" preference pairs ..... DPO
+└─ No labels, but outputs are verifiable/scorable . RFT
+```
+
+| Method | You provide | Best for |
+|--------|-------------|----------|
+| **SFT** | Labeled `messages` (the ideal output) | Classification, extraction, style/format, tool-call shaping. The default. |
+| **DPO** | preferred vs non-preferred responses | Aligning tone/quality when you can rank two answers but can't write the one true answer. |
+| **ORPO** | preferred vs non-preferred responses (same shape as DPO) | Same signal as DPO but **no reference model**. Use managed `dpo-job --loss-method ORPO` for standard runs; custom Training API work starts from the pinned `training/recipes/orpo_loop.py`. |
+| **RFT** | Prompts + an evaluator/reward (0.0–1.0) | Verifiable tasks (math, code, agents) with few labels. |
+
+## SFT format
+
+JSONL, one object per line; OpenAI-style `messages`. **Min 3, max 3M** (aim for 1000+ for quality). Optional per-message `weight` (0 skips from loss).
+
+```jsonl
+{"messages":[{"role":"system","content":"You are a helpful assistant."},{"role":"user","content":"Capital of France?"},{"role":"assistant","content":"Paris."}]}
+```
+
+Docs: https://docs.fireworks.ai/fine-tuning/fine-tuning-models.md.
+
+## DPO format
+
+Preference pairs, **one-turn only** (preferred/non-preferred must be the last assistant turn). Two accepted shapes:
+
+```jsonl
+{"input":{"messages":[{"role":"user","content":"What is Einstein famous for?"}]},"preferred_output":[{"role":"assistant","content":"His theory of relativity, E=mc²."}],"non_preferred_output":[{"role":"assistant","content":"He was a scientist."}]}
+```
+(Training API also accepts `chosen`/`rejected`.) Docs: https://docs.fireworks.ai/fine-tuning/dpo-fine-tuning
+
+If the user has prompts but no preference pairs, do not reject the task or silently invent labels. Use `references/preference-data-and-evaluators.md` to plan, cost, generate, review, and preserve pair provenance before upload.
+
+## RL — reinforcement learning
+
+Provide three things (not necessarily labeled outputs): a **dataset** of prompts; a **reward** that scores an output 0.0→1.0; and the **agent** being trained. Reward code may read `ground_truth` or any other field it declares. Start with **200–500 diverse prompts**. Docs: https://docs.fireworks.ai/fine-tuning/training-api/cookbook/rl.md. Rollout and scheduling detail: `rl-async.md`; multi-turn agents: `rl-agentic.md`.
+
+Managed RFT (`firectl rftj`, registered evaluators) is deprecated and accepts no new jobs. Route new work to the Training API; use `managed-rft-operations.md` only to monitor or recover a job that already exists.
+
+## Classification (a common SFT task)
+
+Classification is SFT where the assistant turn is the label. Two extra checks matter:
+
+- **Label imbalance.** Compute the ratio of the most-frequent to least-frequent label. If it's high (say > 50:1), the model can score well by always predicting the majority. Flag it in the plan and mitigate: rebalance/subsample, use per-message `weight`, or narrow the label set.
+- **Per-label accuracy, not just overall.** Report accuracy per label plus a confusion-matrix-style summary (which labels get confused for which), and always measure on a held-out split. Overall accuracy hides minority-class failure.
+- **Baseline first.** Run the base model on the eval split before training so you have a base-vs-fine-tuned delta (see the benchmark step in `references/deploy-and-troubleshoot.md`), not just an absolute number.
+
+If `ground_truth` is a separate field rather than the final assistant turn, map it onto the assistant message before upload.
+
+### Decision rows (typed probabilities from one prefill)
+
+When the classifier will be served as a decision model — typed `noul` (yes/no), `choice`, and `score` questions about one `state`, answered by reading one option-code logit per option — use decision rows instead of chat rows. They train with `training/recipes/decision_loop.py` (managed: `loss_method="decision"`), not `sft_loop.py`:
+
+```json
+{"state": "...", "questions": {"unsafe": {"type": "noul", "instructions": "...", "label": true}, "kind": {"type": "choice", "instructions": "...", "criteria": {"benign": "...", "exfiltration": "..."}, "label": "exfiltration"}, "risk": {"type": "score", "instructions": "...", "criteria": ["none", "low", "high"], "label": 2}}}
+```
+
+Each labeled question becomes one datum on the single option code at the answer position, tokenized the way packed decision serving tokenizes it (`training/utils/decision.py`); choice options are sorted by key, noul is `A` = true / `B` = false, score levels are 0-based. Every row must be a decision row. `decision_loop.py` trains with K-way cross-entropy (each datum carries its options in `loss_fn_inputs.candidate_tokens`, sent with `loss_fn_config={"target_logprob_support": "candidates"}`), requires a calibration split (`evaluation_dataset`, or a seeded carve-out), fits one temperature per question type on it after training, and saves them into the final sampler checkpoint `step-N-cal` (its `decision.json`), which is the checkpoint it promotes.
+
+## Hyperparameter sweep + promotion gate
+
+For anything past a smoke run, do not hand-pick one config: run the small grid
+below as separate jobs, compare on a held-out split, and promote the winner.
+The coding agent runs the method-specific sweep through
+`../../configure/SKILL.md`.
+
+## LoRA vs full-parameter
+
+**Pick LoRA first** — small adapter, cheaper/faster, fewer GPUs, deployable on the base model. Resolve the current default and range from live docs, the selected training shape, and CLI or recipe configuration. Go **full-parameter** only when LoRA plateaus and you have GPU budget. Docs: https://docs.fireworks.ai/fine-tuning/reinforcement-fine-tuning-models.md.
+
+## Data quality (the main driver of SFT quality)
+
+Quality beats quantity: a small clean set beats a large noisy one. Check two things separately:
+- **Format errors, in isolation:** unreadable JSONL, missing roles, missing outputs, malformed tool calls, invalid labels, train/eval leakage (run the validator above).
+- **The dataset itself:** distribution, coverage of the real input range, label quality, and whether a held-out split actually measures your goal. Capture train/eval row counts, rough input/output token lengths, the output schema or label set, and the metric that decides whether the tune helped. No held-out split means training-set behavior is not evidence of generalization; say so.
+
+## Hyperparameter starting points
+
+One unpinned first LoRA SFT pass: `lora_rank 8`, `learning_rate ~1.5e-4`, 1 epoch. Change one thing at a time and watch the curves. For a small first search, a conservative 3-cell grid (each cell is a separate run and a separate cost line):
+
+| Config | LoRA rank | Learning rate |
+|---|---:|---:|
+| 1 | 8 | 1.5e-4 |
+| 2 | 16 | 1.0e-4 |
+| 3 | 32 | 5.0e-5 |
+
+## RL objectives (Training API)
+
+- **GRPO** (default) — what `rl_loop.py` and `async_rl_loop.py` train: the trainer's built-in loss with group-relative advantages, symmetric clip `[0.8, 1.2]` against the rollout logprobs, and no reference KL. Start here.
+- **DAPO** — asymmetric clip `[0.8, 1.28]`; more aggressive.
+- **GSPO** — sequence-level ratio with tight clipping; for stability on long outputs, may need more steps.
+- **CISPO, DRO, DPPO, importance sampling, REINFORCE, score centering** — research objectives.
+
+Every objective other than GRPO, and GRPO with a reference KL penalty, is a fork of the loop's train step that calls `training.utils.rl.algorithm.<name>`; see `rl-custom-loss.md`.
+
+## Critical rules
+
+- **Default to SFT.** DPO only with preference pairs; RFT only with a reward/verifiable task.
+- **Validate dataset format before uploading** — JSONL, one object/line, right schema, roles in order. Min 3, max 3M.
+- **Datasets may be a single JSONL file or a directory of `.jsonl` shards.** The managed SFT/DPO/ORPO recipes load a staged shard directory in sorted shard order (never concatenated); an empty directory or one with no `.jsonl` shards fails before training starts.
+- **DPO is one-turn only.**
+- **Start LoRA + defaults** (rank 8, 1 epoch, LR ~1e-4); change one thing at a time, watch the curves.
+- **Iterate cheap first** — validate evaluator/data on a small model before scaling.
+
+## Validate before uploading (run this first)
+
+Catch format errors locally before uploading (`client.datasets.create` and `upload`, or `firectl dataset create` when the user runs it). A malformed row otherwise surfaces as a late, often masked, failure. Set `method`, run this on your JSONL file or shard directory, and fix any rejection before uploading:
+
+```python
+import json, os, sys
+
+method = "sft"   # "sft" | "dpo" | "sdk-rft"
+sdk_reward_required_fields = []         # e.g. ["ground_truth"]
+allowed_roles = {"system", "user", "assistant", "tool"}
+
+def validate_messages(messages, line_no, *, final_assistant):
+    assert isinstance(messages, list) and messages, f"line {line_no}: no messages[]"
+    seen_non_system = False
+    previous_role = None
+    for j, message in enumerate(messages):
+        assert isinstance(message, dict), f"line {line_no}: message {j} is not an object"
+        role = message.get("role")
+        assert role in allowed_roles, f"line {line_no}: invalid role {role!r}"
+        content = message.get("content")
+        assert isinstance(content, (str, list)) and content, f"line {line_no}: empty content at message {j}"
+        if role == "system":
+            assert not seen_non_system, f"line {line_no}: system message after conversation started"
+        else:
+            seen_non_system = True
+            if role == "user":
+                assert previous_role in {None, "assistant"}, f"line {line_no}: user cannot follow {previous_role!r}"
+            elif role == "assistant":
+                assert previous_role in {"user", "tool"}, f"line {line_no}: assistant cannot follow {previous_role!r}"
+            elif role == "tool":
+                assert previous_role in {"assistant", "tool"}, f"line {line_no}: tool cannot follow {previous_role!r}"
+            previous_role = role
+    non_system_roles = [m["role"] for m in messages if m["role"] != "system"]
+    assert non_system_roles, f"line {line_no}: no user message"
+    first_non_system = non_system_roles[0]
+    assert first_non_system == "user", f"line {line_no}: first non-system role must be user"
+    if final_assistant:
+        assert messages[-1]["role"] == "assistant", f"line {line_no}: final role must be assistant"
+
+def validate_preference_output(value, line_no, field):
+    assert isinstance(value, list) and len(value) == 1, f"line {line_no}: {field} must contain exactly one message"
+    message = value[0]
+    assert isinstance(message, dict) and message.get("role") == "assistant", f"line {line_no}: {field} must be one assistant message"
+    assert isinstance(message.get("content"), (str, list)) and message["content"], f"line {line_no}: empty {field} content"
+
+def iter_dataset_lines(path):
+    if os.path.isfile(path):
+        shards = [path]
+    else:
+        assert os.path.isdir(path), f"dataset path does not exist: {path}"
+        shards = sorted(
+            os.path.join(root, name)
+            for root, _, names in os.walk(path)
+            for name in names if name.endswith(".jsonl")
+        )
+        assert shards, f"no .jsonl shards in {path}"
+    for shard in shards:
+        with open(shard) as source:
+            for line_no, line in enumerate(source, 1):
+                yield f"{shard}:{line_no}", line
+
+n = 0
+first = None
+for i, line in iter_dataset_lines(sys.argv[1]):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        o = json.loads(line)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{i}: invalid JSONL: {exc}") from exc
+    if first is None:
+        first = o
+    n += 1
+    assert n <= 3_000_000, "maximum 3,000,000 examples"
+    if method == "sft":
+        validate_messages(o.get("messages"), i, final_assistant=True)
+    elif method == "dpo":
+        input_messages = o.get("input", {}).get("messages")
+        validate_messages(input_messages, i, final_assistant=False)
+        dpo_turns = [m for m in input_messages if m["role"] != "system"]
+        assert len(dpo_turns) == 1 and dpo_turns[0]["role"] == "user", f"line {i}: DPO input must contain exactly one user turn"
+        validate_preference_output(o.get("preferred_output"), i, "preferred_output")
+        validate_preference_output(o.get("non_preferred_output"), i, "non_preferred_output")
+    elif method == "sdk-rft":
+        validate_messages(o.get("messages"), i, final_assistant=False)
+        for field in sdk_reward_required_fields:
+            assert field in o, f"line {i}: missing {field!r} required by reward_fn"
+    else:
+        raise ValueError(f"unknown method: {method}")
+assert n >= 3, "need at least 3 examples"
+
+# Data-sufficiency + method/shape sanity: a green "OK" at 3 rows is NOT "ready to train".
+warnings = []
+if n < 1000:
+    warnings.append(f"{n} rows meets the 3-row minimum but is far below the ~1000+ recommended for quality; treat as smoke-only, not evidence of generalization")
+detected = "dpo" if ("preferred_output" in first or "chosen" in first) else "sft/rft"
+if method == "dpo" and detected != "dpo":
+    warnings.append("requested method=dpo but rows look SFT/RFT-shaped (no preferred_output/chosen) -> wrong method or wrong file")
+if method in ("sft", "sdk-rft") and detected == "dpo":
+    warnings.append(f"requested method={method} but rows look DPO-shaped (preferred_output/chosen present) -> wrong method")
+
+print(f"OK: {n} valid {method} rows")
+for w in warnings:
+    print("WARNING:", w)
+```
+
+Reminders: JSONL, one object per line, roles in order, min 3 and max 3M examples. DPO is one-turn only (preferred and non-preferred are the single last assistant turn). Managed RFT validates the prompt schema plus whatever its registered evaluator expects. SDK RFT validates only the fields its selected reward reads; `ground_truth` is common, not universal. `firectl dataset create` re-validates on upload, but running this first turns a late platform error into an instant local fix.

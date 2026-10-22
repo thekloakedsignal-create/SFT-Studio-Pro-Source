@@ -1,0 +1,220 @@
+# Checkpoints — where state lives
+
+The cookbook's checkpoint manager is `TrainingCheckpoints` in `training/utils/checkpoints.py`. The control plane is the source of truth for what checkpoints exist; the only cookbook-side state is `dataloader.json`, which records each saved checkpoint’s recipe step and `data_consumed` cursor.
+
+## Two axes
+
+`TrainingCheckpoints.save(name, *, resumable, promotable, data_consumed=None)` — pick capabilities independently:
+
+- `resumable=True` → DCP write (weights + optimizer). Training can continue from this.
+- `promotable=True` → sampler write (HF safetensors). Eligible for `promote_checkpoint`.
+- Both → DCP + sampler in one call.
+
+Periodic dedicated recipe saves evaluate DCP and sampler cadences independently. Managed SFT/DPO/ORPO uses a server-managed DCP interval and forwards the customer's optional sampler interval separately. When both are due on the same step, one call writes both checkpoint types. The final save is `resumable=True, promotable=True`. A `TrainingCheckpoints` instance writes each DCP name once: if a periodic save already wrote the final step's name, the final save skips the DCP write (serverless multi-session LoRA rejects same-name overwrites) and only refreshes `dataloader.json`. RL FILE weight sync saves sampler checkpoints with `save_weights_for_sampler_ext` and hotloads the returned snapshot identity; those sampler rows are separate from DCP resume saves. Negotiated RDMA weight sync publishes temporary GPU weights without creating sampler checkpoint rows. Explicit resumable/promotable saves remain necessary; see [transport negotiation](rl-hotload.md#transport-negotiation).
+
+### Snapshot type is part of the contract
+
+The path returned by `save_weights_for_sampler()` is an HF/PEFT sampler
+snapshot, not a resumable training checkpoint. It may contain files such as
+`adapter_config.json` and `adapter_model.safetensors`, but it has no DCP trainer
+state or optimizer state. Do not pass that path to `load_state()` or
+`create_training_client_from_state()`.
+
+- Exact continuation: call `save_state()` after a successful `optim_step()` and
+  resume from the returned DCP path. This restores weights and optimizer state.
+- Weights-only LoRA initialization: use `load_adapter()` (or recipe
+  `warm_start_from_adapter`) with the HF/PEFT adapter. The optimizer, schedule,
+  recipe step, and data cursor start fresh.
+- Sampling/hotload: use the identity returned by
+  `save_weights_for_sampler()` with the sampler deployment.
+
+The trainer API rejects an existing non-DCP directory before distributed
+checkpoint loading, so a sampler/DCP type mismatch is returned as a
+request-level user error rather than a trainer-wide failure.
+
+## `dataloader.json`
+
+Written to `{log_path}/dataloader.json` as a versioned recovery manifest:
+
+```json
+{"schema_version": 1, "checkpoints": {"step-10": {"step": 10, "data_consumed": 40}}}
+```
+
+Legacy `{checkpoint_name: data_consumed}` files remain readable. A save commits
+its cursor entry after the DCP becomes visible. With a versioned manifest, only
+checkpoints with committed entries are complete recovery points: auto-resume
+ignores unfinished saves, and explicit optimizer-preserving restore rejects a
+missing entry rather than resetting the cursor. Managed serverless resume also
+selects the newest complete checkpoint/cursor pair before rotating sessions.
+
+Bounded to the newest 20 entries. There is no `checkpoints.jsonl` — never has been, in the new model. The control plane (`FireworksClient.list_checkpoints(job_id)`) is queried at resume / promote time for everything else.
+
+## When each axis is used
+
+- `cfg.dcp_save_interval` > 0 → recipe writes resumable DCP checkpoints every N steps.
+- `cfg.sampler_save_interval` > 0 → recipe writes promotable sampler checkpoints every N steps.
+- Managed SFT/DPO/ORPO fixes `dcp_save_interval` at 20 and sets `sampler_save_interval` only when `sampler_checkpoint_save_interval_steps` is positive.
+- End of training → recipe calls `ckpt.save(resumable=True, promotable=True, ...)`.
+- `cfg.output_model_id` set → recipe also calls `ckpt.promote_latest(output_model_id, base_model)`.
+
+Standalone recipes default both intervals to `0`, so periodic saves are opt-in outside managed SFT/DPO/ORPO.
+
+Managed job checkpoints are listed through the control-plane parent job APIs:
+
+- `FireworksClient.list_training_job_checkpoints(parent)`
+- `FireworksClient.promote_training_job_checkpoint(name=..., output_model_id=..., base_model=...)`
+
+Both use the common `TrainingJobCheckpoint` API. Set `parent` to
+`accounts/<account>/supervisedFineTuningJobs/<job>` for SFT or
+`accounts/<account>/dpoJobs/<job>` for DPO/ORPO. Pass the returned checkpoint
+`name` unchanged when promoting. Existing RLOR and training-session APIs
+retain their own messages and methods.
+
+Filter on `promotable` before promoting, as with `list_checkpoints(job_id)`.
+
+## Delta chain (sampler `checkpoint_type`)
+
+This is an SDK-level detail, surfaced when you call `save_weights_for_sampler_ext` directly. For full-parameter training, only `base` sampler saves are promotable; `delta` saves are not. LoRA always saves the full adapter, so every LoRA sampler checkpoint is promotable. The SDK-managed sampler backend records the base-then-delta chain for recipe hotload; recipe-level `ckpt.save(promotable=True)` always saves `base`. Full-parameter recipe saves keep the resumable name `step-N` and export the promotable sampler as `step-N-base`, preserving any live hotload delta named `step-N`. Promotion by the original logical name, including `step-N-cal`, also accepts its full-parameter `-base` export in the current run.
+
+`checkpoint_type="merged_base"` is a third, LoRA-only value. Instead of saving the standalone adapter, the trainer folds the active adapter into the base weights (`W <- W + scaling*(B@A)`), strips the adapter metadata, and exports a full base checkpoint that promotes as `INFERENCE_BASE` / `HF_BASE_MODEL`. The session must have a non-trivial adapter — either trained in this run, or loaded via `load_adapter` / the recipe `warm_start_from_adapter`; a fresh LoRA session has zero-delta weights, so the save fails with a user error instead of producing a checkpoint. A successful merged-base save is a full standalone checkpoint, so — like `base` — it never participates in the delta chain. Note this client-side adapter load is the supported path; control-plane `warmStartFrom` of a LoRA addon is **not** effective and is rejected for service-mode RLOR jobs.
+
+For a merged-base save, optional `export_precision` selects the final checkpoint encoding: `source`, `bf16`, `nvfp4`, `mxfp8`, or `fp8_block128`. It defaults to `source`; callers do not provide the input precision. The trainer resolves the target from source metadata or the explicit override, then uses the same projection pipeline for both: dequantize, merge in BF16/FP32, encode the target, and stage it immediately. Dense models quantize MLP projections; MoE models quantize routed-expert projections. Packed source INT4 is regenerated with its original pack metadata. Promotion copies the resulting artifact without another precision conversion.
+
+Prefer the `source` default whenever possible. Explicit conversion is an advanced, use-at-your-own-risk override: its generated tensor layout or quantization config may not match the model architecture or downstream serving precision. Before promotion, verify that serving loads the exported checkpoint and run an inference smoke test. If source metadata describes an unsupported format, the export fails instead of silently guessing; choose an explicit target only after confirming that target is supported for the model and serving path.
+
+Two ways to use it:
+
+- **During a LoRA training run** — to emit a full `HF_BASE_MODEL` instead of a `HF_PEFT_ADDON`, save the final promotable checkpoint directly with `client.save_weights_for_sampler("final-merged", checkpoint_type="merged_base")`. Source-format export is the default; pass `export_precision` only to request an output override. Do not rely on `TrainingCheckpoints.save(promotable=True)` (which always saves `base`). The adapter is already loaded in-session, so no separate merge step is needed.
+- **Merge an existing adapter** (no further training) — the standalone `training/examples/tools/merge_lora_and_promote.py` script drives it end to end (provision → `load_adapter` → `merged_base` save → promote). Pass `--adapter-model` as the Fireworks PEFT model resource.
+
+---
+
+## Warm-start from a promoted adapter (LoRA only)
+
+To continue LoRA training from a previously-trained adapter — typically a promoted Fireworks Model or any HF PEFT directory — set `warm_start_from_adapter` on the recipe `Config`:
+
+```python
+cfg = Config(
+    base_model="accounts/fireworks/models/qwen3-8b",
+    lora_rank=16,
+    warm_start_from_adapter="accounts/<acct>/models/my-lora",
+    ...
+)
+```
+
+Semantics: weights-only load — LoRA A/B matrices initialize from the adapter; optimizer, LR schedule, and data cursor start fresh. Prefer a Fireworks PEFT model resource; a `gs://` PEFT directory also works.
+
+Priority inside `TrainingCheckpoints.resume` (highest first):
+
+1. `init_from_checkpoint` — explicit DCP load. A dedicated
+   `<current_job_id>:<checkpoint>` or serverless current-run bare reference
+   restores weights, optimizer, recipe step, and the local dataset cursor.
+   Dedicated bare/cross-job references restore weights and optimizer but
+   start at recipe step/cursor 0. Serverless cross-run references restore the
+   recipe cursor when matching client state remains at the same `log_path`;
+   without a manifest they initialize a new recipe position at 0.
+2. Newest resumable row on the control plane for the current trainer — auto-resume.
+3. `warm_start_from_adapter` — fresh start with adapter weights.
+4. None — fresh start from `base_model`.
+
+**Constraints (enforced by `validate_warm_start_config`):**
+
+- `warm_start_from_adapter` and `init_from_checkpoint` are mutually exclusive.
+- Requires `lora_rank > 0`. Full-parameter continue-training uses `base_model` instead.
+
+Exposed by `sft_loop`, `dpo_loop`, `orpo_loop`, `rl_loop` and `async_rl_loop`.
+
+## Cross-run resume
+
+Auto-resume (priority 2) is **scoped to one trainer job**. If you re-run with the same `log_path` but provision a fresh trainer, the new trainer's `list_checkpoints` is empty and resume falls through to fresh start.
+
+For a full continuation, pin both invocations to the same trainer via
+`cfg.trainer.job_id`, keep the same `log_path`, and use auto-resume. An explicit
+dedicated full resume uses `"<current_job_id>:<checkpoint>"`; an explicit
+serverless current-run full resume uses a bare checkpoint name. The local
+`dataloader.json` is cookbook-owned; it must still be present to recover the
+dataset cursor.
+
+To initialize a new recipe run from another DCP checkpoint:
+
+- Dedicated: use `init_from_checkpoint=f"{prior_job_id}:step-N"` for a
+  cross-job checkpoint, or a bare checkpoint name for a phase handoff on the
+  current trainer. Raw URI and filesystem-path references are not supported.
+  A bare dedicated name deliberately keeps the existing step-0 initialization
+  behavior used for phase handoffs on one trainer.
+- Serverless: use the fully-qualified
+  `"<account>/run-<32 lowercase hex>/<checkpoint>"` logical name. Bare names
+  refer to the current run. Raw URI (including `gs://`, `tinker://`, and
+  `cross_job://`) and absolute-path references are not supported by pooled
+  trainers, and `<other-session>:<checkpoint>` is rejected rather than silently
+  redirected to the current run.
+
+Cross-job DCP initialization restores weights and optimizer state but resets
+the recipe step and cursor. Serverless cross-run continuation also restores
+matching committed client state from the same `log_path`. A versioned manifest
+with no entry for the selected checkpoint is an incomplete recovery point and
+is rejected; it never silently replays the dataset with an advanced optimizer.
+
+Explicit references retain priority over current-run checkpoints by default.
+SFT/DPO's `prefer_current_run_checkpoint=True` opts continuation into preferring
+newer complete checkpoints saved by the replacement run; managed serverless
+resume sets this automatically. If the replacement has no complete save, it
+continues from the previous-attempt reference instead. Failed relaunches reuse
+an already prepared session, and attempts that fail before their first save
+retain the prior recovery reference.
+
+Managed parent checkpoint APIs retain prior attempts' original session and storage
+bindings. Historical checkpoints remain listable and independently promotable
+while a replacement run has not yet bound, and after it moves to another trainer.
+Resume also recreates a missing owned output-model placeholder before dispatch;
+it does not overwrite unrelated models that reuse the name.
+
+Serverless DPO stores its fixed reference at a stable job-level
+`runner.reference_checkpoint_file`, separate from per-attempt billing metadata.
+A resumed DPO run with no recoverable reference is rejected rather than
+snapshotting a different policy. DPO replays deterministic rendering/reference
+cache order while skipping optimizer updates for already consumed batches, both
+in epoch zero and in later cached epochs. Final export is retried even when the
+restored cursor has no remaining batches.
+
+`TrainingCheckpoints.resume(..., restore_optimizer=False)` always honors the
+explicit checkpoint as a weights-only initialization and resets recipe step
+and cursor, even when current-run preference is enabled. For HF/PEFT adapter
+weights with a fresh optimizer, use `warm_start_from_adapter` on supported
+(non-serverless) recipes.
+
+---
+
+## `output_model_id` validation
+
+**Cap: 63 chars, charset `[a-z0-9-]`.** A longer or otherwise-invalid ID is rejected server-side with HTTP 400. Once rejected, that same `checkpoint_id` can later return "not found in GCS" (the staged blob is no longer usable).
+
+**Validate client-side before every promote:**
+
+```python
+from fireworks.training.sdk import validate_output_model_id
+
+errors = validate_output_model_id(output_model_id)
+if errors:
+    raise ValueError("\n".join(errors))
+```
+
+When deriving `output_model_id` from a long policy / run name, trim the prefix before the step suffix:
+
+```python
+# Bad:  "<long-workflow>-<long-policy>-<long-base-model>-step-14"  # 70+ chars → HTTP 400
+# Good: "my-policy-step-14"
+output_model_id = f"{short_policy}-step-{step}"[:63].rstrip("-")
+```
+
+---
+
+## When promote fails
+
+If `promote_checkpoint` returns `checkpoint "<name>" not found in GCS`:
+
+1. Call `FireworksClient.list_checkpoints(job_id)` (or run the `list_checkpoints.py` CLI wrapper) to see which rows the server will actually accept. See [`sdk-tools.md`](sdk-tools.md#listing-checkpoints-fireworksclientlist_checkpoints).
+2. Make sure your `output_model_id` passes `validate_output_model_id` and retry `promote_checkpoint.py` against one of those rows.
+3. If every promotable row still fails, **reach out to Fireworks support** — some recoveries (re-staging a sampler blob from surviving DCP state, looking up a pre-migration `PER_DEPLOYMENT` bucket) require server-side access.
+
+The modern promote API takes a single `name=` (4-segment resource path from `list_checkpoints` output) and works identically for `PER_TRAINER` and `PER_DEPLOYMENT`. The legacy positional `(job_id, checkpoint_id, ...)` form still works but emits a `DeprecationWarning`. See [`rl-hotload.md#promoting-a-checkpoint`](rl-hotload.md#promoting-a-checkpoint) and `sdk-tools.md` for the CLI flow.

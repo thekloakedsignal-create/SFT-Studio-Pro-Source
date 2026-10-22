@@ -1,0 +1,449 @@
+# RL: async recipe (`async_rl_loop.py`)
+
+> ⚠️ **EXPERIMENTAL.** API surface and config fields may change without
+> backward-compatibility shims. Pin the cookbook version for production runs.
+
+Use this reference for implementation details, tuning, and debugging. The
+customer-facing overview stays in the Fireworks docs.
+
+This reference owns the async loop: admission, overlap, grouping, optimizer
+groups, publication, and durability. For multi-turn agents, tools, token
+ancestry, history mismatch, or session/cache architecture, read
+[`rl-agentic.md`](rl-agentic.md).
+
+## Infrastructure variants
+
+Use `training/recipes/async_rl_loop.py` for a dedicated trainer and inference
+deployment. Use the experimental
+`training/recipes/experiment/async_rl_loop_serverless.py` for the shared
+serverless pool. The serverless variant keeps the rollout, scheduling,
+evaluation, batching, and telemetry contracts described here, but replaces
+deployment hotload with session-scoped snapshots and snapshot-bound sampling
+clients. Keep serverless lifecycle code in that experiment rather than in a
+rollout adapter.
+
+## Responsibility boundary
+
+Users provide:
+
+- dataset rows through `Config.dataset` or `rows=`;
+- `rollout_fn_factory(setup) -> rollout_fn`;
+- environment interaction, scoring, and one or more trainer-ready trajectories
+  per successful rollout call;
+- scheduling config and the GRPO clip range (`eps_clip`, `eps_clip_high`);
+- optional `advantage_fn`, `dynamic_filter_fn` and `evaluation_fn` callbacks.
+
+The recipe owns trainer/deployment/sampler lifecycle, rollout fan-out and
+admission, group assembly, advantages, training groups, the server-side GRPO
+forward/backward, the optimizer, sampler hotload, version publication,
+metrics, checkpointing, and cleanup. It has no loss, anchor or KL options; to
+change the objective, fork `train_group` as described in
+[`rl-custom-loss.md`](rl-custom-loss.md).
+
+For complete replay masks with a bounded SC head, see
+[score-centering paths](rl-custom-loss.md#score-centering-paths).
+
+Keep custom environment logic in the rollout function. Do not put scheduler or
+trainer lifecycle state in the rollout.
+
+## Rollout API
+
+The factory runs once. Each rollout call produces one logical rollout result:
+
+```python
+def make_rollout_fn(setup: RolloutSetup) -> RolloutFn:
+    async def rollout_fn(sample_prompt: dict) -> RolloutRun | None:
+        ...
+
+    return rollout_fn
+```
+
+The recipe invokes `rollout_fn` `completions_per_prompt` times for each dataset
+row. Return `None` to drop that rollout draw. On success, return a `RolloutRun`
+containing one or more trainer-ready `RolloutSample` trajectories. The API
+field is named `segments` because these trajectories may be branches or
+disjoint token spans from one environment interaction:
+
+```python
+@dataclass
+class RolloutRun:
+    segments: list[RolloutSample]
+
+@dataclass
+class RolloutSample:
+    tokens: list[int]
+    logprobs: list[float]
+    loss_mask: list[int]
+    reward: float
+```
+
+For every returned trajectory:
+
+- `tokens`, `logprobs`, and `loss_mask` must have equal lengths;
+- `loss_mask=1` marks tokens trained on; prompt, user, tool, and environment
+  tokens stay `0`;
+- non-generated positions should use `0.0` logprobs;
+- all trajectories in one run must share the same scalar reward.
+
+When carrying R3, keep `routing_matrices` aligned with the trajectory through
+slicing and materialization. Use the existing datum builders and
+`fireworks.training.sdk.routing` helpers: payloads may contain compact file
+references, so converting them with `list()` or `tuple()` is not supported.
+
+`RolloutRun` is the reward, advantage, and GRPO group-member boundary; it is
+not restricted to one trainer trajectory. Group assembly computes one
+advantage per surviving run and broadcasts it to every trajectory in that
+run. Each trajectory is then packed as a separate trainer datum. Thus a group
+with `R` surviving runs has `R` rewards and advantages, while its trainer datum
+count is `sum(len(run.segments) for run in runs)` and may exceed `R`.
+
+`main(..., advantage_fn=...)` can override the per-group reward-to-advantage
+calculation. The default `compute_advantages` subtracts the group mean and
+divides by the group standard deviation. For mean-only REINFORCE, pass a
+function that subtracts the mean without that division. Reward scaling belongs
+to the caller; the recipe does not automatically convert binary rewards to
+`-1/+1`. This choice is independent of token-level score centering and gradient
+accumulation normalization.
+
+`RolloutSetup` (`training.utils.rl.rollout.setup`) contains the recipe-owned
+sampler, tokenizer, tokenizer ID, sampling kwargs (`default_sample_kwargs`),
+group size, and the deployment's base URL, API key and model for rollouts that
+call it over HTTP themselves. Task settings are not part of the setup: close the
+factory over a typed config, e.g. `functools.partial(make_rollout_fn,
+task=task_config)`. Treat `setup.sampler` as borrowed: reuse it for every
+trajectory and do not close it or build another sampler. The recipes call the
+factory once; evaluation reuses that rollout with `evaluation=True`, so sandbox
+pools and judges keep one concurrency budget.
+
+R3 uses the same sampler setup. Format negotiation belongs in the SDK: it
+selects Parquet when the SDK, trainer, and inference support it and the trainer
+and inference share an R3 store. Older peers use inline routing. Parquet R3
+files expire six hours after creation by default; override retention with
+`r3_ttl_seconds` in sampling kwargs when needed.
+
+The rollout may optionally declare any of these keyword parameters when it
+needs dataset position context: `cursor_index`, `row_index`, `epoch`,
+`rollout_idx`, `sample_index`, `end_of_epoch`, and `evaluation`. Training calls
+set `evaluation=False`. The recipe passes `evaluation_fn` a compatible wrapper
+that sets `evaluation=True` when the rollout declares it; rollouts that do not
+need mode-specific behavior can omit the keyword.
+
+The scheduler's `RolloutRow` is not part of this user contract. It is the
+recipe-owned envelope that binds a dataset row to `completions_per_prompt`
+rollout calls and an ordered durability callback.
+
+## Evaluation
+
+Pass `evaluation_fn(step, rollout_fn)` and `evaluation_interval=N` to `main()`.
+The recipe evaluates once at the initial or resumed step, every `N` published
+optimizer steps, and once at the actual final step after the input source is
+exhausted. A periodic evaluation at that same final step is not repeated.
+
+The callback owns evaluation rows, fan-out, environment execution, and metric
+aggregation. The recipe owns scheduling and supplies the evaluation-scoped
+rollout wrapper. Evaluation does not enter the producer, assemble prompt
+groups, compute advantages, or mutate optimizer state.
+
+Evaluation receives the same rollout object created from the training
+`RolloutSetup`. It therefore always inherits `max_completion_tokens` through
+`sample_kwargs["max_tokens"]` and the resolved total context limit through
+`sample_kwargs["max_seq_len"]`; there are no separate evaluation length knobs.
+
+Evaluation starts immediately after its policy version is published and shares
+the recipe-owned sampler with rollout production. The initial evaluation starts
+with the coordinator rather than delaying the first rollout cohort. Evaluation
+may overlap rollout production and trainer work for the next optimizer batch,
+but it must finish before that batch hotloads a newer sampler snapshot. This
+weight-sync barrier keeps every multi-turn evaluation on one published policy
+version. Evaluation stays off the critical path only when it finishes before
+the barrier; a slower callback blocks weight publication for its remaining
+tail, reported as `eval/weight_sync_wait_time`.
+
+`max_concurrency_rollout_sample` limits training rollout calls owned by the
+producer; evaluation fan-out does not consume those slots. Both paths share the
+sampler's adaptive inference-request controller, so size deployment capacity
+for their combined peak and let the evaluation callback bound its own fan-out.
+Do not add evaluation calls to the producer merely to reuse its admission
+budget: evaluation remains outside training groups and durability accounting.
+
+Evaluation is fail-open. If the callback raises, the recipe logs the exception,
+emits `eval/failed=1`, and continues training; cancellation still propagates
+during shutdown. Keep the async callback cooperative. Send CPU-heavy scoring or
+blocking verifier work through `asyncio.to_thread(...)` so it does not stall
+rollout completion, admission, or refill on the shared event loop.
+
+## Architecture and ownership
+
+The scheduler is split by one owner per concern:
+
+| Component | Owns |
+|---|---|
+| `RolloutProducer` | In-flight rollout tasks, completion-triggered refill, row-atomic admission, group assembly, failure policy, and the durable row cursor |
+| `OptimizerBatch` | One optimizer batch, accepted rows and the async queue of immediately ready `TrainingGroup`s |
+| `AsyncRLCoordinator` | The producer/batch handoff, one serialized trainer worker, failure boundaries, and publication |
+| `OverlappedEvaluation` | One version-scoped evaluation task, interval/deduplication, joining, and cancellation |
+| `AsyncRLTelemetry` | Rate-limited producer snapshots, completed-batch metric reduction, and reporting |
+| `async_rl_loop.main` | Sampler and service lifecycle plus visible algorithm phases: `train_group` forward/backward, optimizer, hotload, telemetry handoff, and checkpoints |
+
+Complete groups build loss inputs and submit backward requests through the
+coordinator's single trainer worker, with its active-batch failure checks. Results
+wait through the native asynchronous API on the event loop. Optimizer, publication
+and checkpoint calls use that same worker. Rollout retirement, producer refill
+and evaluation can continue during local preparation and while results remain pending.
+There is one optimizer update after every backward in its window succeeds.
+
+### Sampler ownership and shutdown
+
+The async loop creates one sampler and passes that exact object through
+`RolloutSetup`. All rollout trajectories and evaluation calls therefore share
+one HTTP connection pool, deployment route, and sampler concurrency controller.
+A rollout factory may own a gateway or other facade over the sampler, but the
+sampler itself remains borrowed.
+
+Shutdown follows dependency order:
+
+1. stop the coordinator and rollout production;
+2. close the rollout function and any factory-owned gateway;
+3. close the sampler;
+4. close the training/deployment service.
+
+The gateway must not close its borrowed sampler. The dedicated recipe registers
+the sampler after the service in its LIFO cleanup stack, so the sampler closes
+first even on an exception. Serverless keeps the equivalent ordering in its
+async sampling lifecycle.
+
+## Five scheduling knobs
+
+Use these symbols when reasoning about capacity:
+
+| Config field | Symbol | Unit | Meaning |
+|---|---:|---|---|
+| `completions_per_prompt` | `G` | rollout calls per row | Logical GRPO group members requested for one dataset row |
+| `prompt_groups_per_step` | `P` | rows | Complete prompt groups in one optimizer batch |
+| `max_head_offpolicy_versions` | `O` | published versions | Admission headroom beyond the current policy version; `0` is fully on-policy |
+| `max_concurrency_rollout_sample` | `C` | rollout calls | Optional hard cap on in-flight rollout calls |
+
+The loss clips against the rollout logprobs. With `O > 0` those come from a
+policy up to `O` versions stale, so PPO clips against the behavior policy rather
+than a proximal snapshot (AReaL's decoupled PPO). The default `O = 0` keeps the
+two nearly identical; for off-policy runs a fork can recompute the anchor and
+add truncated IS ([`rl-custom-loss.md`](rl-custom-loss.md#recompute-the-anchor)).
+
+Router Replay (R3) is a numerics-alignment setting, not a scheduling knob, and
+has no `Config` field. For an MoE base model both RL recipes add
+`include_routing_matrix=True, echo=False` to the sampling kwargs, replaying
+routes for generated tokens without the serving cost of `echo=True`. A fork
+that needs full-sequence replay sets `echo=True` and passes
+`router_replay_completion_only=False` to `AsyncRLCoordinator` (default `True`);
+expect lower throughput, because `echo=True` with logprobs disables prompt
+KV-cache reuse. For Harbor/TITO prompt
+capture, see the [agentic rollout example](rl-agentic.md#cookbook-example).
+
+Dense models skip R3 automatically. The MoE decision comes from the trainer:
+its `create_model` response advertises `supports_router_replay`, exposed as
+`training_client.supports_router_replay` and consumed by
+`resolve_router_replay_enabled(training_client=...)`, so recipes that pass the
+bound training client decide R3 without GETting the base model (a private
+early-access base model rejects that GET with 403). The model probe still runs
+when there is no trainer answer: a trainer that predates the field (`None`), or
+a path with no trainer at all -- e.g. Harbor sampling-only scoring
+(`harbor_rl/common.py`), which calls the resolver without `training_client`. There a 403/404
+takes the last-resort path below rather than failing. `routing_matrix_format`
+(`parquet_v1`) is the R3 wire format and is advertised for dense models too, so
+it is not an on/off signal.
+
+When the trainer did not report and the model probe returns 403/404 (the
+record is not visible to the caller), the recipes request R3 and log a warning.
+If the model is actually dense, the first sample rejects the routing request;
+remove the routing kwargs in a fork. Any other probe failure (control-plane
+error, or a record with no MoE flag) still raises.
+
+One optimizer batch requests `B = P × G` logical rollout results. The number of
+trainer trajectories can be larger when a result contains multiple
+`RolloutSample`s. The dedicated loop sends currently ready complete groups
+together, even while earlier training requests are pending. It never waits for
+additional groups to fill a request. The serverless loop uses the same pattern.
+
+Request grouping does not change the optimizer batch. Exactly one optimizer mutation, one sampler hotload, and one
+version publication follow all groups in a batch.
+
+## Row-atomic admission gate
+
+Admission bookkeeping uses rollout-call slots, exposed as `*_samples` in the
+producer metrics. It does not reserve capacity per returned trajectory. A row
+is submitted only when both budgets can fit all `G` rollout calls:
+
+```text
+B = prompt_groups_per_step * completions_per_prompt
+
+staleness_capacity =
+    (published_version + max_head_offpolicy_versions + 1) * B
+    - (accepted_samples_offset + accepted_samples + reserved_samples)
+
+concurrency_capacity =
+    max_concurrency_rollout_sample - in_flight_samples  # infinite when unset
+
+admit one row iff min(staleness_capacity, concurrency_capacity) >= G
+```
+
+All calls from one row receive the same submit version. Accepted samples remain
+accounted for, and each publication adds one batch of staleness capacity.
+
+`O=0` is the fully on-policy setting: every optimizer batch trains groups from
+its current published policy version. It does not disable overlap inside that
+batch: the trainer can process each complete group while remaining rollouts
+for the same optimizer batch finish.
+
+When `C` is set, it must be at least `G`. To keep a concurrency window full,
+the admission budget must also cover it. A useful sizing check is:
+
+```text
+O >= ceil(C / B) - 1
+```
+
+This is a capacity heuristic, not a claim about the exact model version that
+generated every token. `async/version_offset_*` measures submit-version lag.
+
+## Completion-driven refill
+
+The producer attempts refill at startup, after publication, and after every
+retired rollout task. For a completion-triggered refill:
+
+1. retire the completed task;
+2. resolve its row when all `G` draws have settled;
+3. emit the complete training group immediately;
+4. immediately retry row admission;
+5. submit as many complete rows as both budgets allow.
+
+This path runs while the trainer worker is active. If the staleness gate is
+full, the refill attempt submits nothing and waits for publication. If only the
+concurrency gate is full, the next rollout completion reopens capacity.
+
+## Batch lifecycle
+
+For each optimizer batch:
+
+1. The first ready group exposes the `OptimizerBatch` to the recipe.
+2. The loop yields each fully assembled, accepted group immediately.
+3. Each group immediately submits a server-side GRPO forward/backward request;
+   earlier requests may still be pending. No half-formed group is submitted.
+4. After every submitted request succeeds, the recipe performs one optimizer
+   step using the accumulated loss-token normalization. A backward or producer
+   failure prevents that optimizer submission; requests are joined before shutdown using
+   finite, best-effort waits. A timeout or failed transport does not prove that
+   remote work has stopped; no further optimizer or success checkpoint is issued.
+5. The recipe joins any evaluation of the current sampler version.
+6. The recipe synchronizes sampler weights through [negotiated RDMA or save → FILE hotload](rl-hotload.md#transport-negotiation).
+7. `coordinator.publish(batch)` advances the policy version, commits accepted
+   rows to the durable cursor, records metrics, and wakes the producer.
+8. If the published step is an evaluation step, its evaluation starts in the
+   background alongside newly admitted rollouts.
+
+The recipe performs an unconditional initial sampler sync and one sync per
+optimizer batch. It has no `weight_sync_interval` or conditional initial-sync
+knob.
+
+When the source ends, the producer seals and trains a final partial optimizer
+batch rather than silently dropping accepted prompt groups.
+
+## Failure policy
+
+One flaky rollout call does not immediately abort a long run:
+
+- `None` explicitly drops that call and contributes no trajectories;
+- explicit drops increment `producer/trajectory_drops_total` but are neutral to
+  the infrastructure circuit breaker; despite its name, this metric counts
+  dropped rollout calls;
+- timeouts, connection failures, HTTP 408/429/5xx, explicitly marked
+  `RecoverableRolloutError`s, and known client transport errors are recoverable;
+- recoverable errors drop that draw and continue if the row still satisfies
+  `min_group_size`;
+- the default circuit breaker aborts after 5 consecutive recoverable failures,
+  or a failure rate of at least 50% after 10 observations in a 20-observation
+  window;
+- invalid return values, data-contract errors, non-retryable HTTP errors,
+  unexpected cancellation, and unknown exceptions are fatal.
+
+For generic rollout implementations, the classifier is intentionally narrow.
+Do not catch arbitrary exceptions and return `None`; mark known infrastructure
+failures explicitly or let programming errors remain fatal.
+
+Agentic adapters may own a broader trajectory boundary than generic rollouts.
+Keep that policy in the adapter and follow [`rl-agentic.md`](rl-agentic.md);
+malformed R3 data is still discarded at async admission before group assembly.
+
+If a Parquet R3 file expires before the trainer reads it, the trainer warns
+the client with the request, file, and expiry time, then continues with natural
+routing for the affected data. An unexpired missing or invalid file remains an
+error; expiry fallback does not make a malformed trajectory valid.
+
+Incomplete-group retries are bounded and `min_group_size` counts surviving
+`RolloutRun`s, not their contained trajectories. After that budget is
+exhausted, the row is rejected and the producer advances. If every row is
+rejected, the loop can finish with zero optimizer steps; use the returned step
+count together with `producer/trajectory_drops_total` and
+`producer/rows_rejected_total` as the experiment-level success criterion.
+
+If a producer failure affects the active optimizer batch, training stops before
+its optimizer mutation. If it affects only a future batch, the recipe finishes
+the current optimizer, hotload, and publication so trainer and sampler versions
+do not diverge.
+
+## Durability and resume
+
+Rejected rows become durable when their draws settle. Accepted rows become
+durable only after the optimizer step, hotload, and publication succeed. A
+crash during an unfinished batch therefore does not silently advance the
+dataset cursor past uncommitted training data.
+
+`dcp_save_interval=0` disables resumable checkpoints. Set a positive interval
+when resume is required. A serverless bare checkpoint name resumes trainer
+state and the dataset cursor for the current run; a dedicated explicit full
+resume uses `<current_job_id>:<checkpoint>`. Dedicated bare/cross-job references
+restore trainer weights and optimizer state but reset the recipe step and
+cursor. Serverless cross-run references also restore matching committed client
+state when the same `log_path` is retained; versioned manifests reject missing
+cursor entries. See [checkpoint recovery](sdk-checkpoints.md#cross-run-resume).
+
+## Metrics and tuning
+
+Static settings are stored once in the run configuration. Optimizer-batch
+metrics use `rollout/step`; rate-limited producer gauges and cumulative refill
+counters use the independent `producer/event` axis. Producer records are
+emitted while training is in progress, so refill and admission behavior is not
+reconstructed from one snapshot at publication.
+
+Read [`async-rl-metrics.md`](async-rl-metrics.md) for the metric glossary,
+invariants, W&B/JSONL reading procedure, refill proof, and tuning decision
+table.
+
+## Loss path
+
+`train_group` trains the trainer's built-in GRPO loss, clipped against the
+rollout logprobs, with no reference model or KL. Advantages are not
+reweighted, and raw inference logprobs feed drift metrics only. Late-arriving
+off-policy tokens are therefore clipped against the policy version that
+sampled them. To use another objective, reference KL, a recomputed trainer
+anchor, TIS or sampling-support replay, fork `train_group`; see
+[`rl-custom-loss.md`](rl-custom-loss.md).
+
+## Examples and related references
+
+- `training/examples/rl/deepmath/` — single-turn renderer rollout with a
+  `dynamic_filter_fn` that drops zero-variance groups
+- `training/examples/rl/frozen_lake/` — multi-turn tool environment as an
+  eval-protocol `@evaluation_test`, adapted with
+  `make_eval_protocol_rollout_fn_factory`
+- `training/examples/rl/deepmath/train_deepmath_serverless.py` — the same rollout contract on
+  `recipes/experiment/async_rl_loop_serverless.py`
+- `training/examples/harbor_rl/` — multi-turn TITO rollouts: one shared
+  `tito.rollout.HarborRollout` with OpenCode, Pi, Mini-SWE-Agent, and mimoagent
+  harness adapters under `harnesses/`; task entry points under `tasks/`
+- `training/recipes/rl_loop.py` — the strict on-policy loop takes the same
+  `rollout_fn_factory(setup)` seam; with `prepare_batch_fn=igpo.prepare_batch(...)`
+  it runs IGPO (`training/examples/rl/multihop_qa/`)
+- [`rl-hotload.md`](rl-hotload.md) — sampler weight transfer
+- [`rl-sampling-timeouts.md`](rl-sampling-timeouts.md) — sampler timeout diagnosis
+- [`rl-gradient-accumulation.md`](rl-gradient-accumulation.md) — optimizer gradient
+  normalization
+- [`rl-dynamic-filter.md`](rl-dynamic-filter.md) — prompt-group filtering
