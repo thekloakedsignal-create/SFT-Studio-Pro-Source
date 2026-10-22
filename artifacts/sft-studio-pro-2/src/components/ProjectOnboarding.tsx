@@ -592,18 +592,12 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
       setStep("definition-review");
       return;
     }
-    const allowReasoning = trainingModel !== "Llama 3.1 70B";
-    const eligibleLibrary = BATCH_RECOMMENDATION_LIBRARY.filter(item =>
-      allowReasoning || !/\breasoning\b|chain[- ]of[- ]thought|\bcot\b/i.test(item.topic)
-    );
-    const recommendedTopics = allowReasoning
-      ? GENERAL_RECOMMENDED_BATCH_TOPICS
-      : GENERAL_RECOMMENDED_BATCH_TOPICS.filter(topic => !/reasoning/i.test(topic));
+    const eligibleLibrary = BATCH_RECOMMENDATION_LIBRARY;
+    const recommendedTopics = GENERAL_RECOMMENDED_BATCH_TOPICS;
     const skillItems = specialSkills
       .split(/\r?\n|[,;]/)
       .map(item => item.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").replace(/^(?:and|&)\s+/i, "").trim())
       .filter(item => item && !/^(?:none|none specified|no special skills?)\.?$/i.test(item))
-      .filter(item => allowReasoning || !/\breasoning\b|chain[- ]of[- ]thought|\bcot\b/i.test(item))
       .filter((item, index, all) => all.findIndex(candidate => candidate.toLowerCase() === item.toLowerCase()) === index);
     const projectDefinitionContext = {
       ...approvedProjectDefinition,

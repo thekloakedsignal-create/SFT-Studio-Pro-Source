@@ -3,11 +3,11 @@ name: Reasoning template scope
 description: User-defined boundary for changes to SFT Reasoning batch generation.
 ---
 
-Automated generation for a Llama project must not add reasoning tags or include Reasoning examples.
+For a Llama project, automated batch examples must use Single Turn and Multi Turn only, without reasoning tags or Reasoning templates. The recommender may still suggest reasoning-related recipes/topics; recipe topic and output template are separate.
 
-**Why:** The user explicitly said, “The llama should not have reasoning tags added” in automated generation.
+**Why:** The user clarified that reasoning recipes may be recommended, but Llama batches must not be auto-generated using the Reasoning template.
 
-**How to apply:** Use the model saved in Project Definition to select the automation mix. Preserve Reasoning for other supported models and do not change Model Trainer.
+**How to apply:** Use the saved onboarding model to set the recommendation mix: Llama gets Single Turn + Multi Turn only; other models retain the existing mix. Do not filter reasoning-related recipe topics or change the actual batch generator or Model Trainer.
 
 For Reasoning-generation work, change only the Reasoning template and its tests. Do not alter Single Turn or Multi Turn prompts, schemas, or behavior. Keep the shared concurrent model schedule.
 
