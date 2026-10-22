@@ -352,21 +352,34 @@ async function requestDraft(instruction: string, appContext: Record<string, unkn
 }
 
 function parseGoldenExample(raw: string) {
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  try {
-    const parsed = JSON.parse(cleaned);
-    if (parsed.userPrompt && parsed.assistantResponse) {
-      return { prompt: String(parsed.userPrompt), completion: String(parsed.assistantResponse) };
-    }
-    const messages = parsed.examples?.[0]?.messages ?? parsed.messages;
-    if (Array.isArray(messages)) {
-      const user = messages.find((message: { role?: string }) => message.role === "user");
-      const assistant = messages.find((message: { role?: string }) => message.role === "assistant");
-      if (typeof user?.content === "string" && typeof assistant?.content === "string") {
-        return { prompt: user.content, completion: assistant.content };
+  const trimmed = raw.trim();
+  const candidates = new Set<string>([
+    trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""),
+  ]);
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) candidates.add(fenced[1].trim());
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.add(trimmed.slice(firstBrace, lastBrace + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed.userPrompt && parsed.assistantResponse) {
+        return { prompt: String(parsed.userPrompt), completion: String(parsed.assistantResponse) };
       }
-    }
-  } catch { /* Reject non-JSON drafts rather than placing the whole response in one field. */ }
+      const messages = parsed.examples?.[0]?.messages ?? parsed.messages;
+      if (Array.isArray(messages)) {
+        const user = messages.find((message: { role?: string }) => message.role === "user");
+        const assistant = messages.find((message: { role?: string }) => message.role === "assistant");
+        if (typeof user?.content === "string" && typeof assistant?.content === "string") {
+          return { prompt: user.content, completion: assistant.content };
+        }
+      }
+    } catch { /* Try the next JSON candidate; never place the whole response into one field. */ }
+  }
   return null;
 }
 
