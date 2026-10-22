@@ -575,7 +575,7 @@ export default function App() {
           autoQa: answers.qa === "audit",
           docs: answers.docs === "yes" ? (answers.docFiles || []) : [],
           recommendations: recommendationsOverride ?? batchRecommendations,
-          trainingModel: settings.onboardingModel ?? modelOverride ?? trainerHandoff.model,
+          onboardingModel: settings.onboardingModel ?? modelOverride ?? "",
           project: {
             name: settings.name,
             systemPrompt: settings.systemPrompt,
