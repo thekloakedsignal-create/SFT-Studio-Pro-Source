@@ -304,6 +304,7 @@ const GENERAL_RECOMMENDED_BATCH_TOPICS = [
 
 interface Props {
   onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[], trainingModel?: string, autoGenerate?: boolean) => void;
+  onRecommendationsApproved: (recommendations: BatchRecommendation[]) => Promise<void>;
   onSkip: () => void;
   startAtBatchInterview?: boolean;
   initialProjectSettings?: ProjectSettings;
@@ -711,6 +712,19 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
     setStep("batch-recommendations");
   };
 
+  const approveRecommendations = async () => {
+    setPending(true);
+    setError("");
+    try {
+      await onRecommendationsApproved(batchRecommendations);
+      setStep("batch-automation");
+    } catch (error: any) {
+      setError(error?.message || "The recommendations could not be saved. Please retry.");
+    } finally {
+      setPending(false);
+    }
+  };
+
   const skipToProject = () => {
     if (startAtBatchInterview) {
       onSkip();
@@ -1042,7 +1056,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
               {batchRecommendations.map((batch, index) => (
                 <li key={`${index}-${batch.topic}`} className="flex items-start justify-between gap-3">
                   <span>• {batch.topic}</span>
-                  <button type="button" aria-label={`Remove batch ${batch.topic}`} className="shrink-0 rounded px-2 py-0.5 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white" onClick={() => setBatchRecommendations(prev => prev.filter((_, i) => i !== index))}>Delete</button>
+                  <button type="button" aria-label={`Remove batch ${batch.topic}`} disabled={pending} className="shrink-0 rounded px-2 py-0.5 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-50" onClick={() => setBatchRecommendations(prev => prev.filter((_, i) => i !== index))}>Delete</button>
                 </li>
               ))}
             </ul>
@@ -1119,7 +1133,7 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
               setStep("voice-choice");
             }}>Continue <ArrowRight className="h-4 w-4" /></button>}
             {step === "batch-recommendations" && <button type="button" className={buttonClass} disabled={pending} onClick={() => setStep("batch-skills")}>Add more topics</button>}
-            {step === "batch-recommendations" && <button type="button" className={buttonClass} onClick={() => setStep("batch-automation")}>The list looks good <ArrowRight className="h-4 w-4" /></button>}
+            {step === "batch-recommendations" && <button type="button" className={buttonClass} disabled={pending} onClick={() => void approveRecommendations()}>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}The list looks good <ArrowRight className="h-4 w-4" /></button>}
             {step === "batch-manual" && <button type="button" className={buttonClass} onClick={() => finish(false)}>Go to Batch generator <ArrowRight className="h-4 w-4" /></button>}
           </div>
         </footer>
@@ -1127,7 +1141,8 @@ export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = 
       <button
         type="button"
         onClick={skipToProject}
-        className="fixed bottom-4 right-4 z-[60] rounded-md border border-purple-500 bg-purple-300 px-2.5 py-1.5 text-xs font-bold !text-[#000000] shadow-lg transition-colors hover:bg-purple-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+        disabled={pending}
+        className="fixed bottom-4 right-4 z-[60] rounded-md border border-purple-500 bg-purple-300 px-2.5 py-1.5 text-xs font-bold !text-[#000000] shadow-lg transition-colors hover:bg-purple-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-50"
       >
         Skip to project
       </button>

@@ -784,6 +784,7 @@ export default function App() {
   const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
   const activeProjectId = useRef<string | null>(null);
   const projectLoadVersion = useRef(0);
+  const pendingRecommendationsProjectId = useRef<string | null>(null);
 
   const pendingAutomationRef = useRef<{ answers: Record<string, any>; recommendations?: BatchRecommendation[]; settings: ProjectSettings; model?: string } | null>(null);
   useEffect(() => {
@@ -4032,14 +4033,33 @@ export default function App() {
           }
         }}
         onRecommendationsApproved={async (recommendations) => {
-          if (!selectedProjectId) throw new Error("Save the project before approving recommendations.");
-          const response = await projectApiFetch(`/api/sql/projects/${encodeURIComponent(selectedProjectId)}`);
-          const data = await response.json();
-          if (!response.ok || !data.success || !data.project) {
-            throw new Error("Could not load the saved project. Please retry.");
+          const projectId = selectedProjectId || pendingRecommendationsProjectId.current || `project-${Date.now()}`;
+          if (!selectedProjectId) pendingRecommendationsProjectId.current = projectId;
+          let existingSettings: Record<string, unknown> = {};
+          if (selectedProjectId) {
+            const response = await projectApiFetch(`/api/sql/projects/${encodeURIComponent(projectId)}`, { cache: "no-store" });
+            if (response.ok) {
+              const data = await response.json();
+              if (!data.success || !data.project) throw new Error("Could not load the saved project. Please retry.");
+              existingSettings = data.project.settings || {};
+            } else if (response.status !== 404) {
+              throw new Error("Could not load the saved project. Please retry.");
+            }
           }
           const savedSettings = {
-            ...data.project.settings,
+            ...existingSettings,
+            name: project.name,
+            onboardingModel: project.onboardingModel,
+            systemPrompt: project.systemPrompt,
+            targetTask: project.targetTask,
+            constraints: project.constraints,
+            selectedPreset: project.selectedPreset,
+            projectFormat: project.projectFormat || ProjectFormat.CONVERSATION,
+            templateType: project.templateType || TemplateType.SINGLE_TURN,
+            instructTemplate: project.instructTemplate || InstructTemplate.CHATML,
+            customInstructionFormat: project.customInstructionFormat || "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+            representativePrompt: project.representativePrompt || "",
+            representativeCompletion: project.representativeCompletion || "",
             batchRecommendations: recommendations,
             completedRecommendedBatches: [],
           };
@@ -4047,8 +4067,8 @@ export default function App() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              id: selectedProjectId,
-              name: data.project.name,
+              id: projectId,
+              name: project.name || "My SFT Custom Assistant",
               settings: savedSettings,
             }),
           });
@@ -4056,12 +4076,29 @@ export default function App() {
           if (!saveResponse.ok || !result.success) {
             throw new Error(result.error || "Could not save approved recommendations. Please retry.");
           }
+          pendingRecommendationsProjectId.current = null;
+          setSelectedProjectId(projectId);
           setBatchRecommendations(recommendations);
           setCompletedRecommendedBatches([]);
-          setUserProjects(current => current.map(saved =>
-            saved.id === selectedProjectId ? { ...saved, settings: savedSettings } : saved
-          ));
-          writeGuideState(selectedProjectId, { recommendations, completedRecommendedBatches: [] });
+          setUserProjects(current => {
+            const existing = current.find(saved => saved.id === projectId);
+            if (existing) {
+              return current.map(saved =>
+                saved.id === projectId ? { ...saved, name: project.name, settings: savedSettings } : saved
+              );
+            }
+            return [{
+              id: projectId,
+              userId: auth.currentUser?.uid || getDeviceId(),
+              name: project.name || "My SFT Custom Assistant",
+              settings: savedSettings,
+              batches: [],
+              batchCount: 0,
+              totalExamples: 0,
+              updatedAt: new Date().toISOString(),
+            }, ...current];
+          });
+          writeGuideState(projectId, { recommendations, completedRecommendedBatches: [] });
         }}
         onComplete={(settings, recommendations, trainingModel, autoGenerate) => {
           if (!showBatchRecommendationInterview) {
