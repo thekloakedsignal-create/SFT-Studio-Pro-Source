@@ -5139,19 +5139,19 @@ async function runAutomationPipeline(job: any) {
 
   if (config.autoGenerate) {
 
-    // Recommended batches: each batch's total is mixed across single-turn, multi-turn,
-    // and reasoning (reasoning skipped for 70B), merged into one batch.
+    // Llama batches are fixed at 200 examples: 100 Single Turn and 100 Multi Turn.
+    // Other models keep their existing counts and template mix.
     // Three batches generate concurrently; the rest queue behind them.
     const recommendations = config.recommendations || [];
     const generateRecommendation = async (rec: any) => {
       job.stage = `Generating: ${rec.topic}`;
       job.batchStatus[rec.topic] = { stage: "generating" };
       try {
-        const total = rec.skill ? 400 : 200;
+        const total = is70B ? 200 : rec.skill ? 400 : 200;
         // The generator only accepts supported batch sizes, so split into supported sizes:
-        // 200 -> 100/50/50 (or 100/100 for 70B); 400 -> 200/100/100 (or 200/200 for 70B).
+        // Other models: 200 -> 100/50/50; 400 -> 200/100/100. Llama: always 200 -> 100/100.
         const half = total / 2;
-        const counts = roundRobin.length === 3 ? [half, half / 2, half / 2] : [half, half];
+        const counts = is70B ? [100, 100] : roundRobin.length === 3 ? [half, half / 2, half / 2] : [half, half];
         const parts = roundRobin.map((templateType, i) => ({ templateType, count: counts[i] }));
         const mergedExamples: any[] = [];
         let mergedBatchId: string | undefined;
@@ -5162,12 +5162,7 @@ async function runAutomationPipeline(job: any) {
               pipelineGenerationBody(config, {
                 batchDescription: rec.topic,
                 specialInstructions: rec.specialInstructions,
-                temporaryConstraints: [
-                  rec.temporaryConstraints,
-                  ...(is70B ? [
-                    "Llama output requirement: use only the requested Single Turn or Multi Turn format. Do not use a Reasoning template, separate reasoning field/channel, or <think>/<reasoning> tags. Put any user-facing explanation in the ordinary assistant response."
-                  ] : [])
-                ].filter(Boolean).join("\n\n"),
+                temporaryConstraints: rec.temporaryConstraints,
                 templateType: part.templateType,
                 count: part.count
               }),
