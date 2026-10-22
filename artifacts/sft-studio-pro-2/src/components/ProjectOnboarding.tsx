@@ -403,7 +403,7 @@ function parseBatchRecommendationPlan(raw: string): { libraryTopics: string[]; a
   }
 }
 
-export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSkip, startAtBatchInterview = false, initialProjectSettings, savedProjects = [], onOpenSaved }: Props) {
+export function ProjectOnboarding({ onComplete, onSkip, startAtBatchInterview = false, initialProjectSettings, savedProjects = [], onOpenSaved }: Props) {
   const [showWorkshopChoice, setShowWorkshopChoice] = useState(!startAtBatchInterview);
   const [showSavedPicker, setShowSavedPicker] = useState(false);
   const [step, setStep] = useState<Step>(startAtBatchInterview ? "batch-skills" : "name");
