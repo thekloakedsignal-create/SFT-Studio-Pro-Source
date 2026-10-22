@@ -5162,7 +5162,12 @@ async function runAutomationPipeline(job: any) {
               pipelineGenerationBody(config, {
                 batchDescription: rec.topic,
                 specialInstructions: rec.specialInstructions,
-                temporaryConstraints: rec.temporaryConstraints,
+                temporaryConstraints: [
+                  rec.temporaryConstraints,
+                  ...(is70B ? [
+                    "Llama output requirement: use only the requested Single Turn or Multi Turn format. Do not use a Reasoning template, separate reasoning field/channel, or <think>/<reasoning> tags. Put any user-facing explanation in the ordinary assistant response."
+                  ] : [])
+                ].filter(Boolean).join("\n\n"),
                 templateType: part.templateType,
                 count: part.count
               }),
