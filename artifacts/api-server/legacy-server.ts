@@ -5133,25 +5133,25 @@ async function runPipelineQaChain(job: any, batchId: string) {
 
 async function runAutomationPipeline(job: any) {
   const { userId, config } = job;
-  const is70B = /llama/i.test(String(config.onboardingModel || ""));
+  const is70B = config.trainingModel === "Llama 3.1 70B";
   const roundRobin = is70B ? ["Single Turn", "Multi Turn"] : ["Single Turn", "Multi Turn", "Reasoning"];
   job.producedBatches ??= [];
 
   if (config.autoGenerate) {
 
-    // Llama batches are fixed at 200 examples: 100 Single Turn and 100 Multi Turn.
-    // Other models keep their existing counts and template mix.
+    // Recommended batches: each batch's total is mixed across single-turn, multi-turn,
+    // and reasoning (reasoning skipped for 70B), merged into one batch.
     // Three batches generate concurrently; the rest queue behind them.
     const recommendations = config.recommendations || [];
     const generateRecommendation = async (rec: any) => {
       job.stage = `Generating: ${rec.topic}`;
       job.batchStatus[rec.topic] = { stage: "generating" };
       try {
-        const total = is70B ? 200 : rec.skill ? 400 : 200;
+        const total = rec.skill ? 400 : 200;
         // The generator only accepts supported batch sizes, so split into supported sizes:
-        // Other models: 200 -> 100/50/50; 400 -> 200/100/100. Llama: always 200 -> 100/100.
+        // 200 -> 100/50/50 (or 100/100 for 70B); 400 -> 200/100/100 (or 200/200 for 70B).
         const half = total / 2;
-        const counts = is70B ? [100, 100] : roundRobin.length === 3 ? [half, half / 2, half / 2] : [half, half];
+        const counts = roundRobin.length === 3 ? [half, half / 2, half / 2] : [half, half];
         const parts = roundRobin.map((templateType, i) => ({ templateType, count: counts[i] }));
         const mergedExamples: any[] = [];
         let mergedBatchId: string | undefined;
@@ -5283,7 +5283,7 @@ function launchPipeline(job: any) {
 app.post("/api/pipeline/start", optionalAuth, async (req: AuthRequest, res): Promise<any> => {
   const userId = projectOwnerId(req);
   if (!userId) return res.status(401).json({ success: false, error: "Sign in to run automation." });
-  const { projectId, autoGenerate, autoQa, docs, recommendations, project, onboardingModel, batchCount } = req.body || {};
+  const { projectId, autoGenerate, autoQa, docs, recommendations, project, trainingModel, batchCount } = req.body || {};
   if (typeof projectId !== "string" || !projectId) {
     return res.status(400).json({ success: false, error: "Missing project id." });
   }
@@ -5311,7 +5311,7 @@ app.post("/api/pipeline/start", optionalAuth, async (req: AuthRequest, res): Pro
       isInstruction: Boolean(project.isInstruction),
       representativePrompt: project.representativePrompt || "",
       representativeCompletion: project.representativeCompletion || "",
-       onboardingModel: typeof onboardingModel === "string" ? onboardingModel : "",
+      trainingModel: typeof trainingModel === "string" ? trainingModel : "",
       batchCount: Number.isFinite(batchCount) ? batchCount : 25
     },
     stage: "starting",

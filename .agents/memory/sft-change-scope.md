@@ -15,12 +15,6 @@ Keep work in Project Onboarding. The only permitted main-app changes are its exi
 
 **How to apply:** Keep recommendation logic in ProjectOnboarding. Touch app code only when required to pass or save the locked Project Definition and approved recommendations. Do not change actual generation behavior, template UI, lock flow, or Trainer.
 
-When addressing automated batch runs, stay inside the background automation workflow; do not inspect or modify the recommender, app UI, generation API, or trainer.
-
-**Why:** The user explicitly distinguished generator automation from both the recommender and the generator itself, and restricted this work to the automation workflow.
-
-**How to apply:** Limit investigation and edits to the background pipeline orchestration.
-
 Save the Project Onboarder model selection permanently in the locked Project Definition only. Do not touch Model Trainer.
 
 **Why:** The user explicitly corrected the scope: “Just fucking save it in the locked project definition” and “don't fucking touch the model trainer.” The onboarding model controls recommendation compatibility; users may reuse the same dataset to train a different model, so the trainer model must remain independent and unlocked.
