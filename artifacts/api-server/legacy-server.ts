@@ -144,6 +144,18 @@ function projectForResponse(project: any): any {
   return sanitizeProjectData({ ...project, batches: visibleBatches(project.batches) });
 }
 
+// The project list must stay small: batch summaries only. Full examples load per project on selection.
+function projectListEntry(project: any): any {
+  if (!Array.isArray(project?.batches)) return project;
+  return {
+    ...project,
+    batches: project.batches.map(({ examples, ...batch }: any) => ({
+      ...batch,
+      examplesCount: batch.examplesCount || (Array.isArray(examples) ? examples.length : 0)
+    }))
+  };
+}
+
 function cacheSQLProject(project: any) {
   try {
     saveLocalProjectItem(project, true);
@@ -268,10 +280,10 @@ app.get("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
         }));
       }
     });
-    return res.json({ success: true, projects: merged });
+    return res.json({ success: true, projects: merged.map(projectListEntry) });
   } catch (error: any) {
     logger.warn({ error: error?.message }, "Loading saved projects from local storage");
-    return res.json({ success: true, projects: ownedLocal.map(projectForResponse) });
+    return res.json({ success: true, projects: ownedLocal.map(projectForResponse).map(projectListEntry) });
   }
 });
 

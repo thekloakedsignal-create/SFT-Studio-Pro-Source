@@ -175,9 +175,12 @@ test("list and detail load saved SQL and local batches by project ID", async () 
   }, [{ ...project, batches: [...project.batches, { id: "local-only" }] }]);
   const list = await f.request("GET", "/api/sql/projects");
   const detail = await f.request("GET", "/api/sql/projects/:id", {}, { id: "p1" });
+  // The list carries batch summaries only; full examples load from the detail route.
+  assert.equal(list.body.projects[0].batches.find((batch: any) => batch.id === "shared").examples, undefined);
+  assert.equal(list.body.projects[0].batches.find((batch: any) => batch.id === "shared").examplesCount, 1);
   for (const loaded of [list.body.projects[0], detail.body.project]) {
     assert.equal(loaded.batches.length, 4);
-    assert.deepEqual(loaded.batches.find((batch: any) => batch.id === "shared").examples, ["latest"]);
+    if (loaded === detail.body.project) assert.deepEqual(loaded.batches.find((batch: any) => batch.id === "shared").examples, ["latest"]);
     assert.equal(loaded.batches.some((batch: any) => batch.id === "foreign"), false);
     assert.equal(loaded.batches.some((batch: any) => batch.id === "local-only"), true);
   }
