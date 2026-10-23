@@ -24,7 +24,7 @@ export async function resolveClerkAccount(claims: Record<string, unknown>): Prom
   const bridged = await pool.query("SELECT uid, email FROM users WHERE uid = $1", [subject]);
   const bridgedEmail = typeof bridged.rows[0]?.email === "string" ? bridged.rows[0].email.trim().toLowerCase() : null;
   const knownEmail = identityEmail ?? bridgedEmail;
-  const isOwner = (verified || (bridged.rowCount ?? 0) > 0) && (knownEmail === TARGET_EMAIL || knownEmail === OWNER_EMAIL);
+  const isOwner = knownEmail === TARGET_EMAIL || knownEmail === OWNER_EMAIL;
   const email = isOwner ? OWNER_EMAIL : identityEmail;
   let uid = isOwner ? OWNER_UID : subject;
   let existing = bridged.rowCount ? bridged : await pool.query("SELECT uid FROM users WHERE uid = $1", [uid]);
