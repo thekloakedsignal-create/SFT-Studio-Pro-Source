@@ -3322,8 +3322,8 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
       }))
     });
   }
-  if (!Number.isInteger(requestedCount) || requestedCount < 1 || requestedCount > 250) {
-    return res.status(400).json({ success: false, error: "Example count must be an integer between 1 and 250." });
+  if (!Number.isInteger(requestedCount) || requestedCount < 1) {
+    return res.status(400).json({ success: false, error: "Example count must be a positive integer." });
   }
 
   let usageReservation: string;
