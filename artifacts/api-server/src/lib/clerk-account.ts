@@ -1,3 +1,4 @@
+import { clerkClient } from "@clerk/express";
 import { trainingPool } from "./training-records.mjs";
 
 // Preserve the existing application UID and owner alias, not Clerk's native ID.
@@ -14,11 +15,20 @@ export interface AppUser {
   photoURL: string | null;
 }
 
-export async function resolveClerkAccount(claims: Record<string, unknown>): Promise<AppUser> {
+export async function resolveClerkAccount(claims: Record<string, unknown>, clerkUserId?: string | null): Promise<AppUser> {
   const subject = typeof claims.userId === "string" ? claims.userId : null;
   if (!subject) throw new Error("The signed-in session is missing its application identity.");
-  const identityEmail = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : null;
-  const verified = claims.email_verified === true || claims.emailVerified === true;
+  let identityEmail = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : null;
+  let verified = claims.email_verified === true || claims.emailVerified === true;
+  // Production session tokens omit the email claim; read it from Clerk so the bridge can match the account.
+  if (!identityEmail && clerkUserId) {
+    const clerkUser = await clerkClient.users.getUser(clerkUserId);
+    const primary = clerkUser.emailAddresses.find(e => e.id === clerkUser.primaryEmailAddressId) ?? clerkUser.emailAddresses[0];
+    if (primary?.emailAddress) {
+      identityEmail = primary.emailAddress.trim().toLowerCase();
+      verified = primary.verification?.status === "verified";
+    }
+  }
   const pool = trainingPool();
   // Session tokens may omit the email claim; fall back to the email already bridged to this account.
   const bridged = await pool.query("SELECT uid, email FROM users WHERE uid = $1", [subject]);

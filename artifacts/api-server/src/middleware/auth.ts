@@ -32,7 +32,7 @@ export const optionalAuth = async (
     }
     const auth = getAuth(req);
     if (auth.userId) {
-      req.user = await resolveClerkAccount(auth.sessionClaims as unknown as Record<string, unknown>);
+      req.user = await resolveClerkAccount(auth.sessionClaims as unknown as Record<string, unknown>, auth.userId);
     }
   } catch (error) {
     logger.warn({ error: String(error) }, "Account bridge unavailable");
