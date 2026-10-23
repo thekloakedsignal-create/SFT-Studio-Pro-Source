@@ -557,11 +557,11 @@ export default function App() {
     docs[index] = { ...docs[index], ...patch };
     answerAutomation("docFiles", docs);
   };
-  const startAutomationPipeline = async (answers: Record<string, any>, recommendationsOverride?: BatchRecommendation[], projectOverride?: ProjectSettings, modelOverride?: string) => {
+  const startAutomationPipeline = async (answers: Record<string, any>, recommendationsOverride?: BatchRecommendation[], projectOverride?: ProjectSettings) => {
     const settings = projectOverride ?? project;
     if (!selectedProjectId) {
       // The project has no id until it is saved: start automatically once Save & Lock creates one.
-      pendingAutomationRef.current = { answers, recommendations: recommendationsOverride, settings, model: modelOverride };
+      pendingAutomationRef.current = { answers, recommendations: recommendationsOverride, settings };
       setNotification({ text: "Save & Lock your project to start generating the batches.", type: "info" });
       return;
     }
@@ -575,7 +575,7 @@ export default function App() {
           autoQa: answers.qa === "audit",
           docs: answers.docs === "yes" ? (answers.docFiles || []) : [],
           recommendations: recommendationsOverride ?? batchRecommendations,
-          trainingModel: settings.onboardingModel ?? modelOverride ?? trainerHandoff.model,
+          onboardingModel: settings.onboardingModel,
           project: {
             name: settings.name,
             systemPrompt: settings.systemPrompt,
@@ -786,12 +786,12 @@ export default function App() {
   const projectLoadVersion = useRef(0);
   const pendingRecommendationsProjectId = useRef<string | null>(null);
 
-  const pendingAutomationRef = useRef<{ answers: Record<string, any>; recommendations?: BatchRecommendation[]; settings: ProjectSettings; model?: string } | null>(null);
+  const pendingAutomationRef = useRef<{ answers: Record<string, any>; recommendations?: BatchRecommendation[]; settings: ProjectSettings } | null>(null);
   useEffect(() => {
     const pending = pendingAutomationRef.current;
     if (!selectedProjectId || !pending) return;
     pendingAutomationRef.current = null;
-    void startAutomationPipeline(pending.answers, pending.recommendations, pending.settings, pending.model);
+    void startAutomationPipeline(pending.answers, pending.recommendations, pending.settings);
   }, [selectedProjectId]);
 
   const pipelineBatchesRef = useRef<SFTBatch[]>([]);
@@ -4100,10 +4100,10 @@ export default function App() {
           });
           writeGuideState(projectId, { recommendations, completedRecommendedBatches: [] });
         }}
-        onComplete={(settings, recommendations, trainingModel, autoGenerate) => {
+        onComplete={(settings, recommendations, onboardingModel, autoGenerate) => {
           if (!showBatchRecommendationInterview) {
             setTrainerHandoff({
-              model: trainingModel || "Qwen3.5 9 Base",
+              model: onboardingModel || "Qwen3.5 9 Base",
               template: `${settings.instructTemplate || "ChatML"} (<|im_start|>)`,
             });
           }
@@ -4116,7 +4116,7 @@ export default function App() {
             if (autoGenerate !== undefined) {
               answerAutomation("generate", autoGenerate ? "yes" : "no");
               if (autoGenerate) {
-                void startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }, recommendations ?? [], settings, trainingModel);
+                void startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }, recommendations ?? [], settings);
               }
             }
             return;
@@ -4147,7 +4147,7 @@ export default function App() {
           if (autoGenerate !== undefined) {
             answerAutomation("generate", autoGenerate ? "yes" : "no");
             if (autoGenerate) {
-              void startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }, recommendations ?? [], settings, trainingModel);
+              void startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }, recommendations ?? [], settings);
             }
           }
           setShowProjectOnboarding(false);

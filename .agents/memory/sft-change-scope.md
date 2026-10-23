@@ -19,7 +19,7 @@ Save the Project Onboarder model selection permanently in the locked Project Def
 
 **Why:** The user explicitly corrected the scope: “Just fucking save it in the locked project definition” and “don't fucking touch the model trainer.” The onboarding model controls recommendation compatibility; users may reuse the same dataset to train a different model, so the trainer model must remain independent and unlocked.
 
-**How to apply:** Preserve the onboarder choice when saving and reopening Project Definition. Do not add trainer behavior, trainer restrictions, or changes to batch settings.
+**How to apply:** Preserve the onboarder choice when saving and reopening Project Definition. Use the exact `onboardingModel` name from Project Definition through batch recommendations and automation; automation must fail explicitly if it is missing and must never fall back to Trainer state. Do not add trainer behavior, trainer restrictions, or changes to batch settings.
 
 Before the batch-skills interview, show the completed project definition and require final user approval. Freeze that approved project-settings snapshot for recommendations and handoff; any edits require approval again. The AI-generated system prompt should be instructed to stay within five sentences, but never block it with a sentence-count gate; leave longer user-written prompts unchanged.
 

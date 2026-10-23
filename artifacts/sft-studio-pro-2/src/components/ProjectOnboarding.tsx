@@ -303,7 +303,7 @@ const GENERAL_RECOMMENDED_BATCH_TOPICS = [
 ];
 
 interface Props {
-  onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[], trainingModel?: string, autoGenerate?: boolean) => void;
+  onComplete: (settings: ProjectSettings, recommendations?: BatchRecommendation[], onboardingModel?: string, autoGenerate?: boolean) => void;
   onRecommendationsApproved: (recommendations: BatchRecommendation[]) => Promise<void>;
   onSkip: () => void;
   startAtBatchInterview?: boolean;
@@ -412,7 +412,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
   const [goalFollowupAnswer, setGoalFollowupAnswer] = useState("");
   const [adaptiveQuestion, setAdaptiveQuestion] = useState("");
   const [constraints, setConstraints] = useState(initialProjectSettings?.constraints || "");
-  const [trainingModel, setTrainingModel] = useState<string>(initialProjectSettings?.onboardingModel || "");
+  const [onboardingModel, setOnboardingModel] = useState<string>(initialProjectSettings?.onboardingModel || "");
   const [voiceDescription, setVoiceDescription] = useState("");
   const [voiceSample, setVoiceSample] = useState("");
   const [voiceSource, setVoiceSource] = useState<"own" | "ai">("own");
@@ -448,7 +448,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
     ? `Your name is ${modelRememberedName.trim()}.`
     : "";
 
-  const mixGuidance = trainingModel === "Llama 3.1 70B"
+  const mixGuidance = onboardingModel === "Llama 3.1 70B"
     ? "For every topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning templates for Llama 3.1 70B."
     : "For every topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples.";
 
@@ -458,7 +458,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
     { step: "name" as Step, label: "Project name", answer: projectName },
     { step: "goal" as Step, label: "Target goal", answer: goal },
     { step: "constraints" as Step, label: "Rules and constraints", answer: constraints || "None" },
-    ...(currentStepPosition > stepOrder.indexOf("model") ? [{ step: "model" as Step, label: "Base model", answer: trainingModel }] : []),
+    ...(currentStepPosition > stepOrder.indexOf("model") ? [{ step: "model" as Step, label: "Base model", answer: onboardingModel }] : []),
     ...(currentStepPosition > stepOrder.indexOf("batch-skills") ? [{ step: "batch-skills" as Step, label: "Special skills and abilities", answer: specialSkills || "None specified" }] : []),
     ...(currentStepPosition > stepOrder.indexOf("voice-review") && voiceSample
       ? [{ step: "voice-review" as Step, label: "Approved voice reference", answer: voiceSample }]
@@ -566,7 +566,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
       customInstructionFormat: "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
       representativePrompt: goldenPrompt.trim(),
       representativeCompletion: goldenCompletion.trim(),
-      onboardingModel: trainingModel,
+      onboardingModel,
     };
   };
 
@@ -574,7 +574,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
     const definition = buildProjectDefinition();
     setApprovedProjectDefinition(definition);
     setError("");
-    onComplete(definition, undefined, trainingModel);
+    onComplete(definition, undefined, onboardingModel);
   };
 
   const finish = (autoGenerate: boolean) => {
@@ -583,7 +583,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
       setStep("definition-review");
       return;
     }
-    onComplete(approvedProjectDefinition, batchRecommendations, trainingModel, autoGenerate);
+    onComplete(approvedProjectDefinition, batchRecommendations, onboardingModel, autoGenerate);
   };
 
   const generateBatchRecommendations = async () => {
@@ -601,7 +601,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
       .filter((item, index, all) => all.findIndex(candidate => candidate.toLowerCase() === item.toLowerCase()) === index);
     const projectDefinitionContext = {
       ...approvedProjectDefinition,
-      onboardingModel: trainingModel,
+      onboardingModel,
     };
     const planInstruction =
       `You are the Project Onboarding batch-recommendation assistant. Analyze the full approved Project Definition, selected model, and eligible user-skill list below. ` +
@@ -612,7 +612,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
       `${mixGuidance} Do not make separate format-only batches. ` +
       `Do not create training examples or actual batches. Return only valid JSON: {"libraryTopics":["exact topic name"],"additionalBatches":[{"skill":"exact user skill item","topic":"...","specialInstructions":"...","temporaryConstraints":"..."}]}. ` +
       `Available curated topic names: ${JSON.stringify(eligibleLibrary.map(item => item.topic))}\n` +
-      `Approved Project Definition (all saved fields; source of truth): ${JSON.stringify(projectDefinitionContext)}\nSelected base model: ${trainingModel}\nEligible user-skill items to cover: ${JSON.stringify(skillItems)}`
+      `Approved Project Definition (all saved fields; source of truth): ${JSON.stringify(projectDefinitionContext)}\nSelected onboarding model: ${onboardingModel}\nEligible user-skill items to cover: ${JSON.stringify(skillItems)}`
     ;
     const draft = await askAI(planInstruction);
     if (!draft) return;
@@ -926,10 +926,10 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
                   key={model.value}
                   type="button"
                   role="radio"
-                  aria-checked={trainingModel === model.value}
+                  aria-checked={onboardingModel === model.value}
                   onClick={() => setTrainingModel(model.value)}
                   className={`rounded-md border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 ${
-                    trainingModel === model.value
+                    onboardingModel === model.value
                     ? "border-purple-500 bg-purple-300 !text-[#000000] font-bold"
                       : "border-slate-500 bg-slate-900 !text-white hover:border-purple-300 hover:bg-slate-800"
                   }`}
@@ -1000,7 +1000,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
                 ["Project name", approvedProjectDefinition?.name ?? projectName],
                 ["Target goal", approvedProjectDefinition?.targetTask ?? goal],
                 ["Rules and constraints", constraints || "None"],
-                ["Base model", trainingModel],
+                ["Onboarding model", onboardingModel],
                 ["Training format", "Instruct ChatML"],
                 ["Approved voice reference", voiceSample],
                 ["Golden example — user prompt", approvedProjectDefinition?.representativePrompt ?? goldenPrompt],
@@ -1067,7 +1067,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
                 <li>Start with a sample batch of 5. You must generate and approve a sample of 5 before larger batch sizes unlock.</li>
                 <li>Generate one batch at a time.</li>
                 <li>Review each generated batch and approve or reject it before generating another.</li>
-                <li>{trainingModel === "Llama 3.1 70B"
+                <li>{onboardingModel === "Llama 3.1 70B"
                   ? "For each topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning examples when training Llama 3.1 70B."
                   : "For each topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples."}</li>
                 <li>You can generate as many batches as you wish. Aim for 3,000–5,000 total examples for a personal-use AI, or 10,000–20,000 total examples for an enterprise AI with specialized skills.</li>
@@ -1127,7 +1127,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
             {step === "definition-review" && <button type="button" className={buttonClass} onClick={approveProjectDefinition}><Check className="h-4 w-4" /> {approvedProjectDefinition ? "Confirm & finish Project Definition" : "Approve & finish Project Definition"}</button>}
             {["name", "goal", "constraints", "remember-model-name", "batch-skills"].includes(step) && <button type="button" className={buttonClass} disabled={pending} onClick={() => void submit()}><span>{step === "batch-skills" ? "Recommend batches" : "Continue"}</span>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}</button>}
             {step === "model" && <button type="button" className={buttonClass} onClick={() => {
-              if (!trainingModel) { setError("Select a base model to continue."); return; }
+              if (!onboardingModel) { setError("Select an onboarding model to continue."); return; }
               setError("");
               setStep("voice-choice");
             }}>Continue <ArrowRight className="h-4 w-4" /></button>}

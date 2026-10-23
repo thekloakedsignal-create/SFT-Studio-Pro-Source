@@ -5133,7 +5133,7 @@ async function runPipelineQaChain(job: any, batchId: string) {
 
 async function runAutomationPipeline(job: any) {
   const { userId, config } = job;
-  const is70B = config.trainingModel === "Llama 3.1 70B";
+  const is70B = config.onboardingModel === "Llama 3.1 70B";
   const roundRobin = is70B ? ["Single Turn", "Multi Turn"] : ["Single Turn", "Multi Turn", "Reasoning"];
   job.producedBatches ??= [];
 
@@ -5283,12 +5283,15 @@ function launchPipeline(job: any) {
 app.post("/api/pipeline/start", optionalAuth, async (req: AuthRequest, res): Promise<any> => {
   const userId = projectOwnerId(req);
   if (!userId) return res.status(401).json({ success: false, error: "Sign in to run automation." });
-  const { projectId, autoGenerate, autoQa, docs, recommendations, project, trainingModel, batchCount } = req.body || {};
+  const { projectId, autoGenerate, autoQa, docs, recommendations, project, onboardingModel, batchCount } = req.body || {};
   if (typeof projectId !== "string" || !projectId) {
     return res.status(400).json({ success: false, error: "Missing project id." });
   }
   if (!project || typeof project.systemPrompt !== "string") {
     return res.status(400).json({ success: false, error: "Missing project settings." });
+  }
+  if (typeof onboardingModel !== "string" || !onboardingModel.trim()) {
+    return res.status(400).json({ success: false, error: "Missing onboarding model." });
   }
   const existing = pipelineJobs.get(projectId);
   if (existing && !["complete", "error", "stopped"].includes(existing.stage)) {
@@ -5311,7 +5314,7 @@ app.post("/api/pipeline/start", optionalAuth, async (req: AuthRequest, res): Pro
       isInstruction: Boolean(project.isInstruction),
       representativePrompt: project.representativePrompt || "",
       representativeCompletion: project.representativeCompletion || "",
-      trainingModel: typeof trainingModel === "string" ? trainingModel : "",
+      onboardingModel,
       batchCount: Number.isFinite(batchCount) ? batchCount : 25
     },
     stage: "starting",
