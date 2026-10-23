@@ -927,7 +927,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
                   type="button"
                   role="radio"
                   aria-checked={onboardingModel === model.value}
-                  onClick={() => setTrainingModel(model.value)}
+                  onClick={() => setOnboardingModel(model.value)}
                   className={`rounded-md border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 ${
                     onboardingModel === model.value
                     ? "border-purple-500 bg-purple-300 !text-[#000000] font-bold"
