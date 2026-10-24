@@ -3099,7 +3099,12 @@ function parseUniversalTranscript(
         const turnContent = cleanTurnContent(extracted.content);
 
         if (turnContent) {
-          turns.push({ role, content: turnContent });
+          if (turns.length > 0 && turns[turns.length - 1].role === role) {
+            // Merge consecutive turns by same speaker to keep question or answer complete
+            turns[turns.length - 1].content += "\n\n" + turnContent;
+          } else {
+            turns.push({ role, content: turnContent });
+          }
         }
         continue;
       }
