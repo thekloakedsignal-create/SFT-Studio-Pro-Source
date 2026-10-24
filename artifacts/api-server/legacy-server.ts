@@ -2396,6 +2396,8 @@ function cleanSftContent(content: string): string {
   let cleaned = content.trim();
 
   // Unescape escaped quotes and newlines
+  cleaned = cleaned.replace(/\\"/g, '"').replace(/\\n/g, "\n");
+  // eslint-disable-next-line no-control-regex
   cleaned = cleaned.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
 
   // Strip leading/trailing JSON structural remnants like '",', '}', '],', '{"', leading/trailing quotes, etc.
