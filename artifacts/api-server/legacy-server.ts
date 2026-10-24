@@ -3165,74 +3165,111 @@ app.post("/api/analyze-document", async (req, res) => {
     });
   }
 
-  try {
   const analysisModel = "gemma-4-31B-it";
+  try {
+  const analysisChunkSize = 40_000;
+  const analysisChunks = Array.from(
+    { length: Math.ceil(documentContent.length / analysisChunkSize) },
+    (_, index) => documentContent.slice(index * analysisChunkSize, (index + 1) * analysisChunkSize)
+  );
   logger.info({
     docType: docType || "knowledge_base",
     model: analysisModel,
     wordCount: words,
     documentCharacters: documentContent.length,
+    chunkCount: analysisChunks.length,
+    chunkCharacters: analysisChunkSize,
   }, "Document analysis started");
-  const analysisPrompt = `
+  const parseAnalysisJson = (rawText: string, stage: string) => {
+    const cleanedJSON = rawText.replace(/```json\s*/gi, "").replace(/```\s*$/gi, "").trim();
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(cleanedJSON);
+    } catch {
+      const match = cleanedJSON.match(/\{[\s\S]*\}/);
+      if (match) {
+        try { parsed = JSON.parse(match[0]); } catch {}
+      }
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      logger.error({ model: analysisModel, stage, responseText: rawText }, "Document analysis returned invalid JSON");
+      throw new Error(`Document analysis ${stage} returned invalid JSON.`);
+    }
+    return parsed;
+  };
+
+  const chunkAnalyses = await Promise.all(analysisChunks.map(async (chunk, index) => {
+    const chunkPrompt = `
+Analyze this complete document segment as part of a larger document.
+Document: "${documentName || "Unknown"}"
+Selected document type: "${docType || "knowledge_base"}"
+Segment ${index + 1} of ${analysisChunks.length}, in original order.
+Identify the segment's sections, distinct topics or narrative arcs, and evidence useful for determining the overall document type and theme.
+Do not estimate the final example count. Do not infer content outside this segment.
+Return only a valid JSON object with this shape:
+{"segment": ${index + 1}, "sections": [], "topics": [], "documentTypeEvidence": "", "titleOrThemeEvidence": "", "coverageNotes": ""}
+
+Complete segment text:
+"""
+${chunk}
+"""
+`;
+    const aiRes = await callDigitalOceanAI({
+      model: analysisModel,
+      contents: chunkPrompt,
+      timeoutMs: 60_000,
+      documentDiagnosticContext: "document-analysis-chunk",
+      config: {
+        temperature: 0.1,
+        maxOutputTokens: 1024,
+        responseMimeType: "application/json",
+      },
+    });
+    return parseAnalysisJson(extractResponseText(aiRes), `chunk ${index + 1}`);
+  }));
+
+  const aggregationPrompt = `
 You are an expert AI Data Engineering Architect and SFT Specialist.
-Perform a thorough, comprehensive architectural analysis across the entire provided document.
-Examine its full structure, narrative arcs, technical topics, chapters, concepts, or dialogue turns from beginning to end.
+Use the analyses of every consecutive segment of the complete document to make one overall recommendation.
+The segments cover the document from beginning to end. Combine recurring topics without double-counting them.
+Use the user's global conversion instructions as authoritative for requested count, focus, or depth.
 
 Document Name: "${documentName || "Unknown"}"
 Selected Document Type: "${docType || "knowledge_base"}"
 Total Word Count: ~${words} words
 Total Character Length: ${documentContent.length} characters
 ${typeof converterInstructions === "string" && converterInstructions.trim() ? `
-USER CONVERSION INSTRUCTIONS (authoritative for this analysis, including any requested example count, focus, or depth):
+USER CONVERSION INSTRUCTIONS:
 """
 ${converterInstructions.trim()}
 """
 ` : ""}
-Full document text in original order:
-"""
-${documentContent}
-"""
+
+Segment analyses in original order:
+${JSON.stringify(chunkAnalyses)}
 
 Tasks:
-1. Conduct a deep architectural assessment of the document's content, breadth, and structural complexity across all chapters or sections.
-2. Estimate the optimal number of distinct, high-quality SFT examples required to thoroughly cover all key topics, chapters, concepts, or narrative arcs without redundancy or gaps (minimum 3; no upper limit — follow the user instructions if they specify a count).
-3. Identify the true document type: "transcript" (dialogues, interviews, chats, or speaker turns), "literature" (novels, stories, books, narrative prose), or "knowledge_base" (technical documentation, manuals, guides, policies, or domain knowledge).
-4. Identify the central title, theme, or subject domain (e.g. "Moby Dick", "The Great Gatsby", "Quantum Mechanics Fundamentals", or "Kubernetes Deployment Architecture").
-5. Provide a clear, professional architectural rationale for your recommendation, detailing how the estimated examples will comprehensively span the document's structure.
+1. Estimate one optimal total number of distinct, high-quality SFT examples for the complete document, covering all unique topics and sections without redundancy (minimum 3; no upper limit; honor an explicit user count).
+2. Identify the document type: "transcript", "literature", or "knowledge_base".
+3. Identify its central title, theme, or subject.
+4. Give a concise rationale based on the combined coverage across all segments.
 
-Return ONLY a valid JSON object matching:
-{
-  "estimatedCount": <number, at least 3>,
-  "recommendedDocType": "transcript" | "knowledge_base" | "literature",
-  "titleOrTheme": "<detected book title, domain, or primary theme>",
-  "explanation": "<detailed architectural rationale for example count and document structure>"
-}
-Do NOT wrap output in extra text outside the JSON. Return raw JSON.
+Return only a valid JSON object:
+{"estimatedCount": 3, "recommendedDocType": "transcript" | "knowledge_base" | "literature", "titleOrTheme": "", "explanation": ""}
 `;
-
-    const aiRes = await callDigitalOceanAI({
-      model: analysisModel,
-      contents: analysisPrompt,
-      timeoutMs: 60_000,
-      documentDiagnosticContext: "document-analysis",
-      config: {
-        temperature: 0.1,
-        maxOutputTokens: 4096
-      }
-    });
-
-    const rawText = extractResponseText(aiRes);
-    const cleanedJSON = rawText.replace(/```json\s*/gi, "").replace(/```\s*$/gi, "").trim();
-
-    let parsed: any = null;
-    try {
-      parsed = JSON.parse(cleanedJSON);
-    } catch (e) {
-      const match = cleanedJSON.match(/\{[\s\S]*\}/);
-      if (match) {
-        try { parsed = JSON.parse(match[0]); } catch (err) {}
-      }
-    }
+  const aiRes = await callDigitalOceanAI({
+    model: analysisModel,
+    contents: aggregationPrompt,
+    timeoutMs: 60_000,
+    documentDiagnosticContext: "document-analysis-aggregate",
+    config: {
+      temperature: 0.1,
+      maxOutputTokens: 4096,
+      responseMimeType: "application/json",
+    },
+  });
+  const rawText = extractResponseText(aiRes);
+  const parsed = parseAnalysisJson(rawText, "final aggregation");
 
     if (parsed && typeof parsed.estimatedCount === "number") {
       logger.info({
@@ -3265,7 +3302,7 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
   } catch (err: any) {
     logger.error({
       docType: docType || "knowledge_base",
-      model: normalizeModel(extractionModel),
+      model: analysisModel,
       wordCount: words,
       fallbackCount: heuristicCount,
       errorName: err?.name,
