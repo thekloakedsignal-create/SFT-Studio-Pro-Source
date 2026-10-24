@@ -3167,7 +3167,7 @@ app.post("/api/analyze-document", async (req, res) => {
 
   try {
   const analysisSample = sampleDocumentContent(documentContent, 12_000);
-  const analysisModel = normalizeModel(extractionModel);
+  const analysisModel = "gemma-4-31B-it";
   logger.info({
     docType: docType || "knowledge_base",
     model: analysisModel,
@@ -3218,7 +3218,7 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
       documentDiagnosticContext: "document-analysis",
       config: {
         temperature: 0.1,
-        maxOutputTokens: 1024
+        maxOutputTokens: 4096
       }
     });
 
