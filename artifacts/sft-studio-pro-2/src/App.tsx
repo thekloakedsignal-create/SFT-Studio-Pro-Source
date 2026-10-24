@@ -1880,6 +1880,7 @@ export default function App() {
   const latestGeneratorBatch = useMemo(() => {
     return batches.find(b => b.source === "Generator" || b.source?.includes("Generator"));
   }, [batches]);
+  const displayedStatus = latestGeneratorBatch?.status === "Approved" && !latestGeneratorBatch.qualityReport ? "Pending" : latestGeneratorBatch?.status;
 
   // Find the latest batch from Document Conversion for inline review
   const latestDocBatch = useMemo(() => {
@@ -5585,8 +5586,8 @@ export default function App() {
                         "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse"
                       }`}>
                         {latestGeneratorBatch.partial
-                          ? `Partial · ${latestGeneratorBatch.examples.length}/${latestGeneratorBatch.requestedExamples || latestGeneratorBatch.examples.length} · ${latestGeneratorBatch.status}`
-                          : `Status: ${latestGeneratorBatch.status}`}
+                          ? `Partial · ${latestGeneratorBatch.examples.length}/${latestGeneratorBatch.requestedExamples || latestGeneratorBatch.examples.length} · ${displayedStatus}`
+                          : `Status: ${displayedStatus}`}
                       </span>
                     )}
                   </div>
