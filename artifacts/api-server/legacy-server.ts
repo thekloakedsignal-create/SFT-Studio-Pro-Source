@@ -5448,7 +5448,7 @@ async function runAutomationPipeline(job: any) {
         instructTemplate: config.isInstruction ? (config.instructTemplate || "ChatML") : undefined,
         isInstruction: Boolean(config.isInstruction),
         ...(Number.isFinite(estimatedCount) ? { count: estimatedCount } : {}),
-        extractionModel: "glm-5.2",
+        extractionModel: "gemma-4-31B-it",
         projectName: config.projectName,
         systemPrompt: config.systemPrompt,
         targetTask: config.targetTask,
