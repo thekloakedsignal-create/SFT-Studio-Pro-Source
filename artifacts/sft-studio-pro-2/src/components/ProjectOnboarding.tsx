@@ -1055,7 +1055,7 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
               {batchRecommendations.map((batch, index) => (
                 <li key={`${index}-${batch.topic}`} className="flex items-start justify-between gap-3">
                   <span>• {batch.topic}</span>
-                  <button type="button" aria-label={`Remove batch ${batch.topic}`} disabled={pending} className="shrink-0 rounded px-2 py-0.5 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-50" onClick={() => setBatchRecommendations(prev => prev.filter((_, i) => i !== index))}>Delete</button>
+                  <button type="button" aria-label={`Remove batch ${batch.topic}`} className="shrink-0 rounded px-2 py-0.5 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white" onClick={() => setBatchRecommendations(prev => prev.filter((_, i) => i !== index))}>Delete</button>
                 </li>
               ))}
             </ul>
