@@ -3,11 +3,11 @@ name: Document conversion intent
 description: User's intended behavior for transcript, knowledge, and literature conversion.
 ---
 
-Knowledge and literature synthesize grounded training examples. Transcript mode instead copies dialogue exactly, stripping metadata according to user-provided speaker tags; it must not call AI to rewrite dialogue.
+Knowledge and literature synthesize grounded training examples. Transcript mode instead copies dialogue exactly, stripping metadata according to user-provided speaker tags; it must not call AI to rewrite dialogue. Keep every speaker-labeled utterance as its own turn, including consecutive turns by the same speaker.
 
 **Why:** The user clarified Transcript behavior: “Copies transcript exactly as is stripping meta data according to user tags.” This supersedes the earlier synthesis requirement for transcripts only.
 
-**How to apply:** Keep Transcript exact and separate converter changes from batch generation. Do not apply transcript-copy behavior to Knowledge or Literature.
+**How to apply:** Keep Transcript exact and separate converter changes from batch generation. Attach unlabeled continuation lines to their current speaker turn, but never merge separate labeled turns. Do not apply transcript-copy behavior to Knowledge or Literature.
 
 Transcript parsing must accept common labeled transcript exports and remove platform, timestamp, header, and recording metadata without rewriting the spoken dialogue.
 
