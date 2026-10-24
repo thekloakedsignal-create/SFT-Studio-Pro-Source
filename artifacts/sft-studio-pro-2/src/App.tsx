@@ -1607,7 +1607,7 @@ export default function App() {
   };
 
   // Confirm creation of new SFT project without overloading DB/API
-  const handleConfirmCreateNewProject = () => {
+  const handleConfirmCreateNewProject = async () => {
     const finalName = newProjName.trim() || `SFT Project ${userProjects.length + 1}`;
     const newProjId = `project-${Date.now()}`;
     
@@ -1676,22 +1676,31 @@ export default function App() {
 
     // Close modal & notify
     setShowNewProjectModal(false);
-    setNotification({ text: `Created and opened "${finalName}"!`, type: "success" });
-
-    // Non-blocking background save to database (one single write, no re-fetching all projects)
-    projectApiFetch("/api/sql/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: newProjId,
-        userId: userIdToUse,
-        name: finalName,
-        settings: defaultSettings,
-        batches: []
-      })
-    }).catch(err => {
-      console.warn("Background project save notice:", err);
-    });
+    // Confirm the database write instead of reporting success before it finishes.
+    try {
+      const response = await projectApiFetch("/api/sql/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: newProjId,
+          userId: userIdToUse,
+          name: finalName,
+          settings: defaultSettings,
+          batches: []
+        })
+      });
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || `Project save failed (${response.status}).`);
+      }
+      setNotification({ text: `Created and saved "${finalName}"!`, type: "success" });
+    } catch (err: any) {
+      console.warn("Project creation save failed:", err);
+      setNotification({
+        text: `Project created in this browser, but could not be saved to your account: ${err?.message || "Please retry."}`,
+        type: "error"
+      });
+    }
   };
 
   // Delete project from Postgres / local state
