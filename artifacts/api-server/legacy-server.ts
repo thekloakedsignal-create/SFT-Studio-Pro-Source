@@ -3152,14 +3152,17 @@ Tasks:
 3. Identify the true document type: "transcript" (dialogues, interviews, chats, or speaker turns), "literature" (novels, stories, books, narrative prose), or "knowledge_base" (technical documentation, manuals, guides, policies, or domain knowledge).
 4. Identify the central title, theme, or subject domain (e.g. "Moby Dick", "The Great Gatsby", "Quantum Mechanics Fundamentals", or "Kubernetes Deployment Architecture").
 5. Provide a clear, professional architectural rationale for your recommendation, detailing how the estimated examples will comprehensively span the document's structure.
+${docType !== "transcript" ? '6. For knowledge_base or literature only, create exactly estimatedCount concise topic strings (3–8 words each), one assigned focus per example. For literature, order topics by narrative progression. Do not include source excerpts or explanations in topicPlan.' : ""}
 
 Return ONLY a valid JSON object matching:
 {
   "estimatedCount": <number, at least 3>,
   "recommendedDocType": "transcript" | "knowledge_base" | "literature",
   "titleOrTheme": "<detected book title, domain, or primary theme>",
-  "explanation": "<detailed architectural rationale for example count and document structure>"
+  "explanation": "<detailed architectural rationale for example count and document structure>",
+  "topicPlan": ["<concise topic for example 1>", "..."]
 }
+For transcript recommendations, set topicPlan to [].
 Do NOT wrap output in extra text outside the JSON. Return raw JSON.
 `;
 
@@ -3169,7 +3172,8 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
       timeoutMs: 120_000,
       config: {
         temperature: 0.1,
-        maxOutputTokens: 1024
+        maxOutputTokens: 4096,
+        responseMimeType: "application/json"
       }
     });
 
@@ -3187,12 +3191,17 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
     }
 
     if (parsed && typeof parsed.estimatedCount === "number") {
+      const recommendedDocType = parsed.recommendedDocType || docType || "knowledge_base";
+      const topicPlan = recommendedDocType !== "transcript" && Array.isArray(parsed.topicPlan)
+        ? parsed.topicPlan.filter((topic: any) => typeof topic === "string" && topic.trim()).map((topic: string) => topic.trim())
+        : [];
       return res.json({
         success: true,
         estimatedCount: Math.max(3, Math.round(parsed.estimatedCount)),
-        recommendedDocType: parsed.recommendedDocType || docType || "knowledge_base",
+        recommendedDocType,
         titleOrTheme: parsed.titleOrTheme || documentName || "Document",
-        explanation: parsed.explanation || `AI analyzed ~${words} words and recommended ${parsed.estimatedCount} SFT examples.`
+        explanation: parsed.explanation || `AI analyzed ~${words} words and recommended ${parsed.estimatedCount} SFT examples.`,
+        ...(topicPlan.length ? { topicPlan } : {})
       });
     }
 
@@ -3258,7 +3267,8 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
     fixedUserPrompt,
     reasoningInstructions,
     literatureTheme,
-    converterInstructions
+    converterInstructions,
+    topicPlan: providedTopicPlan
   } = req.body;
 
   console.log("DigitalOcean Chat Completions client initialized.");
@@ -3426,61 +3436,33 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
     const perSectionCounts = sectionsToProcess.map((_, sectionIndex) =>
       baseSectionCount + (sectionIndex < extraSectionExamples ? 1 : 0)
     );
-    // Topic plan: one planning call per section returns one grounded subtopic per example,
-    // so each example request carries only its assigned passage instead of the whole section.
-    const planSectionTopics = async (sectionText: string, topicCount: number): Promise<string[]> => {
-      const evenSplit = () => Array.from({ length: topicCount }, (_, i) => {
-        const size = Math.ceil(sectionText.length / topicCount);
-        return sectionText.slice(i * size, (i + 1) * size);
+    // Assign the analyzer's topic plan to one grounded source slice per example.
+    const plannedTopics = actualDocType === "transcript" || !Array.isArray(providedTopicPlan)
+      ? []
+      : providedTopicPlan.filter((topic: any) => typeof topic === "string" && topic.trim()).map((topic: string) => topic.trim());
+    let topicAssignmentIndex = 0;
+    const sectionJobs = sectionsToProcess.flatMap((section, sectionIndex) => {
+      const exampleCount = perSectionCounts[sectionIndex];
+      const sliceLength = Math.ceil(section.length / exampleCount);
+      return Array.from({ length: exampleCount }, (_, offset) => {
+        const sourceSlice = section.slice(offset * sliceLength, (offset + 1) * sliceLength).trim();
+        const topic = plannedTopics.length
+          ? plannedTopics[topicAssignmentIndex % plannedTopics.length]
+          : "";
+        topicAssignmentIndex += 1;
+        return {
+          text: `${topic ? `Assigned subtopic: ${topic}\n\n` : ""}${sourceSlice || section}`,
+          sectionIndex,
+          offset,
+          count: 1
+        };
       });
-      if (topicCount <= 0) return [];
-      const planModels = [extractionModel, ...LITERATURE_CONVERTER_BACKUP_MODELS];
-      for (const planModel of planModels) {
-      try {
-        const planRes = await callDigitalOceanAI({
-          model: normalizeModel(planModel),
-          contents: `Read the source section below and divide its substantive content into exactly ${topicCount} distinct subtopics${actualDocType === "literature" ? " (narrative events, arcs, or episodes in order of appearance)" : " (concepts, procedures, facts, or relationships)"}.
-For each subtopic, copy one grounded source passage (verbatim excerpt, at most 500 characters) a writer needs to produce one training example about it. Exclude page numbers, headers, and scan noise. Do not include analysis or explanations.
-Return ONLY valid JSON: { "subtopics": [ { "topic": "<short title>", "passage": "<grounded source text>" } ] } with exactly ${topicCount} entries.
-
-SOURCE SECTION:
-"""
-${sectionText}
-"""`,
-          timeoutMs: 120_000,
-          config: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: "application/json" }
-        });
-        const parsed = JSON.parse(extractResponseText(planRes).replace(/```json\s*/gi, "").replace(/```\s*$/gi, "").trim());
-        const subtopics: string[] = Array.isArray(parsed?.subtopics) ? parsed.subtopics
-          .filter((s: any) => s && typeof s.passage === "string" && s.passage.trim())
-          .map((s: any) => `Assigned subtopic: ${typeof s.topic === "string" ? s.topic : "Untitled"}\n\n${s.passage.trim().slice(0, 500)}`) : [];
-        if (subtopics.length === 0) throw new Error("Topic plan returned no subtopics.");
-        return Array.from({ length: topicCount }, (_, i) => subtopics[i % subtopics.length]);
-      } catch (planErr: any) {
-        console.warn(`[Document Conversion] Topic plan failed on ${planModel}; trying next model:`, planErr?.message);
-      }
-      }
-      return evenSplit();
-    };
-    // Plan a few sections at a time so concurrent requests do not queue into timeouts.
-    const sectionTopics: string[][] = [];
-    const PLAN_CONCURRENCY = 5;
-    for (let i = 0; i < sectionsToProcess.length; i += PLAN_CONCURRENCY) {
-      sectionTopics.push(...await Promise.all(
-        sectionsToProcess.slice(i, i + PLAN_CONCURRENCY).map((text, waveIndex) =>
-          planSectionTopics(text, perSectionCounts[i + waveIndex]))
-      ));
-    }
-    // Give each complete conversation its own 4096-token output budget.
-    const sectionJobs = sectionsToProcess.flatMap((_, sectionIndex) =>
-      sectionTopics[sectionIndex].map((text, offset) => ({
-        text, sectionIndex, offset,
-        count: 1
-      })));
+    });
 
     // Process examples in controlled batches; literature retries independently across ten workers.
     const processSection = async (currentSectionText: string, secIdx: number, sectionExampleCount: number, offset: number, attempt = 0) => {
       try {
+        const assignedSubtopic = currentSectionText.match(/^Assigned subtopic:\s*([^\r\n]+)/)?.[1]?.trim() || "";
         let specificInstructions = "";
         if (actualDocType === "literature") {
           const themeOrTitle = literatureTheme || documentName || "this literary work";
@@ -3604,6 +3586,7 @@ ${currentSectionText}
 Synthesize distinct, mindfully crafted SFT training examples based on the substantive content of this document section.
 Target count: Synthesize exactly ${sectionExampleCount} examples, following the user's content-focus instructions.
 Coverage assignment: examples ${offset + 1}-${offset + sectionExampleCount} of ${perSectionCounts[secIdx]} for this section.
+${assignedSubtopic ? `Assigned topic for this example: "${assignedSubtopic}". Focus on this subtopic using only the supplied grounded source slice.` : ""}
 Order the section's substantive topics or narrative events by their appearance, then focus on this assigned portion to avoid repeating other groups.
 
 QUALITY & SANITIZATION MANDATES:
