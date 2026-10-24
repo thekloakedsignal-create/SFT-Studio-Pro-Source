@@ -3429,9 +3429,7 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
         count: 1
       })));
 
-    // Process examples in controlled batches; literature uses ten concurrent requests.
-    const literatureAttempts = new Map<string, number>();
-    const jobKey = (job: { sectionIndex: number; offset: number }) => `${job.sectionIndex}:${job.offset}`;
+    // Process examples in controlled batches; literature retries independently across ten workers.
     const processSection = async (currentSectionText: string, secIdx: number, sectionExampleCount: number, offset: number, attempt = 0) => {
       try {
         let specificInstructions = "";
@@ -3638,49 +3636,69 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
     };
 
     const CONCURRENCY_LIMIT = actualDocType === "literature" ? 10 : 5;
-    const pendingJobs = [...sectionJobs];
-    let consecutiveFailedWaves = 0;
-    while (pendingJobs.length > 0) {
-      if (literatureDeadline !== null && Date.now() >= literatureDeadline) break;
-      const wave = pendingJobs.splice(0, CONCURRENCY_LIMIT);
-      const waveResults = await Promise.allSettled(
-        wave.map(job => processSection(
-          job.text, job.sectionIndex, job.count, job.offset,
-          actualDocType === "literature" ? literatureAttempts.get(jobKey(job)) || 0 : 0
-        ))
-      );
-      const retryJobs: typeof sectionJobs = [];
-      waveResults.forEach((result, index) => {
-        if (result.status === "fulfilled") {
-          finalExamples.push(...result.value);
-        } else {
-          if (actualDocType === "literature") {
-            const key = jobKey(wave[index]);
-            literatureAttempts.set(key, (literatureAttempts.get(key) || 0) + 1);
+    if (actualDocType === "literature") {
+      let nextJobIndex = 0;
+      const runLiteratureWorker = async () => {
+        while (nextJobIndex < sectionJobs.length && Date.now() < literatureDeadline!) {
+          const job = sectionJobs[nextJobIndex++];
+          let attempt = 0;
+          while (Date.now() < literatureDeadline!) {
+            try {
+              finalExamples.push(...await processSection(
+                job.text, job.sectionIndex, job.count, job.offset, attempt
+              ));
+              if (conversionJob) {
+                conversionJob.completed = Math.min(finalExamples.length, requestedCount);
+                conversionJob.updatedAt = Date.now();
+              }
+              break;
+            } catch {
+              attempt += 1;
+              const remainingMs = literatureDeadline! - Date.now();
+              if (remainingMs <= 0) break;
+              await new Promise(resolve => setTimeout(resolve, Math.min(5_000, remainingMs)));
+            }
           }
-          retryJobs.push(wave[index]);
         }
-      });
-      pendingJobs.push(...retryJobs);
-      consecutiveFailedWaves = retryJobs.length > 0 ? consecutiveFailedWaves + 1 : 0;
-      if (conversionJob) {
-        conversionJob.completed = Math.min(finalExamples.length, requestedCount);
-        conversionJob.updatedAt = Date.now();
-      }
-      if (pendingJobs.length > 0) {
-        const retryDelayMs = retryJobs.length > 0
-          ? Math.min(30_000, 1_000 * (2 ** Math.min(consecutiveFailedWaves - 1, 5)))
-          : 400;
-        const remainingMs = literatureDeadline === null ? null : literatureDeadline - Date.now();
-        if (remainingMs !== null && remainingMs <= 0) break;
-        await new Promise((resolve) => setTimeout(
-          resolve,
-          remainingMs === null ? retryDelayMs : Math.min(retryDelayMs, remainingMs)
-        ));
+      };
+      await Promise.all(Array.from(
+        { length: Math.min(CONCURRENCY_LIMIT, sectionJobs.length) },
+        () => runLiteratureWorker()
+      ));
+    } else {
+      const pendingJobs = [...sectionJobs];
+      let consecutiveFailedWaves = 0;
+      while (pendingJobs.length > 0) {
+        const wave = pendingJobs.splice(0, CONCURRENCY_LIMIT);
+        const waveResults = await Promise.allSettled(
+          wave.map(job => processSection(job.text, job.sectionIndex, job.count, job.offset))
+        );
+        const retryJobs: typeof sectionJobs = [];
+        waveResults.forEach((result, index) => {
+          if (result.status === "fulfilled") {
+            finalExamples.push(...result.value);
+          } else {
+            retryJobs.push(wave[index]);
+          }
+        });
+        pendingJobs.push(...retryJobs);
+        consecutiveFailedWaves = retryJobs.length > 0 ? consecutiveFailedWaves + 1 : 0;
+        if (conversionJob) {
+          conversionJob.completed = Math.min(finalExamples.length, requestedCount);
+          conversionJob.updatedAt = Date.now();
+        }
+        if (pendingJobs.length > 0) {
+          const retryDelayMs = retryJobs.length > 0
+            ? Math.min(30_000, 1_000 * (2 ** Math.min(consecutiveFailedWaves - 1, 5)))
+            : 400;
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        }
       }
     }
 
-    const timedOutLiterature = literatureDeadline !== null && pendingJobs.length > 0;
+    const timedOutLiterature = literatureDeadline !== null
+      && Date.now() >= literatureDeadline
+      && finalExamples.length < requestedCount;
     if (timedOutLiterature && finalExamples.length === 0) {
       throw new Error("Literature conversion batch timed out before any examples were completed.");
     }
