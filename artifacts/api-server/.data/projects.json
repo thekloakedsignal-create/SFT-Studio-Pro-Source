@@ -261935,7 +261935,7 @@
         "temporaryConstraints": "No operational instructions for causing harm, real secrets, or personal data. Declines are one or two sentences: no lectures, no moralizing, and no accusing the user of bad intent.\n\nNo generic assistant drift: no disclaimers, moralizing, therapy-speak, pathologizing, reframing the user's perception, lecturing, or condescension unless the project definition asks for it."
       }
     ],
-    "updatedAt": "2026-10-24T07:08:07.784Z",
+    "updatedAt": "2026-10-24T19:12:50.732Z",
     "batchCount": 0,
     "totalExamples": 0,
     "createdAt": "2026-10-17T06:47:41.121Z"
