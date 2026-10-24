@@ -349,7 +349,9 @@ app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest,
   }
 
   try {
-    const savedBatch = { ...batch };
+    // Strip invisible control characters (NUL etc.) anywhere in the payload; jsonb rejects them
+    // eslint-disable-next-line no-control-regex
+    const savedBatch = JSON.parse(JSON.stringify(batch).replace(/\\u0000/g, "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ""));
     delete savedBatch.__deleted;
     if (!db) {
       const localProject = getLocalProjects().find(project => project.id === projectId);
@@ -2394,7 +2396,7 @@ function cleanSftContent(content: string): string {
   let cleaned = content.trim();
 
   // Unescape escaped quotes and newlines
-  cleaned = cleaned.replace(/\\"/g, '"').replace(/\\n/g, "\n");
+  cleaned = cleaned.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
 
   // Strip leading/trailing JSON structural remnants like '",', '}', '],', '{"', leading/trailing quotes, etc.
   cleaned = cleaned.replace(/^[\{\}\[\]"',:\s]+/, "");
@@ -2752,6 +2754,17 @@ function cleanTranscriptContent(text: string): string {
   if (!text) return "";
   let cleaned = text.replace(/^\uFEFF/, ""); // Remove UTF-8 BOM
   cleaned = cleaned.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  // Remove invisible control characters (NUL etc.); these corrupt output and cannot be stored in jsonb
+  // eslint-disable-next-line no-control-regex
+  cleaned = cleaned.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+
+  // Remove inline print/page date-time stamps spliced into text by PDF/page exports (e.g. "9/9/26, 1:24 AM")
+  cleaned = cleaned.replace(/\b\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)\b/gi, "");
+
+  // Remove page-header/footer lines pairing a URL or file path with a page number or date (web/PDF print artifacts)
+  cleaned = cleaned.replace(/^\s*(?:https?:\/\/|www\.)\S+(?:\s+\S+)*\s+(?:page\s+)?\d+(?:\s+of\s+\d+)?(?:\s*[-–—|]\s*.*)?$/gim, "");
+  cleaned = cleaned.replace(/^\s*(?:[\w\-.\/]+\.(?:pdf|docx?|csv|txt|md|html?))\s+(?:\d{1,2}[:/]\d{1,2}.*|\d+\s*(?:of\s+\d+)?)$/gim, "");
 
   // Remove WebVTT / Subtitle headers and cues
   cleaned = cleaned.replace(/^WEBVTT[^\n]*\n+/i, "");
@@ -3485,10 +3498,8 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
   const literatureDeadline = actualDocType === "literature"
     ? Date.now() + LITERATURE_CONVERTER_BATCH_TIMEOUT_MS
     : null;
-  const documentGenerationModels = [...new Set([
-    normalizeModel(extractionModel),
-    ...LITERATURE_CONVERTER_BACKUP_MODELS,
-  ])];
+  // Same model lineup as regular batch generation.
+  const documentGenerationModels = getGenerationModels();
   const conversionStartedAt = Date.now();
   logger.info({
     docType: actualDocType,
@@ -3778,12 +3789,16 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
         if (literatureRemainingMs !== null && literatureRemainingMs <= 0) {
           throw new Error("Literature conversion batch timed out.");
         }
+        // Same per-example timeouts as regular batch generation (20s single, 60s multi).
+        const docRequestTimeoutMs = format === "multi_turn"
+          ? SFT_MULTI_TURN_EXAMPLE_TIMEOUT_MS
+          : SFT_SINGLE_EXAMPLE_TIMEOUT_MS;
         const aiRes = await callDigitalOceanAI({
           model: normalizeModel(requestModel),
           contents: synthesisPrompt,
           timeoutMs: literatureRemainingMs === null
-            ? DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS
-            : Math.min(DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS, literatureRemainingMs),
+            ? docRequestTimeoutMs
+            : Math.min(docRequestTimeoutMs, literatureRemainingMs),
           documentDiagnosticContext: "document-conversion",
           config: {
             maxOutputTokens: 4096,
@@ -3831,7 +3846,8 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
     // requeue the slot before awaiting so a slow call never holds it, the model
     // rotates per attempt, failures cycle immediately with no wait, and the
     // first valid result for a slot wins.
-    const CONCURRENCY_LIMIT = 10;
+    // Same worker count as regular batch generation (up to 20 cycling workers).
+    const CONCURRENCY_LIMIT = Math.min(requestedCount, 20);
     const documentDeadline = literatureDeadline ?? Infinity;
     const completedDocJobs = new Set<number>();
     const pendingDocJobs = sectionJobs.map((job, jobIndex) => ({ job, jobIndex, attempts: 0 }));

@@ -33,8 +33,8 @@ Knowledge and Literature conversion in the Document Converter must target the an
 
 **How to apply:** Keep this behavior only in Knowledge and Literature conversion. Preserve valid examples, existing timeout/retry policies, and completed-versus-target progress. Leave Transcript and all other generation features unchanged.
 
-Document-converter scheduling must mirror the regular batch generator: one shared pending queue, slots requeued before awaiting (a slow in-flight call never holds its slot; first valid result wins), model rotation per attempt, and immediate cycling on failure with no wait.
+Document-converter (Knowledge/Literature) scheduling must mirror the regular batch generator exactly: the same 10-model lineup (getGenerationModels), up to 20 cycling workers, slots requeued before awaiting (first valid result wins), model rotation per attempt, immediate cycling on failure with no wait, and the same per-example timeouts (20s single-turn, 60s multi-turn).
 
-**Why:** The user found the regular generator's concurrency/model-assignment/retry logic effective and explicitly asked for the same pattern in the document converter — without touching the regular generators or converter-specific assignments.
+**Why:** The user found the regular generator's concurrency/model-assignment/retry logic effective and explicitly asked for the same setup in the document converter — without touching the regular generators or converter-specific prompts.
 
-**How to apply:** Apply only to the converter's worker loop. Keep converter-specific models, prompts, per-request timeouts, and the Literature 10-minute batch deadline separate from the regular generators.
+**How to apply:** Apply only to the converter's scheduling/model/timeout configuration. Keep converter-specific prompts and the Literature 10-minute batch deadline separate. Transcript conversion is unaffected.
