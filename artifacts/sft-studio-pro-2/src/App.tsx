@@ -678,9 +678,8 @@ export default function App() {
   const [transcriptLayout, setTranscriptLayout] = useState<"single_turn" | "multi_turn">("single_turn");
   const [docTemplate, setDocTemplate] = useState<TemplateType>(TemplateType.SINGLE_TURN);
   const [docCount, setDocCount] = useState<number>(8); // AI estimated example count
-  const [docTopicPlan, setDocTopicPlan] = useState<string[]>([]);
   const [literatureTheme, setLiteratureTheme] = useState<string>("");
-  const [extractionModel, setExtractionModel] = useState("glm-5.2");
+  const [extractionModel, setExtractionModel] = useState("glm-5.3");
   const [isConverting, setIsConverting] = useState(false);
   const [docConversionProgress, setDocConversionProgress] = useState<{ completed: number; total: number } | null>(null);
   const [isAnalyzingDoc, setIsAnalyzingDoc] = useState(false);
@@ -2199,7 +2198,7 @@ export default function App() {
       const res = await fetch("/api/analyze-document", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(125_000),
+        signal: AbortSignal.timeout(25_000),
         body: JSON.stringify({
           documentContent: content,
           documentName: name || docName || "Inline Document",
@@ -2210,7 +2209,6 @@ export default function App() {
       });
       const data = await res.json();
       if (data.success) {
-        setDocTopicPlan(Array.isArray(data.topicPlan) ? data.topicPlan.filter((topic: unknown) => typeof topic === "string") : []);
         if (typeof data.estimatedCount === "number") {
           setDocCount(data.estimatedCount);
         }
@@ -2234,7 +2232,6 @@ export default function App() {
       }
     } catch (err: any) {
       console.warn("Document analysis fallback:", err);
-      setDocTopicPlan([]);
       const words = content.trim().split(/\s+/).length;
       const count = Math.max(3, Math.ceil(words / 250));
       setDocCount(count);
@@ -2610,7 +2607,6 @@ export default function App() {
           instructTemplate: project.projectFormat === ProjectFormat.INSTRUCTION ? (project.instructTemplate || InstructTemplate.CHATML) : undefined,
           isInstruction: project.projectFormat === ProjectFormat.INSTRUCTION,
           count: docCount,
-          topicPlan: docTopicPlan,
           extractionModel,
           projectName: project.name,
           systemPrompt: project.systemPrompt,

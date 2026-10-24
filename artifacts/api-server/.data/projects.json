@@ -81698,7 +81698,7 @@
         "id": "batch-1792369841704-oo7sn",
         "name": "Doc (Transcript): Kloak_Memory_Map 2.pdf",
         "source": "Verbatim Transcript Conversion",
-        "status": "Rejected",
+        "status": "Approved",
         "batchId": "batch-1792369841704-oo7sn",
         "partial": false,
         "examples": [],
@@ -81709,7 +81709,7 @@
         "requestedExamples": 1
       }
     ],
-    "updatedAt": "2026-10-24T05:05:53.417Z",
+    "updatedAt": "2026-10-19T02:42:58.240Z",
     "createdAt": "2026-10-18T21:41:31.798Z"
   },
   {
