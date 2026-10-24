@@ -933,9 +933,13 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
     throw new ChatCompletionsHttpError(completionResponse.status, errorMessage);
   }
 
-  const textContent = normalizeText(completion.choices?.[0]?.message?.content);
+  const choice = completion.choices?.[0];
+  const textContent = normalizeText(
+    choice?.message?.content ?? choice?.message?.text ?? choice?.text ?? choice?.delta?.content ?? ""
+  );
 
   if (!textContent) {
+    console.warn(`[DigitalOcean] Empty content from ${targetModel}. Raw body (first 400 chars): ${completionBody.slice(0, 400)}`);
     throw new Error(`Empty response content from DigitalOcean model ${targetModel}`);
   }
 
