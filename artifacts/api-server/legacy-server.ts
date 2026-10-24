@@ -3716,7 +3716,14 @@ QUALITY & SANITIZATION MANDATES:
 ${converterInstructions && converterInstructions.trim() ? `FINAL CHECK: Verify that all generated examples strictly honor the user custom instructions: "${converterInstructions.trim()}".` : ""}
 
 [JSON OUTPUT FORMAT]
-Return ONLY a valid JSON object matching this structure:
+${actualDocType === "knowledge_base" || actualDocType === "literature" ? `Return ONLY one valid JSON object for one example. Do NOT wrap it in an "examples" array:
+{
+  "messages": [
+    ${format === "reasoning" ? "" : `{ "role": "system", "content": ${JSON.stringify(sysPromptVerbatim)} },`}
+    { "role": "user", "content": "<clean user prompt>" },
+    { "role": "assistant", ${format === "reasoning" ? `"reasoning": "<chain of thought>", ` : ""}"content": "<assistant response>" }
+  ]
+}` : `Return ONLY a valid JSON object matching this structure:
 {
   "examples": [
     {
@@ -3727,7 +3734,7 @@ Return ONLY a valid JSON object matching this structure:
       ]
     }
   ]
-}
+}`}
 Return raw JSON without extra conversational text.
 The entire JSON response must fit within 4096 output tokens. Keep the conversation concise enough to finish every answer and close all JSON objects and arrays; never leave a trailing unanswered user message.
 `;
