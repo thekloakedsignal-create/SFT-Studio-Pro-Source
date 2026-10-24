@@ -257,17 +257,27 @@ app.get("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
   const ownedLocal = getLocalProjects().filter(project => projectBelongsTo(project, ownerId));
   try {
     const userProjects = await db.select().from(projects).where(eq(projects.userId, ownerId));
+    const projectIds = [...new Set<string>([
+      ...userProjects.map((project: any) => project.id), ...ownedLocal.map(project => project.id)
+    ])];
+    const batchRows = projectIds.length > 0
+      ? await db.select().from(batches).where(inArray(batches.projectId, projectIds))
+      : [];
     const merged = userProjects.map((sp: any) => {
       const lp = ownedLocal.find(project => project.id === sp.id);
       return projectForResponse({
         ...sp,
         settings: sp.settings || lp?.settings || {},
-        batches: mergeBatchRecords(lp?.batches, sp.batches)
+        batches: mergeProjectSnapshot(
+          mergeBatchRecords(lp?.batches, sp.batches), undefined, sqlBatchData(batchRows, sp.id)
+        )
       });
     });
     ownedLocal.forEach(lp => {
       if (!merged.some((project: any) => project.id === lp.id)) {
-        merged.push(projectForResponse(lp));
+        merged.push(projectForResponse({
+          ...lp, batches: mergeProjectSnapshot(lp.batches, undefined, sqlBatchData(batchRows, lp.id))
+        }));
       }
     });
     return res.json({ success: true, projects: merged.map(projectListEntry) });
