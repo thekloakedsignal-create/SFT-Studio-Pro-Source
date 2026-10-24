@@ -3452,6 +3452,10 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
   const literatureDeadline = actualDocType === "literature"
     ? Date.now() + LITERATURE_CONVERTER_BATCH_TIMEOUT_MS
     : null;
+  const documentGenerationModels = [...new Set([
+    normalizeModel(extractionModel),
+    ...LITERATURE_CONVERTER_BACKUP_MODELS,
+  ])];
   const conversionStartedAt = Date.now();
   logger.info({
     docType: actualDocType,
@@ -3562,15 +3566,13 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
       Array.from({ length: perSectionCounts[sectionIndex] }, (_, offset) => ({
         text, sectionIndex, offset,
         count: 1
-      })));
+      }))).map((job, generationIndex) => ({ ...job, generationIndex }));
 
     // Process examples in controlled batches; literature retries independently across ten workers.
-    const processSection = async (currentSectionText: string, secIdx: number, sectionExampleCount: number, offset: number, attempt = 0) => {
+    const processSection = async (currentSectionText: string, secIdx: number, sectionExampleCount: number, offset: number, attempt = 0, generationIndex = 0) => {
       const sectionStartedAt = Date.now();
       let diagnosticResponseText: string | undefined;
-      const requestModel = actualDocType === "literature" && attempt > 0
-        ? LITERATURE_CONVERTER_BACKUP_MODELS[(attempt - 1) % LITERATURE_CONVERTER_BACKUP_MODELS.length]
-        : extractionModel;
+      const requestModel = documentGenerationModels[(generationIndex + attempt) % documentGenerationModels.length];
       try {
         let specificInstructions = "";
         if (actualDocType === "literature") {
@@ -3792,7 +3794,7 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
       }
     };
 
-    const CONCURRENCY_LIMIT = actualDocType === "literature" ? 10 : 5;
+    const CONCURRENCY_LIMIT = 10;
     if (actualDocType === "literature") {
       let nextJobIndex = 0;
       const runLiteratureWorker = async () => {
@@ -3802,7 +3804,7 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
           while (Date.now() < literatureDeadline!) {
             try {
               finalExamples.push(...await processSection(
-                job.text, job.sectionIndex, job.count, job.offset, attempt
+                job.text, job.sectionIndex, job.count, job.offset, attempt, job.generationIndex
               ));
               if (conversionJob) {
                 conversionJob.completed = Math.min(finalExamples.length, requestedCount);
@@ -3824,33 +3826,33 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
       ));
     } else {
       const pendingJobs = [...sectionJobs];
-      let consecutiveFailedWaves = 0;
-      while (pendingJobs.length > 0) {
-        const wave = pendingJobs.splice(0, CONCURRENCY_LIMIT);
-        const waveResults = await Promise.allSettled(
-          wave.map(job => processSection(job.text, job.sectionIndex, job.count, job.offset))
-        );
-        const retryJobs: typeof sectionJobs = [];
-        waveResults.forEach((result, index) => {
-          if (result.status === "fulfilled") {
-            finalExamples.push(...result.value);
-          } else {
-            retryJobs.push(wave[index]);
+      const runDocumentWorker = async () => {
+        while (pendingJobs.length > 0) {
+          const job = pendingJobs.shift();
+          if (!job) return;
+          let attempt = 0;
+          while (true) {
+            try {
+              finalExamples.push(...await processSection(
+                job.text, job.sectionIndex, job.count, job.offset, attempt, job.generationIndex
+              ));
+              if (conversionJob) {
+                conversionJob.completed = Math.min(finalExamples.length, requestedCount);
+                conversionJob.updatedAt = Date.now();
+              }
+              break;
+            } catch {
+              attempt += 1;
+              const retryDelayMs = Math.min(30_000, 1_000 * (2 ** Math.min(attempt - 1, 5)));
+              await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+            }
           }
-        });
-        pendingJobs.push(...retryJobs);
-        consecutiveFailedWaves = retryJobs.length > 0 ? consecutiveFailedWaves + 1 : 0;
-        if (conversionJob) {
-          conversionJob.completed = Math.min(finalExamples.length, requestedCount);
-          conversionJob.updatedAt = Date.now();
         }
-        if (pendingJobs.length > 0) {
-          const retryDelayMs = retryJobs.length > 0
-            ? Math.min(30_000, 1_000 * (2 ** Math.min(consecutiveFailedWaves - 1, 5)))
-            : 400;
-          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-        }
-      }
+      };
+      await Promise.all(Array.from(
+        { length: Math.min(CONCURRENCY_LIMIT, sectionJobs.length) },
+        () => runDocumentWorker()
+      ));
     }
 
     const timedOutLiterature = literatureDeadline !== null

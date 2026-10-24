@@ -27,8 +27,8 @@ The document converter offers Single Turn, Multi Turn, and Mixed only—not Reas
 
 **How to apply:** Leave Reasoning generation elsewhere unchanged; do not reintroduce converter reasoning controls based on the project's selected template.
 
-Knowledge and Literature conversion in the Document Converter must target the analyst-recommended count. Keep valid examples, retry missing examples in concurrent sequential waves until the target is met, and show actual completed-versus-target progress.
+Knowledge and Literature conversion in the Document Converter must target the analyst-recommended count, use up to ten independent workers distributed across at least three generation models, and keep processing other examples when one request is slow or hung.
 
-**Why:** The user repeatedly limited this reliability change to the Document Converter and clarified that arbitrary retry caps or partial completion do not meet the request.
+**Why:** The user requested concurrency of ten, at least three models generating, and explicitly said one hung example must not make the others wait.
 
-**How to apply:** Keep this behavior only in Knowledge and Literature conversion. Leave Transcript and all other generation features unchanged.
+**How to apply:** Keep this behavior only in Knowledge and Literature conversion. Preserve valid examples, existing timeout/retry policies, and completed-versus-target progress. Leave Transcript and all other generation features unchanged.
