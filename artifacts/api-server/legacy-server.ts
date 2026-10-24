@@ -933,9 +933,52 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
     throw new ChatCompletionsHttpError(completionResponse.status, errorMessage);
   }
 
-  const textContent = normalizeText(completion.choices?.[0]?.message?.content);
+  const firstChoice = completion.choices?.[0];
+  const message = firstChoice?.message;
+  const rawContent = message?.content;
+  const textContent = normalizeText(rawContent);
 
   if (!textContent) {
+    if (typeof params.documentDiagnosticContext === "string") {
+      const describeValue = (value: any) => ({
+        type: Array.isArray(value) ? "array" : typeof value,
+        length: typeof value === "string" ? value.length : Array.isArray(value) ? value.length : undefined,
+        keys: value && typeof value === "object" && !Array.isArray(value) ? Object.keys(value) : undefined,
+      });
+      const alternateFields = ["text", "output_text", "reasoning", "reasoning_content", "refusal"]
+        .filter(key => message?.[key] !== undefined)
+        .map(key => ({ field: key, ...describeValue(message[key]) }));
+      logger.error({
+        context: params.documentDiagnosticContext,
+        model: targetModel,
+        request: {
+          messageCount: baseMessages.length,
+          messageRoles: baseMessages.map(item => item.role),
+          messageContent: baseMessages.map(item => describeValue(item.content)),
+          maxTokenField: params.exactMessages ? "max_completion_tokens" : "max_tokens",
+          maxTokens: maxTokensToUse,
+          jsonMode,
+        },
+        response: {
+          httpStatus: completionResponse.status,
+          topLevelKeys: Object.keys(completion || {}),
+          choiceCount: Array.isArray(completion.choices) ? completion.choices.length : null,
+          firstChoiceKeys: firstChoice && typeof firstChoice === "object" ? Object.keys(firstChoice) : [],
+          finishReason: firstChoice?.finish_reason,
+          messageKeys: message && typeof message === "object" ? Object.keys(message) : [],
+          content: describeValue(rawContent),
+          contentParts: Array.isArray(rawContent)
+            ? rawContent.map((part: any) => describeValue(part))
+            : undefined,
+          alternateFields,
+          usage: completion.usage && {
+            promptTokens: completion.usage.prompt_tokens,
+            completionTokens: completion.usage.completion_tokens,
+            totalTokens: completion.usage.total_tokens,
+          },
+        },
+      }, "Document AI response had no extracted text");
+    }
     throw new Error(`Empty response content from DigitalOcean model ${targetModel}`);
   }
 
@@ -3170,6 +3213,7 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
       model: analysisModel,
       contents: analysisPrompt,
       timeoutMs: 60_000,
+      documentDiagnosticContext: "document-analysis",
       config: {
         temperature: 0.1,
         maxOutputTokens: 1024
@@ -3659,6 +3703,7 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
           timeoutMs: literatureRemainingMs === null
             ? DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS
             : Math.min(DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS, literatureRemainingMs),
+          documentDiagnosticContext: "document-conversion",
           config: {
             maxOutputTokens: 4096,
             responseMimeType: "application/json"
