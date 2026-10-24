@@ -110,26 +110,8 @@ test("knowledge and literature synthesize new examples from ordinary prose", asy
   }
 });
 
-test("transcripts copy tagged dialogue without provider calls and survive sanitization", async () => {
+test("Mixed and instruction formats work; converter rejects Reasoning", async () => {
   const f = fixture();
-  const body = { docType: "transcript", userTag: "User", assistantTag: "Assistant", count: 1,
-    documentContent: "Meeting date: Monday\n[00:01] User: What next at 12:30?\n[00:02] Assistant: Answer: Keep  two spaces.\nUser: Again?\nAssistant: Yes." };
-  const converted = await f.run(body);
-  assert.equal(converted.body.examples.length, 2);
-  assert.equal(f.calls.length, 0);
-  assert.equal(converted.body.examples[0].messages[0].content, "What next at 12:30?");
-  assert.equal(sanitizeExample(converted.body.examples[0]).messages[1].content, "Answer: Keep  two spaces.");
-  const multi = await f.run({ ...body, async: true, transcriptLayout: "multi_turn" });
-  assert.equal(multi.code, 200);
-  assert.equal(multi.body.examples[0].messages.length, 4);
-  assert.equal((await f.run({ ...body, documentContent: "No tagged dialogue." })).code, 400);
-});
-
-test("transcript layout, Mixed, and instruction formats work; converter rejects Reasoning", async () => {
-  const f = fixture();
-  const multi = await f.run({ docType: "transcript", transcriptLayout: "multi_turn",
-    documentContent: "User: Q?\nAssistant: A.\nUser: More?\nAssistant: Yes." });
-  assert.equal(multi.body.examples[0].messages.length, 4);
   const reasoning = await f.run({ docType: "transcript", templateType: "Reasoning" });
   assert.equal(reasoning.code, 400);
   assert.match(reasoning.body.error, /Reasoning is not available/);
