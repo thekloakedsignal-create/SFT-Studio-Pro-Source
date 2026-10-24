@@ -2757,7 +2757,7 @@ function cleanTranscriptContent(text: string): string {
 
   // Remove invisible control characters (NUL etc.); these corrupt output and cannot be stored in jsonb
   // eslint-disable-next-line no-control-regex
-  cleaned = cleaned.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+  cleaned = cleaned.replace(/[\u000B\u000C]/g, "\n").replace(/[\u0000-\u0008\u000E-\u001F\u007F]/g, "");
 
   // Remove inline print/page date-time stamps spliced into text by PDF/page exports (e.g. "9/9/26, 1:24 AM")
   cleaned = cleaned.replace(/\b\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)\b/gi, "");
