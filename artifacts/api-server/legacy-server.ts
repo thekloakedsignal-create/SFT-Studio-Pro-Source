@@ -3370,8 +3370,8 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
     let finalExamples: any[] = [];
 
     // Context-efficient semantic section chunking for long documents
-    // Chunk along natural paragraph and section boundaries (~35,000 characters per chunk)
-    const maxSectionLength = 35000;
+    // Chunk along natural paragraph and section boundaries (~12,000 characters per chunk)
+    const maxSectionLength = 12000;
     const documentSections: string[] = [];
     if (documentContent.length > maxSectionLength) {
       let remaining = documentContent;
@@ -3422,9 +3422,45 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
     const perSectionCounts = sectionsToProcess.map((_, sectionIndex) =>
       baseSectionCount + (sectionIndex < extraSectionExamples ? 1 : 0)
     );
+    // Topic plan: one planning call per section returns one grounded subtopic per example,
+    // so each example request carries only its assigned passage instead of the whole section.
+    const planSectionTopics = async (sectionText: string, topicCount: number): Promise<string[]> => {
+      const evenSplit = () => Array.from({ length: topicCount }, (_, i) => {
+        const size = Math.ceil(sectionText.length / topicCount);
+        return sectionText.slice(i * size, (i + 1) * size);
+      });
+      if (topicCount <= 0) return [];
+      try {
+        const planRes = await callDigitalOceanAI({
+          model: normalizeModel(extractionModel),
+          contents: `Read the source section below and divide its substantive content into exactly ${topicCount} distinct subtopics${actualDocType === "literature" ? " (narrative events, arcs, or episodes in order of appearance)" : " (concepts, procedures, facts, or relationships)"}.
+For each subtopic, copy the grounded source passage (verbatim excerpts, at most 3000 characters) a writer needs to produce one training example about it. Exclude page numbers, headers, and scan noise.
+Return ONLY valid JSON: { "subtopics": [ { "topic": "<short title>", "passage": "<grounded source text>" } ] } with exactly ${topicCount} entries.
+
+SOURCE SECTION:
+"""
+${sectionText}
+"""`,
+          timeoutMs: 90_000,
+          config: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: "application/json" }
+        });
+        const parsed = JSON.parse(extractResponseText(planRes).replace(/```json\s*/gi, "").replace(/```\s*$/gi, "").trim());
+        const subtopics: string[] = Array.isArray(parsed?.subtopics) ? parsed.subtopics
+          .filter((s: any) => s && typeof s.passage === "string" && s.passage.trim())
+          .map((s: any) => `Assigned subtopic: ${typeof s.topic === "string" ? s.topic : "Untitled"}\n\n${s.passage.trim().slice(0, 3000)}`) : [];
+        if (subtopics.length === 0) return evenSplit();
+        return Array.from({ length: topicCount }, (_, i) => subtopics[i % subtopics.length]);
+      } catch (planErr: any) {
+        console.warn("[Document Conversion] Topic plan failed; using even split:", planErr?.message);
+        return evenSplit();
+      }
+    };
+    const sectionTopics = await Promise.all(
+      sectionsToProcess.map((text, sectionIndex) => planSectionTopics(text, perSectionCounts[sectionIndex]))
+    );
     // Give each complete conversation its own 4096-token output budget.
-    const sectionJobs = sectionsToProcess.flatMap((text, sectionIndex) =>
-      Array.from({ length: perSectionCounts[sectionIndex] }, (_, offset) => ({
+    const sectionJobs = sectionsToProcess.flatMap((_, sectionIndex) =>
+      sectionTopics[sectionIndex].map((text, offset) => ({
         text, sectionIndex, offset,
         count: 1
       })));
