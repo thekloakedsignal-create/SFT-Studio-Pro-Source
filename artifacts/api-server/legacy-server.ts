@@ -3827,66 +3827,42 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
       }
     };
 
+    // Same scheduling as regular batch generation: one pending queue, workers
+    // requeue the slot before awaiting so a slow call never holds it, the model
+    // rotates per attempt, failures cycle immediately with no wait, and the
+    // first valid result for a slot wins.
     const CONCURRENCY_LIMIT = 10;
-    if (actualDocType === "literature") {
-      let nextJobIndex = 0;
-      const runLiteratureWorker = async () => {
-        while (nextJobIndex < sectionJobs.length && Date.now() < literatureDeadline!) {
-          const job = sectionJobs[nextJobIndex++];
-          let attempt = 0;
-          while (Date.now() < literatureDeadline!) {
-            try {
-              finalExamples.push(...await processSection(
-                job.text, job.sectionIndex, job.count, job.offset, attempt, job.generationIndex
-              ));
-              if (conversionJob) {
-                conversionJob.completed = Math.min(finalExamples.length, requestedCount);
-                conversionJob.updatedAt = Date.now();
-              }
-              break;
-            } catch {
-              attempt += 1;
-              const remainingMs = literatureDeadline! - Date.now();
-              if (remainingMs <= 0) break;
-              await new Promise(resolve => setTimeout(resolve, Math.min(5_000, remainingMs)));
+    const documentDeadline = literatureDeadline ?? Infinity;
+    const completedDocJobs = new Set<number>();
+    const pendingDocJobs = sectionJobs.map((job, jobIndex) => ({ job, jobIndex, attempts: 0 }));
+    const runDocumentWorker = async () => {
+      while (completedDocJobs.size < sectionJobs.length && Date.now() < documentDeadline) {
+        const item = pendingDocJobs.shift();
+        if (!item) return;
+        if (completedDocJobs.has(item.jobIndex)) continue;
+        pendingDocJobs.push(item);
+        const attempt = item.attempts++;
+        try {
+          const examples = await processSection(
+            item.job.text, item.job.sectionIndex, item.job.count, item.job.offset, attempt, item.jobIndex
+          );
+          if (!completedDocJobs.has(item.jobIndex)) {
+            completedDocJobs.add(item.jobIndex);
+            finalExamples.push(...examples);
+            if (conversionJob) {
+              conversionJob.completed = Math.min(finalExamples.length, requestedCount);
+              conversionJob.updatedAt = Date.now();
             }
           }
+        } catch {
+          // Cycle to the next request immediately; the slot stays in the queue.
         }
-      };
-      await Promise.all(Array.from(
-        { length: Math.min(CONCURRENCY_LIMIT, sectionJobs.length) },
-        () => runLiteratureWorker()
-      ));
-    } else {
-      const pendingJobs = [...sectionJobs];
-      const runDocumentWorker = async () => {
-        while (pendingJobs.length > 0) {
-          const job = pendingJobs.shift();
-          if (!job) return;
-          let attempt = 0;
-          while (true) {
-            try {
-              finalExamples.push(...await processSection(
-                job.text, job.sectionIndex, job.count, job.offset, attempt, job.generationIndex
-              ));
-              if (conversionJob) {
-                conversionJob.completed = Math.min(finalExamples.length, requestedCount);
-                conversionJob.updatedAt = Date.now();
-              }
-              break;
-            } catch {
-              attempt += 1;
-              const retryDelayMs = Math.min(30_000, 1_000 * (2 ** Math.min(attempt - 1, 5)));
-              await new Promise(resolve => setTimeout(resolve, retryDelayMs));
-            }
-          }
-        }
-      };
-      await Promise.all(Array.from(
-        { length: Math.min(CONCURRENCY_LIMIT, sectionJobs.length) },
-        () => runDocumentWorker()
-      ));
-    }
+      }
+    };
+    await Promise.all(Array.from(
+      { length: Math.min(CONCURRENCY_LIMIT, sectionJobs.length) },
+      () => runDocumentWorker()
+    ));
 
     const timedOutLiterature = literatureDeadline !== null
       && Date.now() >= literatureDeadline
