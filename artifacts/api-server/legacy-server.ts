@@ -5326,7 +5326,7 @@ async function runAutomationPipeline(job: any) {
       // Run the converter's own process untouched: it analyzes the document and sets the count itself.
       const analysis = await pipelineCall(userId, "/api/analyze-document", {
         method: "POST",
-        body: JSON.stringify({ documentContent: doc.content, documentName: doc.name, docType, extractionModel: "glm-5.3" })
+        body: JSON.stringify({ documentContent: doc.content, documentName: doc.name, docType, extractionModel: "glm-5.2" })
       }, job.user);
       const estimatedCount = analysis.data?.estimatedCount;
       const result = await pipelineRunJob(userId, "/api/convert-document", {
@@ -5338,7 +5338,7 @@ async function runAutomationPipeline(job: any) {
         instructTemplate: config.isInstruction ? (config.instructTemplate || "ChatML") : undefined,
         isInstruction: Boolean(config.isInstruction),
         ...(Number.isFinite(estimatedCount) ? { count: estimatedCount } : {}),
-        extractionModel: "glm-5.3",
+        extractionModel: "glm-5.2",
         projectName: config.projectName,
         systemPrompt: config.systemPrompt,
         targetTask: config.targetTask,
