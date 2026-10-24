@@ -9,6 +9,12 @@ QA must catch formatting errors and template anomalies as well as assess semanti
 
 **How to apply:** Keep both sources of findings in the existing QA report and scoring. Inspect raw examples without silently sanitizing away defects. Keep audit changes confined to QA, not generation or conversion.
 
+Distribute QA chunks across the available audit models so multiple models receive first-pass calls concurrently; rotate the remaining models as fallbacks for a failed chunk.
+
+**Why:** The user said QA should call a lineup of different models rather than send every chunk to the same model first.
+
+**How to apply:** Keep model assignment scoped to QA chunk dispatch. Do not change chunk size, concurrency, or the audit prompt when changing model distribution.
+
 QA must distinguish substantive defects from minor stylistic preferences. Do not make small wording or formatting nits imply that an otherwise useful example is bad, while continuing to flag meaningful factual, instruction-following, persona, and structural failures.
 
 **Why:** The user said QA currently makes almost all app-generated content look unusable, but should not become permissive either.

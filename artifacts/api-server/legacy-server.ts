@@ -4257,6 +4257,8 @@ app.post("/api/analyze-quality", async (req, res) => {
 
       // Primary audit model plus backups, tried in order when one fails
       const QA_AUDIT_MODELS = ["qwen3.8-max", "deepseek-3.2", "llama-4-maverick", "mistral-3-14B"];
+      const modelStartIndex = (chunkIndex: number) =>
+        Math.floor(chunkIndex / CHUNK_SIZE) % QA_AUDIT_MODELS.length;
 
       // Execute chunks in parallel with a strict 14-second timeout race
       await Promise.allSettled(chunks.map(async (chunk) => {
@@ -4313,7 +4315,9 @@ app.post("/api/analyze-quality", async (req, res) => {
           `;
 
           let response: any = null;
-          for (const auditModel of QA_AUDIT_MODELS) {
+          const firstModelIndex = modelStartIndex(chunk.startIndex);
+          for (let modelOffset = 0; modelOffset < QA_AUDIT_MODELS.length; modelOffset++) {
+            const auditModel = QA_AUDIT_MODELS[(firstModelIndex + modelOffset) % QA_AUDIT_MODELS.length];
             try {
               response = await callDigitalOceanAI({
                 model: auditModel,
