@@ -3217,8 +3217,8 @@ const LITERATURE_CONVERTER_BATCH_TIMEOUT_MS = 10 * 60 * 1000;
 const LITERATURE_CONVERTER_BACKUP_MODELS = [
   "gemma-4-31B-it",
   "qwen3.8-max",
-  "mistral-14B-it",
-  "deepseek-v4-flash",
+  "mistral-3-14B",
+  "deepseek-4-flash",
   "llama-4-maverick",
 ];
 const documentConversionJobs = new Map<string, {
