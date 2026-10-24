@@ -2896,6 +2896,37 @@ function extractSpeakerAndContent(
   return null;
 }
 
+// Rejoin lines that were hard-wrapped mid-sentence by the source export, while
+// preserving blank-line paragraph breaks and intentional bullet/header lines.
+function reflowHardWrappedText(content: string): string {
+  const paragraphs = content.split(/\n{2,}/);
+  const reflowed = paragraphs.map(paragraph => {
+    const lines = paragraph.split("\n");
+    const out: string[] = [];
+    for (const line of lines) {
+      const prev = out[out.length - 1];
+      if (prev === undefined) { out.push(line); continue; }
+      // Orphaned bullet marker split off by wrapping: "polarity: -" + "**Kreepo** — ..."
+      const orphan = prev.match(/^(.*?)(?:\s+|^)([-•*]|\d+\.)$/);
+      if (orphan && orphan[1].trim()) {
+        out[out.length - 1] = orphan[1].trimEnd();
+        out.push(`${orphan[2]} ${line}`);
+        continue;
+      }
+      const endsSentence = /[.!?:;"'\)\]\}»”’*_`~]\s*$/.test(prev);
+      const startsBlock = /^(?:[-•*]|\d+[.)])\s/.test(line);
+      const startsLower = /^[\p{Ll}]/u.test(line);
+      if (startsLower || (!endsSentence && !startsBlock)) {
+        out[out.length - 1] = prev + " " + line;
+      } else {
+        out.push(line);
+      }
+    }
+    return out.join("\n");
+  });
+  return reflowed.join("\n\n");
+}
+
 function parseUniversalTranscript(
   text: string,
   userTag?: string,
@@ -3123,8 +3154,10 @@ function parseUniversalTranscript(
     }
   }
 
-  // Filter out any empty turns
-  const validTurns = turns.filter(t => t.content && t.content.trim().length > 0);
+  // Filter out any empty turns and reflow hard-wrapped source lines into clean text
+  const validTurns = turns
+    .filter(t => t.content && t.content.trim().length > 0)
+    .map(t => ({ ...t, content: reflowHardWrappedText(t.content.trim()) }));
   return {
     turns: validTurns,
     detectedUser: customUserTrim || mappedUser || "User",
