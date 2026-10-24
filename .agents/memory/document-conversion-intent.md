@@ -15,6 +15,12 @@ Transcript parsing must accept common labeled transcript exports and remove plat
 
 **How to apply:** Improve speaker-label and metadata recognition within the transcript parser; keep transcript conversion verbatim and separate from AI synthesis.
 
+Transcript layout choices are deliberate: Single Turn emits one example per complete user/assistant pair; Multi Turn keeps the conversation together as one example. Preserve the user's selection.
+
+**Why:** The user clarified that a long transcript must not become one example when Single Turn is selected, and both layouts currently fail.
+
+**How to apply:** Fix transcript parsing and pair extraction without changing the selected layout or defaulting to Multi Turn.
+
 The Document Guide is instructions-only: ask about transcripts, explain what to do using the existing conversion instructions, then close. Do not upload or handle documents inside the guide. Transcripts need speaker labels, not instructions.
 
 **Why:** The user explicitly replaced the earlier upload-enabled guide request with “Just give the instructions for document conversion and don't upload them in the guide.”
