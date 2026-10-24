@@ -3166,7 +3166,7 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
     const aiRes = await callDigitalOceanAI({
       model: normalizeModel(extractionModel),
       contents: analysisPrompt,
-      timeoutMs: 18_000,
+      timeoutMs: 120_000,
       config: {
         temperature: 0.1,
         maxOutputTokens: 1024
@@ -3447,7 +3447,7 @@ SOURCE SECTION:
 """
 ${sectionText}
 """`,
-          timeoutMs: 30_000,
+          timeoutMs: 120_000,
           config: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: "application/json" }
         });
         const parsed = JSON.parse(extractResponseText(planRes).replace(/```json\s*/gi, "").replace(/```\s*$/gi, "").trim());
@@ -3462,9 +3462,15 @@ ${sectionText}
       }
       return evenSplit();
     };
-    const sectionTopics = await Promise.all(
-      sectionsToProcess.map((text, sectionIndex) => planSectionTopics(text, perSectionCounts[sectionIndex]))
-    );
+    // Plan a few sections at a time so concurrent requests do not queue into timeouts.
+    const sectionTopics: string[][] = [];
+    const PLAN_CONCURRENCY = 5;
+    for (let i = 0; i < sectionsToProcess.length; i += PLAN_CONCURRENCY) {
+      sectionTopics.push(...await Promise.all(
+        sectionsToProcess.slice(i, i + PLAN_CONCURRENCY).map((text, waveIndex) =>
+          planSectionTopics(text, perSectionCounts[i + waveIndex]))
+      ));
+    }
     // Give each complete conversation its own 4096-token output budget.
     const sectionJobs = sectionsToProcess.flatMap((_, sectionIndex) =>
       sectionTopics[sectionIndex].map((text, offset) => ({
