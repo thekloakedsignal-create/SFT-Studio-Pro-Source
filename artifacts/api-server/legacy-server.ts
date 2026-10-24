@@ -3213,6 +3213,14 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
 
 // 2. Document to SFT Convertor
 const DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS = 180_000;
+const LITERATURE_CONVERTER_BATCH_TIMEOUT_MS = 10 * 60 * 1000;
+const LITERATURE_CONVERTER_BACKUP_MODELS = [
+  "gemma-4-31B-it",
+  "qwen3.8-max",
+  "mistral-14B-it",
+  "deepseek-v4-flash",
+  "llama-4-maverick",
+];
 const documentConversionJobs = new Map<string, {
   owner: string; status: "running" | "complete" | "error";
   updatedAt: number; completed: number; total: number; result?: any;
@@ -3332,6 +3340,9 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
   } catch (error: any) {
     return res.status(error.status || 503).json({ success: false, error: error.message });
   }
+  const literatureDeadline = actualDocType === "literature"
+    ? Date.now() + LITERATURE_CONVERTER_BATCH_TIMEOUT_MS
+    : null;
   let conversionJob: (typeof documentConversionJobs extends Map<string, infer Job> ? Job : never) | undefined;
   const finishConversion = (code: number, result: any) => {
     settleExamples(usageReservation, result.success ? result.examples?.length || 0 : 0);
@@ -3418,8 +3429,10 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
         count: 1
       })));
 
-    // Process examples in controlled batches with five concurrent requests.
-    const processSection = async (currentSectionText: string, secIdx: number, sectionExampleCount: number, offset: number) => {
+    // Process examples in controlled batches; literature uses ten concurrent requests.
+    const literatureAttempts = new Map<string, number>();
+    const jobKey = (job: { sectionIndex: number; offset: number }) => `${job.sectionIndex}:${job.offset}`;
+    const processSection = async (currentSectionText: string, secIdx: number, sectionExampleCount: number, offset: number, attempt = 0) => {
       try {
         let specificInstructions = "";
         if (actualDocType === "literature") {
@@ -3581,10 +3594,19 @@ Return raw JSON without extra conversational text.
 The entire JSON response must fit within 4096 output tokens. Keep the conversation concise enough to finish every answer and close all JSON objects and arrays; never leave a trailing unanswered user message.
 `;
 
+        const literatureRemainingMs = literatureDeadline === null ? null : literatureDeadline - Date.now();
+        if (literatureRemainingMs !== null && literatureRemainingMs <= 0) {
+          throw new Error("Literature conversion batch timed out.");
+        }
+        const requestModel = actualDocType === "literature" && attempt > 0
+          ? LITERATURE_CONVERTER_BACKUP_MODELS[(attempt - 1) % LITERATURE_CONVERTER_BACKUP_MODELS.length]
+          : extractionModel;
         const aiRes = await callDigitalOceanAI({
-          model: normalizeModel(extractionModel),
+          model: normalizeModel(requestModel),
           contents: synthesisPrompt,
-          timeoutMs: DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS,
+          timeoutMs: literatureRemainingMs === null
+            ? DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS
+            : Math.min(DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS, literatureRemainingMs),
           config: {
             maxOutputTokens: 4096,
             responseMimeType: "application/json"
@@ -3615,19 +3637,27 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
       }
     };
 
-    const CONCURRENCY_LIMIT = 5;
+    const CONCURRENCY_LIMIT = actualDocType === "literature" ? 10 : 5;
     const pendingJobs = [...sectionJobs];
     let consecutiveFailedWaves = 0;
     while (pendingJobs.length > 0) {
+      if (literatureDeadline !== null && Date.now() >= literatureDeadline) break;
       const wave = pendingJobs.splice(0, CONCURRENCY_LIMIT);
       const waveResults = await Promise.allSettled(
-        wave.map(job => processSection(job.text, job.sectionIndex, job.count, job.offset))
+        wave.map(job => processSection(
+          job.text, job.sectionIndex, job.count, job.offset,
+          actualDocType === "literature" ? literatureAttempts.get(jobKey(job)) || 0 : 0
+        ))
       );
       const retryJobs: typeof sectionJobs = [];
       waveResults.forEach((result, index) => {
         if (result.status === "fulfilled") {
           finalExamples.push(...result.value);
         } else {
+          if (actualDocType === "literature") {
+            const key = jobKey(wave[index]);
+            literatureAttempts.set(key, (literatureAttempts.get(key) || 0) + 1);
+          }
           retryJobs.push(wave[index]);
         }
       });
@@ -3641,10 +3671,19 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
         const retryDelayMs = retryJobs.length > 0
           ? Math.min(30_000, 1_000 * (2 ** Math.min(consecutiveFailedWaves - 1, 5)))
           : 400;
-        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        const remainingMs = literatureDeadline === null ? null : literatureDeadline - Date.now();
+        if (remainingMs !== null && remainingMs <= 0) break;
+        await new Promise((resolve) => setTimeout(
+          resolve,
+          remainingMs === null ? retryDelayMs : Math.min(retryDelayMs, remainingMs)
+        ));
       }
     }
 
+    const timedOutLiterature = literatureDeadline !== null && pendingJobs.length > 0;
+    if (timedOutLiterature && finalExamples.length === 0) {
+      throw new Error("Literature conversion batch timed out before any examples were completed.");
+    }
     const formattedExamples = finalExamples.map(example => {
       const sanitized = sanitizeExample(example, (format === "reasoning" || format === "mixed") ? format : "Single Turn");
       if (isInstructionTemplate && Array.isArray(sanitized.messages)) {
@@ -3689,7 +3728,7 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
       success: true, 
       examples: formattedExamples,
       requestedCount,
-      partial: false,
+      partial: timedOutLiterature,
       source: `Document Conversion (${actualDocType} - ${extractionModel || "DigitalOcean"})`
     });
 
