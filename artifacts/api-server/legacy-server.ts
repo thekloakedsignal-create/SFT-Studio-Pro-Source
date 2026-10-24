@@ -971,6 +971,8 @@ async function callDigitalOceanInference(doApiKey: string, params: any): Promise
             ? rawContent.map((part: any) => describeValue(part))
             : undefined,
           alternateFields,
+          rawMessageContent: rawContent,
+          rawReasoningContent: message?.reasoning_content,
           usage: completion.usage && {
             promptTokens: completion.usage.prompt_tokens,
             completionTokens: completion.usage.completion_tokens,
@@ -3529,6 +3531,7 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
     // Process examples in controlled batches; literature retries independently across ten workers.
     const processSection = async (currentSectionText: string, secIdx: number, sectionExampleCount: number, offset: number, attempt = 0) => {
       const sectionStartedAt = Date.now();
+      let diagnosticResponseText: string | undefined;
       const requestModel = actualDocType === "literature" && attempt > 0
         ? LITERATURE_CONVERTER_BACKUP_MODELS[(attempt - 1) % LITERATURE_CONVERTER_BACKUP_MODELS.length]
         : extractionModel;
@@ -3711,6 +3714,7 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
         });
 
         const rawText = extractResponseText(aiRes);
+        diagnosticResponseText = rawText;
         const sectionExamples = parseGeneratedExamples(rawText, format).filter(item => {
           const conversation = item.messages.filter((message: any) => message.role !== "system");
           return conversation.length >= (format === "multi_turn" ? 4 : 2)
@@ -3739,6 +3743,7 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
           error: secErr?.message || String(secErr),
           status: secErr?.status ?? secErr?.statusCode,
           code: secErr?.code,
+          responseText: diagnosticResponseText,
         }, "Document conversion section failed");
         throw new Error(`Document section ${secIdx + 1} could not be converted: ${formatAIErrorMessage(secErr)}`);
       }
