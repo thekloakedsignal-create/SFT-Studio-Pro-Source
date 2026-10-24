@@ -3122,6 +3122,13 @@ app.post("/api/analyze-document", async (req, res) => {
 
   try {
   const analysisSample = sampleDocumentContent(documentContent, 12_000);
+  const analysisModel = normalizeModel(extractionModel);
+  logger.info({
+    docType: docType || "knowledge_base",
+    model: analysisModel,
+    wordCount: words,
+    sampleCharacters: analysisSample.length,
+  }, "Document analysis started");
   const analysisPrompt = `
 You are an expert AI Data Engineering Architect and SFT Specialist.
 Perform a thorough, comprehensive architectural analysis across the entire provided document.
@@ -3160,9 +3167,9 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
 `;
 
     const aiRes = await callDigitalOceanAI({
-      model: normalizeModel(extractionModel),
+      model: analysisModel,
       contents: analysisPrompt,
-      timeoutMs: 18_000,
+      timeoutMs: 60_000,
       config: {
         temperature: 0.1,
         maxOutputTokens: 1024
@@ -3183,6 +3190,11 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
     }
 
     if (parsed && typeof parsed.estimatedCount === "number") {
+      logger.info({
+        docType: parsed.recommendedDocType || docType || "knowledge_base",
+        model: analysisModel,
+        estimatedCount: Math.max(3, Math.round(parsed.estimatedCount)),
+      }, "Document analysis completed");
       return res.json({
         success: true,
         estimatedCount: Math.max(3, Math.round(parsed.estimatedCount)),
@@ -3192,6 +3204,12 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
       });
     }
 
+    logger.warn({
+      docType: docType || "knowledge_base",
+      model: analysisModel,
+      responseCharacters: rawText.length,
+      fallbackCount: heuristicCount,
+    }, "Document analysis returned invalid JSON; using word-count estimate");
     return res.json({
       success: true,
       estimatedCount: heuristicCount,
@@ -3200,7 +3218,16 @@ Do NOT wrap output in extra text outside the JSON. Return raw JSON.
       explanation: `Analyzed ~${words} words. Estimated ${heuristicCount} SFT examples for optimal dataset depth.`
     });
   } catch (err: any) {
-    console.error("Document analysis error:", err);
+    logger.error({
+      docType: docType || "knowledge_base",
+      model: normalizeModel(extractionModel),
+      wordCount: words,
+      fallbackCount: heuristicCount,
+      errorName: err?.name,
+      error: err?.message || String(err),
+      status: err?.status ?? err?.statusCode,
+      code: err?.code,
+    }, "Document analysis failed; using word-count estimate");
     return res.json({
       success: true,
       estimatedCount: heuristicCount,
@@ -3343,8 +3370,34 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
   const literatureDeadline = actualDocType === "literature"
     ? Date.now() + LITERATURE_CONVERTER_BATCH_TIMEOUT_MS
     : null;
+  const conversionStartedAt = Date.now();
+  logger.info({
+    docType: actualDocType,
+    model: normalizeModel(extractionModel),
+    requestedCount,
+    contentCharacters: documentContent.length,
+    async: req.body.async === true,
+  }, "Document conversion started");
   let conversionJob: (typeof documentConversionJobs extends Map<string, infer Job> ? Job : never) | undefined;
   const finishConversion = (code: number, result: any) => {
+    const completionLog = {
+      docType: actualDocType,
+      model: normalizeModel(extractionModel),
+      statusCode: code,
+      success: Boolean(result.success),
+      requestedCount,
+      completedCount: result.examples?.length || 0,
+      partial: Boolean(result.partial),
+      durationMs: Date.now() - conversionStartedAt,
+    };
+    if (result.success) {
+      logger.info(completionLog, "Document conversion finished");
+    } else {
+      logger.error({
+        ...completionLog,
+        error: result.error || "Unknown conversion error",
+      }, "Document conversion failed");
+    }
     settleExamples(usageReservation, result.success ? result.examples?.length || 0 : 0);
     if (!conversionJob) {
       res.status(code).json(result);
@@ -3431,6 +3484,10 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
 
     // Process examples in controlled batches; literature retries independently across ten workers.
     const processSection = async (currentSectionText: string, secIdx: number, sectionExampleCount: number, offset: number, attempt = 0) => {
+      const sectionStartedAt = Date.now();
+      const requestModel = actualDocType === "literature" && attempt > 0
+        ? LITERATURE_CONVERTER_BACKUP_MODELS[(attempt - 1) % LITERATURE_CONVERTER_BACKUP_MODELS.length]
+        : extractionModel;
       try {
         let specificInstructions = "";
         if (actualDocType === "literature") {
@@ -3596,9 +3653,6 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
         if (literatureRemainingMs !== null && literatureRemainingMs <= 0) {
           throw new Error("Literature conversion batch timed out.");
         }
-        const requestModel = actualDocType === "literature" && attempt > 0
-          ? LITERATURE_CONVERTER_BACKUP_MODELS[(attempt - 1) % LITERATURE_CONVERTER_BACKUP_MODELS.length]
-          : extractionModel;
         const aiRes = await callDigitalOceanAI({
           model: normalizeModel(requestModel),
           contents: synthesisPrompt,
@@ -3630,7 +3684,17 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
         }
         return sectionExamples;
       } catch (secErr: any) {
-        console.warn(`[Document Conversion] Section ${secIdx + 1} processing error:`, secErr?.message);
+        logger.error({
+          docType: actualDocType,
+          section: secIdx + 1,
+          attempt: attempt + 1,
+          model: normalizeModel(requestModel),
+          durationMs: Date.now() - sectionStartedAt,
+          errorName: secErr?.name,
+          error: secErr?.message || String(secErr),
+          status: secErr?.status ?? secErr?.statusCode,
+          code: secErr?.code,
+        }, "Document conversion section failed");
         throw new Error(`Document section ${secIdx + 1} could not be converted: ${formatAIErrorMessage(secErr)}`);
       }
     };
@@ -3751,7 +3815,16 @@ The entire JSON response must fit within 4096 output tokens. Keep the conversati
     });
 
   } catch (error: any) {
-    console.error("Document conversion endpoint error:", error);
+    logger.error({
+      docType: actualDocType,
+      model: normalizeModel(extractionModel),
+      requestedCount,
+      durationMs: Date.now() - conversionStartedAt,
+      errorName: error?.name,
+      error: error?.message || String(error),
+      status: error?.status ?? error?.statusCode,
+      code: error?.code,
+    }, "Document conversion endpoint error");
     return finishConversion(500, { success: false, error: formatAIErrorMessage(error) });
   }
 });
