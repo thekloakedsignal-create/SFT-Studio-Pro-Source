@@ -3166,13 +3166,12 @@ app.post("/api/analyze-document", async (req, res) => {
   }
 
   try {
-  const analysisSample = sampleDocumentContent(documentContent, 12_000);
   const analysisModel = "gemma-4-31B-it";
   logger.info({
     docType: docType || "knowledge_base",
     model: analysisModel,
     wordCount: words,
-    sampleCharacters: analysisSample.length,
+    documentCharacters: documentContent.length,
   }, "Document analysis started");
   const analysisPrompt = `
 You are an expert AI Data Engineering Architect and SFT Specialist.
@@ -3189,9 +3188,9 @@ USER CONVERSION INSTRUCTIONS (authoritative for this analysis, including any req
 ${converterInstructions.trim()}
 """
 ` : ""}
-Representative excerpts sampled across the complete document (do not assume omitted spans are empty):
+Full document text in original order:
 """
-${analysisSample}
+${documentContent}
 """
 
 Tasks:
