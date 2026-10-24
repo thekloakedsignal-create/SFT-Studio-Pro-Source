@@ -32,3 +32,9 @@ Knowledge and Literature conversion in the Document Converter must target the an
 **Why:** The user repeatedly limited this reliability change to the Document Converter and clarified that arbitrary retry caps or partial completion do not meet the request.
 
 **How to apply:** Keep this behavior only in Knowledge and Literature conversion. Leave Transcript and all other generation features unchanged.
+
+Knowledge and Literature topic-planning responses must stay compact enough for the shared 4096-token output cap; avoid requesting long passages for every planned topic.
+
+**Why:** The planner exhausted its output budget returning multiple long excerpts, leaving `content` empty and preventing conversion.
+
+**How to apply:** Return concise grounded topic snippets and assign one to each example request.

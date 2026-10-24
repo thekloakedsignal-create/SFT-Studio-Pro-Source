@@ -3440,7 +3440,7 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
         const planRes = await callDigitalOceanAI({
           model: normalizeModel(planModel),
           contents: `Read the source section below and divide its substantive content into exactly ${topicCount} distinct subtopics${actualDocType === "literature" ? " (narrative events, arcs, or episodes in order of appearance)" : " (concepts, procedures, facts, or relationships)"}.
-For each subtopic, copy the grounded source passage (verbatim excerpts, at most 3000 characters) a writer needs to produce one training example about it. Exclude page numbers, headers, and scan noise.
+For each subtopic, copy one grounded source passage (verbatim excerpt, at most 500 characters) a writer needs to produce one training example about it. Exclude page numbers, headers, and scan noise. Do not include analysis or explanations.
 Return ONLY valid JSON: { "subtopics": [ { "topic": "<short title>", "passage": "<grounded source text>" } ] } with exactly ${topicCount} entries.
 
 SOURCE SECTION:
@@ -3453,7 +3453,7 @@ ${sectionText}
         const parsed = JSON.parse(extractResponseText(planRes).replace(/```json\s*/gi, "").replace(/```\s*$/gi, "").trim());
         const subtopics: string[] = Array.isArray(parsed?.subtopics) ? parsed.subtopics
           .filter((s: any) => s && typeof s.passage === "string" && s.passage.trim())
-          .map((s: any) => `Assigned subtopic: ${typeof s.topic === "string" ? s.topic : "Untitled"}\n\n${s.passage.trim().slice(0, 3000)}`) : [];
+          .map((s: any) => `Assigned subtopic: ${typeof s.topic === "string" ? s.topic : "Untitled"}\n\n${s.passage.trim().slice(0, 500)}`) : [];
         if (subtopics.length === 0) throw new Error("Topic plan returned no subtopics.");
         return Array.from({ length: topicCount }, (_, i) => subtopics[i % subtopics.length]);
       } catch (planErr: any) {
