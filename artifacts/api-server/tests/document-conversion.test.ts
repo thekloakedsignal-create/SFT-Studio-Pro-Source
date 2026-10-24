@@ -112,8 +112,8 @@ test("knowledge and literature synthesize new examples from ordinary prose", asy
 
 test("transcripts copy tagged dialogue without provider calls and survive sanitization", async () => {
   const f = fixture();
-  const body = { docType: "transcript", userTag: "Alice", assistantTag: "Bob", count: 1,
-    documentContent: "Meeting date: Monday\n[00:01] Alice: What next at 12:30?\n[00:02] Bob: Answer: Keep  two spaces.\nAlice: Again?\nBob: Yes." };
+  const body = { docType: "transcript", userTag: "User", assistantTag: "Assistant", count: 1,
+    documentContent: "Meeting date: Monday\n[00:01] User: What next at 12:30?\n[00:02] Assistant: Answer: Keep  two spaces.\nUser: Again?\nAssistant: Yes." };
   const converted = await f.run(body);
   assert.equal(converted.body.examples.length, 2);
   assert.equal(f.calls.length, 0);
