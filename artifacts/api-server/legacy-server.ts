@@ -2755,17 +2755,6 @@ function cleanTranscriptContent(text: string): string {
   let cleaned = text.replace(/^\uFEFF/, ""); // Remove UTF-8 BOM
   cleaned = cleaned.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 
-  // Remove invisible control characters (NUL etc.); these corrupt output and cannot be stored in jsonb
-  // eslint-disable-next-line no-control-regex
-  cleaned = cleaned.replace(/[\u000B\u000C]/g, "\n").replace(/[\u0000-\u0008\u000E-\u001F\u007F]/g, "");
-
-  // Remove inline print/page date-time stamps spliced into text by PDF/page exports (e.g. "9/9/26, 1:24 AM")
-  cleaned = cleaned.replace(/\b\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)\b/gi, "");
-
-  // Remove page-header/footer lines pairing a URL or file path with a page number or date (web/PDF print artifacts)
-  cleaned = cleaned.replace(/^\s*(?:https?:\/\/|www\.)\S+(?:\s+\S+)*\s+(?:page\s+)?\d+(?:\s+of\s+\d+)?(?:\s*[-–—|]\s*.*)?$/gim, "");
-  cleaned = cleaned.replace(/^\s*(?:[\w\-.\/]+\.(?:pdf|docx?|csv|txt|md|html?))\s+(?:\d{1,2}[:/]\d{1,2}.*|\d+\s*(?:of\s+\d+)?)$/gim, "");
-
   // Remove WebVTT / Subtitle headers and cues
   cleaned = cleaned.replace(/^WEBVTT[^\n]*\n+/i, "");
   cleaned = cleaned.replace(/^(?:Kind|Language):[^\n]*\n+/gmi, "");
