@@ -217515,7 +217515,7 @@
         "id": "batch-1792221661280-gf7xa",
         "name": "Doc (Transcript): MaXaM_Thread_334.txt",
         "source": "Verbatim Transcript Conversion",
-        "status": "Rejected",
+        "status": "Pending",
         "batchId": "batch-1792221661280-gf7xa",
         "partial": false,
         "examples": [],
@@ -261935,7 +261935,7 @@
         "temporaryConstraints": "No operational instructions for causing harm, real secrets, or personal data. Declines are one or two sentences: no lectures, no moralizing, and no accusing the user of bad intent.\n\nNo generic assistant drift: no disclaimers, moralizing, therapy-speak, pathologizing, reframing the user's perception, lecturing, or condescension unless the project definition asks for it."
       }
     ],
-    "updatedAt": "2026-10-17T08:14:44.194Z",
+    "updatedAt": "2026-10-24T07:08:07.784Z",
     "batchCount": 0,
     "totalExamples": 0,
     "createdAt": "2026-10-17T06:47:41.121Z"
