@@ -3418,30 +3418,21 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
     const firstUserIndex = parsed.turns.findIndex(turn => turn.role === "user");
     const turns = firstUserIndex > 0 ? parsed.turns.slice(firstUserIndex) : parsed.turns;
     if (!turns.length || !turns.some(turn => turn.role === "user") || !turns.some(turn => turn.role === "assistant")) {
-      logger.warn({
-        documentChars: documentContent.length,
-        userTagProvided: Boolean(userTag?.trim()),
-        assistantTagProvided: Boolean(assistantTag?.trim()),
-        parsedTurns: turns.length,
-        userTurns: turns.filter(turn => turn.role === "user").length,
-        assistantTurns: turns.filter(turn => turn.role === "assistant").length,
-      }, "Transcript conversion rejected: speaker roles not recognized");
       return res.status(400).json({ success: false, error: "No dialogue matched both speaker tags. Check the User and Assistant tags against your transcript." });
     }
     const multiTurn = req.body.transcriptLayout === "multi_turn";
     const groups: DialogueTurn[][] = [];
+    const skippedTrailingUserTurn = !multiTurn
+      && turns.length % 2 === 1
+      && turns[turns.length - 1]?.role === "user";
     if (multiTurn) groups.push(turns);
     else {
-      for (let index = 0; index < turns.length; index += 2) {
-        if (turns[index]?.role !== "user" || turns[index + 1]?.role !== "assistant") {
-          logger.warn({
-            turnCount: turns.length,
-            firstRoles: turns.slice(0, 8).map(turn => turn.role),
-            invalidPairAt: index,
-          }, "Transcript conversion rejected: incomplete single-turn pair");
+      const pairableTurns = skippedTrailingUserTurn ? turns.slice(0, -1) : turns;
+      for (let index = 0; index < pairableTurns.length; index += 2) {
+        if (pairableTurns[index]?.role !== "user" || pairableTurns[index + 1]?.role !== "assistant") {
           return res.status(400).json({ success: false, error: "Single Turn requires complete User/Assistant pairs. Use Multi Turn to preserve all transcript turns." });
         }
-        groups.push(turns.slice(index, index + 2));
+        groups.push(pairableTurns.slice(index, index + 2));
       }
     }
     const transcriptTemplate = multiTurn ? "Multi Turn" : "Single Turn";
@@ -3449,15 +3440,11 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
       const reservation = reserveExamples(req.user, groups.length);
       settleExamples(reservation, groups.length);
     } catch (error: any) {
-      logger.warn({
-        status: error.status || 503,
-        message: String(error.message || "Unknown reservation error"),
-      }, "Transcript conversion rejected during example reservation");
       return res.status(error.status || 503).json({ success: false, error: error.message });
     }
     return res.json({
       success: true, source: "Verbatim Transcript Conversion", templateType: transcriptTemplate,
-      requestedCount: groups.length, partial: false,
+      requestedCount: groups.length, partial: false, skippedTurns: skippedTrailingUserTurn ? 1 : 0,
       examples: groups.map(messages => ({
         id: randomUUID(), templateType: transcriptTemplate, verbatimTranscript: true,
         messages: systemPrompt ? [{ role: "system", content: systemPrompt }, ...messages] : messages
