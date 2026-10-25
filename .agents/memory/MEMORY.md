@@ -20,5 +20,5 @@
 - [Generation request params](generation-request-params.md) — Never send or configure reasoning_effort, thinking budgets, or frequency/presence penalties, even gated or null.
 - [Pipeline automation spec](pipeline-automation-spec.md) — Onboarding ends with four questions (not toggles); QA chain is assess once → regen once → dedupe → approve, no re-assessment, no skipped steps.
 - [Standalone documentation manual](standalone-documentation-manual.md) — Keep the existing GitHub Pages iframe in place; offer a separate scrapeable manual from sign-in and in-app.
-- [Training provider direction](training-provider-direction.md) — Fireworks is for Muse; Nebius Qwen models use 65,536 packing and existing 9B/70B tiers.
+- [Training provider direction](training-provider-direction.md) — Fireworks is for Muse; Nebius Qwen models use 65,536 packing, existing tiers, and public output links.
 - [Onboarding prompt boundary](onboarding-system-prompt-boundary.md) — Never change the onboarding system prompt without explicit approval.

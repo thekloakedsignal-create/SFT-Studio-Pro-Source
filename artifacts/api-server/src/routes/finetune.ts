@@ -3,6 +3,7 @@ import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
 import { logger } from "../lib/logger.ts";
 import { createRecord, getRecord, listRecords, setRecord } from "../lib/training-records.mjs";
 import { ownedTrainingJobs, rememberJobStatus } from "../lib/training-jobs.ts";
+import { makeHuggingFaceModelPublic } from "../lib/huggingface.ts";
 import { consumeTraining, restoreTraining } from "./whop.ts";
 
 // Together AI full fine-tuning automation for the SFT Studio Data Registry.
@@ -139,6 +140,7 @@ interface UserModelChoice {
   baseTrainingModel: string;
   jobId: string;
   createdAt: string;
+  hfRepoPublic: boolean;
 }
 
 async function getUserModelChoices(uid: string): Promise<UserModelChoice[]> {
@@ -146,7 +148,8 @@ async function getUserModelChoices(uid: string): Promise<UserModelChoice[]> {
   return models.filter((model: any) =>
     typeof model?.togetherModelName === "string"
     && typeof model?.hfRepoName === "string"
-    && typeof model?.baseTrainingModel === "string");
+    && typeof model?.baseTrainingModel === "string"
+    && model?.hfRepoPublic === true);
 }
 
 async function findUserModelChoice(uid: string, togetherModelName: string): Promise<UserModelChoice | null> {
@@ -162,12 +165,17 @@ async function rememberCompletedModel(uid: string, job: any, jobId: string): Pro
     || Object.entries(TRAINING_CONFIGS).find(([, config]) => config.model === job?.model)?.[0];
   if (typeof togetherModelName !== "string" || typeof hfRepoName !== "string" || !baseTrainingModel) return false;
 
+  if (saved.hfRepoPublic !== true) {
+    await makeHuggingFaceModelPublic(hfRepoName);
+    await setRecord("job", jobId, { hfRepoPublic: true });
+  }
   const choice: UserModelChoice = {
     togetherModelName,
     hfRepoName,
     baseTrainingModel,
     jobId,
     createdAt: job?.updated_at || new Date().toISOString(),
+    hfRepoPublic: true,
   };
   await setRecord("model", jobId, { ...choice, ownerId: uid });
   return true;
@@ -571,7 +579,9 @@ router.get("/finetune/jobs/:id", async (req: AuthRequest, res) => {
         id: job.id,
         status: job.status,
         modelReady,
-        hfRepoName: job.hf_output_repo_name || (await getRecord("job", jobId))?.hfRepoName || null,
+        hfRepoName: modelReady
+          ? job.hf_output_repo_name || (await getRecord("job", jobId))?.hfRepoName || null
+          : null,
         model: job.model,
         outputName: job.model_output_name || job.output_name || null,
         modelOutputPath: job.model_output_path || null,

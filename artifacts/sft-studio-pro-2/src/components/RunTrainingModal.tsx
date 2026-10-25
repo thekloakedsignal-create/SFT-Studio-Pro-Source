@@ -144,7 +144,9 @@ export function RunTrainingModal({
         }));
         if (cancelled) return;
         const status = String(data.job?.status || "").trim().toLowerCase();
-        if (job?.restored && terminalStatuses.has(status)) {
+        const terminal = terminalStatuses.has(status)
+          && (!successfulStatuses.has(status) || data.job?.modelReady === true);
+        if (job?.restored && terminal) {
           // A previous run that already finished is not shown again; start from a clean trainer.
           stopPolling();
           setJob(null);
@@ -153,7 +155,7 @@ export function RunTrainingModal({
         }
         setJob((current: any) => ({ ...current, ...data.job, restored: false }));
         setError(null);
-        if (terminalStatuses.has(status) && (!successfulStatuses.has(status) || data.job?.modelReady || job?.provider === "nebius")) {
+        if (terminal) {
           stopPolling();
           if (successfulStatuses.has(status)) {
             try {
@@ -327,8 +329,8 @@ export function RunTrainingModal({
   };
 
   const statusLabel = String(job?.status || "").trim().toLowerCase();
-  const isTerminal = terminalStatuses.has(statusLabel);
-  const isSuccessful = successfulStatuses.has(statusLabel);
+  const isSuccessful = successfulStatuses.has(statusLabel) && job?.modelReady === true;
+  const isTerminal = terminalStatuses.has(statusLabel) && (!successfulStatuses.has(statusLabel) || isSuccessful);
   const outputModelName = job?.hfRepoName || (hfRepoName.trim() ? `RoseG/${hfRepoName.trim()}` : "");
   const outputRepoUrl = `https://huggingface.co/${outputModelName.split("/").map(encodeURIComponent).join("/")}`;
   const closeTrainer = () => {
