@@ -116,6 +116,7 @@ interface FinetuneStore {
   sessions: Record<string, OwnerSession>;
   jobOwners: Record<string, string>;
   jobTrainingModels: Record<string, string>;
+  jobCreatedAt: Record<string, string | null>;
 }
 
 async function loadStore(uid: string): Promise<FinetuneStore> {
@@ -125,6 +126,7 @@ async function loadStore(uid: string): Promise<FinetuneStore> {
     sessions: { [uid]: session?.state || {} },
     jobOwners: Object.fromEntries(jobs.map(job => [job.id, job.data.ownerId])),
     jobTrainingModels: Object.fromEntries(jobs.map(job => [job.id, job.data.trainingModel])),
+    jobCreatedAt: Object.fromEntries(jobs.map(job => [job.id, job.createdAt?.toISOString?.() || null])),
   };
 }
 
@@ -518,7 +520,7 @@ router.get("/finetune/latest", (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
   const jobId = Object.entries(store.jobOwners).filter(([, owner]) => owner === uid).at(-1)?.[0] || null;
-  return res.json({ success: true, jobId });
+  return res.json({ success: true, jobId, createdAt: jobId ? store.jobCreatedAt[jobId] || null : null });
 });
 
 router.get("/finetune/model-choices", async (req: AuthRequest, res) => {

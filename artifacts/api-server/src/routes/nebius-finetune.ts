@@ -456,7 +456,11 @@ router.get("/nebius/finetune/latest", async (req: AuthRequest, res) => {
   try {
     const records = await listRecords("nebius-job", uid);
     const latest = records.at(-1);
-    return res.json({ success: true, jobId: latest?.data?.id || latest?.id || null });
+    return res.json({
+      success: true,
+      jobId: latest?.data?.id || latest?.id || null,
+      createdAt: latest?.createdAt?.toISOString?.() || null,
+    });
   } catch {
     return res.status(503).json({ success: false, error: "Training storage is unavailable." });
   }

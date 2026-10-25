@@ -151,7 +151,11 @@ export function RunTrainingModal({
             apiFetch("/api/finetune/latest", { cache: "no-store", signal: AbortSignal.timeout(25000) }).then(readApi),
             apiFetch("/api/nebius/finetune/latest", { cache: "no-store", signal: AbortSignal.timeout(25000) }).then(readApi),
           ]);
-          const restoredJob = together.jobId
+          const togetherCreatedAt = Date.parse(together.createdAt || "");
+          const additionalCreatedAt = Date.parse(additional.createdAt || "");
+          const useTogether = !!together.jobId
+            && (!additional.jobId || togetherCreatedAt >= additionalCreatedAt);
+          const restoredJob = useTogether
             ? { id: together.jobId, provider: "together" }
             : additional.jobId ? { id: additional.jobId, provider: "nebius" } : null;
           if (!cancelled && restoredJob) {
@@ -361,6 +365,10 @@ export function RunTrainingModal({
 
   const downloadCheckpoint = async () => {
     if (!job?.id) return;
+    if (job.provider === "nebius") {
+      window.open(`${outputRepoUrl}/tree/main`, "_blank", "noopener");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -384,7 +392,7 @@ export function RunTrainingModal({
   const outputModelName = job?.hfRepoName || (hfRepoName.trim() ? `RoseG/${hfRepoName.trim()}` : "");
   const outputRepoUrl = `https://huggingface.co/${outputModelName.split("/").map(encodeURIComponent).join("/")}`;
   const closeTrainer = () => {
-    if (busy) return;
+    if (busy || (job?.id && !isTerminal)) return;
     if (isTerminal) setJob(null);
     onClose();
   };
@@ -419,9 +427,11 @@ export function RunTrainingModal({
                   Training typically takes 1–3 hours. When it completes, you will receive the public Hugging Face repository link for your model.
                 </p>
               </div>
-              <button type="button" onClick={closeTrainer} className="p-1.5 rounded-lg hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition cursor-pointer">
-                <X className="h-4 w-4" />
-              </button>
+              {(!job?.id || isTerminal) && (
+                <button type="button" onClick={closeTrainer} className="p-1.5 rounded-lg hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition cursor-pointer">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
 
             {/* Fixed configuration summary */}
@@ -627,15 +637,15 @@ export function RunTrainingModal({
                         {outputRepoUrl}<ExternalLink className="h-3.5 w-3.5 shrink-0" />
                       </a>
                     </div>}
-                    {job.modelOutputPath && (
+                    {(job.modelOutputPath || job.provider === "nebius") && (
                       <button
                         type="button"
                         onClick={downloadCheckpoint}
-                        disabled={busy}
+                        disabled={busy || (job.provider !== "nebius" && !job.modelOutputPath)}
                         className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-green-500/20 to-emerald-600/20 hover:from-green-500/30 hover:to-emerald-600/30 border border-green-500/40 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                       >
                         {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-green-400" />}
-                        <span>{busy ? "Preparing Download…" : "Download Full Checkpoint"}</span>
+                        <span>{busy ? "Preparing Download…" : job.provider === "nebius" ? "Open Model Files to Download" : "Download Full Checkpoint"}</span>
                       </button>
                     )}
                   </div>

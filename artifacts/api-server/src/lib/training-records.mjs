@@ -30,7 +30,7 @@ export async function getRecord(kind, id) {
 
 export async function listRecords(kind, ownerId) {
   const result = await trainingPool().query(
-    `SELECT id, data FROM training_records WHERE kind = $1
+    `SELECT id, data, created_at AS "createdAt" FROM training_records WHERE kind = $1
      AND ($2::text IS NULL OR data->>'ownerId' = $2)
      ORDER BY created_at, id`,
     [kind, ownerId ?? null],
