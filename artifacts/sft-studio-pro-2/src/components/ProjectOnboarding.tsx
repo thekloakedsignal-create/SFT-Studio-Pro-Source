@@ -52,7 +52,7 @@ type Step =
   | "voice-own" | "voice-review" | "golden-generation" | "golden-review" | "remember-name-choice" | "remember-model-name" | "system-choice" | "system-review"
   | "definition-review" | "batch-skills" | "batch-custom-ask" | "batch-custom-form" | "batch-recommendations" | "batch-automation" | "batch-manual";
 
-type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B";
+type TrainingModel = "Qwen3.5 9 Base" | "Qwen3.5 4B Base" | "Llama 3.1 70B" | "Qwen/Qwen3-14B-Base" | "Qwen/Qwen2.5-72B";
 export interface BatchRecommendation {
   topic: string;
   specialInstructions: string;
@@ -66,6 +66,8 @@ const TRAINING_MODELS: { value: TrainingModel; recommended?: boolean }[] = [
   { value: "Qwen3.5 9 Base", recommended: true },
   { value: "Qwen3.5 4B Base" },
   { value: "Llama 3.1 70B" },
+  { value: "Qwen/Qwen3-14B-Base" },
+  { value: "Qwen/Qwen2.5-72B" },
 ];
 
 // Every recipe teaches its behavior through the project's own voice and goals.
@@ -448,8 +450,9 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
     ? `Your name is ${modelRememberedName.trim()}.`
     : "";
 
-  const mixGuidance = onboardingModel === "Llama 3.1 70B"
-    ? "For every topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning templates for Llama 3.1 70B."
+  const noReasoningModel = ["Llama 3.1 70B", "Qwen/Qwen2.5-72B"].includes(onboardingModel);
+  const mixGuidance = noReasoningModel
+    ? `For every topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning templates for ${onboardingModel}.`
     : "For every topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples.";
 
   const stepOrder: Step[] = ["name", "goal", "goal-followup", "constraints", "model", "voice-choice", "voice-description", "voice-own", "voice-review", "golden-generation", "golden-review", "remember-name-choice", "remember-model-name", "system-choice", "system-review", "definition-review", "batch-skills", "batch-custom-ask", "batch-custom-form", "batch-recommendations", "batch-automation", "batch-manual"];
@@ -1067,8 +1070,8 @@ export function ProjectOnboarding({ onComplete, onRecommendationsApproved, onSki
                 <li>Start with a sample batch of 5. You must generate and approve a sample of 5 before larger batch sizes unlock.</li>
                 <li>Generate one batch at a time.</li>
                 <li>Review each generated batch and approve or reject it before generating another.</li>
-                <li>{onboardingModel === "Llama 3.1 70B"
-                  ? "For each topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning examples when training Llama 3.1 70B."
+                <li>{noReasoningModel
+                  ? `For each topic, generate a balanced mix of single-turn and multi-turn examples. Do not generate reasoning examples when training ${onboardingModel}.`
                   : "For each topic, generate a balanced mix of single-turn, multi-turn, and reasoning examples."}</li>
                 <li>You can generate as many batches as you wish. Aim for 3,000–5,000 total examples for a personal-use AI, or 10,000–20,000 total examples for an enterprise AI with specialized skills.</li>
               </ol>
