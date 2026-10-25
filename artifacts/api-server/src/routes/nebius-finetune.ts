@@ -2,11 +2,12 @@ import { Router, type IRouter } from "express";
 import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
 import { createRecord, getRecord, listRecords, setRecord } from "../lib/training-records.mjs";
 import { makeHuggingFaceModelPublic } from "../lib/huggingface.ts";
-import { consumeTraining, restoreTraining } from "./whop.ts";
+import { consumeTraining, isOwner, restoreTraining } from "./whop.ts";
 
 const NEBIUS_API_BASE = "https://api.tokenfactory.nebius.com/v1";
 const PREFLIGHT_TTL_MS = 60 * 60 * 1000;
-const MODELS = new Set(["Qwen/Qwen3-14B-Base", "Qwen/Qwen2.5-72B"]);
+const OWNER_ONLY_MODEL = "Qwen/Qwen2.5-32B";
+const MODELS = new Set(["Qwen/Qwen3-14B-Base", "Qwen/Qwen2.5-72B", OWNER_ONLY_MODEL]);
 const TRAINING_HYPERPARAMETERS = {
   batch_size: 8,
   learning_rate: 0.00001,
@@ -43,8 +44,10 @@ function requireUser(req: AuthRequest, res: any): string | null {
   return uid;
 }
 
-function validateModel(value: unknown): string | null {
-  return typeof value === "string" && MODELS.has(value) ? value : null;
+function validateModel(value: unknown, user: AuthRequest["user"]): string | null {
+  if (typeof value !== "string" || !MODELS.has(value)) return null;
+  if (value === OWNER_ONLY_MODEL && !isOwner(user)) return null;
+  return value;
 }
 
 function requestsLoRA(body: any): boolean {
@@ -196,7 +199,7 @@ router.post("/nebius/finetune/preflight", async (req: AuthRequest, res) => {
   if (requestsLoRA(req.body)) {
     return res.status(400).json({ success: false, error: "This model supports full-parameter training only." });
   }
-  const model = validateModel(req.body?.model);
+  const model = validateModel(req.body?.model, req.user);
   if (!model) {
     return res.status(400).json({ success: false, error: "Choose a supported base model." });
   }
@@ -235,7 +238,7 @@ router.post("/nebius/finetune/validate", (req: AuthRequest, res) => {
   if (requestsLoRA(req.body)) {
     return res.status(400).json({ success: false, error: "This model supports full-parameter training only." });
   }
-  const model = validateModel(req.body?.model);
+  const model = validateModel(req.body?.model, req.user);
   if (!model) {
     return res.status(400).json({ success: false, error: "Choose a supported base model." });
   }
@@ -263,7 +266,7 @@ router.post("/nebius/finetune/upload", async (req: AuthRequest, res) => {
   if (requestsLoRA(req.body)) {
     return res.status(400).json({ success: false, error: "This model supports full-parameter training only." });
   }
-  const model = validateModel(req.body?.model);
+  const model = validateModel(req.body?.model, req.user);
   if (!model) {
     return res.status(400).json({ success: false, error: "Choose a supported base model." });
   }
@@ -326,7 +329,7 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
   if (requestsLoRA(req.body)) {
     return res.status(400).json({ success: false, error: "This model supports full-parameter training only." });
   }
-  const model = validateModel(req.body?.model);
+  const model = validateModel(req.body?.model, req.user);
   if (!model) {
     return res.status(400).json({ success: false, error: "Choose a supported base model." });
   }

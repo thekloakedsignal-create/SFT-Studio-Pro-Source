@@ -16,7 +16,7 @@ export const TRAINING_MODEL_PLANS: Record<string, string> = {
   "Qwen/Qwen3-14B-Base": "train_9b", "Qwen/Qwen2.5-72B": "train_70b",
 };
 // Only the verified owner identity can bypass billing; never trust a client profile role.
-function isOwner(user: AuthRequest["user"]) {
+export function isOwner(user: AuthRequest["user"]) {
   return user?.email_verified === true && user.email?.toLowerCase() === "thekloakedsignal@gmail.com";
 }
 type Account = { used: number; extra: number; training: Record<string, number> };

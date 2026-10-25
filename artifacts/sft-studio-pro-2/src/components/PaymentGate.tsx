@@ -6,6 +6,7 @@ type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respon
 export const trainingPlan: Record<string, string> = {
   "Qwen3.5 4B Base": "train_4b", "Qwen3.5 9 Base": "train_9b", "Llama 3.1 70B": "train_70b",
   "Qwen/Qwen3-14B-Base": "train_9b", "Qwen/Qwen2.5-72B": "train_70b",
+  "Qwen/Qwen2.5-32B": "owner_only",
 };
 const labels: Record<string, string> = {
   train_4b: "4B training — $14.99",
@@ -101,6 +102,11 @@ export function PaymentGate({ apiFetch, planKey, onReady }: {
   };
 
   if (balance?.bypass === true) return null;
+  if (planKey === "owner_only") {
+    return <div className="rounded-xl border border-emerald-500/30 bg-slate-900 p-3 text-xs text-slate-300">
+      This model is available to the owner only.
+    </div>;
+  }
   return <div className="rounded-xl border border-emerald-500/30 bg-slate-900 p-3 space-y-2 text-xs text-slate-200">
     <p className="font-semibold">{usage ? "Example allowance" : "Training payment"}</p>
     <p>{usage

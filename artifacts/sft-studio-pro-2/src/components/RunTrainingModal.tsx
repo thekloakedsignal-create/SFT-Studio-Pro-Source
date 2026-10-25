@@ -15,8 +15,10 @@ const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations
 const ADDITIONAL_TRAINING_MODELS: Record<string, { model: string; base: string; evaluations: number }> = {
   "Qwen/Qwen3-14B-Base": { model: "Qwen/Qwen3-14B-Base", base: "Qwen/Qwen3-14B-Base", evaluations: 1 },
   "Qwen/Qwen2.5-72B": { model: "Qwen/Qwen2.5-72B", base: "Qwen/Qwen2.5-72B", evaluations: 1 },
+  "Qwen/Qwen2.5-32B": { model: "Qwen/Qwen2.5-32B", base: "Qwen/Qwen2.5-32B", evaluations: 1 },
 };
 const ALL_TRAINING_MODELS = { ...TRAINING_MODELS, ...ADDITIONAL_TRAINING_MODELS };
+const OWNER_ONLY_MODEL = "Qwen/Qwen2.5-32B";
 
 type SavedModelChoice = {
   togetherModelName: string;
@@ -53,6 +55,8 @@ export function RunTrainingModal({
 }: RunTrainingModalProps) {
   const [savedModels, setSavedModels] = useState<SavedModelChoice[]>([]);
   const [continuationModel, setContinuationModel] = useState<SavedModelChoice | null>(null);
+  const [ownerOnlyModelAvailable, setOwnerOnlyModelAvailable] = useState(false);
+  const [ownerCheckComplete, setOwnerCheckComplete] = useState(false);
   const selectedModel = ALL_TRAINING_MODELS[trainingModel];
   const usesAdditionalModel = Object.prototype.hasOwnProperty.call(ADDITIONAL_TRAINING_MODELS, trainingModel);
   const MODEL_DISPLAY = continuationModel?.hfRepoName || (trainingModel === "Qwen3.5 9 Base"
@@ -85,6 +89,18 @@ export function RunTrainingModal({
     let cancelled = false;
     if (open) {
       setContinuationModel(null);
+      setOwnerOnlyModelAvailable(false);
+      setOwnerCheckComplete(false);
+      void (async () => {
+        try {
+          const data = await readApi(await apiFetch("/api/whop/entitlements", { cache: "no-store" }));
+          if (!cancelled) setOwnerOnlyModelAvailable(data.bypass === true);
+        } catch {
+          if (!cancelled) setOwnerOnlyModelAvailable(false);
+        } finally {
+          if (!cancelled) setOwnerCheckComplete(true);
+        }
+      })();
       void (async () => {
         try {
           const data = await readApi(await apiFetch("/api/finetune/model-choices", { cache: "no-store" }));
@@ -125,6 +141,13 @@ export function RunTrainingModal({
     }
     return () => { cancelled = true; };
   }, [open]);
+
+  useEffect(() => {
+    if (ownerCheckComplete && !ownerOnlyModelAvailable && trainingModel === OWNER_ONLY_MODEL) {
+      onTrainingModelChange("Qwen3.5 9 Base");
+      setPaidModel(null);
+    }
+  }, [ownerCheckComplete, ownerOnlyModelAvailable, trainingModel, onTrainingModelChange]);
 
   useEffect(() => {
     stopPolling();
@@ -429,7 +452,9 @@ export function RunTrainingModal({
                     }}
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200"
                   >
-                    {Object.entries(ALL_TRAINING_MODELS).map(([key, model]) => <option key={key} value={key}>{model.base}</option>)}
+                    {Object.entries(ALL_TRAINING_MODELS)
+                      .filter(([key]) => key !== OWNER_ONLY_MODEL || ownerOnlyModelAvailable)
+                      .map(([key, model]) => <option key={key} value={key}>{model.base}</option>)}
                     {savedModels.length > 0 && (
                       <optgroup label="Continue from a previous model">
                         {savedModels.map(model => (
