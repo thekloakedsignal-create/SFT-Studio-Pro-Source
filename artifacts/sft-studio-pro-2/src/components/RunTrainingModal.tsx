@@ -658,6 +658,14 @@ export function RunTrainingModal({
                 )}
                 {isTerminal && <button type="button" onClick={() => { setJob(null); setFiles(null); setError(null); setStep("configure"); }}
                   className="w-full rounded-xl kk-primary px-4 py-2.5 text-xs font-bold">Start another training run</button>}
+                {job.id === clearedTrainingJobId && <button type="button" onClick={() => {
+                  stopPolling();
+                  setJob(null);
+                  setFiles(null);
+                  setError(null);
+                  setBusy(false);
+                  setStep("configure");
+                }} className="w-full rounded-xl kk-primary px-4 py-2.5 text-xs font-bold">Dismiss from workspace</button>}
               </div>
             )}
           </motion.div>
