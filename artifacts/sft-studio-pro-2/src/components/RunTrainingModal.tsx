@@ -232,7 +232,7 @@ export function RunTrainingModal({
         checking = false;
       }
     };
-    pollRef.current = setInterval(refresh, 10000);
+    pollRef.current = setInterval(refresh, 15000);
     void refresh();
     window.addEventListener("focus", refresh);
     return () => { cancelled = true; stopPolling(); window.removeEventListener("focus", refresh); };
@@ -446,7 +446,7 @@ export function RunTrainingModal({
               <div className="flex justify-between"><span>Base model</span><span className="text-slate-200">{BASE_DISPLAY}</span></div>
               <div className="flex justify-between"><span>Training type</span><span className="text-slate-200">Full (LoRA disabled)</span></div>
               <div className="flex justify-between"><span>Epochs</span><span className="text-slate-200">2</span></div>
-              {usesAdditionalModel && <div className="flex justify-between"><span>Sequence packing</span><span className="text-slate-200">65,536 tokens</span></div>}
+              {usesAdditionalModel && <div className="flex justify-between"><span>Sequence packing</span><span className="text-slate-200">8,192 tokens</span></div>}
               <div className="flex justify-between"><span>Evaluations</span><span className="text-slate-200">{selectedModel?.evaluations ?? 1}</span></div>
               <div className="flex justify-between"><span>Training format</span><span className="text-emerald-400">{usesAdditionalModel ? "ChatML Conversation (messages)" : "ChatML Instruction (<|im_start|>)"}</span></div>
               <div className="flex justify-between border-t border-slate-800 pt-1.5"><span>Training split</span><span className="text-green-400 font-bold">{splits.training.length} examples</span></div>

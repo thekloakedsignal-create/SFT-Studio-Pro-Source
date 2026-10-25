@@ -405,10 +405,7 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
       ...(typeof req.body?.suffix === "string" && req.body.suffix.trim()
         ? { suffix: req.body.suffix.trim().replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 64) }
         : {}),
-      method: {
-        type: "supervised",
-        supervised: { hyperparameters: TRAINING_HYPERPARAMETERS },
-      },
+      hyperparameters: TRAINING_HYPERPARAMETERS,
       integrations: [{
         type: "hf",
         hf: {
