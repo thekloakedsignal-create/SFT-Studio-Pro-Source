@@ -7833,7 +7833,11 @@ export default function App() {
                   </div>
                   <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-4">
                     <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Training template</h3>
-                    <p className="mt-2 text-sm font-bold text-slate-100">{trainerHandoff.template}</p>
+                    <p className="mt-2 text-sm font-bold text-slate-100">
+                      {["Qwen/Qwen3-14B-Base", "Qwen/Qwen2.5-72B", "Qwen/Qwen2.5-32B"].includes(trainerHandoff.model)
+                        ? "ChatML Conversation (messages)"
+                        : trainerHandoff.template}
+                    </p>
                   </div>
                 </div>
                 <button
