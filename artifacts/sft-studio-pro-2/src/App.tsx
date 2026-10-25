@@ -3677,8 +3677,7 @@ export default function App() {
       totalFormattedExamples: allExamples.length,
       trainingSetCount: formattedTraining.length,
       validationSetCount: formattedValidation.length,
-      sampleFormattedRecords: sampleItems,
-      fullDatasetJsonPreview: formattedTraining
+      sampleFormattedRecords: sampleItems
     };
 
     const formatLabels: Record<string, string> = {
