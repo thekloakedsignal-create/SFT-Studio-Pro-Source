@@ -761,6 +761,8 @@ export default function App() {
   const [showRunTrainingModal, setShowRunTrainingModal] = useState(false);
   const [showExamplePaygate, setShowExamplePaygate] = useState(false);
   const [trainerHandoff, setTrainerHandoff] = useState({ model: "Qwen3.5 9 Base", template: "Instruct ChatML (<|im_start|>)" });
+  const usesNebiusChatMl = ["Qwen/Qwen3-14B-Base", "Qwen/Qwen2.5-72B", "Qwen/Qwen2.5-32B"].includes(trainerHandoff.model);
+  const selectedTrainingFormat = usesNebiusChatMl ? "chatml" : "chatml_token";
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showCustomPackageModal, setShowCustomPackageModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -7834,9 +7836,7 @@ export default function App() {
                   <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-4">
                     <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Training template</h3>
                     <p className="mt-2 text-sm font-bold text-slate-100">
-                      {["Qwen/Qwen3-14B-Base", "Qwen/Qwen2.5-72B", "Qwen/Qwen2.5-32B"].includes(trainerHandoff.model)
-                        ? "ChatML Conversation (messages)"
-                        : trainerHandoff.template}
+                      {usesNebiusChatMl ? "ChatML Conversation (messages)" : trainerHandoff.template}
                     </p>
                   </div>
                 </div>
@@ -8284,12 +8284,12 @@ export default function App() {
       <RunTrainingModal
         open={showRunTrainingModal}
         onClose={() => setShowRunTrainingModal(false)}
-        exportFormat="chatml_token"
+        exportFormat={selectedTrainingFormat}
         trainingModel={trainerHandoff.model}
         onTrainingModelChange={model => setTrainerHandoff(current => ({ ...current, model }))}
         getSerializedSplits={() => ({
-          training: compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, "chatml_token")),
-          validation: compiledDataset.validationSet.map(ex => formatExampleForExport(ex, "chatml_token")),
+          training: compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, selectedTrainingFormat)),
+          validation: compiledDataset.validationSet.map(ex => formatExampleForExport(ex, selectedTrainingFormat)),
         })}
         apiFetch={projectApiFetch}
         notify={(text, type) => setNotification({ text, type })}

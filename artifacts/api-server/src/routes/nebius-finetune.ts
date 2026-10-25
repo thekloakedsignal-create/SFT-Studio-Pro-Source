@@ -119,9 +119,37 @@ function safeProviderId(value: unknown): string | null {
 }
 
 class ProviderError extends Error {
-  constructor(readonly status: number) {
+  constructor(readonly status: number, readonly detail?: string) {
     super("Nebius request failed.");
   }
+}
+
+function safeProviderDetail(body: any): string | undefined {
+  const issues = Array.isArray(body?.detail) ? body.detail : null;
+  const detail = issues
+    ? issues.map((issue: any) => {
+      const location = Array.isArray(issue?.loc)
+        ? issue.loc.filter((part: unknown) => typeof part === "string" || typeof part === "number").join(".")
+        : "";
+      const message = typeof issue?.msg === "string" ? issue.msg : "";
+      return [location, message].filter(Boolean).join(": ");
+    }).filter(Boolean).join("; ")
+    : typeof body?.detail === "string"
+      ? body.detail
+      : typeof body?.error?.message === "string"
+        ? body.error.message
+        : typeof body?.message === "string"
+          ? body.message
+          : "";
+  if (!detail) return undefined;
+  const safe = detail
+    .replace(/https?:\/\/\S+/gi, "[service URL]")
+    .replace(/\b(?:Nebius|Token Factory|Hugging Face)\b/gi, "training service")
+    .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/\bhf_[A-Za-z0-9]{10,}\b/g, "[redacted]")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .slice(0, 500);
+  return hasCredential(safe) ? undefined : safe;
 }
 
 async function nebiusRequest(apiPath: string, init: RequestInit = {}): Promise<any> {
@@ -140,14 +168,18 @@ async function nebiusRequest(apiPath: string, init: RequestInit = {}): Promise<a
   let body: any = null;
   try { body = text ? JSON.parse(text) : null; } catch { /* discard provider response */ }
 
-  if (!response.ok) throw new ProviderError(response.status);
+  if (!response.ok) throw new ProviderError(response.status, safeProviderDetail(body));
   return body;
 }
 
 function providerFailure(res: any, error: unknown, fallback: string) {
   const status = error instanceof ProviderError ? error.status : 502;
   const safeStatus = status >= 400 && status < 600 ? status : 502;
-  return res.status(safeStatus).json({ success: false, error: fallback });
+  const detail = error instanceof ProviderError ? error.detail : undefined;
+  return res.status(safeStatus).json({
+    success: false,
+    error: detail ? `${fallback} ${detail}` : fallback,
+  });
 }
 
 function validateRepoName(value: unknown): string | null {
