@@ -50,6 +50,30 @@ async function readApi(res: Response): Promise<any> {
   return data;
 }
 
+function toNebiusChatMl(records: unknown[]): Array<{ messages: Array<{ role: string; content: string }> }> {
+  return records.map((record, index) => {
+    const row = record as any;
+    if (Array.isArray(row?.messages)) {
+      return {
+        messages: row.messages.map((message: any) => ({
+          role: message.role,
+          content: message.content,
+        })),
+      };
+    }
+    if (typeof row?.text === "string") {
+      const pattern = /<\|im_start\|>(system|user|assistant)\n([\s\S]*?)\n<\|im_end\|>/g;
+      const matches = [...row.text.matchAll(pattern)];
+      if (matches.length && !row.text.replace(pattern, "").trim()) {
+        return {
+          messages: matches.map(match => ({ role: match[1], content: match[2] })),
+        };
+      }
+    }
+    throw new Error(`Example ${index + 1} is not valid ChatML conversation data.`);
+  });
+}
+
 export function RunTrainingModal({
   open, onClose, exportFormat, trainingModel, onTrainingModelChange, getSerializedSplits, apiFetch, notify
 }: RunTrainingModalProps) {
@@ -247,8 +271,11 @@ export function RunTrainingModal({
         current.training = stripReasoning(current.training);
         current.validation = stripReasoning(current.validation);
       }
-      const trainErr = validateRegistryOutput(current.training, exportFormat);
-      const valErr = validateRegistryOutput(current.validation, exportFormat);
+      const trainingRecords = usesAdditionalModel ? toNebiusChatMl(current.training) : current.training;
+      const validationRecords = usesAdditionalModel ? toNebiusChatMl(current.validation) : current.validation;
+      const formatToValidate = usesAdditionalModel ? "chatml" : exportFormat;
+      const trainErr = validateRegistryOutput(trainingRecords, formatToValidate);
+      const valErr = validateRegistryOutput(validationRecords, formatToValidate);
       if (current.training.length === 0 || current.validation.length === 0 || trainErr || valErr) {
         throw new Error(trainErr || valErr || "Both splits must be non-empty before upload.");
       }
@@ -257,8 +284,8 @@ export function RunTrainingModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(usesAdditionalModel ? {
-          trainingJsonl: toJsonl(current.training),
-          validationJsonl: toJsonl(current.validation),
+          trainingJsonl: toJsonl(trainingRecords),
+          validationJsonl: toJsonl(validationRecords),
           suffix,
           model: selectedModel.model,
           confirmUpload: true,
@@ -405,7 +432,7 @@ export function RunTrainingModal({
               <div className="flex justify-between"><span>Epochs</span><span className="text-slate-200">2</span></div>
               {usesAdditionalModel && <div className="flex justify-between"><span>Sequence packing</span><span className="text-slate-200">65,536 tokens</span></div>}
               <div className="flex justify-between"><span>Evaluations</span><span className="text-slate-200">{selectedModel?.evaluations ?? 1}</span></div>
-              <div className="flex justify-between"><span>Training format</span><span className="text-emerald-400">ChatML Instruction (&lt;|im_start|&gt;)</span></div>
+              <div className="flex justify-between"><span>Training format</span><span className="text-emerald-400">{usesAdditionalModel ? "ChatML Conversation (messages)" : "ChatML Instruction (<|im_start|>)"}</span></div>
               <div className="flex justify-between border-t border-slate-800 pt-1.5"><span>Training split</span><span className="text-green-400 font-bold">{splits.training.length} examples</span></div>
               <div className="flex justify-between"><span>Validator split</span><span className="text-yellow-400 font-bold">{splits.validation.length} examples</span></div>
             </div>
@@ -413,7 +440,7 @@ export function RunTrainingModal({
             {(!trainingValid || !validationValid) && step === "configure" && (
               <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/20 text-[11px] text-red-300">
                 <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>Both splits must be non-empty and pass the automatic ChatML Instruction format check before training.</span>
+                <span>Both splits must be non-empty and pass the automatic {usesAdditionalModel ? "ChatML conversation" : "ChatML Instruction"} format check before training.</span>
               </div>
             )}
 
@@ -536,7 +563,7 @@ export function RunTrainingModal({
                   <span>{busy ? "Uploading & Validating…" : "Approve & Upload Datasets"}</span>
                 </button>
                 <p className="text-[10px] text-slate-500 leading-relaxed">
-                  This sends both automatically formatted ChatML Instruction datasets after approval. Starting training still requires separate approval.
+                  This sends both automatically formatted {usesAdditionalModel ? "ChatML conversation" : "ChatML Instruction"} datasets after approval. Starting training still requires separate approval.
                 </p>
               </div>
             )}
