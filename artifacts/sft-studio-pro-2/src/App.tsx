@@ -748,12 +748,6 @@ export default function App() {
   };
   const [exportedPreview, setExportedPreview] = useState<string>("");
   const [formattedFormatBadge, setFormattedFormatBadge] = useState<string | null>(null);
-  const [exportDownload, setExportDownload] = useState<{ url: string; fileName: string } | null>(null);
-  const exportDownloadUrl = useRef<string | null>(null);
-
-  useEffect(() => () => {
-    if (exportDownloadUrl.current) URL.revokeObjectURL(exportDownloadUrl.current);
-  }, []);
 
   // Subscription & Credits States
   const [userProfile, setUserProfile] = useState<{
@@ -3544,14 +3538,9 @@ export default function App() {
 
   // Helper to trigger clean client-side file download via Blob URL
   const triggerFileDownload = (content: string, fileName: string, mimeType: string) => {
-    if (exportDownloadUrl.current) URL.revokeObjectURL(exportDownloadUrl.current);
-    exportDownloadUrl.current = null;
-    setExportDownload(null);
     try {
       const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
       const url = URL.createObjectURL(blob);
-      exportDownloadUrl.current = url;
-      setExportDownload({ url, fileName });
       const a = document.createElement("a");
       a.href = url;
       a.download = fileName;
@@ -3560,11 +3549,11 @@ export default function App() {
       a.click();
       setTimeout(() => {
         document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       }, 1000);
     } catch (err) {
       console.error("Blob download failed, using Data URI fallback:", err);
       const encodedData = `data:${mimeType};charset=utf-8,` + encodeURIComponent(content);
-      setExportDownload({ url: encodedData, fileName });
       const a = document.createElement("a");
       a.href = encodedData;
       a.download = fileName;
@@ -3595,7 +3584,7 @@ export default function App() {
     if (!checkRegistryOutput(records, exportTemplateFormat)) return;
     const lines = records.map(record => JSON.stringify(record)).join("\n");
     triggerFileDownload(lines, fileName, "application/x-jsonlines");
-    setNotification({ text: `Prepared ${fileName} (${records.length} examples). If it did not save automatically, tap the download link below.`, type: "success" });
+    setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!`, type: "success" });
   };
 
   // Export utility for standard JSON files (as a JSON array)
@@ -7533,19 +7522,6 @@ export default function App() {
                           <span>Copy Validation JSONL to Clipboard</span>
                         </button>
                       </div>
-
-                      {exportDownload && (
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-xs text-green-200" role="status">
-                          <span>{exportDownload.fileName} is ready. If it was not saved automatically:</span>
-                          <a
-                            href={exportDownload.url}
-                            download={exportDownload.fileName}
-                            className="rounded-md bg-green-500 px-3 py-1.5 font-semibold text-slate-950 hover:bg-green-400"
-                          >
-                            Tap to download
-                          </a>
-                        </div>
-                      )}
 
                     </div>
                   </div>
