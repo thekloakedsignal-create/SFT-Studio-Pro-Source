@@ -134,11 +134,10 @@ export function RunTrainingModal({
           if (!cancelled) setSavedModels([]);
         }
       })();
-      if (job?.id && job.id !== clearedTrainingJobId) {
+      if (job?.id) {
         setStep("progress");
         return;
       }
-      if (job?.id === clearedTrainingJobId) setJob(null);
       setSuffix(current => ["sft-studio", "custom-v1"].includes(current) ? "" : current);
       setStep("configure");
       setError(null);
@@ -395,8 +394,7 @@ export function RunTrainingModal({
 
   const statusLabel = String(job?.status || "").trim().toLowerCase();
   const isSuccessful = successfulStatuses.has(statusLabel) && job?.modelReady === true;
-  const isClearedJob = job?.id === clearedTrainingJobId;
-  const isTerminal = isClearedJob || (terminalStatuses.has(statusLabel) && (!successfulStatuses.has(statusLabel) || isSuccessful));
+  const isTerminal = terminalStatuses.has(statusLabel) && (!successfulStatuses.has(statusLabel) || isSuccessful);
   const outputModelName = job?.hfRepoName || (hfRepoName.trim() ? `RoseG/${hfRepoName.trim()}` : "");
   const outputRepoUrl = `https://huggingface.co/${outputModelName.split("/").map(encodeURIComponent).join("/")}`;
   const closeTrainer = () => {
@@ -614,7 +612,7 @@ export function RunTrainingModal({
               </div>
             )}
 
-            {step === "progress" && job && !isClearedJob && (
+            {step === "progress" && job && (
               <div className="space-y-3">
                 <div className={`flex items-start gap-2 p-3 rounded-xl border text-[11px] ${
                   isSuccessful ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-300"
