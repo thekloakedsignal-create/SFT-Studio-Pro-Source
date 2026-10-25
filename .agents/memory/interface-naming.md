@@ -3,8 +3,8 @@ name: Interface naming
 description: Scope of model and backend naming removal from the interface.
 ---
 
-Never display model, provider, or backend information anywhere in the interface. Keep progress messages generic and preserve batch names.
+Show the selected model name in training choices, but never disclose the training provider, backend, or pipeline location in the interface. Keep progress messages generic and preserve batch names.
 
-**Why:** The user explicitly said never to add model information to the interface.
+**Why:** The user said the model is the only training detail users need; provider and pipeline details are proprietary.
 
-**How to apply:** Use generic progress and status wording without exposing model/provider/backend details. Do not rename batches or change generation models. When a model call fails, the UI says only "That didn't work! Please try again." — never the model name or backend logic (formatAIErrorMessage enforces this).
+**How to apply:** Show model identifiers when users choose a training model; keep provider/backend names and pipeline location out of user-visible copy. Do not rename batches or change generation models. When a model call fails, the UI says only "That didn't work! Please try again." — never the model name or backend logic (formatAIErrorMessage enforces this).

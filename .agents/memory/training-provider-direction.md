@@ -3,10 +3,10 @@ name: Training provider direction
 description: User's provider choice for Muse training and sequencing of future provider work.
 ---
 
-Use Fireworks for Muse Glimmer training only. Do not run a training job. Nebius may be added later; do not include it in the initial Fireworks setup.
+Use Fireworks for Muse Glimmer training only. Do not run a training job. Nebius supports Qwen/Qwen3-14B-Base and Qwen/Qwen2.5-72B; use 65,536-token sequence packing and map them to the existing 9B and 70B training tiers.
 
 The existing Together AI path keeps its serialized `<|im_start|>` ChatML export. Fireworks Muse uses regular ChatML message arrays from the app's already prepared training and validation splits.
 
-**Why:** The user explicitly said Fireworks is for Muse Glimmer only, no training should be run, and Nebius will be added later.
+**Why:** The user explicitly limited Fireworks to Muse Glimmer, said no training job should be run, and later requested Nebius fine-tuning for the two Qwen models with the specified packing length and tier mapping.
 
-**How to apply:** Restrict Fireworks training setup to Muse Glimmer. Reuse the app's existing prepared data, serialize it as regular `{messages:[{role,content}]}` ChatML without `<|im_start|>` tokens, and leave Together's export untouched. Do not create or run training jobs. Treat Nebius as deferred until requested.
+**How to apply:** Restrict Fireworks training setup to Muse Glimmer. Reuse the app's existing prepared data, serialize it as regular `{messages:[{role,content}]}` ChatML without `<|im_start|>` tokens, and leave Together's export untouched. Do not create or run training jobs. Keep provider details out of the public UI.

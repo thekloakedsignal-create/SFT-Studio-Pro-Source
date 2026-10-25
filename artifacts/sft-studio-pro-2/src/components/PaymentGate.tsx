@@ -5,6 +5,7 @@ import { auth } from "../firebase";
 type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 export const trainingPlan: Record<string, string> = {
   "Qwen3.5 4B Base": "train_4b", "Qwen3.5 9 Base": "train_9b", "Llama 3.1 70B": "train_70b",
+  "Qwen/Qwen3-14B-Base": "train_9b", "Qwen/Qwen2.5-72B": "train_70b",
 };
 const labels: Record<string, string> = {
   train_4b: "4B training — $14.99",

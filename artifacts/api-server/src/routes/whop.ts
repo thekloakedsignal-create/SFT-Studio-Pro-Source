@@ -13,6 +13,7 @@ const plans: Record<string, string | undefined> = {
 };
 export const TRAINING_MODEL_PLANS: Record<string, string> = {
   "Qwen3.5 4B Base": "train_4b", "Qwen3.5 9 Base": "train_9b", "Llama 3.1 70B": "train_70b",
+  "Qwen/Qwen3-14B-Base": "train_9b", "Qwen/Qwen2.5-72B": "train_70b",
 };
 // Only the verified owner identity can bypass billing; never trust a client profile role.
 function isOwner(user: AuthRequest["user"]) {

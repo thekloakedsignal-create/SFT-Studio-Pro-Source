@@ -1,10 +1,22 @@
 import { Router, type IRouter } from "express";
 import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
-import { createRecord, getRecord, setRecord } from "../lib/training-records.mjs";
+import { createRecord, getRecord, listRecords, setRecord } from "../lib/training-records.mjs";
+import { consumeTraining, restoreTraining } from "./whop.ts";
 
 const NEBIUS_API_BASE = "https://api.tokenfactory.nebius.com/v1";
 const PREFLIGHT_TTL_MS = 60 * 60 * 1000;
-const MODELS = new Set(["Qwen/Qwen2.5-14B", "Qwen/Qwen2.5-72B"]);
+const MODELS = new Set(["Qwen/Qwen3-14B-Base", "Qwen/Qwen2.5-72B"]);
+const TRAINING_HYPERPARAMETERS = {
+  batch_size: 8,
+  learning_rate: 0.00001,
+  n_epochs: 2,
+  warmup_ratio: 0,
+  weight_decay: 0,
+  packing: true,
+  max_grad_norm: 1,
+  context_length: 65536,
+  lora: false,
+};
 const SAFE_ID = /^[A-Za-z0-9_-]{1,160}$/;
 
 interface NebiusSession {
@@ -24,7 +36,7 @@ interface NebiusSession {
 function requireUser(req: AuthRequest, res: any): string | null {
   const uid = req.user?.uid;
   if (typeof uid !== "string" || !uid.trim()) {
-    res.status(401).json({ success: false, error: "Sign in to use Nebius fine-tuning." });
+    res.status(401).json({ success: false, error: "Sign in to start fine-tuning." });
     return null;
   }
   return uid;
@@ -73,7 +85,7 @@ function validateJsonl(content: unknown, label: string): { lines: string[]; erro
     if (!messagesValid && !instructionValid && !textValid && !tokenizedValid) {
       return {
         lines: [],
-        error: `The ${label} dataset line ${index + 1} must use a supported Nebius JSONL format.`,
+        error: `The ${label} dataset line ${index + 1} must use a supported JSONL format.`,
       };
     }
   }
@@ -180,11 +192,11 @@ router.post("/nebius/finetune/preflight", async (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
   if (requestsLoRA(req.body)) {
-    return res.status(400).json({ success: false, error: "Nebius fine-tuning supports full-parameter training only." });
+    return res.status(400).json({ success: false, error: "This model supports full-parameter training only." });
   }
   const model = validateModel(req.body?.model);
   if (!model) {
-    return res.status(400).json({ success: false, error: "Choose a supported Nebius Qwen2.5 base model." });
+    return res.status(400).json({ success: false, error: "Choose a supported base model." });
   }
 
   const credentials = credentialsConfigured();
@@ -192,7 +204,7 @@ router.post("/nebius/finetune/preflight", async (req: AuthRequest, res) => {
     return res.status(503).json({
       success: false,
       credentials,
-      error: "Nebius API and Hugging Face export must be configured on the server.",
+      error: "Required training credentials are not configured.",
     });
   }
 
@@ -219,11 +231,11 @@ router.post("/nebius/finetune/validate", (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
   if (requestsLoRA(req.body)) {
-    return res.status(400).json({ success: false, error: "Nebius fine-tuning supports full-parameter training only." });
+    return res.status(400).json({ success: false, error: "This model supports full-parameter training only." });
   }
   const model = validateModel(req.body?.model);
   if (!model) {
-    return res.status(400).json({ success: false, error: "Choose a supported Nebius Qwen2.5 base model." });
+    return res.status(400).json({ success: false, error: "Choose a supported base model." });
   }
 
   const training = validateJsonl(req.body?.trainingJsonl, "training");
@@ -247,11 +259,11 @@ router.post("/nebius/finetune/upload", async (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
   if (requestsLoRA(req.body)) {
-    return res.status(400).json({ success: false, error: "Nebius fine-tuning supports full-parameter training only." });
+    return res.status(400).json({ success: false, error: "This model supports full-parameter training only." });
   }
   const model = validateModel(req.body?.model);
   if (!model) {
-    return res.status(400).json({ success: false, error: "Choose a supported Nebius Qwen2.5 base model." });
+    return res.status(400).json({ success: false, error: "Choose a supported base model." });
   }
   if (req.body?.confirmUpload !== true) {
     return res.status(400).json({ success: false, error: "Dataset upload requires explicit approval." });
@@ -274,7 +286,7 @@ router.post("/nebius/finetune/upload", async (req: AuthRequest, res) => {
     }
     const credentials = credentialsConfigured();
     if (!credentials.nebius || !credentials.huggingFace) {
-      return res.status(503).json({ success: false, error: "Nebius and Hugging Face export are not configured." });
+      return res.status(503).json({ success: false, error: "Required training credentials are not configured." });
     }
 
     const suffix = typeof req.body?.suffix === "string" && req.body.suffix.trim()
@@ -310,11 +322,11 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
   const uid = requireUser(req, res);
   if (!uid) return;
   if (requestsLoRA(req.body)) {
-    return res.status(400).json({ success: false, error: "Nebius fine-tuning supports full-parameter training only." });
+    return res.status(400).json({ success: false, error: "This model supports full-parameter training only." });
   }
   const model = validateModel(req.body?.model);
   if (!model) {
-    return res.status(400).json({ success: false, error: "Choose a supported Nebius Qwen2.5 base model." });
+    return res.status(400).json({ success: false, error: "Choose a supported base model." });
   }
   if (req.body?.confirmSubmit !== true) {
     return res.status(400).json({ success: false, error: "Job submission requires separate explicit approval." });
@@ -339,9 +351,16 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
     }
     const credentials = providerCredentials();
     if (!credentials.nebius || !credentials.huggingFace) {
-      return res.status(503).json({ success: false, error: "Nebius and Hugging Face export are not configured." });
+      return res.status(503).json({ success: false, error: "Required training credentials are not configured." });
     }
 
+    try {
+      consumeTraining(req.user, model);
+    } catch (error: any) {
+      return res.status(error.status || 503).json({ success: false, error: error.message });
+    }
+    let submitted = false;
+    try {
     const requestBody = {
       model,
       training_file: trainingFileId,
@@ -349,7 +368,11 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
       ...(typeof req.body?.suffix === "string" && req.body.suffix.trim()
         ? { suffix: req.body.suffix.trim().replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 64) }
         : {}),
-      hyperparameters: { lora: false },
+      hyperparameters: TRAINING_HYPERPARAMETERS,
+      method: {
+        type: "supervised",
+        supervised: { hyperparameters: TRAINING_HYPERPARAMETERS },
+      },
       integrations: [{
         type: "hf",
         hf: {
@@ -365,6 +388,7 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
     });
     const jobId = safeProviderId(job?.id);
     if (!jobId) throw new ProviderError(502);
+    submitted = true;
 
     const saved = {
       ownerId: uid,
@@ -377,11 +401,27 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
       createdAt: typeof job?.created_at === "number" ? job.created_at : null,
     };
     if (!await createRecord("nebius-job", jobId, saved)) {
-      return res.status(502).json({ success: false, error: "Nebius created a job that could not be safely recorded." });
+      return res.status(502).json({ success: false, error: "The job could not be safely recorded." });
     }
     return res.json({ success: true, job: publicJob(job, saved) });
+    } catch (error) {
+      if (!submitted) restoreTraining(uid, model);
+      return providerFailure(res, error, "Could not create the fine-tuning job.");
+    }
   } catch (error) {
-    return providerFailure(res, error, "Nebius could not create the fine-tuning job.");
+    return providerFailure(res, error, "Could not prepare the fine-tuning job.");
+  }
+});
+
+router.get("/nebius/finetune/latest", async (req: AuthRequest, res) => {
+  const uid = requireUser(req, res);
+  if (!uid) return;
+  try {
+    const records = await listRecords("nebius-job", uid);
+    const latest = records.at(-1);
+    return res.json({ success: true, jobId: latest?.data?.id || latest?.id || null });
+  } catch {
+    return res.status(503).json({ success: false, error: "Training storage is unavailable." });
   }
 });
 

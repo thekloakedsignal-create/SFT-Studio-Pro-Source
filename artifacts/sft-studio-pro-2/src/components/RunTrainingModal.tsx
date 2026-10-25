@@ -12,6 +12,11 @@ const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations
   "Qwen3.5 4B Base": { model: "Qwen/Qwen3.5-4B", base: "Qwen/Qwen3.5-4B", evaluations: 1 },
   "Llama 3.1 70B": { model: "meta-llama/Llama-3.3-70B-Instruct-Reference", base: "meta-llama/Llama-3.1-70B", evaluations: 1 },
 };
+const ADDITIONAL_TRAINING_MODELS: Record<string, { model: string; base: string; evaluations: number }> = {
+  "Qwen/Qwen3-14B-Base": { model: "Qwen/Qwen3-14B-Base", base: "Qwen/Qwen3-14B-Base", evaluations: 1 },
+  "Qwen/Qwen2.5-72B": { model: "Qwen/Qwen2.5-72B", base: "Qwen/Qwen2.5-72B", evaluations: 1 },
+};
+const ALL_TRAINING_MODELS = { ...TRAINING_MODELS, ...ADDITIONAL_TRAINING_MODELS };
 
 type SavedModelChoice = {
   togetherModelName: string;
@@ -20,7 +25,8 @@ type SavedModelChoice = {
 };
 
 type Step = "configure" | "upload" | "submit" | "progress";
-const terminalStatuses = new Set(["completed", "error", "user_error", "failed", "cancelled"]);
+const terminalStatuses = new Set(["completed", "succeeded", "error", "user_error", "failed", "cancelled"]);
+const successfulStatuses = new Set(["completed", "succeeded"]);
 
 interface RunTrainingModalProps {
   open: boolean;
@@ -47,7 +53,8 @@ export function RunTrainingModal({
 }: RunTrainingModalProps) {
   const [savedModels, setSavedModels] = useState<SavedModelChoice[]>([]);
   const [continuationModel, setContinuationModel] = useState<SavedModelChoice | null>(null);
-  const selectedModel = TRAINING_MODELS[trainingModel];
+  const selectedModel = ALL_TRAINING_MODELS[trainingModel];
+  const usesAdditionalModel = Object.prototype.hasOwnProperty.call(ADDITIONAL_TRAINING_MODELS, trainingModel);
   const MODEL_DISPLAY = continuationModel?.hfRepoName || (trainingModel === "Qwen3.5 9 Base"
     ? "Qwen3.5 9B FP8"
     : selectedModel?.model || trainingModel);
@@ -100,9 +107,15 @@ export function RunTrainingModal({
       setBusy(false);
       void (async () => {
         try {
-          const data = await readApi(await apiFetch("/api/finetune/latest", { cache: "no-store", signal: AbortSignal.timeout(25000) }));
-          if (!cancelled && data.jobId) {
-            setJob({ id: data.jobId, restored: true });
+          const [together, additional] = await Promise.all([
+            apiFetch("/api/finetune/latest", { cache: "no-store", signal: AbortSignal.timeout(25000) }).then(readApi),
+            apiFetch("/api/nebius/finetune/latest", { cache: "no-store", signal: AbortSignal.timeout(25000) }).then(readApi),
+          ]);
+          const restoredJob = together.jobId
+            ? { id: together.jobId, provider: "together" }
+            : additional.jobId ? { id: additional.jobId, provider: "nebius" } : null;
+          if (!cancelled && restoredJob) {
+            setJob({ ...restoredJob, restored: true });
             setStep("progress");
           }
         } catch {
@@ -123,7 +136,10 @@ export function RunTrainingModal({
       if (checking) return;
       checking = true;
       try {
-        const data = await readApi(await apiFetch(`/api/finetune/jobs/${encodeURIComponent(jobId)}`, {
+        const statusPath = job?.provider === "nebius"
+          ? `/api/nebius/finetune/jobs/${encodeURIComponent(jobId)}`
+          : `/api/finetune/jobs/${encodeURIComponent(jobId)}`;
+        const data = await readApi(await apiFetch(statusPath, {
           cache: "no-store", signal: AbortSignal.timeout(25000),
         }));
         if (cancelled) return;
@@ -137,12 +153,14 @@ export function RunTrainingModal({
         }
         setJob((current: any) => ({ ...current, ...data.job, restored: false }));
         setError(null);
-        if (terminalStatuses.has(status) && (status !== "completed" || data.job?.modelReady)) {
+        if (terminalStatuses.has(status) && (!successfulStatuses.has(status) || data.job?.modelReady || job?.provider === "nebius")) {
           stopPolling();
-          if (String(data.job?.status || "").trim().toLowerCase() === "completed") {
+          if (successfulStatuses.has(status)) {
             try {
-              const choices = await readApi(await apiFetch("/api/finetune/model-choices", { cache: "no-store" }));
-              if (!cancelled) setSavedModels(Array.isArray(choices.models) ? choices.models : []);
+              if (job?.provider !== "nebius") {
+                const choices = await readApi(await apiFetch("/api/finetune/model-choices", { cache: "no-store" }));
+                if (!cancelled) setSavedModels(Array.isArray(choices.models) ? choices.models : []);
+              }
             } catch {
               if (!cancelled) setError("Training completed, but saved models could not be refreshed. Reopen the trainer to retry.");
             }
@@ -173,14 +191,16 @@ export function RunTrainingModal({
     setBusy(true);
     setError(null);
     try {
-      const data = await readApi(await apiFetch("/api/finetune/preflight", {
+      const data = await readApi(await apiFetch(usesAdditionalModel ? "/api/nebius/finetune/preflight" : "/api/finetune/preflight", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ suffix, hfRepoName, trainingModel }),
+        body: JSON.stringify(usesAdditionalModel
+          ? { model: selectedModel.model }
+          : { suffix, hfRepoName, trainingModel }),
       }));
       setPreflight(data);
-      if (!data.credentials?.together || !data.credentials?.huggingFace) {
-        setError("Server credentials are not configured yet. Add TOGETHER_API_KEY and HF_TOKEN to the app secrets, then run the preflight again.");
+      if (Object.values(data.credentials || {}).some(value => value !== true)) {
+        setError("Required server credentials are not configured yet. Add them in app settings, then run preflight again.");
       } else {
         setStep("upload");
       }
@@ -208,10 +228,16 @@ export function RunTrainingModal({
         throw new Error(trainErr || valErr || "Both splits must be non-empty before upload.");
       }
       const toJsonl = (records: unknown[]) => records.map(r => JSON.stringify(r)).join("\n");
-      const data = await readApi(await apiFetch("/api/finetune/upload", {
+      const data = await readApi(await apiFetch(usesAdditionalModel ? "/api/nebius/finetune/upload" : "/api/finetune/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(usesAdditionalModel ? {
+          trainingJsonl: toJsonl(current.training),
+          validationJsonl: toJsonl(current.validation),
+          suffix,
+          model: selectedModel.model,
+          confirmUpload: true,
+        } : {
           trainingJsonl: toJsonl(current.training),
           validationJsonl: toJsonl(current.validation),
           suffix,
@@ -219,18 +245,20 @@ export function RunTrainingModal({
           confirmUpload: true,
         }),
       }));
-      setFiles(data);
-      const est = await readApi(await apiFetch("/api/finetune/estimate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          trainingFileId: data.trainingFileId,
-          validationFileId: data.validationFileId,
-          trainingModel,
-          ...(continuationModel ? { fromCheckpoint: continuationModel.togetherModelName } : {}),
-        }),
-      }));
-      setEstimate(est.estimate);
+      setFiles({ ...data, validationFileId: data.validationFileId || "" });
+      if (!usesAdditionalModel) {
+        const est = await readApi(await apiFetch("/api/finetune/estimate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trainingFileId: data.trainingFileId,
+            validationFileId: data.validationFileId,
+            trainingModel,
+            ...(continuationModel ? { fromCheckpoint: continuationModel.togetherModelName } : {}),
+          }),
+        }));
+        setEstimate(est.estimate);
+      }
       setStep("submit");
       notify("Datasets uploaded and validated. Ready to submit.", "success");
     } catch (e: any) {
@@ -245,10 +273,17 @@ export function RunTrainingModal({
     setBusy(true);
     setError(null);
     try {
-      const data = await readApi(await apiFetch("/api/finetune/jobs", {
+      const data = await readApi(await apiFetch(usesAdditionalModel ? "/api/nebius/finetune/jobs" : "/api/finetune/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(usesAdditionalModel ? {
+          trainingFileId: files.trainingFileId,
+          validationFileId: files.validationFileId || null,
+          suffix,
+          hfRepoName: `RoseG/${hfRepoName.trim()}`,
+          model: selectedModel.model,
+          confirmSubmit: true,
+        } : {
           trainingFileId: files.trainingFileId,
           validationFileId: files.validationFileId,
           suffix,
@@ -258,7 +293,11 @@ export function RunTrainingModal({
           confirmSubmit: true,
         }),
       }));
-      setJob({ ...data.job, hfRepoName: `RoseG/${hfRepoName.trim()}` });
+      setJob({
+        ...data.job,
+        provider: usesAdditionalModel ? "nebius" : "together",
+        hfRepoName: data.job.hfRepoName || `RoseG/${hfRepoName.trim()}`,
+      });
       setStep("progress");
       notify(`Fine-tune job ${data.job.id} submitted.`, "success");
     } catch (e: any) {
@@ -289,6 +328,7 @@ export function RunTrainingModal({
 
   const statusLabel = String(job?.status || "").trim().toLowerCase();
   const isTerminal = terminalStatuses.has(statusLabel);
+  const isSuccessful = successfulStatuses.has(statusLabel);
   const outputModelName = job?.hfRepoName || (hfRepoName.trim() ? `RoseG/${hfRepoName.trim()}` : "");
   const outputRepoUrl = `https://huggingface.co/${outputModelName.split("/").map(encodeURIComponent).join("/")}`;
   const closeTrainer = () => {
@@ -321,7 +361,7 @@ export function RunTrainingModal({
                   Automated Full Fine-Tune
                 </h2>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Uploads your approved Registry dataset to Together AI and runs a full fine-tune. Nothing is sent or billed without your explicit approval at each step.
+                  Uploads your approved Registry dataset and runs a full fine-tune. Data is sent only after your explicit approval at each step.
                 </p>
                 <p className="text-[11px] text-slate-300 mt-2">
                   Training typically takes 1–3 hours. When it completes, you will receive the public Hugging Face repository link for your model.
@@ -338,6 +378,7 @@ export function RunTrainingModal({
               <div className="flex justify-between"><span>Base model</span><span className="text-slate-200">{BASE_DISPLAY}</span></div>
               <div className="flex justify-between"><span>Training type</span><span className="text-slate-200">Full (LoRA disabled)</span></div>
               <div className="flex justify-between"><span>Epochs</span><span className="text-slate-200">2</span></div>
+              {usesAdditionalModel && <div className="flex justify-between"><span>Sequence packing</span><span className="text-slate-200">65,536 tokens</span></div>}
               <div className="flex justify-between"><span>Evaluations</span><span className="text-slate-200">{selectedModel?.evaluations ?? 1}</span></div>
               <div className="flex justify-between"><span>Training format</span><span className="text-emerald-400">ChatML Instruction (&lt;|im_start|&gt;)</span></div>
               <div className="flex justify-between border-t border-slate-800 pt-1.5"><span>Training split</span><span className="text-green-400 font-bold">{splits.training.length} examples</span></div>
@@ -386,7 +427,7 @@ export function RunTrainingModal({
                     }}
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200"
                   >
-                    {Object.entries(TRAINING_MODELS).map(([key, model]) => <option key={key} value={key}>{model.base}</option>)}
+                    {Object.entries(ALL_TRAINING_MODELS).map(([key, model]) => <option key={key} value={key}>{model.base}</option>)}
                     {savedModels.length > 0 && (
                       <optgroup label="Continue from a previous model">
                         {savedModels.map(model => (
@@ -468,7 +509,7 @@ export function RunTrainingModal({
                   <span>{busy ? "Uploading & Validating…" : "Approve & Upload Datasets"}</span>
                 </button>
                 <p className="text-[10px] text-slate-500 leading-relaxed">
-                  This sends both automatically formatted ChatML Instruction datasets to Together AI. Starting training still requires separate approval.
+                  This sends both automatically formatted ChatML Instruction datasets after approval. Starting training still requires separate approval.
                 </p>
               </div>
             )}
@@ -504,11 +545,11 @@ export function RunTrainingModal({
             {step === "progress" && job && (
               <div className="space-y-3">
                 <div className={`flex items-start gap-2 p-3 rounded-xl border text-[11px] ${
-                  statusLabel === "completed" ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-300"
+                  isSuccessful ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-300"
                   : isTerminal ? "bg-red-500/5 border-red-500/20 text-red-300"
                   : "bg-blue-500/5 border-blue-500/20 text-blue-300"
                 }`}>
-                  {statusLabel === "completed" ? <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  {isSuccessful ? <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
                     : isTerminal ? <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                     : <RefreshCw className="h-4 w-4 shrink-0 mt-0.5 animate-spin" />}
                   <span>
@@ -524,7 +565,7 @@ export function RunTrainingModal({
                     {job.events.map((e: string, i: number) => <div key={i}>• {e}</div>)}
                   </div>
                 )}
-                {statusLabel === "completed" && (
+                {isSuccessful && (
                   <div className="space-y-2">
                     {outputModelName && <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-300">
                       <p>Output model: {outputModelName}</p>
