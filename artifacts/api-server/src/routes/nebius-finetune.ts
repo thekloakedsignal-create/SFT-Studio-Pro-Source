@@ -16,7 +16,7 @@ const TRAINING_HYPERPARAMETERS = {
   weight_decay: 0,
   packing: true,
   max_grad_norm: 1,
-  context_length: 65536,
+  context_length: 8192,
   lora: false,
 };
 const SAFE_ID = /^[A-Za-z0-9_-]{1,160}$/;
