@@ -196,9 +196,18 @@ export function RunTrainingModal({
         const statusPath = job?.provider === "nebius"
           ? `/api/nebius/finetune/jobs/${encodeURIComponent(jobId)}`
           : `/api/finetune/jobs/${encodeURIComponent(jobId)}`;
-        const data = await readApi(await apiFetch(statusPath, {
+        const response = await apiFetch(statusPath, {
           cache: "no-store", signal: AbortSignal.timeout(25000),
-        }));
+        });
+        if (job?.provider === "nebius" && response.status === 404) {
+          if (cancelled) return;
+          stopPolling();
+          setJob(null);
+          setStep("configure");
+          setError(null);
+          return;
+        }
+        const data = await readApi(response);
         if (cancelled) return;
         const status = String(data.job?.status || "").trim().toLowerCase();
         const terminal = terminalStatuses.has(status)
