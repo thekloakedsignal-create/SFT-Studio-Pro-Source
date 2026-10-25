@@ -5365,14 +5365,13 @@ async function runPipelineQaChain(job: any, batchId: string) {
 
 async function runAutomationPipeline(job: any) {
   const { userId, config } = job;
-  const is70B = config.onboardingModel === "Llama 3.1 70B";
-  const roundRobin = is70B ? ["Single Turn", "Multi Turn"] : ["Single Turn", "Multi Turn", "Reasoning"];
+  const noReasoningModel = ["Llama 3.1 70B", "Qwen/Qwen2.5-72B"].includes(config.onboardingModel);
+  const roundRobin = noReasoningModel ? ["Single Turn", "Multi Turn"] : ["Single Turn", "Multi Turn", "Reasoning"];
   job.producedBatches ??= [];
 
   if (config.autoGenerate) {
 
-    // Recommended batches: each batch's total is mixed across single-turn, multi-turn,
-    // and reasoning (reasoning skipped for 70B), merged into one batch.
+    // Recommended batches: each batch is mixed across the enabled templates and merged into one batch.
     // Three batches generate concurrently; the rest queue behind them.
     const recommendations = config.recommendations || [];
     const generateRecommendation = async (rec: any) => {
@@ -5380,8 +5379,7 @@ async function runAutomationPipeline(job: any) {
       job.batchStatus[rec.topic] = { stage: "generating" };
       try {
         const total = rec.skill ? 400 : 200;
-        // The generator only accepts supported batch sizes, so split into supported sizes:
-        // 200 -> 100/50/50 (or 100/100 for 70B); 400 -> 200/100/100 (or 200/200 for 70B).
+        // The generator only accepts supported batch sizes, so split into supported sizes.
         const half = total / 2;
         const counts = roundRobin.length === 3 ? [half, half / 2, half / 2] : [half, half];
         const parts = roundRobin.map((templateType, i) => ({ templateType, count: counts[i] }));
