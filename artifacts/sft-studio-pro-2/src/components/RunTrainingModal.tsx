@@ -29,7 +29,7 @@ type SavedModelChoice = {
 type Step = "configure" | "upload" | "submit" | "progress";
 const terminalStatuses = new Set(["completed", "succeeded", "error", "user_error", "failed", "cancelled"]);
 const successfulStatuses = new Set(["completed", "succeeded"]);
-const clearedTrainingJobId = "ftjob-1d4ffb6113644e249a8dcc57bcee0a26";
+const clearedTrainingJobId = "ftjob-ee8dfbe26f404b15a4b18265742389a8";
 
 interface RunTrainingModalProps {
   open: boolean;
@@ -196,18 +196,9 @@ export function RunTrainingModal({
         const statusPath = job?.provider === "nebius"
           ? `/api/nebius/finetune/jobs/${encodeURIComponent(jobId)}`
           : `/api/finetune/jobs/${encodeURIComponent(jobId)}`;
-        const response = await apiFetch(statusPath, {
+        const data = await readApi(await apiFetch(statusPath, {
           cache: "no-store", signal: AbortSignal.timeout(25000),
-        });
-        if (job?.provider === "nebius" && response.status === 404) {
-          if (cancelled) return;
-          stopPolling();
-          setJob(null);
-          setStep("configure");
-          setError(null);
-          return;
-        }
-        const data = await readApi(response);
+        }));
         if (cancelled) return;
         const status = String(data.job?.status || "").trim().toLowerCase();
         const terminal = terminalStatuses.has(status)

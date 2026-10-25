@@ -5,7 +5,7 @@ import { makeHuggingFaceModelPublic } from "../lib/huggingface.ts";
 import { consumeTraining, isOwner, restoreTraining } from "./whop.ts";
 
 const NEBIUS_API_BASE = "https://api.tokenfactory.nebius.com/v1";
-const CLEARED_NEBIUS_JOB_ID = "ftjob-1d4ffb6113644e249a8dcc57bcee0a26";
+const CLEARED_NEBIUS_JOB_ID = "ftjob-ee8dfbe26f404b15a4b18265742389a8";
 const PREFLIGHT_TTL_MS = 60 * 60 * 1000;
 const OWNER_ONLY_MODEL = "Qwen/Qwen2.5-32B";
 const MODELS = new Set(["Qwen/Qwen3-14B-Base", "Qwen/Qwen2.5-72B", OWNER_ONLY_MODEL]);
