@@ -14,3 +14,9 @@ The filtered Drizzle push can still attempt to remove serial sequences belonging
 **Why:** A development schema push failed while trying to drop the users serial sequence despite the table filter.
 
 **How to apply:** Never force or cascade that change. Use a narrowly scoped development schema addition when necessary; production schema changes remain owned by Publish.
+
+Nebius fine-tuning job requests must provide either top-level `method` or top-level `hyperparameters`, not both. Keep the training settings inside `method.supervised.hyperparameters`.
+
+**Why:** Nebius rejected requests containing both fields with HTTP 422; removing the duplicate made job submission work.
+
+**How to apply:** When editing Nebius job payloads, preserve the base model and use only the supervised `method` object for hyperparameters.

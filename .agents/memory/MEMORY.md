@@ -14,7 +14,7 @@
 - [Storage and generation](local-project-storage.md) — Preserve deliberate saved-project loading; never automatically reopen cached projects or reuse cached batches for generation.
 - [Billing scope](billing-scope.md) — Owner bypasses every paygate; mandatory ChatML Instruction formatting remains independent of payment.
 - [Model chat trial](model-chat-trial.md) — Keep the free sample one-time and 15 minutes; user chose a 10-minute cleanup cadence.
-- [Training provider compatibility](training-provider-compatibility.md) — Completed jobs may omit project identity; avoid forcing filtered schema pushes that touch unrelated sequences.
+- [Training provider compatibility](training-provider-compatibility.md) — Nebius accepts `method` or `hyperparameters`, not both; preserve provider IDs and avoid destructive schema pushes.
 - [Generation voice fidelity](generation-voice-fidelity.md) — Project voice overrides provider alignment; never pathologize, reframe, or condescend to the user.
 - [Project definition immutability](project-definition-immutability.md) — A locked project definition is never rewritten by presets or anything else; the golden exemplar never comes from stock text.
 - [Generation request params](generation-request-params.md) — Never send or configure reasoning_effort, thinking budgets, or frequency/presence penalties, even gated or null.
