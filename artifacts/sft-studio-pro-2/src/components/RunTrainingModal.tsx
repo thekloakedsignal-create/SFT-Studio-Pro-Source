@@ -29,6 +29,7 @@ type SavedModelChoice = {
 type Step = "configure" | "upload" | "submit" | "progress";
 const terminalStatuses = new Set(["completed", "succeeded", "error", "user_error", "failed", "cancelled"]);
 const successfulStatuses = new Set(["completed", "succeeded"]);
+const clearedTrainingJobId = "ftjob-1d4ffb6113644e249a8dcc57bcee0a26";
 
 interface RunTrainingModalProps {
   open: boolean;
@@ -158,7 +159,7 @@ export function RunTrainingModal({
           const restoredJob = useTogether
             ? { id: together.jobId, provider: "together" }
             : additional.jobId ? { id: additional.jobId, provider: "nebius" } : null;
-          if (!cancelled && restoredJob) {
+          if (!cancelled && restoredJob && restoredJob.id !== clearedTrainingJobId) {
             setJob({ ...restoredJob, restored: true });
             setStep("progress");
           }
@@ -181,6 +182,11 @@ export function RunTrainingModal({
     stopPolling();
     const jobId = job?.id;
     if (!jobId) return;
+    if (jobId === clearedTrainingJobId) {
+      setJob(null);
+      setStep("configure");
+      return;
+    }
     let cancelled = false;
     let checking = false;
     const refresh = async () => {
