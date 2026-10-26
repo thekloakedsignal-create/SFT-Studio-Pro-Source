@@ -63,8 +63,8 @@ When removing the Mixed option from the UI, remove it only from the Document Con
 
 **How to apply:** Keep the Batch Synthesis Mixed control available for conversation and instruction projects. Do not expose Mixed in the Document Converter when the user requests its removal there.
 
-For onboarding model-specific restrictions, apply no-reasoning behavior to batch recommendation automation, not the manual template selector. Llama 3.1 70B and Qwen/Qwen2.5-72B use Single Turn and Multi Turn only; do not extend that restriction to Qwen/Qwen3-14B-Base without direction.
+For onboarding model-specific restrictions, exclude Reasoning from automated recommendations and disable the manual Reasoning selector only when the selected Project Definition model is Llama 3.1 70B or Qwen/Qwen2.5-72B. Other models, including Qwen/Qwen3-14B-Base, keep Reasoning available.
 
-**Why:** The user clarified that this request concerned the batch recommendation automater and explicitly mapped the 72B model to Llama's no-reasoning behavior.
+**Why:** The user clarified that model-specific Reasoning restrictions depend on the model saved in Project Definition, and that the manual selector should not appear disabled for other models.
 
-**How to apply:** Keep onboarding model-specific template mix rules in the automated batch recommendation path. Do not modify manual template selection or other app behavior as part of this rule.
+**How to apply:** Use the active project's `onboardingModel` as the source for manual selector availability and automated recommendation mix; do not rely on stale trainer handoff state.

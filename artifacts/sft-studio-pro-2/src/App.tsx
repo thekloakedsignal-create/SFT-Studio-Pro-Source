@@ -762,6 +762,7 @@ export default function App() {
   const [showExamplePaygate, setShowExamplePaygate] = useState(false);
   const [trainerHandoff, setTrainerHandoff] = useState({ model: "Qwen3.5 9 Base", template: "Instruct ChatML (<|im_start|>)" });
   const usesNebiusChatMl = ["Qwen/Qwen3-14B-Base", "Qwen/Qwen2.5-72B", "Qwen/Qwen2.5-32B"].includes(trainerHandoff.model);
+  const noReasoningForProjectModel = ["Llama 3.1 70B", "Qwen/Qwen2.5-72B"].includes(project.onboardingModel || "");
   const selectedTrainingFormat = usesNebiusChatMl ? "chatml" : "chatml_token";
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showCustomPackageModal, setShowCustomPackageModal] = useState(false);
@@ -5391,13 +5392,13 @@ export default function App() {
                               { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Multi-turn Dialogue" },
                             ].map(({ type, label, sub }) => {
                               const isSelected = batchTemplate === type;
-                              const isReasoningBlocked = type === TemplateType.REASONING && trainerHandoff.model === "Llama 3.1 70B";
+                              const isReasoningBlocked = type === TemplateType.REASONING && noReasoningForProjectModel;
                               return (
                                 <button
                                   key={type}
                                   type="button"
                                   disabled={isReasoningBlocked}
-                                  title={isReasoningBlocked ? "Reasoning is not available for Llama 3.1 70B" : undefined}
+                                  title={isReasoningBlocked ? `Reasoning is not available for ${project.onboardingModel}` : undefined}
                                   onClick={() => { if (!isReasoningBlocked) setBatchTemplate(type); }}
                                   className={`p-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center gap-0.5 transition-all ${isReasoningBlocked ? "opacity-40 cursor-not-allowed" : "cursor-pointer"} ${
                                     isSelected
@@ -5428,13 +5429,13 @@ export default function App() {
                               { type: TemplateType.MULTI_TURN, label: "Multi Turn", sub: "Dialogue" },
                             ].map(({ type, label, sub }) => {
                               const isSelected = batchTemplate === type;
-                              const isReasoningBlocked = type === TemplateType.REASONING && trainerHandoff.model === "Llama 3.1 70B";
+                              const isReasoningBlocked = type === TemplateType.REASONING && noReasoningForProjectModel;
                               return (
                                 <button
                                   key={type}
                                   type="button"
                                   disabled={isReasoningBlocked}
-                                  title={isReasoningBlocked ? "Reasoning is not available for Llama 3.1 70B" : undefined}
+                                  title={isReasoningBlocked ? `Reasoning is not available for ${project.onboardingModel}` : undefined}
                                   onClick={() => { if (!isReasoningBlocked) setBatchTemplate(type); }}
                                   className={`p-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center gap-0.5 transition-all ${isReasoningBlocked ? "opacity-40 cursor-not-allowed" : "cursor-pointer"} ${
                                     isSelected
