@@ -29,7 +29,11 @@ type SavedModelChoice = {
 type Step = "configure" | "upload" | "submit" | "progress";
 const terminalStatuses = new Set(["completed", "succeeded", "error", "user_error", "failed", "cancelled"]);
 const successfulStatuses = new Set(["completed", "succeeded"]);
-const clearedTrainingJobId = "ftjob-ee8dfbe26f404b15a4b18265742389a8";
+const clearedTrainingJobIds = new Set([
+  "ftjob-1d4ffb6113644e249a8dcc57bcee0a26",
+  "ftjob-ee8dfbe26f404b15a4b18265742389a8",
+  "ftjob-ca4a1410d6924877bd7aaa6cd3ece5ad",
+]);
 
 interface RunTrainingModalProps {
   open: boolean;
@@ -159,7 +163,7 @@ export function RunTrainingModal({
           const restoredJob = useTogether
             ? { id: together.jobId, provider: "together" }
             : additional.jobId ? { id: additional.jobId, provider: "nebius" } : null;
-          if (!cancelled && restoredJob && restoredJob.id !== clearedTrainingJobId) {
+          if (!cancelled && restoredJob && !clearedTrainingJobIds.has(restoredJob.id)) {
             setJob({ ...restoredJob, restored: true });
             setStep("progress");
           }
@@ -182,7 +186,7 @@ export function RunTrainingModal({
     stopPolling();
     const jobId = job?.id;
     if (!jobId) return;
-    if (jobId === clearedTrainingJobId) {
+    if (clearedTrainingJobIds.has(jobId)) {
       setJob(null);
       setStep("configure");
       return;
@@ -196,9 +200,18 @@ export function RunTrainingModal({
         const statusPath = job?.provider === "nebius"
           ? `/api/nebius/finetune/jobs/${encodeURIComponent(jobId)}`
           : `/api/finetune/jobs/${encodeURIComponent(jobId)}`;
-        const data = await readApi(await apiFetch(statusPath, {
+        const response = await apiFetch(statusPath, {
           cache: "no-store", signal: AbortSignal.timeout(25000),
-        }));
+        });
+        if (job?.provider === "nebius" && response.status === 404) {
+          if (cancelled) return;
+          stopPolling();
+          setJob(null);
+          setStep("configure");
+          setError(null);
+          return;
+        }
+        const data = await readApi(response);
         if (cancelled) return;
         const status = String(data.job?.status || "").trim().toLowerCase();
         const terminal = terminalStatuses.has(status)

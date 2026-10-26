@@ -5,7 +5,11 @@ import { makeHuggingFaceModelPublic } from "../lib/huggingface.ts";
 import { consumeTraining, isOwner, restoreTraining } from "./whop.ts";
 
 const NEBIUS_API_BASE = "https://api.tokenfactory.nebius.com/v1";
-const CLEARED_NEBIUS_JOB_ID = "ftjob-ee8dfbe26f404b15a4b18265742389a8";
+const CLEARED_NEBIUS_JOB_IDS = new Set([
+  "ftjob-1d4ffb6113644e249a8dcc57bcee0a26",
+  "ftjob-ee8dfbe26f404b15a4b18265742389a8",
+  "ftjob-ca4a1410d6924877bd7aaa6cd3ece5ad",
+]);
 const PREFLIGHT_TTL_MS = 60 * 60 * 1000;
 const OWNER_ONLY_MODEL = "Qwen/Qwen2.5-32B";
 const MODELS = new Set(["Qwen/Qwen3-14B-Base", "Qwen/Qwen2.5-72B", OWNER_ONLY_MODEL]);
@@ -454,7 +458,7 @@ router.get("/nebius/finetune/latest", async (req: AuthRequest, res) => {
   try {
     const records = await listRecords("nebius-job", uid);
     const latest = records
-      .filter(record => (record?.data?.id || record?.id) !== CLEARED_NEBIUS_JOB_ID)
+      .filter(record => !CLEARED_NEBIUS_JOB_IDS.has(record?.data?.id || record?.id))
       .at(-1);
     return res.json({
       success: true,
@@ -472,7 +476,7 @@ router.get("/nebius/finetune/jobs/:id", async (req: AuthRequest, res) => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const jobId = safeProviderId(rawId);
   if (!jobId) return res.status(400).json({ success: false, error: "Invalid job ID." });
-  if (jobId === CLEARED_NEBIUS_JOB_ID) {
+  if (CLEARED_NEBIUS_JOB_IDS.has(jobId)) {
     return res.status(404).json({ success: false, error: "Job not found." });
   }
 
