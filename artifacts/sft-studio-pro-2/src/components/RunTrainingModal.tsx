@@ -215,7 +215,7 @@ export function RunTrainingModal({
         if (cancelled) return;
         const status = String(data.job?.status || "").trim().toLowerCase();
         const terminal = terminalStatuses.has(status)
-          && (!successfulStatuses.has(status) || data.job?.modelReady === true);
+          && (!successfulStatuses.has(status) || data.job?.modelReady === true || !!data.job?.modelOutputPath);
         if (job?.restored && terminal) {
           // A previous run that already finished is not shown again; start from a clean trainer.
           stopPolling();
@@ -406,7 +406,7 @@ export function RunTrainingModal({
   };
 
   const statusLabel = String(job?.status || "").trim().toLowerCase();
-  const isSuccessful = successfulStatuses.has(statusLabel) && job?.modelReady === true;
+  const isSuccessful = successfulStatuses.has(statusLabel) && (job?.modelReady === true || !!job?.modelOutputPath);
   const isTerminal = terminalStatuses.has(statusLabel) && (!successfulStatuses.has(statusLabel) || isSuccessful);
   const outputModelName = job?.hfRepoName || (hfRepoName.trim() ? `RoseG/${hfRepoName.trim()}` : "");
   const outputRepoUrl = `https://huggingface.co/${outputModelName.split("/").map(encodeURIComponent).join("/")}`;
