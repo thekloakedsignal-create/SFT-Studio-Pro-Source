@@ -143,50 +143,12 @@ interface UserModelChoice {
   createdAt: string;
 }
 
-const hfCheckpointCache = new Map<string, { ready: boolean; expiresAt: number }>();
-
-async function hasHuggingFaceCheckpoint(repoName: string): Promise<boolean> {
-  const repoParts = repoName.trim().split("/");
-  const token = process.env.HF_TOKEN;
-  if (!token || repoParts.length !== 2 || repoParts.some(part => !part)) return false;
-
-  const repoId = repoParts.map(encodeURIComponent).join("/");
-  const cached = hfCheckpointCache.get(repoId);
-  if (cached && cached.expiresAt > Date.now()) return cached.ready;
-
-  const response = await fetch(`https://huggingface.co/api/models/${repoId}?blobs=true`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(10000),
-  });
-  if (response.status === 401 || response.status === 403 || response.status === 404) {
-    hfCheckpointCache.set(repoId, { ready: false, expiresAt: Date.now() + 30000 });
-    return false;
-  }
-  if (!response.ok) {
-    throw new Error(`Hugging Face repository verification failed (HTTP ${response.status}).`);
-  }
-
-  const model = await response.json() as { siblings?: Array<{ rfilename?: string; size?: number; lfs?: { size?: number } }> };
-  const ready = Array.isArray(model.siblings) && model.siblings.some(file => {
-    const name = file?.rfilename?.split("/").pop() || "";
-    const isWeightFile = /\.(?:safetensors|gguf|bin|pt|pth)$/i.test(name)
-      && !/(?:optimizer|scheduler|rng_state|training_args|tokenizer|vocab|merges|special_tokens_map)\./i.test(name);
-    const size = Number(file?.size ?? file?.lfs?.size);
-    return isWeightFile && (!Number.isFinite(size) || size > 0);
-  });
-  hfCheckpointCache.set(repoId, { ready, expiresAt: Date.now() + (ready ? 120000 : 30000) });
-  return ready;
-}
-
 async function getUserModelChoices(uid: string): Promise<UserModelChoice[]> {
   const models = (await listRecords("model", uid)).map(record => record.data);
-  const candidates = models.filter((model: any) =>
+  return models.filter((model: any) =>
     typeof model?.togetherModelName === "string"
     && typeof model?.hfRepoName === "string"
     && typeof model?.baseTrainingModel === "string");
-  const verified = await Promise.all(candidates.map(async (model: any) =>
-    await hasHuggingFaceCheckpoint(model.hfRepoName) ? model as UserModelChoice : null));
-  return verified.filter((model): model is UserModelChoice => model !== null);
 }
 
 async function findUserModelChoice(uid: string, togetherModelName: string): Promise<UserModelChoice | null> {
@@ -201,7 +163,6 @@ async function rememberCompletedModel(uid: string, job: any, jobId: string): Pro
   const baseTrainingModel = saved.trainingModel
     || Object.entries(TRAINING_CONFIGS).find(([, config]) => config.model === job?.model)?.[0];
   if (typeof togetherModelName !== "string" || typeof hfRepoName !== "string" || !baseTrainingModel) return false;
-  if (!await hasHuggingFaceCheckpoint(hfRepoName)) return false;
 
   const choice: UserModelChoice = {
     togetherModelName,

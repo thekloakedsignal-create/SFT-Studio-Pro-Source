@@ -11,8 +11,8 @@ Together keeps its serialized `<|im_start|>` ChatML export. Nebius uploads stand
 
 **How to apply:** Restrict Fireworks training setup to Muse Glimmer. For Nebius, convert the prepared chat data to `{messages:[{role,content}]}` JSONL without `<|im_start|>` tokens; leave Together's export untouched. Don't set a learning-rate schedule unless Nebius documents a supported field. Show sanitized validation details to the submitting user without leaking tokens or backend-provider names. Do not create or run training jobs. Keep provider details out of the public UI, and set each output repository public only after training completes and before returning the link. When restoring status, choose the newest job across Together and Nebius; offer the correct output/download action for each, not a Together-only path. Keep the active status screen visible until the job reaches a terminal state.
 
-When implementing Hugging Face visibility changes, keep export and saved-model availability independent of the visibility API call. A failed visibility update must not block model status, export, or link retrieval.
+Together owns its Hugging Face model export. The app passes the requested output repository when creating the job and must not add a competing transfer or Hugging Face API check after completion.
 
-**Why:** The automatic “make public” call and `hfRepoPublic` gate interfered with the user's ability to export models and were removed.
+**Why:** The user said Together completes the Hugging Face upload itself and app-side interference broke that transfer.
 
-**How to apply:** Do not put visibility mutations or visibility flags in the critical model-export/status path. Revisit public-repo automation only if it can fail without blocking export and the user asks for it.
+**How to apply:** Keep Together's training submission settings and output repo name intact. Do not initiate, verify, or mutate the Hugging Face repository from the app after submission unless the user explicitly asks.
