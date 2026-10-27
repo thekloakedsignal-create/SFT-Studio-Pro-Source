@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { optionalAuth, type AuthRequest } from "../middleware/auth.ts";
 import { createRecord, getRecord, listRecords, setRecord } from "../lib/training-records.mjs";
+import { makeHuggingFaceModelPublic } from "../lib/huggingface.ts";
 import { consumeTraining, isOwner, restoreTraining } from "./whop.ts";
 
 const NEBIUS_API_BASE = "https://api.tokenfactory.nebius.com/v1";
@@ -207,13 +208,12 @@ async function uploadDataset(content: string, fileName: string): Promise<string>
 
 function publicJob(job: any, saved: any) {
   const status = typeof job?.status === "string" ? job.status.slice(0, 64) : "unknown";
-  const modelReady = ["succeeded", "completed"].includes(status.toLowerCase()) && Boolean(saved.hfRepoName);
   return {
     id: saved.id,
     status: hasCredential(status) ? "[redacted]" : status,
     model: saved.model,
-    hfRepoName: modelReady ? saved.hfRepoName : null,
-    modelReady,
+    hfRepoName: saved.hfRepoPublic === true ? saved.hfRepoName : null,
+    modelReady: saved.hfRepoPublic === true,
     createdAt: typeof job?.created_at === "number" ? job.created_at : null,
     finishedAt: typeof job?.finished_at === "number" ? job.finished_at : null,
     estimatedFinish: typeof job?.estimated_finish === "number" ? job.estimated_finish : null,
@@ -435,6 +435,7 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
       hfRepoName: repoName,
       trainingFileId,
       validationFileId: validationFileId || null,
+      hfRepoPublic: false,
       status: typeof job?.status === "string" && !hasCredential(job.status) ? job.status.slice(0, 64) : "unknown",
       createdAt: typeof job?.created_at === "number" ? job.created_at : null,
     };
@@ -490,9 +491,15 @@ router.get("/nebius/finetune/jobs/:id", async (req: AuthRequest, res) => {
     const status = typeof job?.status === "string" && !hasCredential(job.status)
       ? job.status.slice(0, 64)
       : "unknown";
+    let hfRepoPublic = saved.hfRepoPublic === true;
+    if (["succeeded", "completed"].includes(status.toLowerCase()) && !hfRepoPublic) {
+      await makeHuggingFaceModelPublic(saved.hfRepoName);
+      hfRepoPublic = true;
+    }
     const safeSaved = {
       ...saved,
       status,
+      hfRepoPublic,
       createdAt: typeof job?.created_at === "number" ? job.created_at : saved.createdAt,
     };
     await setRecord("nebius-job", jobId, safeSaved);

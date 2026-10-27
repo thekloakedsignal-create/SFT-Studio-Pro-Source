@@ -4250,12 +4250,9 @@ app.post("/api/analyze-quality", async (req, res) => {
       const QA_AUDIT_MODELS = ["qwen3.8-max", "deepseek-3.2", "llama-4-maverick", "mistral-3-14B"];
       const modelStartIndex = (chunkIndex: number) =>
         Math.floor(chunkIndex / CHUNK_SIZE) % QA_AUDIT_MODELS.length;
-      const CONCURRENCY_PER_STACK = 20;
-      const MAX_CONCURRENCY_STACKS = 10;
-      const STACK_START_DELAY_MS = 2000;
 
       // Execute chunks in parallel with a strict 14-second timeout race
-      const processChunk = async (chunk: { startIndex: number; items: any[] }) => {
+      await Promise.allSettled(chunks.map(async (chunk) => {
         try {
           const chunkPrompt = `
             You are a calibrated SFT dataset auditor. Identify concrete defects and direct violations of the supplied project and batch definitions. Neither seek faults in acceptable examples nor excuse clear failures. Judge each example independently; do not aim for a particular pass rate.
@@ -4357,32 +4354,7 @@ app.post("/api/analyze-quality", async (req, res) => {
         } catch (chunkErr: any) {
           console.warn(`Quality audit chunk ${chunk.startIndex} notice:`, chunkErr?.message || chunkErr);
         }
-      };
-
-      let nextChunkIndex = 0;
-      const processOpenSeats = async () => {
-        while (nextChunkIndex < chunks.length) {
-          const chunk = chunks[nextChunkIndex++];
-          await processChunk(chunk);
-        }
-      };
-
-      const concurrencyStacks: Promise<void[]>[] = [];
-      for (
-        let stackIndex = 0;
-        stackIndex < MAX_CONCURRENCY_STACKS && nextChunkIndex < chunks.length;
-        stackIndex++
-      ) {
-        if (stackIndex > 0) {
-          await new Promise(resolve => setTimeout(resolve, STACK_START_DELAY_MS));
-        }
-        if (nextChunkIndex >= chunks.length) break;
-        const openSeats = Math.min(CONCURRENCY_PER_STACK, chunks.length - nextChunkIndex);
-        concurrencyStacks.push(
-          Promise.all(Array.from({ length: openSeats }, () => processOpenSeats()))
-        );
-      }
-      await Promise.all(concurrencyStacks);
+      }));
     }
   } catch (error: any) {
     console.warn("AI Quality assessment model warning:", error?.message || error);
