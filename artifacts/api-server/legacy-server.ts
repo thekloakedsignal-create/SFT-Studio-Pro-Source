@@ -4233,7 +4233,7 @@ app.post("/api/analyze-quality", async (req, res) => {
   try {
     if (client) {
       // 2. Run Semantic & Persona AI Quality Audit on 100% of all dataset examples
-      const CHUNK_SIZE = 6;
+      const CHUNK_SIZE = 10;
       const chunks: Array<{ startIndex: number; items: any[] }> = [];
 
       for (let c = 0; c < examples.length; c += CHUNK_SIZE) {
@@ -4246,13 +4246,16 @@ app.post("/api/analyze-quality", async (req, res) => {
         });
       }
 
-      // Primary audit model plus backups, tried in order when one fails
+      // Rotate first-choice models across chunks; each chunk is submitted once.
       const QA_AUDIT_MODELS = ["qwen3.8-max", "deepseek-3.2", "llama-4-maverick", "mistral-3-14B"];
       const modelStartIndex = (chunkIndex: number) =>
         Math.floor(chunkIndex / CHUNK_SIZE) % QA_AUDIT_MODELS.length;
+      const CONCURRENCY_PER_STACK = 20;
+      const MAX_CONCURRENCY_STACKS = 10;
+      const STACK_START_DELAY_MS = 2000;
+      const QA_REQUEST_TIMEOUT_MS = 30_000;
 
-      // Execute chunks in parallel with a strict 14-second timeout race
-      await Promise.allSettled(chunks.map(async (chunk) => {
+      const processChunk = async (chunk: { startIndex: number; items: any[] }) => {
         try {
           const chunkPrompt = `
             You are a calibrated SFT dataset auditor. Identify concrete defects and direct violations of the supplied project and batch definitions. Neither seek faults in acceptable examples nor excuse clear failures. Judge each example independently; do not aim for a particular pass rate.
@@ -4305,45 +4308,48 @@ app.post("/api/analyze-quality", async (req, res) => {
             - "suggestions": Array of 0 to 3 optional, non-blocking recommendations for recurring improvements. Suggestions must not imply that examples fail QA.
           `;
 
-          let response: any = null;
-          const firstModelIndex = modelStartIndex(chunk.startIndex);
-          for (let modelOffset = 0; modelOffset < QA_AUDIT_MODELS.length; modelOffset++) {
-            const auditModel = QA_AUDIT_MODELS[(firstModelIndex + modelOffset) % QA_AUDIT_MODELS.length];
-            try {
-              response = await callDigitalOceanAI({
-                model: auditModel,
-                contents: chunkPrompt,
-                config: {
-                  temperature: 0.1,
-                  responseMimeType: "application/json"
-                }
-              });
-              break;
-            } catch (modelErr: any) {
-              console.warn(`Quality audit chunk ${chunk.startIndex} model ${auditModel} notice:`, modelErr?.message || modelErr);
+          const auditModel = QA_AUDIT_MODELS[modelStartIndex(chunk.startIndex)];
+          const response = await callDigitalOceanAI({
+            model: auditModel,
+            contents: chunkPrompt,
+            timeoutMs: QA_REQUEST_TIMEOUT_MS,
+            config: {
+              temperature: 0.1,
+              responseMimeType: "application/json"
             }
-          }
-          if (!response) throw new Error("All QA audit models failed for this chunk.");
+          });
 
           const parsed = JSON.parse(extractResponseText(response) || "{}");
-          if (Array.isArray(parsed.issues)) {
-            for (const iss of parsed.issues) {
-              if (
-                typeof iss.exampleIndex === "number" &&
-                iss.exampleIndex >= chunk.startIndex &&
-                iss.exampleIndex < chunk.startIndex + chunk.items.length &&
-                iss.message
-              ) {
-                const sev = iss.severity === "High" ? "High" : iss.severity === "Low" ? "Low" : "Medium";
-                aiIssues.push({
-                  exampleIndex: iss.exampleIndex,
-                  severity: sev,
-                  type: iss.type || "AI Audit Finding",
-                  message: iss.message
-                });
-              }
-            }
+          if (!Array.isArray(parsed.issues)) {
+            throw new Error("QA response did not contain a valid issues array.");
           }
+
+          const chunkIssues: Array<{
+            exampleIndex: number;
+            severity: "High" | "Medium" | "Low";
+            type: string;
+            message: string;
+          }> = [];
+          for (const iss of parsed.issues) {
+            if (
+              !Number.isInteger(iss?.exampleIndex) ||
+              iss.exampleIndex < chunk.startIndex ||
+              iss.exampleIndex >= chunk.startIndex + chunk.items.length ||
+              typeof iss.message !== "string" ||
+              !iss.message.trim()
+            ) {
+              throw new Error("QA response contained an invalid issue record.");
+            }
+            const sev: "High" | "Medium" | "Low" =
+              iss.severity === "High" ? "High" : iss.severity === "Low" ? "Low" : "Medium";
+            chunkIssues.push({
+              exampleIndex: iss.exampleIndex,
+              severity: sev,
+              type: iss.type || "AI Audit Finding",
+              message: iss.message
+            });
+          }
+          aiIssues.push(...chunkIssues);
           if (Array.isArray(parsed.suggestions)) {
             for (const sug of parsed.suggestions) {
               if (typeof sug === "string" && sug.trim().length > 0 && !aiSuggestions.includes(sug)) {
@@ -4352,9 +4358,42 @@ app.post("/api/analyze-quality", async (req, res) => {
             }
           }
         } catch (chunkErr: any) {
-          console.warn(`Quality audit chunk ${chunk.startIndex} notice:`, chunkErr?.message || chunkErr);
+          console.warn(`Quality audit chunk ${chunk.startIndex} was not processed:`, chunkErr?.message || chunkErr);
+          for (const item of chunk.items) {
+            aiIssues.push({
+              exampleIndex: item.exampleIndex,
+              severity: "High",
+              type: "Not Processed",
+              message: "This example was not processed by the AI quality audit. Run QA again to assess it."
+            });
+          }
         }
-      }));
+      };
+
+      let nextChunkIndex = 0;
+      const processOpenSeats = async () => {
+        while (nextChunkIndex < chunks.length) {
+          const chunk = chunks[nextChunkIndex++];
+          await processChunk(chunk);
+        }
+      };
+
+      const concurrencyStacks: Promise<void[]>[] = [];
+      for (
+        let stackIndex = 0;
+        stackIndex < MAX_CONCURRENCY_STACKS && nextChunkIndex < chunks.length;
+        stackIndex++
+      ) {
+        if (stackIndex > 0) {
+          await new Promise(resolve => setTimeout(resolve, STACK_START_DELAY_MS));
+        }
+        if (nextChunkIndex >= chunks.length) break;
+        const openSeats = Math.min(CONCURRENCY_PER_STACK, chunks.length - nextChunkIndex);
+        concurrencyStacks.push(
+          Promise.all(Array.from({ length: openSeats }, () => processOpenSeats()))
+        );
+      }
+      await Promise.all(concurrencyStacks);
     }
   } catch (error: any) {
     console.warn("AI Quality assessment model warning:", error?.message || error);

@@ -9,11 +9,11 @@ QA must catch formatting errors and template anomalies as well as assess semanti
 
 **How to apply:** Keep both sources of findings in the existing QA report and scoring. Inspect raw examples without silently sanitizing away defects. Keep audit changes confined to QA, not generation or conversion.
 
-Distribute QA chunks across the available audit models so multiple models receive first-pass calls concurrently; rotate the remaining models as fallbacks for a failed chunk.
+Use chunks of 10. Assign models cyclically across chunks. Run stacks of 20 concurrent requests, starting another stack every 2 seconds up to 10 stacks; refill open slots from the shared chunk queue. Give each request a 30-second timeout. Do not retry failed or stalled chunks; mark every example in them as High-severity "Not Processed" so the audit cannot silently pass them.
 
-**Why:** The user said QA should call a lineup of different models rather than send every chunk to the same model first.
+**Why:** The user specified 20-way concurrency with staggered stacks and continuous slot refill for large document batches, no retries, and visible flags for unprocessed examples.
 
-**How to apply:** Keep model assignment scoped to QA chunk dispatch. Do not change chunk size, concurrency, or the audit prompt when changing model distribution.
+**How to apply:** Keep each chunk's findings isolated until its response validates. A failed request or invalid response marks every example in that chunk Not Processed, then the slot continues. Do not return partial results that treat skipped examples as passed.
 
 QA must distinguish substantive defects from minor stylistic preferences. Do not make small wording or formatting nits imply that an otherwise useful example is bad, while continuing to flag meaningful factual, instruction-following, persona, and structural failures.
 
