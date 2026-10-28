@@ -36,6 +36,10 @@ interface NebiusSession {
     trainingCount: number;
     validationCount: number;
     uploadedAt: string;
+    providerRecords?: {
+      training: unknown;
+      validation?: unknown;
+    };
   } | null;
 }
 
@@ -84,16 +88,10 @@ function validateJsonl(content: unknown, label: string): { lines: string[]; erro
         && typeof message.role === "string"
         && (typeof message.content === "string" || Array.isArray(message.tool_calls)))
       && row.messages.at(-1)?.role === "assistant";
-    const instructionValid = typeof row.prompt === "string" && row.prompt.trim()
-      && typeof row.completion === "string" && row.completion.trim();
-    const textValid = typeof row.text === "string" && row.text.trim();
-    const tokenizedValid = Array.isArray(row.input_ids) && row.input_ids.length > 0
-      && row.input_ids.every((id: unknown) => Number.isInteger(id) && (id as number) >= 0);
-
-    if (!messagesValid && !instructionValid && !textValid && !tokenizedValid) {
+    if (!messagesValid) {
       return {
         lines: [],
-        error: `The ${label} dataset line ${index + 1} must use a supported JSONL format.`,
+        error: `The ${label} dataset line ${index + 1} must contain a non-empty messages array ending with an assistant message.`,
       };
     }
   }
@@ -123,7 +121,7 @@ function safeProviderId(value: unknown): string | null {
 }
 
 class ProviderError extends Error {
-  constructor(readonly status: number, readonly detail?: string) {
+  constructor(readonly status: number, readonly detail?: string, readonly providerRecord?: unknown) {
     super("Nebius request failed.");
   }
 }
@@ -170,10 +168,45 @@ async function nebiusRequest(apiPath: string, init: RequestInit = {}): Promise<a
   });
   const text = await response.text();
   let body: any = null;
-  try { body = text ? JSON.parse(text) : null; } catch { /* discard provider response */ }
+  let providerRecord: unknown = text || null;
+  try {
+    body = text ? JSON.parse(text) : null;
+    providerRecord = body;
+  } catch { /* Keep the raw provider response for server-side diagnostics. */ }
 
-  if (!response.ok) throw new ProviderError(response.status, safeProviderDetail(body));
+  if (!response.ok) throw new ProviderError(response.status, safeProviderDetail(body), providerRecord);
   return body;
+}
+
+function adminProviderDiagnostic(error: unknown, operation: string) {
+  if (!(error instanceof ProviderError) || error.providerRecord == null) return null;
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(error.providerRecord);
+  } catch {
+    return null;
+  }
+  for (const secret of Object.values(providerCredentials()).filter(Boolean)) {
+    serialized = serialized.split(secret).join("[redacted credential]");
+  }
+  let providerRecord: unknown = serialized;
+  try { providerRecord = JSON.parse(serialized); } catch { /* Preserve non-JSON response text. */ }
+  return {
+    operation,
+    status: error.status,
+    recordedAt: new Date().toISOString(),
+    providerRecord,
+  };
+}
+
+async function retainAdminProviderDiagnostic(kind: string, id: string, error: unknown, operation: string) {
+  const diagnostic = adminProviderDiagnostic(error, operation);
+  if (!diagnostic) return;
+  try {
+    await setRecord(kind, id, { lastProviderError: diagnostic });
+  } catch {
+    // A diagnostic write must not replace the provider's actual error response.
+  }
 }
 
 function providerFailure(res: any, error: unknown, fallback: string) {
@@ -195,19 +228,51 @@ function validateRepoName(value: unknown): string | null {
     : null;
 }
 
-async function uploadDataset(content: string, fileName: string): Promise<string> {
+async function uploadDataset(content: string, fileName: string): Promise<{ id: string; providerRecord: unknown }> {
   const form = new FormData();
   form.append("file", new Blob([content], { type: "application/jsonl" }), fileName);
   form.append("purpose", "fine-tune");
   const file = await nebiusRequest("/files", { method: "POST", body: form });
   const fileId = safeProviderId(file?.id);
   if (!fileId) throw new ProviderError(502);
-  return fileId;
+  return { id: fileId, providerRecord: file };
+}
+
+async function verifyHuggingFaceCheckpoint(repoName: string, token: string) {
+  const [owner, repo] = repoName.split("/");
+  const checkedAt = new Date().toISOString();
+  try {
+    const response = await fetch(
+      `https://huggingface.co/api/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/tree/main?recursive=true`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(15000),
+        cache: "no-store",
+      },
+    );
+    if (!response.ok) {
+      return { verified: false, checkedAt, httpStatus: response.status, checkpointFiles: [] as string[] };
+    }
+    const files = await response.json();
+    const checkpointFiles = Array.isArray(files)
+      ? files
+        .filter((file: any) => file?.type === "file"
+          && typeof file.path === "string"
+          && /\.(?:safetensors|bin|pt|pth|gguf)$/i.test(file.path)
+          && typeof file.size === "number"
+          && file.size > 0)
+        .map((file: any) => file.path)
+      : [];
+    return { verified: checkpointFiles.length > 0, checkedAt, httpStatus: response.status, checkpointFiles };
+  } catch {
+    return { verified: false, checkedAt, httpStatus: null, checkpointFiles: [] as string[] };
+  }
 }
 
 function publicJob(job: any, saved: any) {
   const status = typeof job?.status === "string" ? job.status.slice(0, 64) : "unknown";
-  const modelReady = ["succeeded", "completed"].includes(status.toLowerCase()) && Boolean(saved.hfRepoName);
+  const modelReady = ["succeeded", "completed"].includes(status.toLowerCase())
+    && saved.hfRepoContentsVerified === true;
   return {
     id: saved.id,
     status: hasCredential(status) ? "[redacted]" : status,
@@ -334,10 +399,12 @@ router.post("/nebius/finetune/upload", async (req: AuthRequest, res) => {
     const suffix = typeof req.body?.suffix === "string" && req.body.suffix.trim()
       ? req.body.suffix.trim().replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 40)
       : "sft-studio";
-    const trainingFileId = await uploadDataset(training.lines.join("\n"), `${suffix}-training.jsonl`);
-    const validationFileId = validationProvided
+    const trainingFile = await uploadDataset(training.lines.join("\n"), `${suffix}-training.jsonl`);
+    const validationFile = validationProvided
       ? await uploadDataset(validation.lines.join("\n"), `${suffix}-validation.jsonl`)
       : undefined;
+    const trainingFileId = trainingFile.id;
+    const validationFileId = validationFile?.id;
     const upload = {
       model,
       trainingFileId,
@@ -345,6 +412,10 @@ router.post("/nebius/finetune/upload", async (req: AuthRequest, res) => {
       trainingCount: training.lines.length,
       validationCount: validation.lines.length,
       uploadedAt: new Date().toISOString(),
+      providerRecords: {
+        training: trainingFile.providerRecord,
+        ...(validationFile ? { validation: validationFile.providerRecord } : {}),
+      },
     };
     await setRecord("nebius-session", uid, { ownerId: uid, model, upload });
     return res.json({
@@ -356,6 +427,7 @@ router.post("/nebius/finetune/upload", async (req: AuthRequest, res) => {
       validationCount: upload.validationCount,
     });
   } catch (error) {
+    await retainAdminProviderDiagnostic("nebius-session", uid, error, "dataset_upload");
     return providerFailure(res, error, "Dataset upload failed. Check the dataset and try again.");
   }
 });
@@ -437,12 +509,16 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
       validationFileId: validationFileId || null,
       status: typeof job?.status === "string" && !hasCredential(job.status) ? job.status.slice(0, 64) : "unknown",
       createdAt: typeof job?.created_at === "number" ? job.created_at : null,
+      providerRecord: job,
+      hfRepoContentsVerified: false,
+      hfRepoVerification: null,
     };
     if (!await createRecord("nebius-job", jobId, saved)) {
       return res.status(502).json({ success: false, error: "The job could not be safely recorded." });
     }
     return res.json({ success: true, job: publicJob(job, saved) });
     } catch (error) {
+      await retainAdminProviderDiagnostic("nebius-session", uid, error, "job_submission");
       if (!submitted) restoreTraining(uid, model);
       return providerFailure(res, error, "Could not create the fine-tuning job.");
     }
@@ -490,14 +566,27 @@ router.get("/nebius/finetune/jobs/:id", async (req: AuthRequest, res) => {
     const status = typeof job?.status === "string" && !hasCredential(job.status)
       ? job.status.slice(0, 64)
       : "unknown";
+    let hfRepoVerification = saved.hfRepoVerification || null;
+    let hfRepoContentsVerified = saved.hfRepoContentsVerified === true;
+    if (["succeeded", "completed"].includes(status.toLowerCase()) && !hfRepoContentsVerified) {
+      const token = providerCredentials().huggingFace;
+      if (token && saved.hfRepoName) {
+        hfRepoVerification = await verifyHuggingFaceCheckpoint(saved.hfRepoName, token);
+        hfRepoContentsVerified = hfRepoVerification.verified;
+      }
+    }
     const safeSaved = {
       ...saved,
       status,
       createdAt: typeof job?.created_at === "number" ? job.created_at : saved.createdAt,
+      providerRecord: job,
+      hfRepoContentsVerified,
+      hfRepoVerification,
     };
     await setRecord("nebius-job", jobId, safeSaved);
     return res.json({ success: true, job: publicJob(job, safeSaved) });
   } catch (error) {
+    await retainAdminProviderDiagnostic("nebius-job", jobId, error, "job_status");
     return providerFailure(res, error, "Could not retrieve the job status.");
   }
 });

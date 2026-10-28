@@ -245,7 +245,7 @@ export function RunTrainingModal({
         checking = false;
       }
     };
-    pollRef.current = setInterval(refresh, 10000);
+    pollRef.current = setInterval(refresh, 30000);
     void refresh();
     window.addEventListener("focus", refresh);
     return () => { cancelled = true; stopPolling(); window.removeEventListener("focus", refresh); };
