@@ -209,41 +209,9 @@ async function uploadDataset(content: string, fileName: string): Promise<{ id: s
   return { id: fileId, providerRecord: file };
 }
 
-async function verifyHuggingFaceCheckpoint(repoName: string, token: string) {
-  const [owner, repo] = repoName.split("/");
-  const checkedAt = new Date().toISOString();
-  try {
-    const response = await fetch(
-      `https://huggingface.co/api/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/tree/main?recursive=true`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(15000),
-        cache: "no-store",
-      },
-    );
-    if (!response.ok) {
-      return { verified: false, checkedAt, httpStatus: response.status, checkpointFiles: [] as string[] };
-    }
-    const files = await response.json();
-    const checkpointFiles = Array.isArray(files)
-      ? files
-        .filter((file: any) => file?.type === "file"
-          && typeof file.path === "string"
-          && /\.(?:safetensors|bin|pt|pth|gguf)$/i.test(file.path)
-          && typeof file.size === "number"
-          && file.size > 0)
-        .map((file: any) => file.path)
-      : [];
-    return { verified: checkpointFiles.length > 0, checkedAt, httpStatus: response.status, checkpointFiles };
-  } catch {
-    return { verified: false, checkedAt, httpStatus: null, checkpointFiles: [] as string[] };
-  }
-}
-
 function publicJob(job: any, saved: any) {
   const status = typeof job?.status === "string" ? job.status.slice(0, 64) : "unknown";
-  const modelReady = ["succeeded", "completed"].includes(status.toLowerCase())
-    && saved.hfRepoContentsVerified === true;
+  const modelReady = ["succeeded", "completed"].includes(status.toLowerCase()) && Boolean(saved.hfRepoName);
   return {
     id: saved.id,
     status: hasCredential(status) ? "[redacted]" : status,
@@ -480,8 +448,6 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
       status: typeof job?.status === "string" && !hasCredential(job.status) ? job.status.slice(0, 64) : "unknown",
       createdAt: typeof job?.created_at === "number" ? job.created_at : null,
       providerRecord: job,
-      hfRepoContentsVerified: false,
-      hfRepoVerification: null,
     };
     if (!await createRecord("nebius-job", jobId, saved)) {
       return res.status(502).json({ success: false, error: "The job could not be safely recorded." });
@@ -535,22 +501,11 @@ router.get("/nebius/finetune/jobs/:id", async (req: AuthRequest, res) => {
     const status = typeof job?.status === "string" && !hasCredential(job.status)
       ? job.status.slice(0, 64)
       : "unknown";
-    let hfRepoVerification = saved.hfRepoVerification || null;
-    let hfRepoContentsVerified = saved.hfRepoContentsVerified === true;
-    if (["succeeded", "completed"].includes(status.toLowerCase()) && !hfRepoContentsVerified) {
-      const token = providerCredentials().huggingFace;
-      if (token && saved.hfRepoName) {
-        hfRepoVerification = await verifyHuggingFaceCheckpoint(saved.hfRepoName, token);
-        hfRepoContentsVerified = hfRepoVerification.verified;
-      }
-    }
     const safeSaved = {
       ...saved,
       status,
       createdAt: typeof job?.created_at === "number" ? job.created_at : saved.createdAt,
       providerRecord: job,
-      hfRepoContentsVerified,
-      hfRepoVerification,
     };
     await setRecord("nebius-job", jobId, safeSaved);
     return res.json({ success: true, job: publicJob(job, safeSaved) });
