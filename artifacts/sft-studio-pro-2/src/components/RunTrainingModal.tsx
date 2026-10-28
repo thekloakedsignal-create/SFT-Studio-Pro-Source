@@ -101,6 +101,7 @@ export function RunTrainingModal({
   const [files, setFiles] = useState<{ trainingFileId: string; validationFileId: string; trainingCount: number; validationCount: number } | null>(null);
   const [estimate, setEstimate] = useState<any>(null);
   const [job, setJob] = useState<any>(null);
+  const [checkpointFiles, setCheckpointFiles] = useState<Array<{ id: string; filename: string; url: string }>>([]);
   const [paidModel, setPaidModel] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -251,6 +252,10 @@ export function RunTrainingModal({
     return () => { cancelled = true; stopPolling(); window.removeEventListener("focus", refresh); };
   }, [job?.id, open]);
 
+  useEffect(() => {
+    setCheckpointFiles([]);
+  }, [job?.id]);
+
   const runPreflight = async () => {
     if (!hfRepoName.trim()) {
       setError("Choose a name for your model before continuing.");
@@ -385,7 +390,20 @@ export function RunTrainingModal({
   const downloadCheckpoint = async () => {
     if (!job?.id) return;
     if (job.provider === "nebius") {
-      window.open(`${outputRepoUrl}/tree/main`, "_blank", "noopener");
+      setBusy(true);
+      setError(null);
+      setCheckpointFiles([]);
+      try {
+        const data = await readApi(await apiFetch(
+          `/api/nebius/finetune/jobs/${encodeURIComponent(job.id)}/checkpoint-files`,
+          { cache: "no-store", signal: AbortSignal.timeout(60000) },
+        ));
+        setCheckpointFiles(Array.isArray(data.files) ? data.files : []);
+      } catch (e: any) {
+        setError(e?.message || "Checkpoint files could not be loaded.");
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     setBusy(true);
@@ -664,8 +682,22 @@ export function RunTrainingModal({
                         className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-green-500/20 to-emerald-600/20 hover:from-green-500/30 hover:to-emerald-600/30 border border-green-500/40 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                       >
                         {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-green-400" />}
-                        <span>{busy ? "Preparing Download…" : job.provider === "nebius" ? "Open Model Files to Download" : "Download Full Checkpoint"}</span>
+                        <span>{busy ? "Preparing Download…" : job.provider === "nebius" ? "Load Checkpoint Downloads" : "Download Full Checkpoint"}</span>
                       </button>
+                    )}
+                    {job.provider === "nebius" && checkpointFiles.length > 0 && (
+                      <div className="space-y-1.5">
+                        {checkpointFiles.map(file => (
+                          <a
+                            key={file.id}
+                            href={file.url}
+                            className="w-full rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 text-[11px] text-slate-200 hover:border-emerald-500/40 flex items-center justify-between gap-3"
+                          >
+                            <span className="truncate">{file.filename}</span>
+                            <span className="shrink-0 inline-flex items-center gap-1 text-emerald-400"><Download className="h-3.5 w-3.5" />Save</span>
+                          </a>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}

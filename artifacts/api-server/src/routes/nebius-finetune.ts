@@ -227,6 +227,40 @@ function publicJob(job: any, saved: any) {
   };
 }
 
+async function getLatestCheckpoint(jobId: string): Promise<any | null> {
+  const checkpoints: any[] = [];
+  let after = "";
+  for (let pageNumber = 0; pageNumber < 20; pageNumber++) {
+    const query = new URLSearchParams({ limit: "100" });
+    if (after) query.set("after", after);
+    const page = await nebiusRequest(
+      `/fine_tuning/jobs/${encodeURIComponent(jobId)}/checkpoints?${query.toString()}`,
+    );
+    if (Array.isArray(page?.data)) checkpoints.push(...page.data);
+    if (page?.has_more !== true) break;
+    const next = safeProviderId(page?.last_id);
+    if (!next || next === after || pageNumber === 19) {
+      throw new ProviderError(502, "Checkpoint listing did not finish.");
+    }
+    after = next;
+  }
+  return checkpoints.reduce((latest, checkpoint) => {
+    if (!latest) return checkpoint;
+    const currentStep = Number(checkpoint?.step_number) || 0;
+    const latestStep = Number(latest?.step_number) || 0;
+    const currentTime = Number(checkpoint?.created_at) || 0;
+    const latestTime = Number(latest?.created_at) || 0;
+    return currentStep > latestStep || (currentStep === latestStep && currentTime > latestTime)
+      ? checkpoint
+      : latest;
+  }, null as any);
+}
+
+function safeDownloadFilename(value: unknown): string {
+  const filename = typeof value === "string" ? value.split(/[\\/]/).at(-1) || "" : "";
+  return filename.replace(/[^\w.-]/g, "_").slice(0, 180) || "checkpoint-file";
+}
+
 const router: IRouter = Router();
 router.use(optionalAuth);
 router.use((_req, res, next) => {
@@ -511,6 +545,118 @@ router.get("/nebius/finetune/jobs/:id", async (req: AuthRequest, res) => {
     return res.json({ success: true, job: publicJob(job, safeSaved) });
   } catch (error) {
     return providerFailure(res, error, "Could not retrieve the job status.");
+  }
+});
+
+router.get("/nebius/finetune/jobs/:id/checkpoint-files", async (req: AuthRequest, res) => {
+  const uid = requireUser(req, res);
+  if (!uid) return;
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const jobId = safeProviderId(rawId);
+  if (!jobId || CLEARED_NEBIUS_JOB_IDS.has(jobId)) {
+    return res.status(404).json({ success: false, error: "Job not found." });
+  }
+
+  try {
+    const saved = await getRecord("nebius-job", jobId);
+    if (!saved || saved.ownerId !== uid) {
+      return res.status(404).json({ success: false, error: "Job not found." });
+    }
+    const job = await nebiusRequest(`/fine_tuning/jobs/${encodeURIComponent(jobId)}`);
+    if (!["succeeded", "completed"].includes(String(job?.status || "").toLowerCase())) {
+      return res.status(409).json({ success: false, error: "Checkpoint files are available after training completes." });
+    }
+    const checkpoint = await getLatestCheckpoint(jobId);
+    const fileIds: string[] = Array.isArray(checkpoint?.result_files)
+      ? checkpoint.result_files.map((id: unknown) => safeProviderId(id)).filter((id: string | null): id is string => Boolean(id))
+      : [];
+    if (!fileIds.length) {
+      return res.status(404).json({ success: false, error: "No checkpoint files are available for this job." });
+    }
+    const files = await Promise.all(fileIds.map(async id => {
+      const metadata = await nebiusRequest(`/files/${encodeURIComponent(id)}`);
+      if (metadata?.id !== id || typeof metadata?.filename !== "string") {
+        throw new ProviderError(502, "Checkpoint file metadata was incomplete.");
+      }
+      return {
+        id,
+        filename: safeDownloadFilename(metadata.filename),
+        url: `/api/nebius/finetune/jobs/${encodeURIComponent(jobId)}/checkpoint-files/${encodeURIComponent(id)}`,
+      };
+    }));
+    return res.json({
+      success: true,
+      checkpoint: { id: safeProviderId(checkpoint?.id), stepNumber: checkpoint?.step_number ?? null },
+      files,
+    });
+  } catch (error) {
+    return providerFailure(res, error, "Could not retrieve checkpoint files.");
+  }
+});
+
+router.get("/nebius/finetune/jobs/:id/checkpoint-files/:fileId", async (req: AuthRequest, res) => {
+  const uid = requireUser(req, res);
+  if (!uid) return;
+  const rawJobId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const rawFileId = Array.isArray(req.params.fileId) ? req.params.fileId[0] : req.params.fileId;
+  const jobId = safeProviderId(rawJobId);
+  const fileId = safeProviderId(rawFileId);
+  if (!jobId || !fileId || CLEARED_NEBIUS_JOB_IDS.has(jobId)) {
+    return res.status(404).json({ success: false, error: "Checkpoint file not found." });
+  }
+
+  try {
+    const saved = await getRecord("nebius-job", jobId);
+    if (!saved || saved.ownerId !== uid) {
+      return res.status(404).json({ success: false, error: "Checkpoint file not found." });
+    }
+    const job = await nebiusRequest(`/fine_tuning/jobs/${encodeURIComponent(jobId)}`);
+    if (!["succeeded", "completed"].includes(String(job?.status || "").toLowerCase())) {
+      return res.status(409).json({ success: false, error: "Checkpoint files are available after training completes." });
+    }
+    const checkpoint = await getLatestCheckpoint(jobId);
+    const fileIds: string[] = Array.isArray(checkpoint?.result_files)
+      ? checkpoint.result_files.map((id: unknown) => safeProviderId(id)).filter((id: string | null): id is string => Boolean(id))
+      : [];
+    if (!fileIds.includes(fileId)) {
+      return res.status(404).json({ success: false, error: "Checkpoint file not found." });
+    }
+    const metadata = await nebiusRequest(`/files/${encodeURIComponent(fileId)}`);
+    if (metadata?.id !== fileId || typeof metadata?.filename !== "string") {
+      return res.status(502).json({ success: false, error: "Checkpoint file metadata was incomplete." });
+    }
+    const apiKey = process.env.NEBIUS_API_KEY;
+    if (!apiKey) throw new ProviderError(503);
+    const upstream = await fetch(`${NEBIUS_API_BASE}/files/${encodeURIComponent(fileId)}/content`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(60 * 60 * 1000),
+    });
+    if (!upstream.ok || !upstream.body) {
+      const text = await upstream.text().catch(() => "");
+      let body: any = null;
+      try { body = text ? JSON.parse(text) : null; } catch { /* Keep the provider status. */ }
+      throw new ProviderError(upstream.status || 502, safeProviderDetail(body));
+    }
+
+    const { Readable } = await import("node:stream");
+    const filename = safeDownloadFilename(metadata.filename);
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    const length = Number(upstream.headers.get("content-length"));
+    if (Number.isFinite(length) && length > 0) res.setHeader("Content-Length", String(length));
+    const stream = Readable.fromWeb(upstream.body as any);
+    stream.on("error", () => {
+      if (res.headersSent) res.destroy();
+      else res.status(502).end("Checkpoint download interrupted.");
+    });
+    stream.pipe(res);
+  } catch (error) {
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
+    return providerFailure(res, error, "Checkpoint download failed.");
   }
 });
 
