@@ -88,10 +88,16 @@ function validateJsonl(content: unknown, label: string): { lines: string[]; erro
         && typeof message.role === "string"
         && (typeof message.content === "string" || Array.isArray(message.tool_calls)))
       && row.messages.at(-1)?.role === "assistant";
-    if (!messagesValid) {
+    const instructionValid = typeof row.prompt === "string" && row.prompt.trim()
+      && typeof row.completion === "string" && row.completion.trim();
+    const textValid = typeof row.text === "string" && row.text.trim();
+    const tokenizedValid = Array.isArray(row.input_ids) && row.input_ids.length > 0
+      && row.input_ids.every((id: unknown) => Number.isInteger(id) && (id as number) >= 0);
+
+    if (!messagesValid && !instructionValid && !textValid && !tokenizedValid) {
       return {
         lines: [],
-        error: `The ${label} dataset line ${index + 1} must contain a non-empty messages array ending with an assistant message.`,
+        error: `The ${label} dataset line ${index + 1} must use a supported JSONL format.`,
       };
     }
   }
@@ -121,7 +127,7 @@ function safeProviderId(value: unknown): string | null {
 }
 
 class ProviderError extends Error {
-  constructor(readonly status: number, readonly detail?: string, readonly providerRecord?: unknown) {
+  constructor(readonly status: number, readonly detail?: string) {
     super("Nebius request failed.");
   }
 }
@@ -168,45 +174,10 @@ async function nebiusRequest(apiPath: string, init: RequestInit = {}): Promise<a
   });
   const text = await response.text();
   let body: any = null;
-  let providerRecord: unknown = text || null;
-  try {
-    body = text ? JSON.parse(text) : null;
-    providerRecord = body;
-  } catch { /* Keep the raw provider response for server-side diagnostics. */ }
+  try { body = text ? JSON.parse(text) : null; } catch { /* discard provider response */ }
 
-  if (!response.ok) throw new ProviderError(response.status, safeProviderDetail(body), providerRecord);
+  if (!response.ok) throw new ProviderError(response.status, safeProviderDetail(body));
   return body;
-}
-
-function adminProviderDiagnostic(error: unknown, operation: string) {
-  if (!(error instanceof ProviderError) || error.providerRecord == null) return null;
-  let serialized: string;
-  try {
-    serialized = JSON.stringify(error.providerRecord);
-  } catch {
-    return null;
-  }
-  for (const secret of Object.values(providerCredentials()).filter(Boolean)) {
-    serialized = serialized.split(secret).join("[redacted credential]");
-  }
-  let providerRecord: unknown = serialized;
-  try { providerRecord = JSON.parse(serialized); } catch { /* Preserve non-JSON response text. */ }
-  return {
-    operation,
-    status: error.status,
-    recordedAt: new Date().toISOString(),
-    providerRecord,
-  };
-}
-
-async function retainAdminProviderDiagnostic(kind: string, id: string, error: unknown, operation: string) {
-  const diagnostic = adminProviderDiagnostic(error, operation);
-  if (!diagnostic) return;
-  try {
-    await setRecord(kind, id, { lastProviderError: diagnostic });
-  } catch {
-    // A diagnostic write must not replace the provider's actual error response.
-  }
 }
 
 function providerFailure(res: any, error: unknown, fallback: string) {
@@ -427,7 +398,6 @@ router.post("/nebius/finetune/upload", async (req: AuthRequest, res) => {
       validationCount: upload.validationCount,
     });
   } catch (error) {
-    await retainAdminProviderDiagnostic("nebius-session", uid, error, "dataset_upload");
     return providerFailure(res, error, "Dataset upload failed. Check the dataset and try again.");
   }
 });
@@ -518,7 +488,6 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
     }
     return res.json({ success: true, job: publicJob(job, saved) });
     } catch (error) {
-      await retainAdminProviderDiagnostic("nebius-session", uid, error, "job_submission");
       if (!submitted) restoreTraining(uid, model);
       return providerFailure(res, error, "Could not create the fine-tuning job.");
     }
@@ -586,7 +555,6 @@ router.get("/nebius/finetune/jobs/:id", async (req: AuthRequest, res) => {
     await setRecord("nebius-job", jobId, safeSaved);
     return res.json({ success: true, job: publicJob(job, safeSaved) });
   } catch (error) {
-    await retainAdminProviderDiagnostic("nebius-job", jobId, error, "job_status");
     return providerFailure(res, error, "Could not retrieve the job status.");
   }
 });
