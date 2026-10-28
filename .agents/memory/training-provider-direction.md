@@ -16,3 +16,9 @@ Together owns its Hugging Face model export. The app passes the requested output
 **Why:** The user said Together completes the Hugging Face upload itself and app-side interference broke that transfer.
 
 **How to apply:** Keep Together's training submission settings and output repo name intact. Do not initiate, verify, or mutate the Hugging Face repository from the app after submission unless the user explicitly asks.
+
+Completed-model UI should provide the Hugging Face repository/files link only; do not load model weights into the app or add a separate download/transfer path for the listing.
+
+**Why:** The user clarified they wanted a button linking to model downloads, not the model weights loaded into the app.
+
+**How to apply:** Display the saved repository link as the download destination and leave model bytes in the provider/Hugging Face storage.

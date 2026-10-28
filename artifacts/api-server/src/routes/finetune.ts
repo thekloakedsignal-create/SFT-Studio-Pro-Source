@@ -141,7 +141,6 @@ interface UserModelChoice {
   baseTrainingModel: string;
   jobId: string;
   createdAt: string;
-  checkpointDownloadAvailable: boolean;
 }
 
 async function getUserModelChoices(uid: string): Promise<UserModelChoice[]> {
@@ -171,7 +170,6 @@ async function rememberCompletedModel(uid: string, job: any, jobId: string): Pro
     baseTrainingModel,
     jobId,
     createdAt: job?.updated_at || new Date().toISOString(),
-    checkpointDownloadAvailable: typeof job?.model_output_path === "string" && job.model_output_path.length > 0,
   };
   await setRecord("model", jobId, { ...choice, ownerId: uid });
   return true;
@@ -533,7 +531,6 @@ router.get("/finetune/completed-models", async (req: AuthRequest, res): Promise<
       baseModel: string | null;
       hfRepoName: string | null;
       completedAt: string | null;
-      checkpointDownloadAvailable: boolean;
     }>();
     const asIso = (value: unknown, fallback?: Date): string | null => {
       const date = typeof value === "number"
@@ -554,7 +551,6 @@ router.get("/finetune/completed-models", async (req: AuthRequest, res): Promise<
         baseModel: model.baseTrainingModel || job.trainingModel || job.model || null,
         hfRepoName,
         completedAt: asIso(model.createdAt || job.createdAt || job.providerUpdatedAt),
-        checkpointDownloadAvailable: model.checkpointDownloadAvailable === true,
       });
     }
 
@@ -567,7 +563,6 @@ router.get("/finetune/completed-models", async (req: AuthRequest, res): Promise<
         baseModel: model.baseTrainingModel || null,
         hfRepoName: model.hfRepoName || null,
         completedAt: asIso(model.createdAt),
-        checkpointDownloadAvailable: model.checkpointDownloadAvailable === true,
       });
     }
 
@@ -581,7 +576,6 @@ router.get("/finetune/completed-models", async (req: AuthRequest, res): Promise<
         baseModel: job.model || null,
         hfRepoName,
         completedAt: asIso(job.providerRecord?.finished_at || job.createdAt),
-        checkpointDownloadAvailable: false,
       });
     }
 
