@@ -141,6 +141,7 @@ interface UserModelChoice {
   baseTrainingModel: string;
   jobId: string;
   createdAt: string;
+  checkpointDownloadAvailable: boolean;
 }
 
 async function getUserModelChoices(uid: string): Promise<UserModelChoice[]> {
@@ -170,6 +171,7 @@ async function rememberCompletedModel(uid: string, job: any, jobId: string): Pro
     baseTrainingModel,
     jobId,
     createdAt: job?.updated_at || new Date().toISOString(),
+    checkpointDownloadAvailable: typeof job?.model_output_path === "string" && job.model_output_path.length > 0,
   };
   await setRecord("model", jobId, { ...choice, ownerId: uid });
   return true;
@@ -513,6 +515,85 @@ router.get("/finetune/latest", (req: AuthRequest, res) => {
   if (!uid) return;
   const jobId = Object.entries(store.jobOwners).filter(([, owner]) => owner === uid).at(-1)?.[0] || null;
   return res.json({ success: true, jobId, createdAt: jobId ? store.jobCreatedAt[jobId] || null : null });
+});
+
+router.get("/finetune/completed-models", async (req: AuthRequest, res): Promise<void> => {
+  const uid = requireUser(req, res);
+  if (!uid) return;
+  try {
+    const [jobs, savedModels, nebiusJobs] = await Promise.all([
+      listRecords("job", uid),
+      listRecords("model", uid),
+      listRecords("nebius-job", uid),
+    ]);
+    const savedModelsByJobId = new Map(savedModels.map(record => [record.id, record.data]));
+    const completed = new Map<string, {
+      jobId: string;
+      modelName: string;
+      baseModel: string | null;
+      hfRepoName: string | null;
+      completedAt: string | null;
+      checkpointDownloadAvailable: boolean;
+    }>();
+    const asIso = (value: unknown, fallback?: Date): string | null => {
+      const date = typeof value === "number"
+        ? new Date(value < 1e12 ? value * 1000 : value)
+        : typeof value === "string" ? new Date(value) : fallback;
+      return date && Number.isFinite(date.getTime()) ? date.toISOString() : null;
+    };
+
+    for (const record of jobs) {
+      const job = record.data || {};
+      if (String(job.status || "").toLowerCase() !== "completed") continue;
+      const model = savedModelsByJobId.get(record.id) || {};
+      const hfRepoName = model.hfRepoName || job.hfRepoName || null;
+      const modelName = model.togetherModelName || job.outputName || job.model || hfRepoName || "Trained model";
+      completed.set(record.id, {
+        jobId: record.id,
+        modelName,
+        baseModel: model.baseTrainingModel || job.trainingModel || job.model || null,
+        hfRepoName,
+        completedAt: asIso(model.createdAt || job.createdAt || job.providerUpdatedAt),
+        checkpointDownloadAvailable: model.checkpointDownloadAvailable === true,
+      });
+    }
+
+    for (const record of savedModels) {
+      if (completed.has(record.id)) continue;
+      const model = record.data || {};
+      completed.set(record.id, {
+        jobId: record.id,
+        modelName: model.togetherModelName || model.hfRepoName || "Trained model",
+        baseModel: model.baseTrainingModel || null,
+        hfRepoName: model.hfRepoName || null,
+        completedAt: asIso(model.createdAt),
+        checkpointDownloadAvailable: model.checkpointDownloadAvailable === true,
+      });
+    }
+
+    for (const record of nebiusJobs) {
+      const job = record.data || {};
+      if (!["succeeded", "completed"].includes(String(job.status || "").toLowerCase())) continue;
+      const hfRepoName = typeof job.hfRepoName === "string" ? job.hfRepoName : null;
+      completed.set(record.id, {
+        jobId: record.id,
+        modelName: hfRepoName || job.model || "Trained model",
+        baseModel: job.model || null,
+        hfRepoName,
+        completedAt: asIso(job.providerRecord?.finished_at || job.createdAt),
+        checkpointDownloadAvailable: false,
+      });
+    }
+
+    res.json({
+      success: true,
+      models: [...completed.values()].sort((a, b) =>
+        Date.parse(b.completedAt || "") - Date.parse(a.completedAt || "")),
+    });
+  } catch (error) {
+    logger.warn({ error: String(error) }, "Completed models could not be loaded");
+    res.status(503).json({ success: false, error: "Completed models could not be loaded. Please retry." });
+  }
 });
 
 router.get("/finetune/model-choices", async (req: AuthRequest, res) => {

@@ -12,6 +12,14 @@ type TrialStatus = {
     remainingMs: number | null;
   };
 };
+type CompletedModel = {
+  jobId: string;
+  modelName: string;
+  baseModel: string | null;
+  hfRepoName: string | null;
+  completedAt: string | null;
+  checkpointDownloadAvailable: boolean;
+};
 type Props = {
   apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 };
@@ -25,6 +33,10 @@ export function ModelChatTab({ apiFetch }: Props) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  const [completedModels, setCompletedModels] = useState<CompletedModel[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelsError, setModelsError] = useState("");
+  const [downloadingJobId, setDownloadingJobId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -41,11 +53,30 @@ export function ModelChatTab({ apiFetch }: Props) {
     }
   }, []);
 
+  const loadCompletedModels = useCallback(async () => {
+    setModelsLoading(true);
+    try {
+      const response = await apiFetchRef.current("/api/finetune/completed-models", { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "Could not load completed models.");
+      setCompletedModels(Array.isArray(result.models) ? result.models : []);
+      setModelsError("");
+    } catch (err) {
+      setModelsError(err instanceof Error ? err.message : "Could not load completed models.");
+    } finally {
+      setModelsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void refresh();
     const timer = window.setInterval(() => void refresh(), 15000);
     return () => window.clearInterval(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    void loadCompletedModels();
+  }, [loadCompletedModels]);
 
   useEffect(() => {
     if (remainingMs === null || !status?.trial?.expiresAt) return;
@@ -72,6 +103,27 @@ export function ModelChatTab({ apiFetch }: Props) {
       setError(err instanceof Error ? err.message : "Could not start model chat.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const downloadCheckpoint = async (model: CompletedModel) => {
+    setDownloadingJobId(model.jobId);
+    setModelsError("");
+    try {
+      const response = await apiFetchRef.current(`/api/finetune/jobs/${encodeURIComponent(model.jobId)}/download`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmDownload: true }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success || typeof result.url !== "string") {
+        throw new Error(result.error || "Checkpoint download could not be prepared.");
+      }
+      window.open(result.url, "_blank", "noopener");
+    } catch (err) {
+      setModelsError(err instanceof Error ? err.message : "Checkpoint download failed.");
+    } finally {
+      setDownloadingJobId(null);
     }
   };
 
@@ -111,6 +163,62 @@ export function ModelChatTab({ apiFetch }: Props) {
         <h2 className="text-lg font-bold text-slate-100">Model Chat</h2>
         <p className="mt-1 text-sm text-slate-400">Try a conversation with your trained model.</p>
       </header>
+
+      <section className="space-y-3 rounded-lg border border-slate-800 bg-slate-900/50 p-4" aria-labelledby="completed-models-title">
+        <div className="flex items-center justify-between gap-3">
+          <h3 id="completed-models-title" className="text-sm font-bold text-slate-100">Completed Models</h3>
+          <button type="button" onClick={() => void loadCompletedModels()} disabled={modelsLoading}
+            className="text-xs text-slate-400 underline hover:text-slate-200 disabled:opacity-50">
+            Refresh
+          </button>
+        </div>
+        {modelsLoading && <p className="text-sm text-slate-400">Loading completed models…</p>}
+        {!modelsLoading && modelsError && <p role="alert" className="text-sm text-rose-300">{modelsError}</p>}
+        {!modelsLoading && !modelsError && completedModels.length === 0 && (
+          <p className="text-sm text-slate-400">No completed models found.</p>
+        )}
+        {!modelsLoading && completedModels.length > 0 && (
+          <ul className="space-y-3">
+            {completedModels.map(model => {
+              const repoUrl = model.hfRepoName
+                ? `https://huggingface.co/${model.hfRepoName.split("/").map(encodeURIComponent).join("/")}/tree/main`
+                : null;
+              const completedDate = model.completedAt && Number.isFinite(Date.parse(model.completedAt))
+                ? new Date(model.completedAt).toLocaleString()
+                : null;
+              return (
+                <li key={model.jobId} className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-all text-sm font-semibold text-slate-100">{model.hfRepoName || model.modelName}</p>
+                      {model.baseModel && <p className="mt-1 break-all text-xs text-slate-400">Base model: {model.baseModel}</p>}
+                      {completedDate && <p className="mt-1 text-xs text-slate-500">Completed {completedDate}</p>}
+                    </div>
+                    <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold text-emerald-300">
+                      Completed
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {repoUrl && (
+                      <a href={repoUrl} target="_blank" rel="noopener noreferrer"
+                        className="rounded-md border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800">
+                        Open model files
+                      </a>
+                    )}
+                    {model.checkpointDownloadAvailable && (
+                      <button type="button" onClick={() => void downloadCheckpoint(model)}
+                        disabled={downloadingJobId === model.jobId}
+                        className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50">
+                        {downloadingJobId === model.jobId ? "Preparing download…" : "Download full checkpoint"}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       {status?.availableModelName && !trial && (
         <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-4">
