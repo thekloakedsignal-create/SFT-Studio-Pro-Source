@@ -178,7 +178,7 @@ export function ModelChatTab({ apiFetch }: Props) {
                   <div className="mt-3 flex flex-wrap gap-2">
                     {repoUrl && (
                       <a href={repoUrl} target="_blank" rel="noopener noreferrer"
-                        className="rounded-md border border-slate-700 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+                        className="kk-model-chat-download-link rounded-md border border-slate-700 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
                         Download model files
                       </a>
                     )}
