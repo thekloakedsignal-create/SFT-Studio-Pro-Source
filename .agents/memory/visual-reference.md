@@ -22,3 +22,9 @@ Use the purple gradient from the highlighted batch-size “5” for selected opt
 **Why:** The user requested one consistent selection color to avoid confusion, with no unrelated or functional changes, and replaced the pink/fuchsia role-label request because it was uncomfortable to look at.
 
 **How to apply:** Keep selected-choice styling consistent across tabs, templates, batch sizes, filters, and selected registry boxes; preserve existing selection behavior and layout.
+
+Model-related action buttons use white lettering.
+
+**Why:** The user requested white text so the model buttons are readable.
+
+**How to apply:** Use white text on model download, save, and refresh buttons without changing their behavior.
