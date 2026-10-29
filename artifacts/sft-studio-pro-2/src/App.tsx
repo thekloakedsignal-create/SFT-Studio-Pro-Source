@@ -4341,7 +4341,7 @@ export default function App() {
         <div className="fixed bottom-4 right-4 z-50 w-80 rounded-2xl border border-emerald-500/30 bg-slate-950/95 p-4 shadow-xl space-y-3">
           <p className="text-sm font-semibold text-slate-100">Do you want to train a model now or export your data set?</p>
           <div className="flex gap-2 items-center">
-            <button type="button" onClick={() => { setDismissedQaExit(qaExitKey); setSectionGuide(null); setActiveTab("trainer"); setShowRunTrainingModal(true); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Train a model</button>
+            <button type="button" onClick={() => { setDismissedQaExit(qaExitKey); setSectionGuide(null); setShowRunTrainingModal(true); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Train a model</button>
             <button type="button" onClick={() => { setDismissedQaExit(qaExitKey); setSectionGuide(null); setActiveTab("registry"); }} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">Export data set</button>
             <button type="button" onClick={() => setDismissedQaExit(qaExitKey)} className="ml-auto text-slate-500 hover:text-slate-300 text-xs transition cursor-pointer">Later</button>
           </div>
@@ -4622,8 +4622,8 @@ export default function App() {
             <button
               id="tab-trainer"
               onClick={() => {
-                setActiveTab("trainer");
                 setIsMobileNavOpen(false);
+                setShowRunTrainingModal(true);
               }}
               className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 shrink-0 ${
                 activeTab === "trainer"
@@ -7290,7 +7290,7 @@ export default function App() {
                   {sectionGuide === "registry" && (
                     <RegistryGuide
                       onClose={() => setSectionGuide(null)}
-                      onOpenTrainer={() => { setSectionGuide(null); setActiveTab("trainer"); }}
+                      onOpenTrainer={() => { setSectionGuide(null); setShowRunTrainingModal(true); }}
                     />
                   )}
 
@@ -7821,36 +7821,6 @@ export default function App() {
                   </div>
                 </div>
               </motion.div>
-            )}
-
-            {activeTab === "trainer" && (
-              <section className="mx-auto w-full max-w-5xl space-y-5 rounded-xl border border-slate-800/60 bg-slate-950/30 p-6">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-100">Automated Trainer</h2>
-                  <p className="mt-1 text-sm text-slate-400">Review the project’s handoff settings, then open the trainer when you are ready. Training will not start automatically.</p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-4">
-                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Selected model</h3>
-                    <p className="mt-2 text-sm font-bold text-slate-100">{trainerHandoff.model}</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-4">
-                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Training template</h3>
-                    <p className="mt-2 text-sm font-bold text-slate-100">
-                      {usesNebiusChatMl ? "ChatML Conversation (messages)" : trainerHandoff.template}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowRunTrainingModal(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-500/40 bg-blue-500/15 px-5 py-3 text-sm font-bold text-slate-100 transition hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Cpu className="h-4 w-4 text-blue-400" />
-                  Open automated trainer
-                </button>
-                <PaymentGate apiFetch={projectApiFetch} planKey={trainingPlan[trainerHandoff.model]} />
-              </section>
             )}
 
             {activeTab === "modelChat" && <ModelChatTab apiFetch={projectApiFetch} />}
