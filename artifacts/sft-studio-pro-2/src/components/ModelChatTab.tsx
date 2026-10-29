@@ -223,7 +223,7 @@ export function ModelChatTab({ apiFetch }: Props) {
                   <div className="mt-3 flex flex-wrap gap-2">
                     {repoUrl && (
                       <a href={repoUrl} target="_blank" rel="noopener noreferrer"
-                        className="kk-model-chat-download-link rounded-md border border-slate-700 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+                        className="kk-model-chat-download-link rounded-lg border border-purple-400 bg-purple-300 px-3 py-2 text-xs font-bold text-black transition hover:bg-purple-200">
                         Hugging Face repository
                       </a>
                     )}
@@ -231,7 +231,7 @@ export function ModelChatTab({ apiFetch }: Props) {
                       type="button"
                       onClick={() => void downloadModelWeights(model)}
                       disabled={downloadingModelId === model.jobId}
-                      className="rounded-md border border-slate-700 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                      className="rounded-lg border border-purple-400 bg-purple-300 px-3 py-2 text-xs font-bold text-black transition hover:bg-purple-200 disabled:opacity-60"
                     >
                       {downloadingModelId === model.jobId ? "Preparing download…" : "Download model weights"}
                     </button>

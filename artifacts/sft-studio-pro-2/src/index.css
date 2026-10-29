@@ -365,7 +365,7 @@ main [class~="opacity-45"] { opacity: .72; }
 
 #root > div:has(> .kk-header) > main .kk-workspace-panel .kk-model-chat-tab :is(button, a.kk-model-chat-download-link),
 #root > div:has(> .kk-header) > main .kk-workspace-panel .kk-model-chat-tab :is(button, a.kk-model-chat-download-link) * {
-  color: #ffffff !important;
+  color: #000000 !important;
 }
 
 #root > div:has(> .kk-header) > main .kk-workspace-panel .kk-model-chat-model-card,
