@@ -135,7 +135,7 @@ export function ModelChatTab({ apiFetch }: Props) {
   const ready = trial?.state === "ready" && remainingMs !== 0;
 
   return (
-    <section className="mx-auto w-full max-w-5xl space-y-5 rounded-xl border border-slate-800/60 bg-slate-950/30 p-6">
+    <section className="kk-model-chat-tab mx-auto w-full max-w-5xl space-y-5 rounded-xl border border-slate-800/60 bg-slate-950/30 p-6">
       <header>
         <h2 className="text-lg font-bold text-slate-100">Model Chat</h2>
         <p className="mt-1 text-sm text-slate-400">Try a conversation with your trained model.</p>

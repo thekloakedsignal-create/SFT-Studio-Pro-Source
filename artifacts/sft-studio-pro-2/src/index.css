@@ -363,7 +363,8 @@ main [class~="opacity-45"] { opacity: .72; }
   color: #ffffff !important;
 }
 
-#root > div:has(> .kk-header) > main .kk-workspace-panel a.kk-model-chat-download-link {
+#root > div:has(> .kk-header) > main .kk-workspace-panel .kk-model-chat-tab :is(button, a.kk-model-chat-download-link),
+#root > div:has(> .kk-header) > main .kk-workspace-panel .kk-model-chat-tab :is(button, a.kk-model-chat-download-link) * {
   color: #ffffff !important;
 }
 
