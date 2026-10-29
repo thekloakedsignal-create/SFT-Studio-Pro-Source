@@ -18,7 +18,9 @@ type CompletedModel = {
   baseModel: string | null;
   hfRepoName: string | null;
   completedAt: string | null;
+  provider: "together" | "nebius";
 };
+type CheckpointFile = { id: string; filename: string; url: string };
 type Props = {
   apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 };
@@ -35,6 +37,9 @@ export function ModelChatTab({ apiFetch }: Props) {
   const [completedModels, setCompletedModels] = useState<CompletedModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState("");
+  const [downloadingModelId, setDownloadingModelId] = useState<string | null>(null);
+  const [checkpointFiles, setCheckpointFiles] = useState<Record<string, CheckpointFile[]>>({});
+  const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({});
 
   const refresh = useCallback(async () => {
     try {
@@ -65,6 +70,46 @@ export function ModelChatTab({ apiFetch }: Props) {
       setModelsLoading(false);
     }
   }, []);
+
+  const downloadModelWeights = async (model: CompletedModel) => {
+    setDownloadingModelId(model.jobId);
+    setDownloadErrors(current => ({ ...current, [model.jobId]: "" }));
+    try {
+      if (model.provider === "nebius") {
+        const response = await apiFetchRef.current(
+          `/api/nebius/finetune/jobs/${encodeURIComponent(model.jobId)}/checkpoint-files`,
+          { cache: "no-store" },
+        );
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || "Checkpoint files could not be loaded.");
+        if (!Array.isArray(result.files) || result.files.length === 0) {
+          throw new Error("No checkpoint files are available for this model.");
+        }
+        setCheckpointFiles(current => ({ ...current, [model.jobId]: result.files }));
+      } else {
+        const response = await apiFetchRef.current(
+          `/api/finetune/jobs/${encodeURIComponent(model.jobId)}/download`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ confirmDownload: true }),
+          },
+        );
+        const result = await response.json();
+        if (!response.ok || !result.success || typeof result.url !== "string") {
+          throw new Error(result.error || "Checkpoint download link could not be prepared.");
+        }
+        window.open(result.url, "_blank", "noopener");
+      }
+    } catch (err) {
+      setDownloadErrors(current => ({
+        ...current,
+        [model.jobId]: err instanceof Error ? err.message : "Checkpoint download failed.",
+      }));
+    } finally {
+      setDownloadingModelId(null);
+    }
+  };
 
   useEffect(() => {
     void refresh();
@@ -164,10 +209,10 @@ export function ModelChatTab({ apiFetch }: Props) {
                 ? new Date(model.completedAt).toLocaleString()
                 : null;
               return (
-                <li key={model.jobId} className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                <li key={model.jobId} className="kk-model-chat-model-card rounded-lg border border-slate-800 bg-slate-950/60 p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="break-all text-sm font-semibold text-slate-100">{model.hfRepoName || model.modelName}</p>
+                      <p className="break-all text-sm font-semibold text-white">{model.hfRepoName || model.baseModel || "Trained model"}</p>
                       {model.baseModel && <p className="mt-1 break-all text-xs text-slate-400">Base model: {model.baseModel}</p>}
                       {completedDate && <p className="mt-1 text-xs text-slate-500">Completed {completedDate}</p>}
                     </div>
@@ -179,10 +224,30 @@ export function ModelChatTab({ apiFetch }: Props) {
                     {repoUrl && (
                       <a href={repoUrl} target="_blank" rel="noopener noreferrer"
                         className="kk-model-chat-download-link rounded-md border border-slate-700 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
-                        Download model files
+                        Hugging Face repository
                       </a>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => void downloadModelWeights(model)}
+                      disabled={downloadingModelId === model.jobId}
+                      className="rounded-md border border-slate-700 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                    >
+                      {downloadingModelId === model.jobId ? "Preparing download…" : "Download model weights"}
+                    </button>
                   </div>
+                  {checkpointFiles[model.jobId]?.length > 0 && (
+                    <div className="mt-3 flex flex-col gap-2">
+                      {checkpointFiles[model.jobId].map(file => (
+                        <a key={file.id} href={file.url} className="break-all text-xs font-semibold text-white underline">
+                          {file.filename}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {downloadErrors[model.jobId] && (
+                    <p role="alert" className="mt-2 text-xs text-white">{downloadErrors[model.jobId]}</p>
+                  )}
                 </li>
               );
             })}

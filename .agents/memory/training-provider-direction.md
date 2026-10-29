@@ -17,8 +17,8 @@ Together owns its Hugging Face model export. The app passes the requested output
 
 **How to apply:** Keep Together's training submission settings and output repo name intact. Do not initiate, verify, or mutate the Hugging Face repository from the app after submission unless the user explicitly asks.
 
-Completed-model UI should provide the Hugging Face repository/files link only; do not load model weights into the app or add a separate download/transfer path for the listing.
+Completed-model cards should show the Hugging Face repository link and a separate provider-native checkpoint download action labeled “Download model weights.” Hide provider names and provider-generated internal model IDs; display the Hugging Face repo name or base model instead.
 
-**Why:** The user clarified they wanted a button linking to model downloads, not the model weights loaded into the app.
+**Why:** The user wants both the Hugging Face destination and the training provider's own checkpoint download, without exposing which service powers training.
 
-**How to apply:** Display the saved repository link as the download destination and leave model bytes in the provider/Hugging Face storage.
+**How to apply:** Use the existing server-side checkpoint download routes; keep checkpoint bytes out of the app and send them directly to the user's browser.

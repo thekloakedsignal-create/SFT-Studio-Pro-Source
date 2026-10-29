@@ -531,6 +531,7 @@ router.get("/finetune/completed-models", async (req: AuthRequest, res): Promise<
       baseModel: string | null;
       hfRepoName: string | null;
       completedAt: string | null;
+      provider: "together" | "nebius";
     }>();
     const asIso = (value: unknown, fallback?: Date): string | null => {
       const date = typeof value === "number"
@@ -551,6 +552,7 @@ router.get("/finetune/completed-models", async (req: AuthRequest, res): Promise<
         baseModel: model.baseTrainingModel || job.trainingModel || job.model || null,
         hfRepoName,
         completedAt: asIso(model.createdAt || job.createdAt || job.providerUpdatedAt),
+        provider: "together",
       });
     }
 
@@ -563,6 +565,7 @@ router.get("/finetune/completed-models", async (req: AuthRequest, res): Promise<
         baseModel: model.baseTrainingModel || null,
         hfRepoName: model.hfRepoName || null,
         completedAt: asIso(model.createdAt),
+        provider: "together",
       });
     }
 
@@ -576,6 +579,7 @@ router.get("/finetune/completed-models", async (req: AuthRequest, res): Promise<
         baseModel: job.model || null,
         hfRepoName,
         completedAt: asIso(job.providerRecord?.finished_at || job.createdAt),
+        provider: "nebius",
       });
     }
 
