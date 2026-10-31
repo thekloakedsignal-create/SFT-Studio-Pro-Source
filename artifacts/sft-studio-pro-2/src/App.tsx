@@ -3535,39 +3535,62 @@ export default function App() {
   const finalizeExamplesForFormat = (examples: SFTExample[], format: string) =>
     finalizeRegistryOutput(examples.map(example => formatExampleForExport(example, format)), format);
 
-  // Helper to trigger clean client-side file download via Blob URL
-  const triggerFileDownload = (content: string, fileName: string, mimeType: string) => {
+  // Save the export through the device picker/share sheet, then use a browser download fallback.
+  const triggerFileDownload = async (
+    content: string,
+    fileName: string,
+    mimeType: string
+  ): Promise<"downloaded" | "shared" | "cancelled"> => {
+    const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+    const extension = fileName.toLowerCase().endsWith(".jsonl") ? ".jsonl" : ".json";
+    const picker = (window as any).showSaveFilePicker;
+
+    if (typeof picker === "function") {
+      try {
+        const handle = await picker({
+          suggestedName: fileName,
+          types: [{ description: extension === ".jsonl" ? "JSON Lines" : "JSON", accept: { [mimeType]: [extension] } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return "downloaded";
+      } catch (error: any) {
+        if (error?.name === "AbortError") return "cancelled";
+      }
+    }
+
+    const shareNavigator = navigator as any;
+    const file = new File([blob], fileName, { type: mimeType });
+    if (typeof shareNavigator.share === "function"
+      && typeof shareNavigator.canShare === "function"
+      && shareNavigator.canShare({ files: [file] })) {
+      try {
+        await shareNavigator.share({ files: [file], title: fileName });
+        return "shared";
+      } catch (error: any) {
+        if (error?.name === "AbortError") return "cancelled";
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.style.display = "none";
+    document.body.appendChild(anchor);
     try {
-      const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
+      anchor.click();
+    } finally {
       setTimeout(() => {
-        document.body.removeChild(a);
+        anchor.remove();
         URL.revokeObjectURL(url);
       }, 1000);
-    } catch (err) {
-      console.error("Blob download failed, using Data URI fallback:", err);
-      const encodedData = `data:${mimeType};charset=utf-8,` + encodeURIComponent(content);
-      const a = document.createElement("a");
-      a.href = encodedData;
-      a.download = fileName;
-      a.setAttribute("download", fileName);
-      a.target = "_blank";
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-      }, 1000);
     }
+    return "downloaded";
   };
 
-  const downloadJSONL = (dataset: SFTExample[], fileName: string) => {
+  const downloadJSONL = async (dataset: SFTExample[], fileName: string) => {
     if (dataset.length === 0) {
       setNotification({ text: "No compiled examples to download.", type: "error" });
       return;
@@ -3577,13 +3600,23 @@ export default function App() {
       setNotification({ text: finalized.error, type: "error" });
       return;
     }
-    triggerFileDownload(finalized.jsonl, fileName, "application/x-jsonlines");
-    const correctionNote = finalized.corrections ? ` Auto-corrected ${finalized.corrections} formatting issue(s).` : "";
-    setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!${correctionNote}`, type: "success" });
+    try {
+      const result = await triggerFileDownload(finalized.jsonl, fileName, "application/x-jsonlines");
+      if (result === "cancelled") return;
+      const correctionNote = finalized.corrections ? ` Auto-corrected ${finalized.corrections} formatting issue(s).` : "";
+      setNotification({
+        text: result === "shared"
+          ? `${fileName} is ready in the share sheet. Choose Save to Files.${correctionNote}`
+          : `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!${correctionNote}`,
+        type: "success",
+      });
+    } catch (error: any) {
+      setNotification({ text: error?.message || "Could not save the JSONL export.", type: "error" });
+    }
   };
 
   // Export utility for standard JSON files (as a JSON array)
-  const downloadJSON = (dataset: SFTExample[], fileName: string) => {
+  const downloadJSON = async (dataset: SFTExample[], fileName: string) => {
     if (dataset.length === 0) {
       setNotification({ text: "No compiled examples to download.", type: "error" });
       return;
@@ -3594,9 +3627,19 @@ export default function App() {
       return;
     }
     const jsonString = JSON.stringify(finalized.records, null, 2);
-    triggerFileDownload(jsonString, fileName, "application/json");
-    const correctionNote = finalized.corrections ? ` Auto-corrected ${finalized.corrections} formatting issue(s).` : "";
-    setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!${correctionNote}`, type: "success" });
+    try {
+      const result = await triggerFileDownload(jsonString, fileName, "application/json");
+      if (result === "cancelled") return;
+      const correctionNote = finalized.corrections ? ` Auto-corrected ${finalized.corrections} formatting issue(s).` : "";
+      setNotification({
+        text: result === "shared"
+          ? `${fileName} is ready in the share sheet. Choose Save to Files.${correctionNote}`
+          : `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!${correctionNote}`,
+        type: "success",
+      });
+    } catch (error: any) {
+      setNotification({ text: error?.message || "Could not save the JSON export.", type: "error" });
+    }
   };
 
   // Request file export with session permission check
@@ -3610,9 +3653,9 @@ export default function App() {
       setShowExportAccessModal(true);
     } else {
       if (format === "json") {
-        downloadJSON(dataset, fileName);
+        void downloadJSON(dataset, fileName);
       } else {
-        downloadJSONL(dataset, fileName);
+        void downloadJSONL(dataset, fileName);
       }
     }
   };
@@ -3628,9 +3671,9 @@ export default function App() {
     setShowExportAccessModal(false);
     if (pendingExport) {
       if (pendingExport.format === "json") {
-        downloadJSON(pendingExport.dataset, pendingExport.fileName);
+        void downloadJSON(pendingExport.dataset, pendingExport.fileName);
       } else {
-        downloadJSONL(pendingExport.dataset, pendingExport.fileName);
+        void downloadJSONL(pendingExport.dataset, pendingExport.fileName);
       }
       setPendingExport(null);
     }
