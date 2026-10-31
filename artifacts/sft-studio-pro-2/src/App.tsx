@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { fetchResponse as fetch } from "@workspace/api-client-react";
 import { rememberBatch, forgetBatch, orderBatchesForReview } from "./lib/batch-recovery";
-import { validateRegistryOutput } from "./lib/registry-validation";
+import { finalizeRegistryOutput, validateRegistryOutput } from "./lib/registry-validation";
 import { mergeRepairReport } from "./lib/merge-repair-report";
 import { 
   Sparkles, 
@@ -3317,11 +3317,12 @@ export default function App() {
     if (targetFormat === "chatml" || targetFormat === "openai") {
       return {
         messages: rawMessages.map(m => {
-          const cleanMsg: Record<string, any> = { role: m.role, content: cleanExportText(m.content) };
+          const cleanMsg: Record<string, any> = { role: m.role };
           const reasoningVal = m.reasoning || m.reasoning_content;
           if (m.role === "assistant" && reasoningVal) {
             cleanMsg.reasoning_content = cleanExportText(reasoningVal);
           }
+          cleanMsg.content = cleanExportText(m.content);
           return cleanMsg;
         })
       };
@@ -3354,22 +3355,27 @@ export default function App() {
       let input = "";
       const primaryUserContent = cleanExportText(userMsgs[0]?.content || "");
 
-      if (primaryUserContent.includes("### Instruction:") || primaryUserContent.includes("### Response:")) {
+      if (isMultiTurn) {
+        instruction = cleanExportText(sysMsg?.content || "Continue the conversation using the dialogue context below.");
+        const dialogue = rawMessages.filter(m => m.role === "user" || m.role === "assistant");
+        const finalAssistantIndex = dialogue.findLastIndex(m => m.role === "assistant");
+        input = dialogue.slice(0, finalAssistantIndex)
+          .map(m => `[${m.role === "user" ? "User" : "Assistant"}]: ${cleanExportText(m.content)}`)
+          .join("\n\n");
+      } else if (primaryUserContent.includes("### Instruction:") || primaryUserContent.includes("### Response:")) {
         const instMatch = primaryUserContent.match(/### Instruction:\s*([\s\S]*?)(?=### Input:|### Response:|$)/i);
         const inputMatch = primaryUserContent.match(/### Input:\s*([\s\S]*?)(?=### Response:|$)/i);
         instruction = cleanExportText(instMatch ? instMatch[1].trim() : primaryUserContent.replace(/### Instruction:\s*/i, "").trim());
         input = cleanExportText(inputMatch ? inputMatch[1].trim() : "");
       } else {
         instruction = cleanExportText(userMsgs[0]?.content || (sysMsg ? sysMsg.content : ""));
-        if (isMultiTurn) {
-          instruction = cleanExportText(sysMsg?.content || "Follow the conversation dialogue below:");
-          input = userMsgs.map((m, idx) => `[User Turn ${idx + 1}]: ${cleanExportText(m.content)}`).join("\n\n");
-        } else if (sysMsg && userMsgs.length > 0) {
+        if (sysMsg && userMsgs.length > 0) {
           input = "";
         }
       }
 
-      const output = assistantMsgs.map(m => {
+      const outputMessages = isMultiTurn ? assistantMsgs.slice(-1) : assistantMsgs;
+      const output = outputMessages.map(m => {
         let val = cleanExportText(m.content || "");
         if (val.startsWith("### Response:\n") || val.startsWith("### Response:")) {
           val = val.replace(/^### Response:\s*/i, "").trim();
@@ -3543,18 +3549,8 @@ export default function App() {
     return { messages: rawMessages };
   };
 
-  const formatExampleForTraining = (ex: SFTExample) => {
-    const formatted = formatExampleForExport(ex, selectedTrainingFormat);
-    if (!usesTogetherQwenChatMl || !Array.isArray((formatted as any)?.messages)) return formatted;
-    return {
-      ...(formatted as any),
-      messages: (formatted as any).messages.map((message: any) => ({
-        role: message.role,
-        ...(message.reasoning_content !== undefined ? { reasoning_content: message.reasoning_content } : {}),
-        content: message.content,
-      })),
-    };
-  };
+  const finalizeExamplesForFormat = (examples: SFTExample[], format: string) =>
+    finalizeRegistryOutput(examples.map(example => formatExampleForExport(example, format)), format);
 
   // Helper to trigger clean client-side file download via Blob URL
   const triggerFileDownload = (content: string, fileName: string, mimeType: string) => {
@@ -3600,11 +3596,14 @@ export default function App() {
       setNotification({ text: "No compiled examples to download.", type: "error" });
       return;
     }
-    const records = dataset.map(ex => formatExampleForExport(ex, exportTemplateFormat));
-    if (!checkRegistryOutput(records, exportTemplateFormat)) return;
-    const lines = records.map(record => JSON.stringify(record)).join("\n");
-    triggerFileDownload(lines, fileName, "application/x-jsonlines");
-    setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!`, type: "success" });
+    const finalized = finalizeExamplesForFormat(dataset, exportTemplateFormat);
+    if (finalized.error) {
+      setNotification({ text: finalized.error, type: "error" });
+      return;
+    }
+    triggerFileDownload(finalized.jsonl, fileName, "application/x-jsonlines");
+    const correctionNote = finalized.corrections ? ` Auto-corrected ${finalized.corrections} formatting issue(s).` : "";
+    setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!${correctionNote}`, type: "success" });
   };
 
   // Export utility for standard JSON files (as a JSON array)
@@ -3613,11 +3612,15 @@ export default function App() {
       setNotification({ text: "No compiled examples to download.", type: "error" });
       return;
     }
-    const sanitizedData = dataset.map(ex => formatExampleForExport(ex, exportTemplateFormat));
-    if (!checkRegistryOutput(sanitizedData, exportTemplateFormat)) return;
-    const jsonString = JSON.stringify(sanitizedData, null, 2);
+    const finalized = finalizeExamplesForFormat(dataset, exportTemplateFormat);
+    if (finalized.error) {
+      setNotification({ text: finalized.error, type: "error" });
+      return;
+    }
+    const jsonString = JSON.stringify(finalized.records, null, 2);
     triggerFileDownload(jsonString, fileName, "application/json");
-    setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!`, type: "success" });
+    const correctionNote = finalized.corrections ? ` Auto-corrected ${finalized.corrections} formatting issue(s).` : "";
+    setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!${correctionNote}`, type: "success" });
   };
 
   // Request file export with session permission check
@@ -3678,25 +3681,25 @@ export default function App() {
     }
 
     // Format all examples for training and validation set
-    const formattedTraining = compiledDataset.trainingSet.length > 0 
-      ? compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, fmt))
-      : allExamples.map(ex => formatExampleForExport(ex, fmt));
-      
-    const formattedValidation = compiledDataset.validationSet.length > 0 
-      ? compiledDataset.validationSet.map(ex => formatExampleForExport(ex, fmt))
-      : [];
+    const formattedTraining = compiledDataset.trainingSet.length > 0
+      ? finalizeExamplesForFormat(compiledDataset.trainingSet, fmt)
+      : finalizeExamplesForFormat(allExamples, fmt);
+    const formattedValidation = compiledDataset.validationSet.length > 0
+      ? finalizeExamplesForFormat(compiledDataset.validationSet, fmt)
+      : finalizeRegistryOutput([], fmt);
 
-    if (!checkRegistryOutput([...formattedTraining, ...formattedValidation], fmt)) {
+    if (formattedTraining.error || formattedValidation.error) {
+      setNotification({ text: formattedTraining.error || formattedValidation.error || "Final dataset validation failed.", type: "error" });
       setExportedPreview("");
       return;
     }
-    const sampleItems = formattedTraining.slice(0, 3);
+    const sampleItems = formattedTraining.records.slice(0, 3);
     
     const previewPayload = {
       targetSchemaFormat: fmt,
       totalFormattedExamples: allExamples.length,
-      trainingSetCount: formattedTraining.length,
-      validationSetCount: formattedValidation.length,
+      trainingSetCount: formattedTraining.records.length,
+      validationSetCount: formattedValidation.records.length,
       sampleFormattedRecords: sampleItems
     };
 
@@ -3718,7 +3721,7 @@ export default function App() {
     setExportedPreview(JSON.stringify(previewPayload, null, 2));
 
     setNotification({
-      text: `Dataset successfully formatted to [${label}]! (${formattedTraining.length} training items, ${formattedValidation.length} validation items formatted). Output preview updated!`,
+      text: `Dataset successfully formatted to [${label}]! (${formattedTraining.records.length} training items, ${formattedValidation.records.length} validation items formatted).${formattedTraining.corrections + formattedValidation.corrections ? ` Auto-corrected ${formattedTraining.corrections + formattedValidation.corrections} formatting issue(s).` : ""} Output preview updated!`,
       type: "success"
     });
 
@@ -3786,12 +3789,20 @@ export default function App() {
   // Preview compile
   useEffect(() => {
     if (compiledDataset.trainingSet.length > 0) {
-      const trainSampleClean = formatExampleForExport(compiledDataset.trainingSet[0], exportTemplateFormat);
+      const trainFinal = finalizeExamplesForFormat(compiledDataset.trainingSet.slice(0, 1), exportTemplateFormat);
+      const valFinal = compiledDataset.validationSet.length > 0
+        ? finalizeExamplesForFormat(compiledDataset.validationSet.slice(0, 1), exportTemplateFormat)
+        : null;
+      if (trainFinal.error || valFinal?.error) {
+        setExportedPreview(trainFinal.error || valFinal?.error || "Final dataset validation failed.");
+        return;
+      }
+      const trainSampleClean = trainFinal.records[0];
       const jsonlSample = JSON.stringify(trainSampleClean);
       const jsonPrettySample = JSON.stringify(trainSampleClean, null, 2);
 
-      const valSampleClean = compiledDataset.validationSet.length > 0 
-        ? JSON.stringify(formatExampleForExport(compiledDataset.validationSet[0], exportTemplateFormat))
+      const valSampleClean = valFinal && valFinal.records.length > 0
+        ? JSON.stringify(valFinal.records[0])
         : "None";
 
       setExportedPreview(
@@ -7488,10 +7499,12 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => {
-                            const records = compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, exportTemplateFormat));
-                            if (!checkRegistryOutput(records, exportTemplateFormat)) return;
-                            const lines = records.map(record => JSON.stringify(record)).join("\n");
-                            navigator.clipboard.writeText(lines);
+                            const finalized = finalizeExamplesForFormat(compiledDataset.trainingSet, exportTemplateFormat);
+                            if (finalized.error) {
+                              setNotification({ text: finalized.error, type: "error" });
+                              return;
+                            }
+                            navigator.clipboard.writeText(finalized.jsonl);
                             setNotification({ text: `Copied Training JSONL dataset (${compiledDataset.trainingSet.length} items) to clipboard!`, type: "success" });
                           }}
                           disabled={compiledDataset.trainingSet.length === 0}
@@ -7528,10 +7541,12 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => {
-                            const records = compiledDataset.validationSet.map(ex => formatExampleForExport(ex, exportTemplateFormat));
-                            if (!checkRegistryOutput(records, exportTemplateFormat)) return;
-                            const lines = records.map(record => JSON.stringify(record)).join("\n");
-                            navigator.clipboard.writeText(lines);
+                            const finalized = finalizeExamplesForFormat(compiledDataset.validationSet, exportTemplateFormat);
+                            if (finalized.error) {
+                              setNotification({ text: finalized.error, type: "error" });
+                              return;
+                            }
+                            navigator.clipboard.writeText(finalized.jsonl);
                             setNotification({ text: `Copied Validation JSONL dataset (${compiledDataset.validationSet.length} items) to clipboard!`, type: "success" });
                           }}
                           disabled={compiledDataset.validationSet.length === 0}
@@ -8276,8 +8291,8 @@ export default function App() {
         trainingModel={trainerHandoff.model}
         onTrainingModelChange={model => setTrainerHandoff(current => ({ ...current, model }))}
         getSerializedSplits={() => ({
-          training: compiledDataset.trainingSet.map(formatExampleForTraining),
-          validation: compiledDataset.validationSet.map(formatExampleForTraining),
+          training: finalizeExamplesForFormat(compiledDataset.trainingSet, selectedTrainingFormat).records,
+          validation: finalizeExamplesForFormat(compiledDataset.validationSet, selectedTrainingFormat).records,
         })}
         apiFetch={projectApiFetch}
         notify={(text, type) => setNotification({ text, type })}

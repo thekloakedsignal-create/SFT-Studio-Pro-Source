@@ -5,7 +5,8 @@ export function validateRegistryOutput(records: unknown[], format: string): stri
     if (!Array.isArray(messages) || !messages.length) return false;
     const turns = messages[0]?.role === "system" && allowSystem ? messages.slice(1) : messages;
     return messages.every(m => m && text(m.content)
-      && (m.reasoning_content === undefined || text(m.reasoning_content)))
+      && (m.reasoning_content === undefined
+        || (m.role === "assistant" && text(m.reasoning_content))))
       && turns.length >= 2 && turns.length % 2 === 0
       && turns.every((m, i) => m.role === (i % 2 ? "assistant" : "user"));
   };
@@ -45,4 +46,88 @@ export function validateRegistryOutput(records: unknown[], format: string): stri
     if (!valid) return `Final format check failed at example ${index + 1}. Please correct it in QA before exporting.`;
   }
   return null;
+}
+
+export interface FinalizedRegistryOutput {
+  records: unknown[];
+  jsonl: string;
+  corrections: number;
+  error: string | null;
+}
+
+const normalizeLineEndings = (value: unknown, onCorrection: () => void): unknown => {
+  if (typeof value !== "string") return value;
+  const normalized = value.replace(/\r\n?/g, "\n");
+  if (normalized !== value) onCorrection();
+  return normalized;
+};
+
+/**
+ * Canonicalize deterministic template issues, serialize to JSONL, reparse it,
+ * and validate the exact records that Registry export or training will use.
+ */
+export function finalizeRegistryOutput(records: unknown[], format: string): FinalizedRegistryOutput {
+  let corrections = 0;
+  const corrected = records.map(record => {
+    if (!record || typeof record !== "object" || Array.isArray(record)) return record;
+    const row = { ...(record as Record<string, any>) };
+
+    if (format === "alpaca") {
+      if (row.input === undefined || row.input === null) {
+        row.input = "";
+        corrections++;
+      }
+      for (const key of ["system", "instruction", "input", "output"]) {
+        row[key] = normalizeLineEndings(row[key], () => corrections++);
+      }
+      return row;
+    }
+
+    if (["chatml", "openai", "openai_o1_o3", "deepseek"].includes(format)
+      && Array.isArray(row.messages)) {
+      row.messages = row.messages.map((message: any) => {
+        if (!message || typeof message !== "object" || Array.isArray(message)) return message;
+        let role = message.role;
+        if (role === "human") {
+          role = "user";
+          corrections++;
+        } else if (role === "gpt") {
+          role = "assistant";
+          corrections++;
+        }
+        const reasoning = message.reasoning_content ?? message.reasoning;
+        if (message.reasoning !== undefined && message.reasoning_content === undefined) corrections++;
+        const normalized: Record<string, unknown> = { role };
+        if (role === "assistant" && reasoning !== undefined) {
+          normalized.reasoning_content = normalizeLineEndings(reasoning, () => corrections++);
+        }
+        normalized.content = normalizeLineEndings(message.content, () => corrections++);
+        return normalized;
+      });
+      return row;
+    }
+
+    if (format === "chatml_token" || format === "chatml_tokens"
+      || format === "chatml_raw" || format === "chatml_instruction") {
+      row.text = normalizeLineEndings(row.text, () => corrections++);
+    }
+    return row;
+  });
+
+  let jsonl = "";
+  let serializedRecords: unknown[] = [];
+  let error: string | null = null;
+  try {
+    jsonl = corrected.map(record => JSON.stringify(record)).join("\n");
+    serializedRecords = jsonl ? jsonl.split("\n").map(line => JSON.parse(line)) : [];
+    if (serializedRecords.length !== records.length) {
+      error = "Final serialization changed the dataset record count.";
+    } else {
+      error = validateRegistryOutput(serializedRecords, format);
+    }
+  } catch {
+    error = "Final serialization failed; the dataset contains a non-JSON value.";
+  }
+
+  return { records: serializedRecords, jsonl, corrections, error };
 }
