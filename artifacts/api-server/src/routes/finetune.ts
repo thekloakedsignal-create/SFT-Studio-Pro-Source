@@ -237,11 +237,11 @@ function validateJsonl(content: unknown, label: string, format: "chatml" | "alpa
       }
       if (format === "alpaca") {
         const valid = typeof row.instruction === "string" && row.instruction.trim().length > 0
-          && typeof row.input === "string"
+          && typeof row.input === "string" && row.input.trim().length > 0
           && typeof row.output === "string" && row.output.trim().length > 0
-          && (row.system === undefined || typeof row.system === "string");
+          && row.system === undefined && row.response === undefined;
         if (!valid) {
-          return { lines: [], error: `The ${label} dataset line ${i + 1} must use Alpaca instruction/input/output format.` };
+          return { lines: [], error: `The ${label} dataset line ${i + 1} must use instruction/input/output format with no system field.` };
         }
       } else {
         const messages = row.messages;

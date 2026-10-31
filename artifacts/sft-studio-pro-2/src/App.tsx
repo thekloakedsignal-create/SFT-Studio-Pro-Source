@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { fetchResponse as fetch } from "@workspace/api-client-react";
 import { rememberBatch, forgetBatch, orderBatchesForReview } from "./lib/batch-recovery";
-import { finalizeRegistryOutput, validateRegistryOutput } from "./lib/registry-validation";
+import { finalizeRegistryOutput } from "./lib/registry-validation";
 import { mergeRepairReport } from "./lib/merge-repair-report";
 import { 
   Sparkles, 
@@ -3317,12 +3317,11 @@ export default function App() {
     if (targetFormat === "chatml" || targetFormat === "openai") {
       return {
         messages: rawMessages.map(m => {
-          const cleanMsg: Record<string, any> = { role: m.role };
+          const cleanMsg: Record<string, any> = { role: m.role, content: cleanExportText(m.content) };
           const reasoningVal = m.reasoning || m.reasoning_content;
           if (m.role === "assistant" && reasoningVal) {
             cleanMsg.reasoning_content = cleanExportText(reasoningVal);
           }
-          cleanMsg.content = cleanExportText(m.content);
           return cleanMsg;
         })
       };
@@ -3351,29 +3350,14 @@ export default function App() {
       const userMsgs = rawMessages.filter(m => m.role === "user");
       const assistantMsgs = rawMessages.filter(m => m.role === "assistant");
 
-      let instruction = "";
-      let input = "";
-      const primaryUserContent = cleanExportText(userMsgs[0]?.content || "");
-
-      if (isMultiTurn) {
-        instruction = cleanExportText(sysMsg?.content || "Continue the conversation using the dialogue context below.");
-        const dialogue = rawMessages.filter(m => m.role === "user" || m.role === "assistant");
-        const finalAssistantIndex = dialogue.findLastIndex(m => m.role === "assistant");
-        input = dialogue.slice(0, finalAssistantIndex)
+      const instruction = cleanExportText(sysMsg?.content || project.systemPrompt || "");
+      const dialogue = rawMessages.filter(m => m.role === "user" || m.role === "assistant");
+      const finalAssistantIndex = dialogue.map(m => m.role).lastIndexOf("assistant");
+      const input = isMultiTurn
+        ? dialogue.slice(0, finalAssistantIndex)
           .map(m => `[${m.role === "user" ? "User" : "Assistant"}]: ${cleanExportText(m.content)}`)
-          .join("\n\n");
-      } else if (primaryUserContent.includes("### Instruction:") || primaryUserContent.includes("### Response:")) {
-        const instMatch = primaryUserContent.match(/### Instruction:\s*([\s\S]*?)(?=### Input:|### Response:|$)/i);
-        const inputMatch = primaryUserContent.match(/### Input:\s*([\s\S]*?)(?=### Response:|$)/i);
-        instruction = cleanExportText(instMatch ? instMatch[1].trim() : primaryUserContent.replace(/### Instruction:\s*/i, "").trim());
-        input = cleanExportText(inputMatch ? inputMatch[1].trim() : "");
-      } else {
-        instruction = cleanExportText(userMsgs[0]?.content || (sysMsg ? sysMsg.content : ""));
-        if (sysMsg && userMsgs.length > 0) {
-          input = "";
-        }
-      }
-
+          .join("\n\n")
+        : cleanExportText(userMsgs[0]?.content || "");
       const outputMessages = isMultiTurn ? assistantMsgs.slice(-1) : assistantMsgs;
       const output = outputMessages.map(m => {
         let val = cleanExportText(m.content || "");
@@ -3389,7 +3373,6 @@ export default function App() {
       }).join("\n\n");
 
       return {
-        ...(sysMsg && !isMultiTurn ? { system: cleanExportText(sysMsg.content) } : {}),
         instruction,
         input,
         output
@@ -3582,13 +3565,6 @@ export default function App() {
         document.body.removeChild(a);
       }, 1000);
     }
-  };
-
-  // Export utility for JSONL files
-  const checkRegistryOutput = (records: unknown[], format: string) => {
-    const error = validateRegistryOutput(records, format);
-    if (error) setNotification({ text: error, type: "error" });
-    return !error;
   };
 
   const downloadJSONL = (dataset: SFTExample[], fileName: string) => {
@@ -8290,10 +8266,11 @@ export default function App() {
         exportFormat={selectedTrainingFormat}
         trainingModel={trainerHandoff.model}
         onTrainingModelChange={model => setTrainerHandoff(current => ({ ...current, model }))}
-        getSerializedSplits={() => ({
-          training: finalizeExamplesForFormat(compiledDataset.trainingSet, selectedTrainingFormat).records,
-          validation: finalizeExamplesForFormat(compiledDataset.validationSet, selectedTrainingFormat).records,
-        })}
+        getSerializedSplits={() => {
+          const training = compiledDataset.trainingSet.map(example => formatExampleForExport(example, selectedTrainingFormat));
+          const validation = compiledDataset.validationSet.map(example => formatExampleForExport(example, selectedTrainingFormat));
+          return { training, validation };
+        }}
         apiFetch={projectApiFetch}
         notify={(text, type) => setNotification({ text, type })}
       />

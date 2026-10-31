@@ -21,8 +21,8 @@ Nebius fine-tuning job requests must provide either top-level `method` or top-le
 
 **How to apply:** When editing Nebius job payloads, preserve the base model and use only the supervised `method` object for hyperparameters.
 
-For the Together automated-training final dataset only, format Llama datasets as Alpaca and Qwen datasets as ChatML `messages`, placing `reasoning_content` before `content` inside each assistant message. Do not change Nebius formatting, Registry exports, generation, or other training workflow behavior.
+For final Registry output and Together uploads, Llama's Alpaca records are `instruction` (system prompt), `input` (user prompt), and `output` (assistant answer), with no `system` field. Qwen ChatML keeps `reasoning_content` before `content` inside the assistant message. Do not change Nebius formatting or generation.
 
-**Why:** The user explicitly limited this model-specific formatting to the final Together training dataset and specified that Qwen reasoning comes before answer content inside the assistant message.
+**Why:** The user specified the exact Llama fields and speaker mapping, required the system prompt to be represented as `instruction`, confirmed `output` is the correct answer field, and placed Qwen reasoning before answer content.
 
-**How to apply:** Select the template at the Together training finalization boundary and validate the matching JSONL schema before upload; leave all other dataset paths and system prompts unchanged.
+**How to apply:** Run final formatting and validation only on Registry finalized outputs and the Together upload; keep Nebius and generation paths unchanged.

@@ -4,7 +4,7 @@ import {
   X, Cpu, Upload, CheckCircle, AlertCircle, RefreshCw, Download,
   ShieldAlert, Cloud, ExternalLink
 } from "lucide-react";
-import { validateRegistryOutput } from "../lib/registry-validation";
+import { finalizeRegistryOutput, validateRegistryOutput } from "../lib/registry-validation";
 import { PaymentGate, trainingPlan } from "./PaymentGate";
 
 const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations: number }> = {
@@ -299,11 +299,22 @@ export function RunTrainingModal({
         current.training = stripReasoning(current.training);
         current.validation = stripReasoning(current.validation);
       }
-      const trainingRecords = usesAdditionalModel ? toNebiusChatMl(current.training) : current.training;
-      const validationRecords = usesAdditionalModel ? toNebiusChatMl(current.validation) : current.validation;
+      let trainingRecords = usesAdditionalModel ? toNebiusChatMl(current.training) : current.training;
+      let validationRecords = usesAdditionalModel ? toNebiusChatMl(current.validation) : current.validation;
       const formatToValidate = usesAdditionalModel ? "chatml" : exportFormat;
-      const trainErr = validateRegistryOutput(trainingRecords, formatToValidate);
-      const valErr = validateRegistryOutput(validationRecords, formatToValidate);
+      let corrections = 0;
+      if (!usesAdditionalModel) {
+        const trainingFinal = finalizeRegistryOutput(trainingRecords, formatToValidate);
+        const validationFinal = finalizeRegistryOutput(validationRecords, formatToValidate);
+        trainingRecords = trainingFinal.records;
+        validationRecords = validationFinal.records;
+        corrections = trainingFinal.corrections + validationFinal.corrections;
+        if (trainingFinal.error || validationFinal.error) {
+          throw new Error(trainingFinal.error || validationFinal.error || "Final dataset validation failed.");
+        }
+      }
+      const trainErr = usesAdditionalModel ? validateRegistryOutput(trainingRecords, formatToValidate) : null;
+      const valErr = usesAdditionalModel ? validateRegistryOutput(validationRecords, formatToValidate) : null;
       if (current.training.length === 0 || current.validation.length === 0 || trainErr || valErr) {
         throw new Error(trainErr || valErr || "Both splits must be non-empty before upload.");
       }
@@ -318,8 +329,8 @@ export function RunTrainingModal({
           model: selectedModel.model,
           confirmUpload: true,
         } : {
-          trainingJsonl: toJsonl(current.training),
-          validationJsonl: toJsonl(current.validation),
+          trainingJsonl: toJsonl(trainingRecords),
+          validationJsonl: toJsonl(validationRecords),
           suffix,
           trainingModel,
           confirmUpload: true,
@@ -340,7 +351,7 @@ export function RunTrainingModal({
         setEstimate(est.estimate);
       }
       setStep("submit");
-      notify("Datasets uploaded and validated. Ready to submit.", "success");
+      notify(`Datasets uploaded and validated.${corrections ? ` Auto-corrected ${corrections} formatting issue(s).` : ""} Ready to submit.`, "success");
     } catch (e: any) {
       setError(e?.message || "Dataset upload failed.");
     } finally {

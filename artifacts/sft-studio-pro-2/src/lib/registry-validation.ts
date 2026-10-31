@@ -5,8 +5,7 @@ export function validateRegistryOutput(records: unknown[], format: string): stri
     if (!Array.isArray(messages) || !messages.length) return false;
     const turns = messages[0]?.role === "system" && allowSystem ? messages.slice(1) : messages;
     return messages.every(m => m && text(m.content)
-      && (m.reasoning_content === undefined
-        || (m.role === "assistant" && text(m.reasoning_content))))
+      && (m.reasoning_content === undefined || text(m.reasoning_content)))
       && turns.length >= 2 && turns.length % 2 === 0
       && turns.every((m, i) => m.role === (i % 2 ? "assistant" : "user"));
   };
@@ -32,11 +31,12 @@ export function validateRegistryOutput(records: unknown[], format: string): stri
             && matches.every(m => !/<\|im_(?:start|end)\|>/.test(m[2]))
             && conversation(matches.map(m => ({ role: m[1], content: m[2] })));
         }
-      } else if (format === "alpaca" || format === "maestro") {
+      } else if (format === "alpaca") {
+        valid = text(row.instruction) && text(row.input) && text(row.output)
+          && row.system === undefined && row.response === undefined;
+      } else if (format === "maestro") {
         valid = text(row.instruction) && typeof row.input === "string"
-          && text(row[format === "alpaca" ? "output" : "response"])
-          && (format === "maestro" ? typeof row.system === "string"
-            : row.system === undefined || typeof row.system === "string");
+          && text(row.response) && typeof row.system === "string";
       } else if (format === "prompt_response") {
         valid = text(row.prompt) && text(row.response);
       }
@@ -73,11 +73,26 @@ export function finalizeRegistryOutput(records: unknown[], format: string): Fina
     const row = { ...(record as Record<string, any>) };
 
     if (format === "alpaca") {
-      if (row.input === undefined || row.input === null) {
-        row.input = "";
+      if (typeof row.system === "string") {
+        const previousInstruction = row.instruction;
+        if ((row.input === undefined || row.input === null || row.input === "")
+          && typeof previousInstruction === "string" && previousInstruction !== row.system) {
+          row.input = previousInstruction;
+          corrections++;
+        }
+        row.instruction = row.system;
+        delete row.system;
         corrections++;
       }
-      for (const key of ["system", "instruction", "input", "output"]) {
+      if (row.output === undefined && typeof row.response === "string") {
+        row.output = row.response;
+        delete row.response;
+        corrections++;
+      } else if (row.response !== undefined) {
+        delete row.response;
+        corrections++;
+      }
+      for (const key of ["instruction", "input", "output"]) {
         row[key] = normalizeLineEndings(row[key], () => corrections++);
       }
       return row;
