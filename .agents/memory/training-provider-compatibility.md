@@ -20,3 +20,9 @@ Nebius fine-tuning job requests must provide either top-level `method` or top-le
 **Why:** Nebius rejected requests containing both fields with HTTP 422; removing the duplicate made job submission work.
 
 **How to apply:** When editing Nebius job payloads, preserve the base model and use only the supervised `method` object for hyperparameters.
+
+For the Together automated-training final dataset only, format Llama datasets as Alpaca and Qwen datasets as ChatML `messages`, preserving assistant reasoning separately as `reasoning_content`. Do not change Nebius formatting, Registry exports, generation, or other training workflow behavior.
+
+**Why:** The user explicitly limited this model-specific formatting to the final Together training dataset and required reasoning to remain a separate field for Qwen.
+
+**How to apply:** Select the template at the Together training finalization boundary and validate the matching JSONL schema before upload; leave all other dataset paths and system prompts unchanged.
