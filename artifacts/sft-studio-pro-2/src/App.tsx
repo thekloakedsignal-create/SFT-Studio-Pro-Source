@@ -3684,7 +3684,7 @@ export default function App() {
       chatml_token: "ChatML Instruction (<|im_start|>)",
       chatml_instruction: "ChatML Instruction (<|im_start|>)",
       openai: "ChatML Conversation (messages)",
-      alpaca: "Alpaca Instruction Format (instruction, input, output)",
+      alpaca: "Alpaca (instruction=system prompt, input=user prompt, output=assistant answer)",
       maestro: "Maestro Instruction Format (system, instruction, input, response)",
       prompt_response: "Prompt & Response Pair",
       openai_o1_o3: "OpenAI o1/o3 Reasoning Conversation (reasoning_content)",
