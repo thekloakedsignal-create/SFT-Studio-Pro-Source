@@ -3543,6 +3543,19 @@ export default function App() {
     return { messages: rawMessages };
   };
 
+  const formatExampleForTraining = (ex: SFTExample) => {
+    const formatted = formatExampleForExport(ex, selectedTrainingFormat);
+    if (!usesTogetherQwenChatMl || !Array.isArray((formatted as any)?.messages)) return formatted;
+    return {
+      ...(formatted as any),
+      messages: (formatted as any).messages.map((message: any) => ({
+        role: message.role,
+        ...(message.reasoning_content !== undefined ? { reasoning_content: message.reasoning_content } : {}),
+        content: message.content,
+      })),
+    };
+  };
+
   // Helper to trigger clean client-side file download via Blob URL
   const triggerFileDownload = (content: string, fileName: string, mimeType: string) => {
     try {
@@ -8263,8 +8276,8 @@ export default function App() {
         trainingModel={trainerHandoff.model}
         onTrainingModelChange={model => setTrainerHandoff(current => ({ ...current, model }))}
         getSerializedSplits={() => ({
-          training: compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, selectedTrainingFormat)),
-          validation: compiledDataset.validationSet.map(ex => formatExampleForExport(ex, selectedTrainingFormat)),
+          training: compiledDataset.trainingSet.map(formatExampleForTraining),
+          validation: compiledDataset.validationSet.map(formatExampleForTraining),
         })}
         apiFetch={projectApiFetch}
         notify={(text, type) => setNotification({ text, type })}
