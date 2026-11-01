@@ -292,8 +292,8 @@ export function RunTrainingModal({
     setPreparingDataset(true);
     setError(null);
     try {
-      // Let the preparation indicator paint before synchronous dataset cleaning.
-      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      // Yield without requiring animation frames, which hidden tabs can suspend.
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
       const current = getSerializedSplits();
       if (trainingModel === "Llama 3.1 70B") {
         // Reasoning batches cannot be uploaded for this model.
