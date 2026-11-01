@@ -49,4 +49,4 @@ Before document conversion, pass the uploaded document through CleanFlux's rule-
 
 **Why:** The user explicitly requested CleanFlux preprocessing before conversion and specified rule-based cleaning, not AI cleaning.
 
-**How to apply:** Read `CLEANFLUX_API_KEY` only on the server. Clean the document before passing it to the existing converter, and fail clearly if preprocessing is unavailable.
+**How to apply:** Read `CLEAN_FLUX_API_KEY` only on the server. Clean the document before passing it to the existing converter, and fail clearly if preprocessing is unavailable.

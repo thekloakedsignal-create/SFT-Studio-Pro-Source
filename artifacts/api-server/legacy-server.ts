@@ -3346,9 +3346,9 @@ class CleanFluxError extends Error {
 }
 
 async function cleanDocumentWithCleanFlux(text: string): Promise<string> {
-  const apiKey = process.env.CLEANFLUX_API_KEY?.trim();
+  const apiKey = process.env.CLEAN_FLUX_API_KEY?.trim();
   if (!apiKey) {
-    throw new CleanFluxError("CleanFlux is not configured. Add CLEANFLUX_API_KEY to server secrets.", 503);
+    throw new CleanFluxError("CleanFlux is not configured. Add CLEAN_FLUX_API_KEY to server secrets.", 503);
   }
 
   let response: Response;
