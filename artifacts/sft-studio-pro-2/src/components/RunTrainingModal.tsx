@@ -325,23 +325,25 @@ export function RunTrainingModal({
       const toJsonl = (records: unknown[]) => records.map(r => JSON.stringify(r)).join("\n");
       const trainingJsonl = toJsonl(trainingRecords);
       const validationJsonl = toJsonl(validationRecords);
+      const uploadForm = new FormData();
+      if (!usesAdditionalModel) {
+        uploadForm.append("trainingFile", new Blob([trainingJsonl], { type: "application/jsonl" }), "training.jsonl");
+        uploadForm.append("validationFile", new Blob([validationJsonl], { type: "application/jsonl" }), "validation.jsonl");
+        uploadForm.append("trainingModel", trainingModel);
+        uploadForm.append("suffix", suffix);
+        uploadForm.append("confirmUpload", "true");
+      }
       setPreparingDataset(false);
       const data = await readApi(await apiFetch(usesAdditionalModel ? "/api/nebius/finetune/upload" : "/api/finetune/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(usesAdditionalModel ? {
+        headers: usesAdditionalModel ? { "Content-Type": "application/json" } : undefined,
+        body: usesAdditionalModel ? JSON.stringify({
           trainingJsonl,
           validationJsonl,
           suffix,
           model: selectedModel.model,
           confirmUpload: true,
-        } : {
-          trainingJsonl,
-          validationJsonl,
-          suffix,
-          trainingModel,
-          confirmUpload: true,
-        }),
+        }) : uploadForm,
       }));
       setFiles({ ...data, validationFileId: data.validationFileId || "" });
       if (!usesAdditionalModel) {
