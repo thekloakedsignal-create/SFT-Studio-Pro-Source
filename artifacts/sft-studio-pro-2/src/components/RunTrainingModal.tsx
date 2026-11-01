@@ -303,7 +303,7 @@ export function RunTrainingModal({
       let validationRecords = usesAdditionalModel ? toNebiusChatMl(current.validation) : current.validation;
       const formatToValidate = usesAdditionalModel ? "chatml" : exportFormat;
       let corrections = 0;
-      if (!usesAdditionalModel) {
+      {
         const trainingFinal = finalizeRegistryOutput(trainingRecords, formatToValidate);
         const validationFinal = finalizeRegistryOutput(validationRecords, formatToValidate);
         trainingRecords = trainingFinal.records;

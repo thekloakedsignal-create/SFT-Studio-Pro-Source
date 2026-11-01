@@ -26,3 +26,9 @@ For final Registry output and Together uploads, Llama's Alpaca records are `inst
 **Why:** The user specified the exact Llama fields and speaker mapping, required the system prompt to be represented as `instruction`, confirmed `output` is the correct answer field, and placed Qwen reasoning before answer content.
 
 **How to apply:** Run final formatting and validation only on Registry finalized outputs and the Together upload; keep Nebius and generation paths unchanged.
+
+The final-output corpus-cleansing pass also applies to Nebius training and validation uploads, after their existing ChatML conversion.
+
+**Why:** The user explicitly extended the supplied final-dataset cleaning to Nebius.
+
+**How to apply:** Share the existing finalizer at upload only; do not change Nebius templates, job settings, or lifecycle.
