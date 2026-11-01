@@ -39,6 +39,10 @@ export function validateRegistryOutput(records: unknown[], format: string): stri
           && text(row.response) && typeof row.system === "string";
       } else if (format === "prompt_response") {
         valid = text(row.prompt) && text(row.response);
+      } else if (format === "text_completion") {
+        valid = text(row.prompt) && text(row.completion);
+      } else if (format === "preference") {
+        valid = text(row.prompt) && text(row.chosen) && text(row.rejected);
       }
     } catch {
       valid = false;
@@ -55,9 +59,14 @@ export interface FinalizedRegistryOutput {
   error: string | null;
 }
 
-const normalizeLineEndings = (value: unknown, onCorrection: () => void): unknown => {
+const normalizeLineEndings = (value: unknown, onCorrection: () => void, preserveThink = false): unknown => {
   if (typeof value !== "string") return value;
-  const normalized = value.replace(/\r\n?/g, "\n");
+  const normalized = value
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(preserveThink ? /<(?!\/?think\b)[^>]*>/gi : /<[^>]*>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (normalized !== value) onCorrection();
   return normalized;
 };
@@ -102,7 +111,8 @@ export function finalizeRegistryOutput(records: unknown[], format: string): Fina
       && Array.isArray(row.messages)) {
       row.messages = row.messages.map((message: any) => {
         if (!message || typeof message !== "object" || Array.isArray(message)) return message;
-        let role = message.role;
+        let role = typeof message.role === "string" ? message.role.trim().toLowerCase() : message.role;
+        if (role !== message.role) corrections++;
         if (role === "human") {
           role = "user";
           corrections++;
@@ -116,7 +126,7 @@ export function finalizeRegistryOutput(records: unknown[], format: string): Fina
         if (role === "assistant" && reasoning !== undefined) {
           normalized.reasoning_content = normalizeLineEndings(reasoning, () => corrections++);
         }
-        normalized.content = normalizeLineEndings(message.content, () => corrections++);
+        normalized.content = normalizeLineEndings(message.content, () => corrections++, format === "deepseek");
         return normalized;
       });
       return row;
@@ -124,7 +134,28 @@ export function finalizeRegistryOutput(records: unknown[], format: string): Fina
 
     if (format === "chatml_token" || format === "chatml_tokens"
       || format === "chatml_raw" || format === "chatml_instruction") {
-      row.text = normalizeLineEndings(row.text, () => corrections++);
+      if (typeof row.text === "string") {
+        // Clean message bodies without removing the selected template's framing.
+        row.text = row.text.replace(
+          /<\|im_start\|>(system|user|assistant)\n([\s\S]*?)\n<\|im_end\|>/g,
+          (_: string, role: string, content: string) =>
+            `<|im_start|>${role}\n${normalizeLineEndings(content, () => corrections++, true)}\n<|im_end|>`
+        );
+      }
+    } else if (format === "sharegpt" && Array.isArray(row.conversations)) {
+      row.conversations = row.conversations.map((message: any) => ({
+        ...message,
+        value: normalizeLineEndings(message?.value, () => corrections++, true),
+      }));
+    } else {
+      const fields = format === "maestro" ? ["system", "instruction", "input", "response"]
+        : format === "prompt_response" ? ["prompt", "response"]
+        : format === "text_completion" ? ["prompt", "completion"]
+        : format === "preference" ? ["prompt", "chosen", "rejected"]
+        : [];
+      for (const key of fields) {
+        row[key] = normalizeLineEndings(row[key], () => corrections++);
+      }
     }
     return row;
   });
