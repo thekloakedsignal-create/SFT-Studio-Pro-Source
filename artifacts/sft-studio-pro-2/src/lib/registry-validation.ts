@@ -41,8 +41,6 @@ export function validateRegistryOutput(records: unknown[], format: string): stri
         valid = text(row.prompt) && text(row.response);
       } else if (format === "text_completion") {
         valid = text(row.prompt) && text(row.completion);
-      } else if (format === "preference") {
-        valid = text(row.prompt) && text(row.chosen) && text(row.rejected);
       }
     } catch {
       valid = false;
@@ -151,7 +149,6 @@ export function finalizeRegistryOutput(records: unknown[], format: string): Fina
       const fields = format === "maestro" ? ["system", "instruction", "input", "response"]
         : format === "prompt_response" ? ["prompt", "response"]
         : format === "text_completion" ? ["prompt", "completion"]
-        : format === "preference" ? ["prompt", "chosen", "rejected"]
         : [];
       for (const key of fields) {
         row[key] = normalizeLineEndings(row[key], () => corrections++);
