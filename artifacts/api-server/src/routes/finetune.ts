@@ -349,8 +349,18 @@ router.post("/finetune/upload", async (req: AuthRequest, res) => {
 
   const safeSuffix = (typeof suffix === "string" && suffix.trim() ? suffix.trim() : "sft-studio").replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 40);
   try {
-    const trainFile = await uploadFineTuneFile(training.lines.join("\n"), `${safeSuffix}-training.jsonl`);
-    const valFile = await uploadFineTuneFile(validation.lines.join("\n"), `${safeSuffix}-validation.jsonl`);
+    // Adapt Alpaca only at ingestion; retain the system prompt as Instruction.
+    const uploadJsonl = (lines: string[]) => datasetFormat === "alpaca"
+      ? lines.map(line => {
+        const { instruction, input, output } = JSON.parse(line);
+        return JSON.stringify({
+          prompt: `### Instruction:\n${instruction}\n\n### Input:\n${input}\n\n### Response:\n`,
+          completion: output,
+        });
+      }).join("\n")
+      : lines.join("\n");
+    const trainFile = await uploadFineTuneFile(uploadJsonl(training.lines), `${safeSuffix}-training.jsonl`);
+    const valFile = await uploadFineTuneFile(uploadJsonl(validation.lines), `${safeSuffix}-validation.jsonl`);
     await waitForFileProcessing(trainFile.id);
     await waitForFileProcessing(valFile.id);
     store.sessions[uid] = {
