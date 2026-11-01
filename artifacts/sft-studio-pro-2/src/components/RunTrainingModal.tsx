@@ -4,7 +4,7 @@ import {
   X, Cpu, Upload, CheckCircle, AlertCircle, RefreshCw, Download,
   ShieldAlert, Cloud, ExternalLink
 } from "lucide-react";
-import { finalizeRegistryOutput, validateRegistryOutput } from "../lib/registry-validation";
+import { excludeUnansweredExamples, finalizeRegistryOutput, validateRegistryOutput } from "../lib/registry-validation";
 import { PaymentGate, trainingPlan } from "./PaymentGate";
 
 const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations: number }> = {
@@ -107,8 +107,10 @@ export function RunTrainingModal({
   const splits = open ? getSerializedSplits() : { training: [], validation: [] };
   const is70B = trainingModel === "Llama 3.1 70B";
   const hasReasoning = is70B && [...splits.training, ...splits.validation].some(r => /<think>|sft_reasoning/.test(JSON.stringify(r)));
-  const trainingValid = splits.training.length > 0 && !validateRegistryOutput(splits.training, exportFormat);
-  const validationValid = splits.validation.length > 0 && !validateRegistryOutput(splits.validation, exportFormat);
+  const completeTraining = excludeUnansweredExamples(splits.training, exportFormat);
+  const completeValidation = excludeUnansweredExamples(splits.validation, exportFormat);
+  const trainingValid = completeTraining.length > 0 && !validateRegistryOutput(completeTraining, exportFormat);
+  const validationValid = completeValidation.length > 0 && !validateRegistryOutput(completeValidation, exportFormat);
 
   const stopPolling = () => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -317,7 +319,7 @@ export function RunTrainingModal({
       }
       const trainErr = usesAdditionalModel ? validateRegistryOutput(trainingRecords, formatToValidate) : null;
       const valErr = usesAdditionalModel ? validateRegistryOutput(validationRecords, formatToValidate) : null;
-      if (current.training.length === 0 || current.validation.length === 0 || trainErr || valErr) {
+      if (trainingRecords.length === 0 || validationRecords.length === 0 || trainErr || valErr) {
         throw new Error(trainErr || valErr || "Both splits must be non-empty before upload.");
       }
       const toJsonl = (records: unknown[]) => records.map(r => JSON.stringify(r)).join("\n");

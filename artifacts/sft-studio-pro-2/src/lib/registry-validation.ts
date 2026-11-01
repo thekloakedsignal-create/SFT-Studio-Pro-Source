@@ -50,6 +50,27 @@ export function validateRegistryOutput(records: unknown[], format: string): stri
   return null;
 }
 
+// Exclude incomplete examples only from finalized copies; never trim their turns.
+export function excludeUnansweredExamples(records: unknown[], format: string): unknown[] {
+  return records.filter(record => {
+    const row = record as any;
+    if (["chatml", "openai", "openai_o1_o3", "deepseek"].includes(format)) {
+      return !Array.isArray(row?.messages) || row.messages.at(-1)?.role !== "user";
+    }
+    if (format === "sharegpt") {
+      return !Array.isArray(row?.conversations) || row.conversations.at(-1)?.from !== "human";
+    }
+    if (["chatml_token", "chatml_tokens", "chatml_raw", "chatml_instruction"].includes(format)
+      && typeof row?.text === "string") {
+      const pattern = /<\|im_start\|>(system|user|assistant)\n([\s\S]*?)\n<\|im_end\|>/g;
+      const turns = [...row.text.matchAll(pattern)];
+      // Leave malformed framing for the validator to reject.
+      return !!row.text.replace(pattern, "").trim() || turns.at(-1)?.[1] !== "user";
+    }
+    return true;
+  });
+}
+
 export interface FinalizedRegistryOutput {
   records: unknown[];
   jsonl: string;
@@ -74,8 +95,9 @@ const normalizeLineEndings = (value: unknown, onCorrection: () => void, preserve
  * and validate the exact records that Registry export or training will use.
  */
 export function finalizeRegistryOutput(records: unknown[], format: string): FinalizedRegistryOutput {
-  let corrections = 0;
-  const corrected = records.map(record => {
+  const completeRecords = excludeUnansweredExamples(records, format);
+  let corrections = records.length - completeRecords.length;
+  const corrected = completeRecords.map(record => {
     if (!record || typeof record !== "object" || Array.isArray(record)) return record;
     const row = { ...(record as Record<string, any>) };
 
@@ -154,7 +176,9 @@ export function finalizeRegistryOutput(records: unknown[], format: string): Fina
   try {
     jsonl = corrected.map(record => JSON.stringify(record)).join("\n");
     serializedRecords = jsonl ? jsonl.split("\n").map(line => JSON.parse(line)) : [];
-    if (serializedRecords.length !== records.length) {
+    if (records.length > 0 && completeRecords.length === 0) {
+      error = "No complete examples remain; every example ends with an unanswered user message.";
+    } else if (serializedRecords.length !== completeRecords.length) {
       error = "Final serialization changed the dataset record count.";
     } else {
       error = validateRegistryOutput(serializedRecords, format);

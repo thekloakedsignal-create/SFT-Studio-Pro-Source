@@ -24,3 +24,9 @@ Preserve existing ChatML message fields and roles during cleaning; do not rebuil
 **Why:** The user explicitly rejected rebuilding ChatML as outside the authorized cleaning scope.
 
 **How to apply:** Clean only existing text values on copies; preserve message structure and metadata.
+
+Final cleanup excludes the entire example when its conversation ends with an unanswered user message. Never repair it by removing only that turn.
+
+**Why:** The user explicitly required whole-example exclusion rather than turn trimming.
+
+**How to apply:** Apply only to finalized export/upload copies; preserve stored examples and reject an empty resulting training or validation split.
