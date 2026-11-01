@@ -3338,53 +3338,6 @@ const LITERATURE_CONVERTER_BACKUP_MODELS = [
   "deepseek-4-flash",
   "llama-4-maverick",
 ];
-class CleanFluxError extends Error {
-  constructor(message: string, readonly statusCode: number) {
-    super(message);
-    this.name = "CleanFluxError";
-  }
-}
-
-async function cleanDocumentWithCleanFlux(text: string): Promise<string> {
-  const apiKey = process.env.CLEAN_FLUX_API_KEY?.trim();
-  if (!apiKey) {
-    throw new CleanFluxError("CleanFlux is not configured. Add CLEAN_FLUX_API_KEY to server secrets.", 503);
-  }
-
-  let response: Response;
-  try {
-    response = await fetch("https://api.cleanflux.ai/clean", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ text, mode: "rule-based" }),
-      signal: AbortSignal.timeout(60_000),
-    });
-  } catch (error: any) {
-    const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError";
-    throw new CleanFluxError(
-      timedOut ? "CleanFlux document cleanup timed out." : "Could not reach CleanFlux for document cleanup.",
-      timedOut ? 504 : 502,
-    );
-  }
-
-  let result: any;
-  try {
-    result = await response.json();
-  } catch {
-    throw new CleanFluxError(`CleanFlux returned an unreadable response (HTTP ${response.status}).`, 502);
-  }
-  if (!response.ok) {
-    throw new CleanFluxError(`CleanFlux document cleanup failed (HTTP ${response.status}).`, 502);
-  }
-  if (result?.success !== true || typeof result.output !== "string" || !result.output.trim()) {
-    throw new CleanFluxError("CleanFlux returned no cleaned document text.", 502);
-  }
-  return result.output;
-}
-
 const documentConversionJobs = new Map<string, {
   owner: string; status: "running" | "complete" | "error";
   updatedAt: number; completed: number; total: number; result?: any;
@@ -3430,20 +3383,6 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
   if (!["transcript", "knowledge_base", "literature"].includes(actualDocType)) {
     return res.status(400).json({ success: false, error: "Unsupported document type." });
   }
-  let cleanedDocumentContent: string;
-  try {
-    cleanedDocumentContent = await cleanDocumentWithCleanFlux(documentContent);
-  } catch (error: any) {
-    logger.error({
-      docType: actualDocType,
-      status: error?.statusCode,
-      error: error?.message || String(error),
-    }, "CleanFlux document preprocessing failed");
-    return res.status(error?.statusCode || 502).json({
-      success: false,
-      error: error?.message || "CleanFlux document preprocessing failed.",
-    });
-  }
 
   // Standardize templateType format
   const tTypeLower = (templateType || "Single Turn").toLowerCase();
@@ -3473,7 +3412,7 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
   const requestedCount = count === undefined ? 8 : Number(count);
   // Transcript mode is extraction, never synthesis. Do not truncate to an AI example count.
   if (actualDocType === "transcript") {
-    const parsed = parseUniversalTranscript(cleanedDocumentContent, userTag, assistantTag);
+    const parsed = parseUniversalTranscript(documentContent, userTag, assistantTag);
     // Training conversations must open with the user: drop anything captured before the first user turn
     // (assistant greetings, or header/metadata misattributed to the assistant speaker).
     const firstUserIndex = parsed.turns.findIndex(turn => turn.role === "user");
@@ -3583,8 +3522,8 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
     // Chunk along natural paragraph and section boundaries (~35,000 characters per chunk)
     const maxSectionLength = 35000;
     const documentSections: string[] = [];
-    if (cleanedDocumentContent.length > maxSectionLength) {
-      let remaining = cleanedDocumentContent;
+    if (documentContent.length > maxSectionLength) {
+      let remaining = documentContent;
       while (remaining.length > 0) {
         if (remaining.length <= maxSectionLength) {
           documentSections.push(remaining);
@@ -3606,7 +3545,7 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
         remaining = remaining.slice(splitIdx).trim();
       }
     } else {
-      documentSections.push(cleanedDocumentContent);
+      documentSections.push(documentContent);
     }
 
     // If a very large source has more chunks than requested examples, balance

@@ -44,9 +44,3 @@ Document-converter (Knowledge/Literature) scheduling must mirror the regular bat
 **Why:** The user found the regular generator's concurrency/model-assignment/retry logic effective and explicitly asked for the same setup in the document converter — without touching the regular generators or converter-specific prompts.
 
 **How to apply:** Apply only to the converter's scheduling/model/timeout configuration. Keep converter-specific prompts and the Literature 10-minute batch deadline separate. Transcript conversion is unaffected.
-
-Before document conversion, pass the uploaded document through CleanFlux's rule-based `/clean` endpoint; never call its profanity endpoint or AI mode.
-
-**Why:** The user explicitly requested CleanFlux preprocessing before conversion and specified rule-based cleaning, not AI cleaning.
-
-**How to apply:** Read `CLEAN_FLUX_API_KEY` only on the server. Clean the document before passing it to the existing converter, and fail clearly if preprocessing is unavailable.
