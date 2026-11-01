@@ -354,7 +354,7 @@ router.post("/finetune/upload", async (req: AuthRequest, res) => {
       ? lines.map(line => {
         const { instruction, input, output } = JSON.parse(line);
         return JSON.stringify({
-          prompt: `### Instruction:\n${instruction}\n\n### Input:\n${input}\n\n### Response:\n`,
+          prompt: `### Instruction:\n${instruction}\n\n${input}\n\n### Response:\n`,
           completion: output,
         });
       }).join("\n")

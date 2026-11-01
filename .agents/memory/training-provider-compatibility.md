@@ -37,4 +37,4 @@ Together's ingestion does not recognize raw `instruction`/`input`/`output` Alpac
 
 **Why:** A read-only file-status check confirmed `INVALID_FORMAT` / “Unknown dataset format” on a file whose first row had exactly the three Alpaca string fields; the provider's data-preparation documentation confirms the accepted shapes.
 
-**How to apply:** The user approved an Alpaca-only upload adapter, retaining the system prompt in the Instruction section. Use Alpaca Instruction/Input/Response headings in the provider's prompt/completion envelope only at upload; do not change Registry exports, stored examples, or other formats.
+**How to apply:** The user approved an Alpaca-only upload adapter, combining both system and user prompts under Instruction and using the assistant message as Response, without a separate Input heading. Use the provider's prompt/completion envelope only at upload; do not change Registry exports, stored examples, or other formats.
