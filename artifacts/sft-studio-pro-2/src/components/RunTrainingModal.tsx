@@ -446,7 +446,6 @@ export function RunTrainingModal({
   const outputModelName = job?.hfRepoName || (hfRepoName.trim() ? `RoseG/${hfRepoName.trim()}` : "");
   const outputRepoUrl = `https://huggingface.co/${outputModelName.split("/").map(encodeURIComponent).join("/")}`;
   const closeTrainer = () => {
-    if (busy || (job?.id && !isTerminal)) return;
     if (isTerminal) setJob(null);
     onClose();
   };
@@ -481,11 +480,9 @@ export function RunTrainingModal({
                   Training typically takes 1–3 hours. When it completes, you will receive the public Hugging Face repository link for your model.
                 </p>
               </div>
-              {(!job?.id || isTerminal) && (
-                <button type="button" onClick={closeTrainer} className="p-1.5 rounded-lg hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition cursor-pointer">
+                <button type="button" onClick={closeTrainer} aria-label="Close automated trainer" className="p-1.5 rounded-lg hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition cursor-pointer">
                   <X className="h-4 w-4" />
                 </button>
-              )}
             </div>
 
             {/* Fixed configuration summary */}
