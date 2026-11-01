@@ -96,6 +96,7 @@ export function RunTrainingModal({
   const [suffix, setSuffix] = useState("");
   const [hfRepoName, setHfRepoName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [preparingDataset, setPreparingDataset] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preflight, setPreflight] = useState<any>(null);
   const [files, setFiles] = useState<{ trainingFileId: string; validationFileId: string; trainingCount: number; validationCount: number } | null>(null);
@@ -290,8 +291,11 @@ export function RunTrainingModal({
 
   const uploadDatasets = async () => {
     setBusy(true);
+    setPreparingDataset(true);
     setError(null);
     try {
+      // Let the preparation indicator paint before synchronous dataset cleaning.
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
       const current = getSerializedSplits();
       if (trainingModel === "Llama 3.1 70B") {
         // Reasoning batches cannot be uploaded for this model.
@@ -319,18 +323,21 @@ export function RunTrainingModal({
         throw new Error(trainErr || valErr || "Both splits must be non-empty before upload.");
       }
       const toJsonl = (records: unknown[]) => records.map(r => JSON.stringify(r)).join("\n");
+      const trainingJsonl = toJsonl(trainingRecords);
+      const validationJsonl = toJsonl(validationRecords);
+      setPreparingDataset(false);
       const data = await readApi(await apiFetch(usesAdditionalModel ? "/api/nebius/finetune/upload" : "/api/finetune/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(usesAdditionalModel ? {
-          trainingJsonl: toJsonl(trainingRecords),
-          validationJsonl: toJsonl(validationRecords),
+          trainingJsonl,
+          validationJsonl,
           suffix,
           model: selectedModel.model,
           confirmUpload: true,
         } : {
-          trainingJsonl: toJsonl(trainingRecords),
-          validationJsonl: toJsonl(validationRecords),
+          trainingJsonl,
+          validationJsonl,
           suffix,
           trainingModel,
           confirmUpload: true,
@@ -355,6 +362,7 @@ export function RunTrainingModal({
     } catch (e: any) {
       setError(e?.message || "Dataset upload failed.");
     } finally {
+      setPreparingDataset(false);
       setBusy(false);
     }
   };
@@ -618,7 +626,7 @@ export function RunTrainingModal({
                   className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500/20 to-green-600/20 hover:from-emerald-500/30 hover:to-green-600/30 border border-emerald-500/40 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                 >
                   {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 text-emerald-400" />}
-                  <span>{busy ? "Uploading & Validating…" : "Approve & Upload Datasets"}</span>
+                  <span>{preparingDataset ? "preparing data set for training" : busy ? "Uploading & Validating…" : "Approve & Upload Datasets"}</span>
                 </button>
                 <p className="text-[10px] text-slate-500 leading-relaxed">
                   This sends both automatically formatted {usesAdditionalModel ? "ChatML conversation" : "ChatML Instruction"} datasets after approval. Starting training still requires separate approval.

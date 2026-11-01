@@ -32,3 +32,9 @@ The final-output corpus-cleansing pass also applies to Nebius training and valid
 **Why:** The user explicitly extended the supplied final-dataset cleaning to Nebius.
 
 **How to apply:** Share the existing finalizer at upload only; do not change Nebius templates, job settings, or lifecycle.
+
+Together's ingestion does not recognize raw `instruction`/`input`/`output` Alpaca objects. Its documented SFT JSONL shapes are `prompt`/`completion`, `messages`, or `text`. Keep the user's Alpaca export requirement distinct from provider ingestion requirements.
+
+**Why:** A read-only file-status check confirmed `INVALID_FORMAT` / “Unknown dataset format” on a file whose first row had exactly the three Alpaca string fields; the provider's data-preparation documentation confirms the accepted shapes.
+
+**How to apply:** Ask before changing the explicitly requested training template; any approved provider adapter belongs at upload only, not in Registry exports or stored examples.

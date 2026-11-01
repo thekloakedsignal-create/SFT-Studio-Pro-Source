@@ -286,7 +286,7 @@ async function waitForFileProcessing(fileId: string): Promise<void> {
     const status = String(info?.processing_status || info?.status || "").toLowerCase();
     if (status === "completed" || (!info?.processing_status && (info?.Processed === true || status === "processed"))) return;
     if (status === "invalid_format" || status.includes("error") || status.includes("fail")) {
-      throw new Error(info?.error || `Together AI could not process uploaded file ${fileId}.`);
+      throw new Error(info?.validation_report?.error || info?.error || `Together AI could not process uploaded file ${fileId}.`);
     }
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
