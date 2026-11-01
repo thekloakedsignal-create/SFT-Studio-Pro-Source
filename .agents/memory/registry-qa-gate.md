@@ -18,3 +18,9 @@ Apply the user's supplied corpus-cleansing rules only to finalized export/upload
 **Why:** The user supplied the cleansing script and explicitly restricted its integration to the final dataset before export or training, without rewriting existing logic.
 
 **How to apply:** Keep stored examples, generation, and training workflow unchanged; use the existing final-output boundary rather than adding a new API/service.
+
+Preserve existing ChatML message fields and roles during cleaning; do not rebuild messages from a field whitelist or rename reasoning fields.
+
+**Why:** The user explicitly rejected rebuilding ChatML as outside the authorized cleaning scope.
+
+**How to apply:** Clean only existing text values on copies; preserve message structure and metadata.

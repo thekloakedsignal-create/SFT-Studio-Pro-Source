@@ -109,20 +109,11 @@ export function finalizeRegistryOutput(records: unknown[], format: string): Fina
       && Array.isArray(row.messages)) {
       row.messages = row.messages.map((message: any) => {
         if (!message || typeof message !== "object" || Array.isArray(message)) return message;
-        let role = typeof message.role === "string" ? message.role.trim().toLowerCase() : message.role;
-        if (role !== message.role) corrections++;
-        if (role === "human") {
-          role = "user";
-          corrections++;
-        } else if (role === "gpt") {
-          role = "assistant";
-          corrections++;
-        }
-        const reasoning = message.reasoning_content ?? message.reasoning;
-        if (message.reasoning !== undefined && message.reasoning_content === undefined) corrections++;
-        const normalized: Record<string, unknown> = { role };
-        if (role === "assistant" && reasoning !== undefined) {
-          normalized.reasoning_content = normalizeLineEndings(reasoning, () => corrections++);
+        const normalized: Record<string, unknown> = { ...message };
+        for (const key of ["reasoning", "reasoning_content"]) {
+          if (message[key] !== undefined) {
+            normalized[key] = normalizeLineEndings(message[key], () => corrections++);
+          }
         }
         normalized.content = normalizeLineEndings(message.content, () => corrections++, format === "deepseek");
         return normalized;
