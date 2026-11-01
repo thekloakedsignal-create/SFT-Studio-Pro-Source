@@ -60,10 +60,8 @@ function toNebiusChatMl(records: unknown[]): Array<{ messages: Array<{ role: str
     const row = record as any;
     if (Array.isArray(row?.messages)) {
       return {
-        messages: row.messages.map((message: any) => ({
-          role: message.role,
-          content: message.content,
-        })),
+        ...row,
+        messages: row.messages.map((message: any) => ({ ...message })),
       };
     }
     if (typeof row?.text === "string") {
