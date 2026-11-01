@@ -505,7 +505,7 @@ export function RunTrainingModal({
             {error && (
               <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/20 text-[11px] text-red-300">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{error}</span>
+                <span>{error.replace(/\b(?:Together(?:\s*AI)?|Nebius(?:\s+Token\s+Factory)?|Token\s+Factory)\b/gi, "Training")}</span>
               </div>
             )}
 
