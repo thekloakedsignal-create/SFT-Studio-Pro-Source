@@ -3286,6 +3286,7 @@ export default function App() {
     const cleanExportText = (text: any): string => {
       if (text === null || text === undefined) return "";
       let str = typeof text === "string" ? text : String(text);
+      str = str.replace(/\\n/g, "\n");
       // Remove accidental literal "/n" artifacts (forward slash n) which should be clean newlines
       str = str.replace(/\\\/n/g, "\n");
       str = str.replace(/(?<=\s|^)\/n(?=\s|$)/g, "\n");
