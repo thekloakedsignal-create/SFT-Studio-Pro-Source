@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { fetchResponse as fetch } from "@workspace/api-client-react";
 import { rememberBatch, forgetBatch, orderBatchesForReview } from "./lib/batch-recovery";
-import { finalizeRegistryOutput } from "./lib/registry-validation";
+import { validateRegistryOutput } from "./lib/registry-validation";
 import { mergeRepairReport } from "./lib/merge-repair-report";
 import { 
   Sparkles, 
@@ -762,12 +762,8 @@ export default function App() {
   const [showExamplePaygate, setShowExamplePaygate] = useState(false);
   const [trainerHandoff, setTrainerHandoff] = useState({ model: "Qwen3.5 9 Base", template: "Instruct ChatML (<|im_start|>)" });
   const usesNebiusChatMl = ["Qwen/Qwen3-14B-Base", "Qwen/Qwen2.5-72B", "Qwen/Qwen2.5-32B"].includes(trainerHandoff.model);
-  const usesTogetherLlamaAlpaca = trainerHandoff.model === "Llama 3.1 70B";
-  const usesTogetherQwenChatMl = ["Qwen3.5 9 Base", "Qwen3.5 4B Base"].includes(trainerHandoff.model);
   const noReasoningForProjectModel = ["Llama 3.1 70B", "Qwen/Qwen2.5-72B"].includes(project.onboardingModel || "");
-  const selectedTrainingFormat = usesNebiusChatMl || usesTogetherQwenChatMl
-    ? "chatml"
-    : usesTogetherLlamaAlpaca ? "alpaca" : "chatml_token";
+  const selectedTrainingFormat = usesNebiusChatMl ? "chatml" : "chatml_token";
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showCustomPackageModal, setShowCustomPackageModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -3284,26 +3280,7 @@ export default function App() {
 
   // Helper to format SFT examples according to target template format (ChatML, Alpaca, Maestro, DeepSeek, OpenAI o1/o3, ShareGPT, Prompt/Response)
   const formatExampleForExport = (ex: SFTExample, targetFormat: string) => {
-    if (!ex) return ex;
-    const source = ex as SFTExample & {
-      instruction?: string;
-      input?: string;
-      output?: string;
-    };
-    const sourceMessages = Array.isArray(source.messages) && source.messages.length > 0
-      ? source.messages
-      : targetFormat === "chatml"
-        && typeof source.input === "string"
-        && typeof source.output === "string"
-        ? [
-          ...(typeof source.instruction === "string" && source.instruction.trim()
-            ? [{ role: "system", content: source.instruction }]
-            : []),
-          { role: "user", content: source.input },
-          { role: "assistant", content: source.output },
-        ]
-        : null;
-    if (!sourceMessages) return ex;
+    if (!ex || !Array.isArray(ex.messages) || ex.messages.length === 0) return ex;
 
     // Helper to sanitize any stray or accidental "/n" string artifacts into clean newlines
     const cleanExportText = (text: any): string => {
@@ -3320,7 +3297,7 @@ export default function App() {
     };
 
     // Preserve exact messages array without destructive text regex mangling
-    const rawMessages = sourceMessages.map(m => ({
+    const rawMessages = ex.messages.map(m => ({
       role: m.role,
       content: cleanExportText(m.content),
       ...(m.reasoning ? { reasoning: cleanExportText(m.reasoning) } : {}),
@@ -3369,16 +3346,26 @@ export default function App() {
       const userMsgs = rawMessages.filter(m => m.role === "user");
       const assistantMsgs = rawMessages.filter(m => m.role === "assistant");
 
-      const instruction = cleanExportText(sysMsg?.content || project.systemPrompt || "");
-      const dialogue = rawMessages.filter(m => m.role === "user" || m.role === "assistant");
-      const finalAssistantIndex = dialogue.map(m => m.role).lastIndexOf("assistant");
-      const input = isMultiTurn
-        ? dialogue.slice(0, finalAssistantIndex)
-          .map(m => `[${m.role === "user" ? "User" : "Assistant"}]: ${cleanExportText(m.content)}`)
-          .join("\n\n")
-        : cleanExportText(userMsgs[0]?.content || "");
-      const outputMessages = isMultiTurn ? assistantMsgs.slice(-1) : assistantMsgs;
-      const output = outputMessages.map(m => {
+      let instruction = "";
+      let input = "";
+      const primaryUserContent = cleanExportText(userMsgs[0]?.content || "");
+
+      if (primaryUserContent.includes("### Instruction:") || primaryUserContent.includes("### Response:")) {
+        const instMatch = primaryUserContent.match(/### Instruction:\s*([\s\S]*?)(?=### Input:|### Response:|$)/i);
+        const inputMatch = primaryUserContent.match(/### Input:\s*([\s\S]*?)(?=### Response:|$)/i);
+        instruction = cleanExportText(instMatch ? instMatch[1].trim() : primaryUserContent.replace(/### Instruction:\s*/i, "").trim());
+        input = cleanExportText(inputMatch ? inputMatch[1].trim() : "");
+      } else {
+        instruction = cleanExportText(userMsgs[0]?.content || (sysMsg ? sysMsg.content : ""));
+        if (isMultiTurn) {
+          instruction = cleanExportText(sysMsg?.content || "Follow the conversation dialogue below:");
+          input = userMsgs.map((m, idx) => `[User Turn ${idx + 1}]: ${cleanExportText(m.content)}`).join("\n\n");
+        } else if (sysMsg && userMsgs.length > 0) {
+          input = "";
+        }
+      }
+
+      const output = assistantMsgs.map(m => {
         let val = cleanExportText(m.content || "");
         if (val.startsWith("### Response:\n") || val.startsWith("### Response:")) {
           val = val.replace(/^### Response:\s*/i, "").trim();
@@ -3392,6 +3379,7 @@ export default function App() {
       }).join("\n\n");
 
       return {
+        ...(sysMsg && !isMultiTurn ? { system: cleanExportText(sysMsg.content) } : {}),
         instruction,
         input,
         output
@@ -3551,28 +3539,43 @@ export default function App() {
     return { messages: rawMessages };
   };
 
-  const finalizeExamplesForFormat = (examples: SFTExample[], format: string) =>
-    finalizeRegistryOutput(examples.map(example => formatExampleForExport(example, format)), format);
-
-  const triggerFileDownload = (content: string, fileName: string, mimeType: string): boolean => {
+  // Helper to trigger clean client-side file download via Blob URL
+  const triggerFileDownload = (content: string, fileName: string, mimeType: string) => {
     try {
       const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
       const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = fileName;
-      anchor.style.display = "none";
-      document.body.appendChild(anchor);
-      anchor.click();
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
       setTimeout(() => {
-        anchor.remove();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 1000);
-      return true;
-    } catch {
-      setNotification({ text: "Could not save the export file.", type: "error" });
-      return false;
+    } catch (err) {
+      console.error("Blob download failed, using Data URI fallback:", err);
+      const encodedData = `data:${mimeType};charset=utf-8,` + encodeURIComponent(content);
+      const a = document.createElement("a");
+      a.href = encodedData;
+      a.download = fileName;
+      a.setAttribute("download", fileName);
+      a.target = "_blank";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+      }, 1000);
     }
+  };
+
+  // Export utility for JSONL files
+  const checkRegistryOutput = (records: unknown[], format: string) => {
+    const error = validateRegistryOutput(records, format);
+    if (error) setNotification({ text: error, type: "error" });
+    return !error;
   };
 
   const downloadJSONL = (dataset: SFTExample[], fileName: string) => {
@@ -3580,14 +3583,11 @@ export default function App() {
       setNotification({ text: "No compiled examples to download.", type: "error" });
       return;
     }
-    const finalized = finalizeExamplesForFormat(dataset, exportTemplateFormat);
-    if (finalized.error) {
-      setNotification({ text: finalized.error, type: "error" });
-      return;
-    }
-    if (!triggerFileDownload(finalized.jsonl, fileName, "application/x-jsonlines")) return;
-    const correctionNote = finalized.corrections ? ` Auto-corrected ${finalized.corrections} formatting issue(s).` : "";
-    setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!${correctionNote}`, type: "success" });
+    const records = dataset.map(ex => formatExampleForExport(ex, exportTemplateFormat));
+    if (!checkRegistryOutput(records, exportTemplateFormat)) return;
+    const lines = records.map(record => JSON.stringify(record)).join("\n");
+    triggerFileDownload(lines, fileName, "application/x-jsonlines");
+    setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!`, type: "success" });
   };
 
   // Export utility for standard JSON files (as a JSON array)
@@ -3596,15 +3596,11 @@ export default function App() {
       setNotification({ text: "No compiled examples to download.", type: "error" });
       return;
     }
-    const finalized = finalizeExamplesForFormat(dataset, exportTemplateFormat);
-    if (finalized.error) {
-      setNotification({ text: finalized.error, type: "error" });
-      return;
-    }
-    const jsonString = JSON.stringify(finalized.records, null, 2);
-    if (!triggerFileDownload(jsonString, fileName, "application/json")) return;
-    const correctionNote = finalized.corrections ? ` Auto-corrected ${finalized.corrections} formatting issue(s).` : "";
-    setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!${correctionNote}`, type: "success" });
+    const sanitizedData = dataset.map(ex => formatExampleForExport(ex, exportTemplateFormat));
+    if (!checkRegistryOutput(sanitizedData, exportTemplateFormat)) return;
+    const jsonString = JSON.stringify(sanitizedData, null, 2);
+    triggerFileDownload(jsonString, fileName, "application/json");
+    setNotification({ text: `Exported ${fileName} successfully in [${exportTemplateFormat.toUpperCase()}] template format!`, type: "success" });
   };
 
   // Request file export with session permission check
@@ -3665,25 +3661,25 @@ export default function App() {
     }
 
     // Format all examples for training and validation set
-    const formattedTraining = compiledDataset.trainingSet.length > 0
-      ? finalizeExamplesForFormat(compiledDataset.trainingSet, fmt)
-      : finalizeExamplesForFormat(allExamples, fmt);
-    const formattedValidation = compiledDataset.validationSet.length > 0
-      ? finalizeExamplesForFormat(compiledDataset.validationSet, fmt)
-      : finalizeRegistryOutput([], fmt);
+    const formattedTraining = compiledDataset.trainingSet.length > 0 
+      ? compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, fmt))
+      : allExamples.map(ex => formatExampleForExport(ex, fmt));
+      
+    const formattedValidation = compiledDataset.validationSet.length > 0 
+      ? compiledDataset.validationSet.map(ex => formatExampleForExport(ex, fmt))
+      : [];
 
-    if (formattedTraining.error || formattedValidation.error) {
-      setNotification({ text: formattedTraining.error || formattedValidation.error || "Final dataset validation failed.", type: "error" });
+    if (!checkRegistryOutput([...formattedTraining, ...formattedValidation], fmt)) {
       setExportedPreview("");
       return;
     }
-    const sampleItems = formattedTraining.records.slice(0, 2);
+    const sampleItems = formattedTraining.slice(0, 3);
     
     const previewPayload = {
       targetSchemaFormat: fmt,
       totalFormattedExamples: allExamples.length,
-      trainingSetCount: formattedTraining.records.length,
-      validationSetCount: formattedValidation.records.length,
+      trainingSetCount: formattedTraining.length,
+      validationSetCount: formattedValidation.length,
       sampleFormattedRecords: sampleItems
     };
 
@@ -3692,7 +3688,7 @@ export default function App() {
       chatml_token: "ChatML Instruction (<|im_start|>)",
       chatml_instruction: "ChatML Instruction (<|im_start|>)",
       openai: "ChatML Conversation (messages)",
-      alpaca: "Alpaca (instruction=system prompt, input=user prompt, output=assistant answer)",
+      alpaca: "Alpaca Instruction Format (instruction, input, output)",
       maestro: "Maestro Instruction Format (system, instruction, input, response)",
       prompt_response: "Prompt & Response Pair",
       openai_o1_o3: "OpenAI o1/o3 Reasoning Conversation (reasoning_content)",
@@ -3705,7 +3701,7 @@ export default function App() {
     setExportedPreview(JSON.stringify(previewPayload, null, 2));
 
     setNotification({
-      text: `Dataset successfully formatted to [${label}]! (${formattedTraining.records.length} training items, ${formattedValidation.records.length} validation items formatted).${formattedTraining.corrections + formattedValidation.corrections ? ` Auto-corrected ${formattedTraining.corrections + formattedValidation.corrections} formatting issue(s).` : ""} Output preview updated!`,
+      text: `Dataset successfully formatted to [${label}]! (${formattedTraining.length} training items, ${formattedValidation.length} validation items formatted). Output preview updated!`,
       type: "success"
     });
 
@@ -3759,22 +3755,6 @@ export default function App() {
           });
           return { ...ex, messages: updatedMsgs };
         }
-        if ((fmt === "chatml" || fmt === "openai") && !Array.isArray((ex as any).messages)) {
-          const legacyAlpaca = ex as any;
-          if (typeof legacyAlpaca.input === "string" && typeof legacyAlpaca.output === "string") {
-            const instruction = typeof legacyAlpaca.instruction === "string"
-              ? legacyAlpaca.instruction.trim()
-              : "";
-            return {
-              ...legacyAlpaca,
-              messages: [
-                ...(instruction ? [{ role: "system", content: instruction }] : []),
-                { role: "user", content: legacyAlpaca.input },
-                { role: "assistant", content: legacyAlpaca.output },
-              ],
-            };
-          }
-        }
         return ex;
       });
       return { ...b, examples: updatedExamples };
@@ -3789,20 +3769,12 @@ export default function App() {
   // Preview compile
   useEffect(() => {
     if (compiledDataset.trainingSet.length > 0) {
-      const trainFinal = finalizeExamplesForFormat(compiledDataset.trainingSet.slice(0, 1), exportTemplateFormat);
-      const valFinal = compiledDataset.validationSet.length > 0
-        ? finalizeExamplesForFormat(compiledDataset.validationSet.slice(0, 1), exportTemplateFormat)
-        : null;
-      if (trainFinal.error || valFinal?.error) {
-        setExportedPreview(trainFinal.error || valFinal?.error || "Final dataset validation failed.");
-        return;
-      }
-      const trainSampleClean = trainFinal.records[0];
+      const trainSampleClean = formatExampleForExport(compiledDataset.trainingSet[0], exportTemplateFormat);
       const jsonlSample = JSON.stringify(trainSampleClean);
       const jsonPrettySample = JSON.stringify(trainSampleClean, null, 2);
 
-      const valSampleClean = valFinal && valFinal.records.length > 0
-        ? JSON.stringify(valFinal.records[0])
+      const valSampleClean = compiledDataset.validationSet.length > 0 
+        ? JSON.stringify(formatExampleForExport(compiledDataset.validationSet[0], exportTemplateFormat))
         : "None";
 
       setExportedPreview(
@@ -7499,12 +7471,10 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => {
-                            const finalized = finalizeExamplesForFormat(compiledDataset.trainingSet, exportTemplateFormat);
-                            if (finalized.error) {
-                              setNotification({ text: finalized.error, type: "error" });
-                              return;
-                            }
-                            navigator.clipboard.writeText(finalized.jsonl);
+                            const records = compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, exportTemplateFormat));
+                            if (!checkRegistryOutput(records, exportTemplateFormat)) return;
+                            const lines = records.map(record => JSON.stringify(record)).join("\n");
+                            navigator.clipboard.writeText(lines);
                             setNotification({ text: `Copied Training JSONL dataset (${compiledDataset.trainingSet.length} items) to clipboard!`, type: "success" });
                           }}
                           disabled={compiledDataset.trainingSet.length === 0}
@@ -7541,12 +7511,10 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => {
-                            const finalized = finalizeExamplesForFormat(compiledDataset.validationSet, exportTemplateFormat);
-                            if (finalized.error) {
-                              setNotification({ text: finalized.error, type: "error" });
-                              return;
-                            }
-                            navigator.clipboard.writeText(finalized.jsonl);
+                            const records = compiledDataset.validationSet.map(ex => formatExampleForExport(ex, exportTemplateFormat));
+                            if (!checkRegistryOutput(records, exportTemplateFormat)) return;
+                            const lines = records.map(record => JSON.stringify(record)).join("\n");
+                            navigator.clipboard.writeText(lines);
                             setNotification({ text: `Copied Validation JSONL dataset (${compiledDataset.validationSet.length} items) to clipboard!`, type: "success" });
                           }}
                           disabled={compiledDataset.validationSet.length === 0}
@@ -8290,11 +8258,10 @@ export default function App() {
         exportFormat={selectedTrainingFormat}
         trainingModel={trainerHandoff.model}
         onTrainingModelChange={model => setTrainerHandoff(current => ({ ...current, model }))}
-        getSerializedSplits={() => {
-          const training = compiledDataset.trainingSet.map(example => formatExampleForExport(example, selectedTrainingFormat));
-          const validation = compiledDataset.validationSet.map(example => formatExampleForExport(example, selectedTrainingFormat));
-          return { training, validation };
-        }}
+        getSerializedSplits={() => ({
+          training: compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, selectedTrainingFormat)),
+          validation: compiledDataset.validationSet.map(ex => formatExampleForExport(ex, selectedTrainingFormat)),
+        })}
         apiFetch={projectApiFetch}
         notify={(text, type) => setNotification({ text, type })}
       />

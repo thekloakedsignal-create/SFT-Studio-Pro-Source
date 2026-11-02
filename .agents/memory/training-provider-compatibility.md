@@ -20,27 +20,3 @@ Nebius fine-tuning job requests must provide either top-level `method` or top-le
 **Why:** Nebius rejected requests containing both fields with HTTP 422; removing the duplicate made job submission work.
 
 **How to apply:** When editing Nebius job payloads, preserve the base model and use only the supervised `method` object for hyperparameters.
-
-For final Registry output and Together uploads, Llama's Alpaca records are `instruction` (system prompt), `input` (user prompt), and `output` (assistant answer), with no `system` field. Qwen ChatML keeps `reasoning_content` before `content` inside the assistant message. Do not change Nebius formatting or generation.
-
-**Why:** The user specified the exact Llama fields and speaker mapping, required the system prompt to be represented as `instruction`, confirmed `output` is the correct answer field, and placed Qwen reasoning before answer content.
-
-**How to apply:** Run final formatting and validation only on Registry finalized outputs and the Together upload; keep Nebius and generation paths unchanged.
-
-The final-output corpus-cleansing pass also applies to Nebius training and validation uploads, after their existing ChatML conversion.
-
-**Why:** The user explicitly extended the supplied final-dataset cleaning to Nebius.
-
-**How to apply:** Share the existing finalizer at upload only; do not change Nebius templates, job settings, or lifecycle.
-
-Together's ingestion does not recognize raw `instruction`/`input`/`output` Alpaca objects. Its documented SFT JSONL shapes are `prompt`/`completion`, `messages`, or `text`. Keep the user's Alpaca export requirement distinct from provider ingestion requirements.
-
-**Why:** A read-only file-status check confirmed `INVALID_FORMAT` / “Unknown dataset format” on a file whose first row had exactly the three Alpaca string fields; the provider's data-preparation documentation confirms the accepted shapes.
-
-**How to apply:** The user approved an Alpaca-only upload adapter, combining both system and user prompts under Instruction and using the assistant message as Response, without a separate Input heading. Use the provider's prompt/completion envelope only at upload; do not change Registry exports, stored examples, or other formats.
-
-SFT Studio Pro is SFT-only; do not introduce DPO/preference-data support.
-
-**Why:** The user explicitly said “we do not do that here. It's SFT studio pro not DPO.”
-
-**How to apply:** Do not add preference-format validators or training paths when adapting supplied scripts.

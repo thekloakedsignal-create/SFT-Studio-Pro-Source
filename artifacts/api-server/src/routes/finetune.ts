@@ -223,7 +223,7 @@ async function togetherRequest(apiPath: string, init: RequestInit = {}): Promise
   return body;
 }
 
-function validateJsonl(content: unknown, label: string, format: "chatml" | "alpaca"): { lines: string[]; error?: string } {
+function validateJsonl(content: unknown, label: string): { lines: string[]; error?: string } {
   if (typeof content !== "string" || !content.trim()) {
     return { lines: [], error: `The ${label} dataset is empty.` };
   }
@@ -235,31 +235,15 @@ function validateJsonl(content: unknown, label: string, format: "chatml" | "alpa
       if (!row || Array.isArray(row) || typeof row !== "object") {
         return { lines: [], error: `The ${label} dataset line ${i + 1} is not a JSON object.` };
       }
-      if (format === "alpaca") {
-        const valid = typeof row.instruction === "string" && row.instruction.trim().length > 0
-          && typeof row.input === "string" && row.input.trim().length > 0
-          && typeof row.output === "string" && row.output.trim().length > 0
-          && row.system === undefined && row.response === undefined;
-        if (!valid) {
-          return { lines: [], error: `The ${label} dataset line ${i + 1} must use instruction/input/output format with no system field.` };
-        }
-      } else {
-        const messages = row.messages;
-        const messagesValid = Array.isArray(messages)
-          && messages.length > 0
-          && messages.every((message: any) => message && typeof message === "object"
-            && ["system", "user", "assistant"].includes(message.role)
-            && typeof message.content === "string" && message.content.trim().length > 0
-            && (message.reasoning_content === undefined
-              || (message.role === "assistant"
-                && typeof message.reasoning_content === "string"
-                && message.reasoning_content.trim().length > 0)));
-        const dialogue = messagesValid && messages[0]?.role === "system" ? messages.slice(1) : messages;
-        if (!messagesValid || !dialogue || dialogue.length < 2 || dialogue.length % 2
-          || dialogue.at(-1)?.role !== "assistant"
-          || dialogue.some((message: any, index: number) => message.role !== (index % 2 ? "assistant" : "user"))) {
-          return { lines: [], error: `The ${label} dataset line ${i + 1} must use ChatML messages with complete user/assistant turns.` };
-        }
+      const pattern = /<\|im_start\|>(system|user|assistant)\n([\s\S]*?)\n<\|im_end\|>/g;
+      const text = typeof row.text === "string" ? row.text : "";
+      const turns = [...text.matchAll(pattern)];
+      const dialogue = turns[0]?.[1] === "system" ? turns.slice(1) : turns;
+      if (!turns.length || text.replace(pattern, "").trim()
+        || turns.some(t => !t[2].trim() || /<\|im_(?:start|end)\|>/.test(t[2]))
+        || dialogue.length < 2 || dialogue.length % 2
+        || dialogue.some((t, index) => t[1] !== (index % 2 ? "assistant" : "user"))) {
+        return { lines: [], error: `The ${label} dataset line ${i + 1} must use ChatML Instruction (<|im_start|>) format.` };
       }
     } catch {
       return { lines: [], error: `The ${label} dataset line ${i + 1} is not valid JSON.` };
@@ -286,7 +270,7 @@ async function waitForFileProcessing(fileId: string): Promise<void> {
     const status = String(info?.processing_status || info?.status || "").toLowerCase();
     if (status === "completed" || (!info?.processing_status && (info?.Processed === true || status === "processed"))) return;
     if (status === "invalid_format" || status.includes("error") || status.includes("fail")) {
-      throw new Error(info?.validation_report?.error || info?.error || `Together AI could not process uploaded file ${fileId}.`);
+      throw new Error(info?.error || `Together AI could not process uploaded file ${fileId}.`);
     }
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
@@ -329,8 +313,7 @@ router.post("/finetune/upload", async (req: AuthRequest, res) => {
   const store: FinetuneStore = res.locals.finetuneStore;
   const uid = requireUser(req, res);
   if (!uid) return;
-  const trainingModel = req.body?.trainingModel ?? "Qwen3.5 9 Base";
-  const config = getTrainingConfig(trainingModel);
+  const config = getTrainingConfig(req.body?.trainingModel);
   if (!config) return res.status(400).json({ success: false, error: "Unsupported training model." });
   const { trainingJsonl, validationJsonl, suffix, confirmUpload } = req.body || {};
   if (confirmUpload !== true) {
@@ -341,26 +324,15 @@ router.post("/finetune/upload", async (req: AuthRequest, res) => {
     || (store.sessions[uid]?.preflightModel || TRAINING_CONFIGS["Qwen3.5 9 Base"].model) !== config.model) {
     return res.status(409).json({ success: false, error: "Run the preflight check before uploading datasets." });
   }
-  const datasetFormat = trainingModel === "Llama 3.1 70B" ? "alpaca" : "chatml";
-  const training = validateJsonl(trainingJsonl, "training", datasetFormat);
+  const training = validateJsonl(trainingJsonl, "training");
   if (training.error) return res.status(400).json({ success: false, error: training.error });
-  const validation = validateJsonl(validationJsonl, "validation", datasetFormat);
+  const validation = validateJsonl(validationJsonl, "validation");
   if (validation.error) return res.status(400).json({ success: false, error: validation.error });
 
   const safeSuffix = (typeof suffix === "string" && suffix.trim() ? suffix.trim() : "sft-studio").replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 40);
   try {
-    // Adapt Alpaca only at ingestion; retain the system prompt as Instruction.
-    const uploadJsonl = (lines: string[]) => datasetFormat === "alpaca"
-      ? lines.map(line => {
-        const { instruction, input, output } = JSON.parse(line);
-        return JSON.stringify({
-          prompt: `### Instruction:\n${instruction}\n\n${input}\n\n### Response:\n`,
-          completion: output,
-        });
-      }).join("\n")
-      : lines.join("\n");
-    const trainFile = await uploadFineTuneFile(uploadJsonl(training.lines), `${safeSuffix}-training.jsonl`);
-    const valFile = await uploadFineTuneFile(uploadJsonl(validation.lines), `${safeSuffix}-validation.jsonl`);
+    const trainFile = await uploadFineTuneFile(training.lines.join("\n"), `${safeSuffix}-training.jsonl`);
+    const valFile = await uploadFineTuneFile(validation.lines.join("\n"), `${safeSuffix}-validation.jsonl`);
     await waitForFileProcessing(trainFile.id);
     await waitForFileProcessing(valFile.id);
     store.sessions[uid] = {

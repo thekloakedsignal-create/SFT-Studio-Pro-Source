@@ -3,7 +3,7 @@ name: Interface naming
 description: Scope of model and backend naming removal from the interface.
 ---
 
-Show the selected model name in training choices, but never disclose the training provider, backend, or pipeline location in the interface, including errors returned by the server during upload. Keep progress messages generic and preserve batch names.
+Show the selected model name in training choices, but never disclose the training provider, backend, or pipeline location in the interface. Keep progress messages generic and preserve batch names.
 
 **Why:** The user said the model is the only training detail users need; provider and pipeline details are proprietary.
 

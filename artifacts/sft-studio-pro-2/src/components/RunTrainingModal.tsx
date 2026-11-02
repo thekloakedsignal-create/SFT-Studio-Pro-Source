@@ -4,7 +4,7 @@ import {
   X, Cpu, Upload, CheckCircle, AlertCircle, RefreshCw, Download,
   ShieldAlert, Cloud, ExternalLink
 } from "lucide-react";
-import { excludeUnansweredExamples, finalizeRegistryOutput, validateRegistryOutput } from "../lib/registry-validation";
+import { validateRegistryOutput } from "../lib/registry-validation";
 import { PaymentGate, trainingPlan } from "./PaymentGate";
 
 const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations: number }> = {
@@ -60,8 +60,10 @@ function toNebiusChatMl(records: unknown[]): Array<{ messages: Array<{ role: str
     const row = record as any;
     if (Array.isArray(row?.messages)) {
       return {
-        ...row,
-        messages: row.messages.map((message: any) => ({ ...message })),
+        messages: row.messages.map((message: any) => ({
+          role: message.role,
+          content: message.content,
+        })),
       };
     }
     if (typeof row?.text === "string") {
@@ -94,7 +96,6 @@ export function RunTrainingModal({
   const [suffix, setSuffix] = useState("");
   const [hfRepoName, setHfRepoName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [preparingDataset, setPreparingDataset] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preflight, setPreflight] = useState<any>(null);
   const [files, setFiles] = useState<{ trainingFileId: string; validationFileId: string; trainingCount: number; validationCount: number } | null>(null);
@@ -107,10 +108,8 @@ export function RunTrainingModal({
   const splits = open ? getSerializedSplits() : { training: [], validation: [] };
   const is70B = trainingModel === "Llama 3.1 70B";
   const hasReasoning = is70B && [...splits.training, ...splits.validation].some(r => /<think>|sft_reasoning/.test(JSON.stringify(r)));
-  const completeTraining = excludeUnansweredExamples(splits.training, exportFormat);
-  const completeValidation = excludeUnansweredExamples(splits.validation, exportFormat);
-  const trainingValid = completeTraining.length > 0 && !validateRegistryOutput(completeTraining, exportFormat);
-  const validationValid = completeValidation.length > 0 && !validateRegistryOutput(completeValidation, exportFormat);
+  const trainingValid = splits.training.length > 0 && !validateRegistryOutput(splits.training, exportFormat);
+  const validationValid = splits.validation.length > 0 && !validateRegistryOutput(splits.validation, exportFormat);
 
   const stopPolling = () => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -291,11 +290,8 @@ export function RunTrainingModal({
 
   const uploadDatasets = async () => {
     setBusy(true);
-    setPreparingDataset(true);
     setError(null);
     try {
-      // Yield without requiring animation frames, which hidden tabs can suspend.
-      await new Promise<void>(resolve => setTimeout(resolve, 0));
       const current = getSerializedSplits();
       if (trainingModel === "Llama 3.1 70B") {
         // Reasoning batches cannot be uploaded for this model.
@@ -303,47 +299,31 @@ export function RunTrainingModal({
         current.training = stripReasoning(current.training);
         current.validation = stripReasoning(current.validation);
       }
-      let trainingRecords = usesAdditionalModel ? toNebiusChatMl(current.training) : current.training;
-      let validationRecords = usesAdditionalModel ? toNebiusChatMl(current.validation) : current.validation;
+      const trainingRecords = usesAdditionalModel ? toNebiusChatMl(current.training) : current.training;
+      const validationRecords = usesAdditionalModel ? toNebiusChatMl(current.validation) : current.validation;
       const formatToValidate = usesAdditionalModel ? "chatml" : exportFormat;
-      let corrections = 0;
-      {
-        const trainingFinal = finalizeRegistryOutput(trainingRecords, formatToValidate);
-        const validationFinal = finalizeRegistryOutput(validationRecords, formatToValidate);
-        trainingRecords = trainingFinal.records;
-        validationRecords = validationFinal.records;
-        corrections = trainingFinal.corrections + validationFinal.corrections;
-        if (trainingFinal.error || validationFinal.error) {
-          throw new Error(trainingFinal.error || validationFinal.error || "Final dataset validation failed.");
-        }
-      }
-      const trainErr = usesAdditionalModel ? validateRegistryOutput(trainingRecords, formatToValidate) : null;
-      const valErr = usesAdditionalModel ? validateRegistryOutput(validationRecords, formatToValidate) : null;
-      if (trainingRecords.length === 0 || validationRecords.length === 0 || trainErr || valErr) {
+      const trainErr = validateRegistryOutput(trainingRecords, formatToValidate);
+      const valErr = validateRegistryOutput(validationRecords, formatToValidate);
+      if (current.training.length === 0 || current.validation.length === 0 || trainErr || valErr) {
         throw new Error(trainErr || valErr || "Both splits must be non-empty before upload.");
       }
       const toJsonl = (records: unknown[]) => records.map(r => JSON.stringify(r)).join("\n");
-      const trainingJsonl = toJsonl(trainingRecords);
-      const validationJsonl = toJsonl(validationRecords);
-      const uploadForm = new FormData();
-      if (!usesAdditionalModel) {
-        uploadForm.append("trainingFile", new Blob([trainingJsonl], { type: "application/jsonl" }), "training.jsonl");
-        uploadForm.append("validationFile", new Blob([validationJsonl], { type: "application/jsonl" }), "validation.jsonl");
-        uploadForm.append("trainingModel", trainingModel);
-        uploadForm.append("suffix", suffix);
-        uploadForm.append("confirmUpload", "true");
-      }
-      setPreparingDataset(false);
       const data = await readApi(await apiFetch(usesAdditionalModel ? "/api/nebius/finetune/upload" : "/api/finetune/upload", {
         method: "POST",
-        headers: usesAdditionalModel ? { "Content-Type": "application/json" } : undefined,
-        body: usesAdditionalModel ? JSON.stringify({
-          trainingJsonl,
-          validationJsonl,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(usesAdditionalModel ? {
+          trainingJsonl: toJsonl(trainingRecords),
+          validationJsonl: toJsonl(validationRecords),
           suffix,
           model: selectedModel.model,
           confirmUpload: true,
-        }) : uploadForm,
+        } : {
+          trainingJsonl: toJsonl(current.training),
+          validationJsonl: toJsonl(current.validation),
+          suffix,
+          trainingModel,
+          confirmUpload: true,
+        }),
       }));
       setFiles({ ...data, validationFileId: data.validationFileId || "" });
       if (!usesAdditionalModel) {
@@ -360,11 +340,10 @@ export function RunTrainingModal({
         setEstimate(est.estimate);
       }
       setStep("submit");
-      notify(`Datasets uploaded and validated.${corrections ? ` Auto-corrected ${corrections} formatting issue(s).` : ""} Ready to submit.`, "success");
+      notify("Datasets uploaded and validated. Ready to submit.", "success");
     } catch (e: any) {
       setError(e?.message || "Dataset upload failed.");
     } finally {
-      setPreparingDataset(false);
       setBusy(false);
     }
   };
@@ -450,6 +429,7 @@ export function RunTrainingModal({
   const outputModelName = job?.hfRepoName || (hfRepoName.trim() ? `RoseG/${hfRepoName.trim()}` : "");
   const outputRepoUrl = `https://huggingface.co/${outputModelName.split("/").map(encodeURIComponent).join("/")}`;
   const closeTrainer = () => {
+    if (busy || (job?.id && !isTerminal)) return;
     if (isTerminal) setJob(null);
     onClose();
   };
@@ -484,9 +464,11 @@ export function RunTrainingModal({
                   Training typically takes 1–3 hours. When it completes, you will receive the public Hugging Face repository link for your model.
                 </p>
               </div>
-                <button type="button" onClick={closeTrainer} aria-label="Close automated trainer" className="p-1.5 rounded-lg hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition cursor-pointer">
+              {(!job?.id || isTerminal) && (
+                <button type="button" onClick={closeTrainer} className="p-1.5 rounded-lg hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition cursor-pointer">
                   <X className="h-4 w-4" />
                 </button>
+              )}
             </div>
 
             {/* Fixed configuration summary */}
@@ -512,7 +494,7 @@ export function RunTrainingModal({
             {error && (
               <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/20 text-[11px] text-red-300">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{error.replace(/\b(?:Together(?:\s*AI)?|Nebius(?:\s+Token\s+Factory)?|Token\s+Factory)\b/gi, "Training")}</span>
+                <span>{error}</span>
               </div>
             )}
 
@@ -625,7 +607,7 @@ export function RunTrainingModal({
                   className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500/20 to-green-600/20 hover:from-emerald-500/30 hover:to-green-600/30 border border-emerald-500/40 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                 >
                   {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 text-emerald-400" />}
-                  <span>{preparingDataset ? "preparing data set for training" : busy ? "Uploading & Validating…" : "Approve & Upload Datasets"}</span>
+                  <span>{busy ? "Uploading & Validating…" : "Approve & Upload Datasets"}</span>
                 </button>
                 <p className="text-[10px] text-slate-500 leading-relaxed">
                   This sends both automatically formatted {usesAdditionalModel ? "ChatML conversation" : "ChatML Instruction"} datasets after approval. Starting training still requires separate approval.
