@@ -4,7 +4,7 @@ import {
   X, Cpu, Upload, CheckCircle, AlertCircle, RefreshCw, Download,
   ShieldAlert, Cloud, ExternalLink
 } from "lucide-react";
-import { finalizeRegistryOutput, validateRegistryOutput } from "../lib/registry-validation";
+import { excludeUnansweredExamples, finalizeRegistryOutput, validateRegistryOutput } from "../lib/registry-validation";
 import { PaymentGate, trainingPlan } from "./PaymentGate";
 
 const TRAINING_MODELS: Record<string, { model: string; base: string; evaluations: number }> = {
@@ -107,10 +107,10 @@ export function RunTrainingModal({
   const splits = open ? getSerializedSplits() : { training: [], validation: [] };
   const is70B = trainingModel === "Llama 3.1 70B";
   const hasReasoning = is70B && [...splits.training, ...splits.validation].some(r => /<think>|sft_reasoning/.test(JSON.stringify(r)));
-  const finalizedTraining = finalizeRegistryOutput(splits.training, exportFormat);
-  const finalizedValidation = finalizeRegistryOutput(splits.validation, exportFormat);
-  const trainingValid = finalizedTraining.records.length > 0 && !finalizedTraining.error;
-  const validationValid = finalizedValidation.records.length > 0 && !finalizedValidation.error;
+  const completeTraining = excludeUnansweredExamples(splits.training, exportFormat);
+  const completeValidation = excludeUnansweredExamples(splits.validation, exportFormat);
+  const trainingValid = completeTraining.length > 0 && !validateRegistryOutput(completeTraining, exportFormat);
+  const validationValid = completeValidation.length > 0 && !validateRegistryOutput(completeValidation, exportFormat);
 
   const stopPolling = () => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }

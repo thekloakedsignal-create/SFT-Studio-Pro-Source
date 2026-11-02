@@ -3677,7 +3677,7 @@ export default function App() {
       setExportedPreview("");
       return;
     }
-    const sampleItems = formattedTraining.records.slice(0, 3);
+    const sampleItems = formattedTraining.records.slice(0, 2);
     
     const previewPayload = {
       targetSchemaFormat: fmt,
