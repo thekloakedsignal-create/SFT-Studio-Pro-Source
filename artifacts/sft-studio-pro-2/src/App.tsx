@@ -3284,7 +3284,26 @@ export default function App() {
 
   // Helper to format SFT examples according to target template format (ChatML, Alpaca, Maestro, DeepSeek, OpenAI o1/o3, ShareGPT, Prompt/Response)
   const formatExampleForExport = (ex: SFTExample, targetFormat: string) => {
-    if (!ex || !Array.isArray(ex.messages) || ex.messages.length === 0) return ex;
+    if (!ex) return ex;
+    const source = ex as SFTExample & {
+      instruction?: string;
+      input?: string;
+      output?: string;
+    };
+    const sourceMessages = Array.isArray(source.messages) && source.messages.length > 0
+      ? source.messages
+      : targetFormat === "chatml"
+        && typeof source.input === "string"
+        && typeof source.output === "string"
+        ? [
+          ...(typeof source.instruction === "string" && source.instruction.trim()
+            ? [{ role: "system", content: source.instruction }]
+            : []),
+          { role: "user", content: source.input },
+          { role: "assistant", content: source.output },
+        ]
+        : null;
+    if (!sourceMessages) return ex;
 
     // Helper to sanitize any stray or accidental "/n" string artifacts into clean newlines
     const cleanExportText = (text: any): string => {
@@ -3301,7 +3320,7 @@ export default function App() {
     };
 
     // Preserve exact messages array without destructive text regex mangling
-    const rawMessages = ex.messages.map(m => ({
+    const rawMessages = sourceMessages.map(m => ({
       role: m.role,
       content: cleanExportText(m.content),
       ...(m.reasoning ? { reasoning: cleanExportText(m.reasoning) } : {}),
