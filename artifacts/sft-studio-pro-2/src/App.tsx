@@ -3759,6 +3759,22 @@ export default function App() {
           });
           return { ...ex, messages: updatedMsgs };
         }
+        if ((fmt === "chatml" || fmt === "openai") && !Array.isArray((ex as any).messages)) {
+          const legacyAlpaca = ex as any;
+          if (typeof legacyAlpaca.input === "string" && typeof legacyAlpaca.output === "string") {
+            const instruction = typeof legacyAlpaca.instruction === "string"
+              ? legacyAlpaca.instruction.trim()
+              : "";
+            return {
+              ...legacyAlpaca,
+              messages: [
+                ...(instruction ? [{ role: "system", content: instruction }] : []),
+                { role: "user", content: legacyAlpaca.input },
+                { role: "assistant", content: legacyAlpaca.output },
+              ],
+            };
+          }
+        }
         return ex;
       });
       return { ...b, examples: updatedExamples };
