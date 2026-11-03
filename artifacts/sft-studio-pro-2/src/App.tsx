@@ -7610,11 +7610,11 @@ export default function App() {
                     {/* Automation questions attach to each section guide */}
                     {guidePage === "synthesizer" && !automationAnswers.generate && (
                       <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-3">
-                        <p className="text-sm text-slate-200 font-semibold">Would you like to automatically generate suggested batches?</p>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">I'll build the batches in the background in a balanced mix of single-turn, multi-turn, and reasoning.</p>
+                        <p className="text-sm text-slate-200 font-semibold">Generate recommended batches?</p>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">Balanced across single-turn, multi-turn, and reasoning.</p>
                         <div className="flex gap-2">
-                          <button type="button" onClick={() => { answerAutomation("generate", "yes"); void startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Yes, generate them</button>
-                          <button type="button" onClick={() => answerAutomation("generate", "no")} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">No, I'll do it myself</button>
+                          <button type="button" onClick={() => { answerAutomation("generate", "yes"); void startAutomationPipeline({ ...automationAnswers, generate: "yes", qa: "manual" }); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Generate batches</button>
+                          <button type="button" onClick={() => answerAutomation("generate", "no")} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">Skip</button>
                         </div>
                       </div>
                     )}
@@ -7650,10 +7650,10 @@ export default function App() {
                     )}
                     {guidePage === "convert" && !automationAnswers.docs && (
                       <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-3">
-                        <p className="text-sm text-slate-200 font-semibold">Do you have any documents to convert? Would you like me to process them for you?</p>
+                        <p className="text-sm text-slate-200 font-semibold">Upload documents to convert?</p>
                         <div className="flex gap-2">
-                          <button type="button" onClick={() => answerAutomation("docs", "yes")} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Yes — I'll upload them</button>
-                          <button type="button" onClick={() => answerAutomation("docs", "no")} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">No documents</button>
+                          <button type="button" onClick={() => answerAutomation("docs", "yes")} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer">Upload documents</button>
+                          <button type="button" onClick={() => answerAutomation("docs", "no")} className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer">Skip</button>
                         </div>
                       </div>
                     )}
