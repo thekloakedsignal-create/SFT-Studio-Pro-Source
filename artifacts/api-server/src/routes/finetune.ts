@@ -223,7 +223,7 @@ async function togetherRequest(apiPath: string, init: RequestInit = {}): Promise
   return body;
 }
 
-function validateJsonl(content: unknown, label: string): { lines: string[]; error?: string } {
+function validateJsonl(content: unknown, label: string, format: "chatml" | "chatml_token"): { lines: string[]; error?: string } {
   if (typeof content !== "string" || !content.trim()) {
     return { lines: [], error: `The ${label} dataset is empty.` };
   }
@@ -235,15 +235,28 @@ function validateJsonl(content: unknown, label: string): { lines: string[]; erro
       if (!row || Array.isArray(row) || typeof row !== "object") {
         return { lines: [], error: `The ${label} dataset line ${i + 1} is not a JSON object.` };
       }
-      const pattern = /<\|im_start\|>(system|user|assistant)\n([\s\S]*?)\n<\|im_end\|>/g;
-      const text = typeof row.text === "string" ? row.text : "";
-      const turns = [...text.matchAll(pattern)];
-      const dialogue = turns[0]?.[1] === "system" ? turns.slice(1) : turns;
-      if (!turns.length || text.replace(pattern, "").trim()
-        || turns.some(t => !t[2].trim() || /<\|im_(?:start|end)\|>/.test(t[2]))
-        || dialogue.length < 2 || dialogue.length % 2
-        || dialogue.some((t, index) => t[1] !== (index % 2 ? "assistant" : "user"))) {
-        return { lines: [], error: `The ${label} dataset line ${i + 1} must use ChatML Instruction (<|im_start|>) format.` };
+      if (format === "chatml") {
+        const messages = Array.isArray(row.messages) ? row.messages : [];
+        const dialogue = messages[0]?.role === "system" ? messages.slice(1) : messages;
+        if (!messages.length
+          || messages.some((message: any) => !message
+            || !["system", "user", "assistant"].includes(message.role)
+            || typeof message.content !== "string" || !message.content.trim())
+          || dialogue.length < 2 || dialogue.length % 2
+          || dialogue.some((message: any, index: number) => message.role !== (index % 2 ? "assistant" : "user"))) {
+          return { lines: [], error: `The ${label} dataset line ${i + 1} must use ChatML Conversation (messages) format.` };
+        }
+      } else {
+        const pattern = /<\|im_start\|>(system|user|assistant)\n([\s\S]*?)\n<\|im_end\|>/g;
+        const text = typeof row.text === "string" ? row.text : "";
+        const turns = [...text.matchAll(pattern)];
+        const dialogue = turns[0]?.[1] === "system" ? turns.slice(1) : turns;
+        if (!turns.length || text.replace(pattern, "").trim()
+          || turns.some(t => !t[2].trim() || /<\|im_(?:start|end)\|>/.test(t[2]))
+          || dialogue.length < 2 || dialogue.length % 2
+          || dialogue.some((t, index) => t[1] !== (index % 2 ? "assistant" : "user"))) {
+          return { lines: [], error: `The ${label} dataset line ${i + 1} must use ChatML Instruction (<|im_start|>) format.` };
+        }
       }
     } catch {
       return { lines: [], error: `The ${label} dataset line ${i + 1} is not valid JSON.` };
@@ -324,9 +337,10 @@ router.post("/finetune/upload", async (req: AuthRequest, res) => {
     || (store.sessions[uid]?.preflightModel || TRAINING_CONFIGS["Qwen3.5 9 Base"].model) !== config.model) {
     return res.status(409).json({ success: false, error: "Run the preflight check before uploading datasets." });
   }
-  const training = validateJsonl(trainingJsonl, "training");
+  const format = ["Qwen3.5 9 Base", "Llama 3.1 70B"].includes(req.body?.trainingModel) ? "chatml_token" : "chatml";
+  const training = validateJsonl(trainingJsonl, "training", format);
   if (training.error) return res.status(400).json({ success: false, error: training.error });
-  const validation = validateJsonl(validationJsonl, "validation");
+  const validation = validateJsonl(validationJsonl, "validation", format);
   if (validation.error) return res.status(400).json({ success: false, error: validation.error });
 
   const safeSuffix = (typeof suffix === "string" && suffix.trim() ? suffix.trim() : "sft-studio").replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 40);

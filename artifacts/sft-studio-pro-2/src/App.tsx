@@ -761,9 +761,10 @@ export default function App() {
   const [showRunTrainingModal, setShowRunTrainingModal] = useState(false);
   const [showExamplePaygate, setShowExamplePaygate] = useState(false);
   const [trainerHandoff, setTrainerHandoff] = useState({ model: "Qwen3.5 9 Base", template: "Instruct ChatML (<|im_start|>)" });
-  const usesNebiusChatMl = ["Qwen/Qwen3-14B-Base", "Qwen/Qwen2.5-72B", "Qwen/Qwen2.5-32B"].includes(trainerHandoff.model);
   const noReasoningForProjectModel = ["Llama 3.1 70B", "Qwen/Qwen2.5-72B"].includes(project.onboardingModel || "");
-  const selectedTrainingFormat = usesNebiusChatMl ? "chatml" : "chatml_token";
+  const selectedTrainingFormat = ["Qwen3.5 9 Base", "Llama 3.1 70B"].includes(trainerHandoff.model)
+    ? "chatml_token"
+    : "chatml";
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showCustomPackageModal, setShowCustomPackageModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);

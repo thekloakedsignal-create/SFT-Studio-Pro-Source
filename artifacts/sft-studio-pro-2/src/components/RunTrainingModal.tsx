@@ -55,7 +55,7 @@ async function readApi(res: Response): Promise<any> {
   return data;
 }
 
-function toNebiusChatMl(records: unknown[]): Array<{ messages: Array<{ role: string; content: string }> }> {
+function toChatMlMessages(records: unknown[]): Array<{ messages: Array<{ role: string; content: string }> }> {
   return records.map((record, index) => {
     const row = record as any;
     if (Array.isArray(row?.messages)) {
@@ -88,6 +88,7 @@ export function RunTrainingModal({
   const [ownerCheckComplete, setOwnerCheckComplete] = useState(false);
   const selectedModel = ALL_TRAINING_MODELS[trainingModel];
   const usesAdditionalModel = Object.prototype.hasOwnProperty.call(ADDITIONAL_TRAINING_MODELS, trainingModel);
+  const usesConversationFormat = exportFormat === "chatml";
   const MODEL_DISPLAY = continuationModel?.hfRepoName || (trainingModel === "Qwen3.5 9 Base"
     ? "Qwen3.5 9B FP8"
     : selectedModel?.model || trainingModel);
@@ -299,9 +300,9 @@ export function RunTrainingModal({
         current.training = stripReasoning(current.training);
         current.validation = stripReasoning(current.validation);
       }
-      const trainingRecords = usesAdditionalModel ? toNebiusChatMl(current.training) : current.training;
-      const validationRecords = usesAdditionalModel ? toNebiusChatMl(current.validation) : current.validation;
-      const formatToValidate = usesAdditionalModel ? "chatml" : exportFormat;
+      const trainingRecords = usesConversationFormat ? toChatMlMessages(current.training) : current.training;
+      const validationRecords = usesConversationFormat ? toChatMlMessages(current.validation) : current.validation;
+      const formatToValidate = usesConversationFormat ? "chatml" : exportFormat;
       const trainErr = validateRegistryOutput(trainingRecords, formatToValidate);
       const valErr = validateRegistryOutput(validationRecords, formatToValidate);
       if (current.training.length === 0 || current.validation.length === 0 || trainErr || valErr) {
@@ -318,8 +319,8 @@ export function RunTrainingModal({
           model: selectedModel.model,
           confirmUpload: true,
         } : {
-          trainingJsonl: toJsonl(current.training),
-          validationJsonl: toJsonl(current.validation),
+          trainingJsonl: toJsonl(trainingRecords),
+          validationJsonl: toJsonl(validationRecords),
           suffix,
           trainingModel,
           confirmUpload: true,
@@ -479,7 +480,7 @@ export function RunTrainingModal({
               <div className="flex justify-between"><span>Epochs</span><span className="text-slate-200">2</span></div>
               {usesAdditionalModel && <div className="flex justify-between"><span>Sequence packing</span><span className="text-slate-200">8,192 tokens</span></div>}
               <div className="flex justify-between"><span>Evaluations</span><span className="text-slate-200">{selectedModel?.evaluations ?? 1}</span></div>
-              <div className="flex justify-between"><span>Training format</span><span className="text-emerald-400">{usesAdditionalModel ? "ChatML Conversation (messages)" : "ChatML Instruction (<|im_start|>)"}</span></div>
+               <div className="flex justify-between"><span>Training format</span><span className="text-emerald-400">{usesConversationFormat ? "ChatML Conversation (messages)" : "ChatML Instruction (<|im_start|>)"}</span></div>
               <div className="flex justify-between border-t border-slate-800 pt-1.5"><span>Training split</span><span className="text-green-400 font-bold">{splits.training.length} examples</span></div>
               <div className="flex justify-between"><span>Validator split</span><span className="text-yellow-400 font-bold">{splits.validation.length} examples</span></div>
             </div>
@@ -487,7 +488,7 @@ export function RunTrainingModal({
             {(!trainingValid || !validationValid) && step === "configure" && (
               <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/20 text-[11px] text-red-300">
                 <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>Both splits must be non-empty and pass the automatic {usesAdditionalModel ? "ChatML conversation" : "ChatML Instruction"} format check before training.</span>
+                <span>Both splits must be non-empty and pass the automatic {usesConversationFormat ? "ChatML conversation" : "ChatML Instruction"} format check before training.</span>
               </div>
             )}
 
