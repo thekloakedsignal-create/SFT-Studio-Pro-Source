@@ -4098,13 +4098,7 @@ export default function App() {
           });
           writeGuideState(projectId, { recommendations, completedRecommendedBatches: [] });
         }}
-        onComplete={(settings, recommendations, onboardingModel, autoGenerate) => {
-          if (!showBatchRecommendationInterview) {
-            setTrainerHandoff({
-              model: onboardingModel || "Qwen3.5 9 Base",
-              template: `${settings.instructTemplate || "ChatML"} (<|im_start|>)`,
-            });
-          }
+        onComplete={(settings, recommendations, _onboardingModel, autoGenerate) => {
           if (showBatchRecommendationInterview) {
             setBatchRecommendations(recommendations ?? []);
             setCompletedRecommendedBatches([]);

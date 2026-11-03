@@ -22,3 +22,4 @@
 - [Standalone documentation manual](standalone-documentation-manual.md) — Keep the existing GitHub Pages iframe in place; offer a separate scrapeable manual from sign-in and in-app.
 - [Training provider direction](training-provider-direction.md) — Provider-specific training rules; Together owns HF model upload, without competing app-side post-completion transfer or checks.
 - [Onboarding prompt boundary](onboarding-system-prompt-boundary.md) — Never change the onboarding system prompt without explicit approval.
+- [Training model handoff](training-model-handoff.md) — Onboarding model choice must not determine the automated trainer’s model or format.
