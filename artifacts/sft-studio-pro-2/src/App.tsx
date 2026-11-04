@@ -1450,9 +1450,10 @@ export default function App() {
       selected.batches.forEach((b: SFTBatch) => {
         if (b && b.id) {
           const existing = batchesMap.get(b.id);
-          const existingCount = existing?.examples?.length || existing?.examplesCount || 0;
-          const newCount = b.examples?.length || b.examplesCount || 0;
-          if (!existing || newCount >= existingCount) {
+          const hasFullExamples = Array.isArray(b.examples);
+          const existingHasFullExamples = Array.isArray(existing?.examples);
+          if (!existing
+            || (hasFullExamples && (!existingHasFullExamples || b.examples.length >= existing.examples.length))) {
             batchesMap.set(b.id, b);
           }
         }
