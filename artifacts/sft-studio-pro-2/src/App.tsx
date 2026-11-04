@@ -3248,7 +3248,10 @@ export default function App() {
   const compiledDataset = useMemo(() => {
     const allExamples: SFTExample[] = [];
     selectedApprovedBatches.forEach(b => {
-      allExamples.push(...b.examples);
+      const rejectedIndices = new Set(
+        (reports[b.id] || b.qualityReport)?.issues?.map(issue => issue.exampleIndex) || []
+      );
+      allExamples.push(...b.examples.filter((_, index) => !rejectedIndices.has(index)));
     });
 
     const totalCount = allExamples.length;
@@ -3278,7 +3281,7 @@ export default function App() {
     }
 
     return { trainingSet, validationSet };
-  }, [selectedApprovedBatches]);
+  }, [selectedApprovedBatches, reports]);
 
   // Helper to format SFT examples according to target template format (ChatML, Alpaca, Maestro, DeepSeek, OpenAI o1/o3, ShareGPT, Prompt/Response)
   const formatExampleForExport = (ex: SFTExample, targetFormat: string) => {
