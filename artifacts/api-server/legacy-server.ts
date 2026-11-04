@@ -9,7 +9,7 @@ import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 import { db } from "./src/db/index.ts";
 import { projects, batches, users, studentCodes } from "./src/db/schema.ts";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { optionalAuth, requireAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { reserveExamples, settleExamples } from "./src/routes/whop.ts";
 import { logger } from "./src/lib/logger.ts";
@@ -256,13 +256,42 @@ app.get("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
   
   const ownedLocal = getLocalProjects().filter(project => projectBelongsTo(project, ownerId));
   try {
-    const userProjects = await db.select().from(projects).where(eq(projects.userId, ownerId));
+    const userProjects = await db.select({
+      id: projects.id,
+      userId: projects.userId,
+      name: projects.name,
+      settings: projects.settings,
+      updatedAt: projects.updatedAt
+    }).from(projects).where(eq(projects.userId, ownerId));
+    const projectIds = [...new Set<string>([
+      ...userProjects.map((project: any) => project.id), ...ownedLocal.map(project => project.id)
+    ])];
+    const batchRows = projectIds.length > 0
+      ? await db.select({
+          id: batches.id,
+          projectId: batches.projectId,
+          name: batches.name,
+          timestamp: batches.timestamp,
+          templateType: batches.templateType,
+          examplesCount: sql<number>`case
+            when jsonb_typeof(${batches.data}->'examples') = 'array'
+            then jsonb_array_length(${batches.data}->'examples')
+            else 0
+          end`
+        }).from(batches).where(inArray(batches.projectId, projectIds))
+      : [];
+    const summariesByProject = new Map<string, any[]>();
+    batchRows.forEach((batch: any) => {
+      const summaries = summariesByProject.get(batch.projectId) || [];
+      summaries.push(batch);
+      summariesByProject.set(batch.projectId, summaries);
+    });
     const merged = userProjects.map((sp: any) => {
       const lp = ownedLocal.find(project => project.id === sp.id);
       return projectListEntry({
         ...sp,
         settings: sp.settings || lp?.settings || {},
-        batches: visibleBatches(mergeBatchRecords(lp?.batches, sp.batches))
+        batches: visibleBatches(mergeBatchRecords(lp?.batches, summariesByProject.get(sp.id)))
       });
     });
     ownedLocal.forEach(lp => {
