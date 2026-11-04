@@ -5,17 +5,17 @@
     "name": "Test Kloak",
     "settings": {
       "name": "Test Kloak",
+      "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
       "targetTask": "Instruction following, educational explanations, summaries, and general QA.",
       "constraints": "Maintain a helpful and educational tone. Avoid speculative claims. Keep answers concise, factual, and fully self-contained.",
-      "systemPrompt": "You are a helpful, respectful, and honest AI assistant. Always answer queries as accurately and safely as possible, providing clear and direct explanations.",
-      "templateType": "Single Turn",
-      "projectFormat": "Conversation",
       "selectedPreset": "General Use AI",
+      "projectFormat": "Conversation",
+      "templateType": "Single Turn",
       "instructTemplate": "ChatML",
-      "batchRecommendations": [],
-      "representativePrompt": "",
       "customInstructionFormat": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:\n{response}",
+      "representativePrompt": "",
       "representativeCompletion": "",
+      "batchRecommendations": [],
       "completedRecommendedBatches": []
     },
     "batches": [
@@ -3570,7 +3570,7 @@
         "temporaryConstraints": "Long in depth answers, non fiction. St Dennis is a national research center, there are several tall guyed antennae, The Canadian Space Agency tests topology aircraft with NASA in the area, there is a SUPERDARN location, a huge supply of monitored ground water, and underground facilities.  Fine facts. "
       }
     ],
-    "updatedAt": "2026-11-02T11:57:29.815Z",
+    "updatedAt": "2026-11-04T00:43:06.513Z",
     "createdAt": "2026-11-02T11:44:25.632Z"
   },
   {
