@@ -8255,12 +8255,11 @@ export default function App() {
       <RunTrainingModal
         open={showRunTrainingModal}
         onClose={() => setShowRunTrainingModal(false)}
-        exportFormat={selectedTrainingFormat}
         trainingModel={trainerHandoff.model}
         onTrainingModelChange={model => setTrainerHandoff(current => ({ ...current, model }))}
-        getSerializedSplits={() => ({
-          training: compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, selectedTrainingFormat)),
-          validation: compiledDataset.validationSet.map(ex => formatExampleForExport(ex, selectedTrainingFormat)),
+        getSerializedSplits={format => ({
+          training: compiledDataset.trainingSet.map(ex => formatExampleForExport(ex, format)),
+          validation: compiledDataset.validationSet.map(ex => formatExampleForExport(ex, format)),
         })}
         apiFetch={projectApiFetch}
         notify={(text, type) => setNotification({ text, type })}

@@ -38,11 +38,10 @@ const clearedTrainingJobIds = new Set([
 interface RunTrainingModalProps {
   open: boolean;
   onClose: () => void;
-  exportFormat: string;
   trainingModel: string;
   onTrainingModelChange: (model: string) => void;
   // Serialized + ready-to-validate records for each split (compiled from selected, approved batches)
-  getSerializedSplits: () => { training: unknown[]; validation: unknown[] };
+  getSerializedSplits: (format: string) => { training: unknown[]; validation: unknown[] };
   apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   notify: (text: string, type: "success" | "error" | "info") => void;
 }
@@ -80,7 +79,7 @@ function toChatMlMessages(records: unknown[]): Array<{ messages: Array<{ role: s
 }
 
 export function RunTrainingModal({
-  open, onClose, exportFormat, trainingModel, onTrainingModelChange, getSerializedSplits, apiFetch, notify
+  open, onClose, trainingModel, onTrainingModelChange, getSerializedSplits, apiFetch, notify
 }: RunTrainingModalProps) {
   const [savedModels, setSavedModels] = useState<SavedModelChoice[]>([]);
   const [continuationModel, setContinuationModel] = useState<SavedModelChoice | null>(null);
@@ -88,7 +87,11 @@ export function RunTrainingModal({
   const [ownerCheckComplete, setOwnerCheckComplete] = useState(false);
   const selectedModel = ALL_TRAINING_MODELS[trainingModel];
   const usesAdditionalModel = Object.prototype.hasOwnProperty.call(ADDITIONAL_TRAINING_MODELS, trainingModel);
-  const usesConversationFormat = exportFormat === "chatml";
+  const uploadFormat = usesAdditionalModel
+    || !["Qwen3.5 9 Base", "Llama 3.1 70B"].includes(trainingModel)
+    ? "chatml"
+    : "chatml_token";
+  const usesConversationFormat = uploadFormat === "chatml";
   const MODEL_DISPLAY = continuationModel?.hfRepoName || (trainingModel === "Qwen3.5 9 Base"
     ? "Qwen3.5 9B FP8"
     : selectedModel?.model || trainingModel);
@@ -106,11 +109,11 @@ export function RunTrainingModal({
   const [paidModel, setPaidModel] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const splits = open ? getSerializedSplits() : { training: [], validation: [] };
+  const splits = open ? getSerializedSplits(uploadFormat) : { training: [], validation: [] };
   const is70B = trainingModel === "Llama 3.1 70B";
   const hasReasoning = is70B && [...splits.training, ...splits.validation].some(r => /<think>|sft_reasoning/.test(JSON.stringify(r)));
-  const trainingValid = splits.training.length > 0 && !validateRegistryOutput(splits.training, exportFormat);
-  const validationValid = splits.validation.length > 0 && !validateRegistryOutput(splits.validation, exportFormat);
+  const trainingValid = splits.training.length > 0 && !validateRegistryOutput(splits.training, uploadFormat);
+  const validationValid = splits.validation.length > 0 && !validateRegistryOutput(splits.validation, uploadFormat);
 
   const stopPolling = () => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -293,7 +296,7 @@ export function RunTrainingModal({
     setBusy(true);
     setError(null);
     try {
-      const current = getSerializedSplits();
+      const current = getSerializedSplits(uploadFormat);
       if (trainingModel === "Llama 3.1 70B") {
         // Reasoning batches cannot be uploaded for this model.
         const stripReasoning = (records: unknown[]) => records.filter(r => !/<think>|sft_reasoning/.test(JSON.stringify(r)));
@@ -302,9 +305,8 @@ export function RunTrainingModal({
       }
       const trainingRecords = usesConversationFormat ? toChatMlMessages(current.training) : current.training;
       const validationRecords = usesConversationFormat ? toChatMlMessages(current.validation) : current.validation;
-      const formatToValidate = usesConversationFormat ? "chatml" : exportFormat;
-      const trainErr = validateRegistryOutput(trainingRecords, formatToValidate);
-      const valErr = validateRegistryOutput(validationRecords, formatToValidate);
+      const trainErr = validateRegistryOutput(trainingRecords, uploadFormat);
+      const valErr = validateRegistryOutput(validationRecords, uploadFormat);
       if (current.training.length === 0 || current.validation.length === 0 || trainErr || valErr) {
         throw new Error(trainErr || valErr || "Both splits must be non-empty before upload.");
       }
@@ -611,7 +613,7 @@ export function RunTrainingModal({
                   <span>{busy ? "Uploading & Validating…" : "Approve & Upload Datasets"}</span>
                 </button>
                 <p className="text-[10px] text-slate-500 leading-relaxed">
-                  This sends both automatically formatted {usesAdditionalModel ? "ChatML conversation" : "ChatML Instruction"} datasets after approval. Starting training still requires separate approval.
+                  This sends both automatically formatted {usesConversationFormat ? "ChatML conversation" : "ChatML Instruction"} datasets after approval. Starting training still requires separate approval.
                 </p>
               </div>
             )}
