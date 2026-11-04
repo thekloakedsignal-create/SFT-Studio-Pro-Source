@@ -257,30 +257,20 @@ app.get("/api/sql/projects", optionalAuth, async (req: AuthRequest, res) => {
   const ownedLocal = getLocalProjects().filter(project => projectBelongsTo(project, ownerId));
   try {
     const userProjects = await db.select().from(projects).where(eq(projects.userId, ownerId));
-    const projectIds = [...new Set<string>([
-      ...userProjects.map((project: any) => project.id), ...ownedLocal.map(project => project.id)
-    ])];
-    const batchRows = projectIds.length > 0
-      ? await db.select().from(batches).where(inArray(batches.projectId, projectIds))
-      : [];
     const merged = userProjects.map((sp: any) => {
       const lp = ownedLocal.find(project => project.id === sp.id);
-      return projectForResponse({
+      return projectListEntry({
         ...sp,
         settings: sp.settings || lp?.settings || {},
-        batches: mergeProjectSnapshot(
-          mergeBatchRecords(lp?.batches, sp.batches), undefined, sqlBatchData(batchRows, sp.id)
-        )
+        batches: visibleBatches(mergeBatchRecords(lp?.batches, sp.batches))
       });
     });
     ownedLocal.forEach(lp => {
       if (!merged.some((project: any) => project.id === lp.id)) {
-        merged.push(projectForResponse({
-          ...lp, batches: mergeProjectSnapshot(lp.batches, undefined, sqlBatchData(batchRows, lp.id))
-        }));
+        merged.push(projectListEntry({ ...lp, batches: visibleBatches(lp.batches) }));
       }
     });
-    return res.json({ success: true, projects: merged.map(projectListEntry) });
+    return res.json({ success: true, projects: merged });
   } catch (error: any) {
     logger.warn({ error: error?.message }, "Loading saved projects from local storage");
     return res.json({ success: true, projects: ownedLocal.map(projectForResponse).map(projectListEntry) });
