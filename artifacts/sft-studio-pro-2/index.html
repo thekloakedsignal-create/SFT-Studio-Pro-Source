@@ -75,12 +75,45 @@
     <meta name="theme-color" content="#020617" />
   </head>
   <body class="bg-slate-950 text-slate-100">
-    <noscript>
-      <main>
-        <h1>AI Fine-Tuning from Idea to Deployed Model</h1>
-        <p>SFT Studio Pro supports project definition, training-data creation and validation, automated fine-tuning, and access to the resulting model. Read the <a href="/manual.html">complete SFT Studio Pro workflow guide</a>.</p>
-      </main>
-    </noscript>
+    <style>
+      #public-overview {
+        box-sizing: border-box;
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: clamp(1.5rem, 5vw, 3.5rem);
+        border: 1px solid #e9e4ee;
+        background: #fdfbf4;
+        color: #38303f;
+        font: 1rem/1.75 Georgia, "Times New Roman", serif;
+      }
+      #public-overview h1, #public-overview h2 { color: #4b2e7c; line-height: 1.2; }
+      #public-overview h1 { font-size: clamp(2rem, 5vw, 3rem); }
+      #public-overview h2 { margin-top: 2rem; font-size: 1.4rem; }
+      #public-overview a { color: #4b2e7c; font-weight: 600; }
+      #public-overview li + li { margin-top: .5rem; }
+    </style>
+    <main id="public-overview">
+      <p>TRiAD AI · SFT Studio Pro</p>
+      <h1>Take an AI project idea through fine-tuning to a trained model</h1>
+      <p>SFT Studio Pro brings project planning, training-data creation and review, automated fine-tuning, and model access into one connected workflow.</p>
+      <nav aria-label="SFT Studio Pro resources">
+        <a href="/sign-up">Start a project</a> ·
+        <a href="/manual.html">Read the complete workflow manual</a> ·
+        <a href="/docs.html">Dataset formats and documentation</a>
+      </nav>
+      <section aria-labelledby="public-pipeline-heading">
+        <h2 id="public-pipeline-heading">The full fine-tuning pipeline</h2>
+        <ol>
+          <li><strong>Define the project.</strong> Describe the model’s purpose, intended behavior, voice, and example format.</li>
+          <li><strong>Create training examples.</strong> Generate examples in batches or convert source documents into examples for the project.</li>
+          <li><strong>Review quality and coverage.</strong> Inspect batches, run quality checks, and approve examples for the dataset.</li>
+          <li><strong>Assemble the training dataset.</strong> Organize approved examples and prepare training and validation data.</li>
+          <li><strong>Run supervised fine-tuning.</strong> Choose a supported base model and train it on the prepared data.</li>
+          <li><strong>Access the trained model.</strong> Open its repository or download available model weights after training completes.</li>
+        </ol>
+      </section>
+      <p>Learn more about the <a href="/training-pipeline.html">complete training pipeline</a>.</p>
+    </main>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
