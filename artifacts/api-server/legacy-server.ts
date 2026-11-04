@@ -4270,7 +4270,7 @@ app.post("/api/analyze-quality", async (req, res) => {
       const modelStartIndex = (chunkIndex: number) =>
         Math.floor(chunkIndex / CHUNK_SIZE) % QA_AUDIT_MODELS.length;
 
-      // Execute chunks in parallel with a strict 14-second timeout race
+      // Execute chunks in parallel; bound each model request so stalled models advance to fallback.
       await Promise.allSettled(chunks.map(async (chunk) => {
         try {
           const chunkPrompt = `
@@ -4332,6 +4332,7 @@ app.post("/api/analyze-quality", async (req, res) => {
               response = await callDigitalOceanAI({
                 model: auditModel,
                 contents: chunkPrompt,
+                timeoutMs: 14_000,
                 config: {
                   temperature: 0.1,
                   responseMimeType: "application/json"

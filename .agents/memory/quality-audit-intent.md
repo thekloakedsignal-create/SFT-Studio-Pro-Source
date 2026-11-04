@@ -38,3 +38,7 @@ After Deduplicate removes flagged examples, update the displayed QA report count
 After Regenerate Flagged, assess only the regenerated examples, never automatically reassess the whole batch. Merge their findings into the original report and leave untouched examples' findings unchanged.
 **Why:** The user explicitly requested “Assessing the regens ONLY.”
 **How to apply:** Map subset assessment indices back to their original batch positions, retain flags for failed regeneration slots, and recalculate batch totals from the merged findings. Full-batch assessment remains a separate manual action.
+
+Bound each individual QA model request so a stalled model can move to the configured fallback.
+**Why:** The QA path had no per-request cap, allowing a single chunk to wait through multiple long provider timeouts.
+**How to apply:** Pass the request timeout through the existing inference helper; keep chunk sizing, parallel dispatch, and fallback ordering unchanged unless separately requested.
