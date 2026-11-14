@@ -29,6 +29,8 @@ interface NebiusSession {
   ownerId: string;
   preflightAt?: string;
   model?: string;
+  exportToHuggingFace?: boolean;
+  hfRepoName?: string | null;
   upload?: {
     model: string;
     trainingFileId: string;
@@ -211,12 +213,14 @@ async function uploadDataset(content: string, fileName: string): Promise<{ id: s
 
 function publicJob(job: any, saved: any) {
   const status = typeof job?.status === "string" ? job.status.slice(0, 64) : "unknown";
-  const modelReady = ["succeeded", "completed"].includes(status.toLowerCase()) && Boolean(saved.hfRepoName);
+  const modelReady = ["succeeded", "completed"].includes(status.toLowerCase())
+    && (saved.exportToHuggingFace === false || Boolean(saved.hfRepoName));
   return {
     id: saved.id,
     status: hasCredential(status) ? "[redacted]" : status,
     model: saved.model,
-    hfRepoName: modelReady ? saved.hfRepoName : null,
+    exportToHuggingFace: saved.exportToHuggingFace !== false,
+    hfRepoName: modelReady ? saved.hfRepoName || null : null,
     modelReady,
     createdAt: typeof job?.created_at === "number" ? job.created_at : null,
     finishedAt: typeof job?.finished_at === "number" ? job.finished_at : null,
@@ -279,11 +283,20 @@ router.post("/nebius/finetune/preflight", async (req: AuthRequest, res) => {
     return res.status(400).json({ success: false, error: "Choose a supported base model." });
   }
 
+  const exportToHuggingFace = req.body?.exportToHuggingFace !== false;
+  const repoName = exportToHuggingFace ? validateRepoName(req.body?.hfRepoName) : null;
+  if (exportToHuggingFace && !repoName) {
+    return res.status(400).json({ success: false, error: "Provide a valid Hugging Face repository in owner/repository format." });
+  }
   const credentials = credentialsConfigured();
-  if (!credentials.nebius || !credentials.huggingFace) {
+  const requiredCredentials = {
+    nebius: credentials.nebius,
+    ...(exportToHuggingFace ? { huggingFace: credentials.huggingFace } : {}),
+  };
+  if (!credentials.nebius || (exportToHuggingFace && !credentials.huggingFace)) {
     return res.status(503).json({
       success: false,
-      credentials,
+      credentials: requiredCredentials,
       error: "Required training credentials are not configured.",
     });
   }
@@ -294,13 +307,15 @@ router.post("/nebius/finetune/preflight", async (req: AuthRequest, res) => {
       ownerId: uid,
       preflightAt: new Date().toISOString(),
       model,
+      exportToHuggingFace,
+      hfRepoName: repoName,
       upload: existing?.upload?.model === model ? existing.upload : null,
     });
     return res.json({
       success: true,
       model,
       trainingType: "full",
-      credentials: { nebius: true, huggingFace: true },
+      credentials: requiredCredentials,
     });
   } catch {
     return res.status(503).json({ success: false, error: "Training storage is unavailable. Please retry." });
@@ -364,8 +379,8 @@ router.post("/nebius/finetune/upload", async (req: AuthRequest, res) => {
       || session.model !== model) {
       return res.status(409).json({ success: false, error: "Run preflight for this model before uploading datasets." });
     }
-    const credentials = credentialsConfigured();
-    if (!credentials.nebius || !credentials.huggingFace) {
+    const credentials = providerCredentials();
+    if (!credentials.nebius) {
       return res.status(503).json({ success: false, error: "Required training credentials are not configured." });
     }
 
@@ -390,7 +405,7 @@ router.post("/nebius/finetune/upload", async (req: AuthRequest, res) => {
         ...(validationFile ? { validation: validationFile.providerRecord } : {}),
       },
     };
-    await setRecord("nebius-session", uid, { ownerId: uid, model, upload });
+    await setRecord("nebius-session", uid, { ...session, ownerId: uid, model, upload });
     return res.json({
       success: true,
       model,
@@ -418,8 +433,9 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
     return res.status(400).json({ success: false, error: "Job submission requires separate explicit approval." });
   }
 
-  const repoName = validateRepoName(req.body?.hfRepoName);
-  if (!repoName) {
+  const exportToHuggingFace = req.body?.exportToHuggingFace !== false;
+  const repoName = exportToHuggingFace ? validateRepoName(req.body?.hfRepoName) : null;
+  if (exportToHuggingFace && !repoName) {
     return res.status(400).json({ success: false, error: "Provide a valid Hugging Face repository in owner/repository format." });
   }
   const trainingFileId = safeProviderId(req.body?.trainingFileId);
@@ -432,11 +448,13 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
     const session = await getRecord("nebius-session", uid) as NebiusSession | null;
     const upload = session?.upload;
     if (!upload || upload.model !== model || upload.trainingFileId !== trainingFileId
-      || (upload.validationFileId || undefined) !== validationFileId) {
+      || (upload.validationFileId || undefined) !== validationFileId
+      || (session.exportToHuggingFace ?? true) !== exportToHuggingFace
+      || (exportToHuggingFace && session.hfRepoName !== repoName)) {
       return res.status(403).json({ success: false, error: "Jobs can only use your own uploaded datasets." });
     }
     const credentials = providerCredentials();
-    if (!credentials.nebius || !credentials.huggingFace) {
+    if (!credentials.nebius || (exportToHuggingFace && !credentials.huggingFace)) {
       return res.status(503).json({ success: false, error: "Required training credentials are not configured." });
     }
 
@@ -455,13 +473,15 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
         ? { suffix: req.body.suffix.trim().replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 64) }
         : {}),
       hyperparameters: TRAINING_HYPERPARAMETERS,
-      integrations: [{
-        type: "hf",
-        hf: {
-          output_repo_name: repoName,
-          api_token: credentials.huggingFace,
-        },
-      }],
+      ...(exportToHuggingFace ? {
+        integrations: [{
+          type: "hf",
+          hf: {
+            output_repo_name: repoName,
+            api_token: credentials.huggingFace,
+          },
+        }],
+      } : {}),
     };
     const job = await nebiusRequest("/fine_tuning/jobs", {
       method: "POST",
@@ -477,6 +497,7 @@ router.post("/nebius/finetune/jobs", async (req: AuthRequest, res) => {
       id: jobId,
       model,
       hfRepoName: repoName,
+      exportToHuggingFace,
       trainingFileId,
       validationFileId: validationFileId || null,
       status: typeof job?.status === "string" && !hasCredential(job.status) ? job.status.slice(0, 64) : "unknown",

@@ -99,6 +99,7 @@ export function RunTrainingModal({
   const [step, setStep] = useState<Step>("configure");
   const [suffix, setSuffix] = useState("");
   const [hfRepoName, setHfRepoName] = useState("");
+  const [noHfAccount, setNoHfAccount] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preflight, setPreflight] = useState<any>(null);
@@ -114,6 +115,7 @@ export function RunTrainingModal({
   const hasReasoning = is70B && [...splits.training, ...splits.validation].some(r => /<think>|sft_reasoning/.test(JSON.stringify(r)));
   const trainingValid = splits.training.length > 0 && !validateRegistryOutput(splits.training, uploadFormat);
   const validationValid = splits.validation.length > 0 && !validateRegistryOutput(splits.validation, uploadFormat);
+  const hasValidHfRepo = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\/[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$/.test(hfRepoName.trim());
 
   const stopPolling = () => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -241,7 +243,9 @@ export function RunTrainingModal({
             } catch {
               if (!cancelled) setError("Training completed, but saved models could not be refreshed. Reopen the trainer to retry.");
             }
-            notify(`Training complete. Open the automated trainer for your model's Hugging Face repository link.`, "success");
+            notify(data.job?.hfRepoName
+              ? "Training complete. Open the automated trainer for your model's Hugging Face repository link."
+              : "Training complete. Your model weights are ready to download.", "success");
           }
         }
       } catch {
@@ -261,8 +265,8 @@ export function RunTrainingModal({
   }, [job?.id]);
 
   const runPreflight = async () => {
-    if (!hfRepoName.trim()) {
-      setError("Choose a name for your model before continuing.");
+    if (!noHfAccount && !hasValidHfRepo) {
+      setError("Enter a valid Hugging Face repository in owner/repository format, or select that you do not have an account.");
       return;
     }
     if (!trainingValid || !validationValid) {
@@ -276,8 +280,8 @@ export function RunTrainingModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(usesAdditionalModel
-          ? { model: selectedModel.model }
-          : { suffix, hfRepoName, trainingModel }),
+          ? { model: selectedModel.model, exportToHuggingFace: !noHfAccount, hfRepoName: noHfAccount ? null : hfRepoName.trim() }
+          : { suffix, hfRepoName: noHfAccount ? null : hfRepoName.trim(), exportToHuggingFace: !noHfAccount, trainingModel }),
       }));
       setPreflight(data);
       if (Object.values(data.credentials || {}).some(value => value !== true)) {
@@ -363,14 +367,16 @@ export function RunTrainingModal({
           trainingFileId: files.trainingFileId,
           validationFileId: files.validationFileId || null,
           suffix,
-          hfRepoName: `RoseG/${hfRepoName.trim()}`,
+          exportToHuggingFace: !noHfAccount,
+          hfRepoName: noHfAccount ? null : hfRepoName.trim(),
           model: selectedModel.model,
           confirmSubmit: true,
         } : {
           trainingFileId: files.trainingFileId,
           validationFileId: files.validationFileId,
           suffix,
-          hfRepoName,
+          exportToHuggingFace: !noHfAccount,
+          hfRepoName: noHfAccount ? null : hfRepoName.trim(),
           trainingModel,
           ...(continuationModel ? { fromCheckpoint: continuationModel.togetherModelName } : {}),
           confirmSubmit: true,
@@ -379,7 +385,8 @@ export function RunTrainingModal({
       setJob({
         ...data.job,
         provider: usesAdditionalModel ? "nebius" : "together",
-        hfRepoName: data.job.hfRepoName || `RoseG/${hfRepoName.trim()}`,
+        exportToHuggingFace: !noHfAccount,
+        hfRepoName: data.job.hfRepoName || (noHfAccount ? null : hfRepoName.trim()),
       });
       setStep("progress");
       notify(`Fine-tune job ${data.job.id} submitted.`, "success");
@@ -429,7 +436,9 @@ export function RunTrainingModal({
   const statusLabel = String(job?.status || "").trim().toLowerCase();
   const isSuccessful = successfulStatuses.has(statusLabel) && job?.modelReady === true;
   const isTerminal = terminalStatuses.has(statusLabel) && (!successfulStatuses.has(statusLabel) || isSuccessful);
-  const outputModelName = job?.hfRepoName || (hfRepoName.trim() ? `RoseG/${hfRepoName.trim()}` : "");
+  const outputModelName = job?.exportToHuggingFace === false
+    ? ""
+    : job?.hfRepoName || (hfRepoName.trim() ? hfRepoName.trim() : "");
   const outputRepoUrl = `https://huggingface.co/${outputModelName.split("/").map(encodeURIComponent).join("/")}`;
   const closeTrainer = () => {
     if (busy || (job?.id && !isTerminal)) return;
@@ -550,20 +559,31 @@ export function RunTrainingModal({
                 <div>
                   <PaymentGate key={trainingModel} apiFetch={apiFetch} planKey={trainingPlan[trainingModel]}
                     onReady={ready => setPaidModel(ready ? trainingModel : null)} />
-                  <label htmlFor="output-model-name" className="block text-xs font-bold text-slate-300 mb-1 mt-3">What would you like to name your model?</label>
-                  <div className="flex items-center rounded-lg border border-slate-800 bg-slate-900 focus-within:border-emerald-500/50">
-                    <span className="pl-3 text-xs font-mono text-emerald-400">RoseG/</span>
+                  <label className="mt-3 flex items-center gap-2 text-xs text-slate-300">
                     <input
-                      id="output-model-name"
-                      type="text"
-                      required
-                      value={hfRepoName}
-                      onChange={e => setHfRepoName(e.target.value.replace(/^\/+/, "").replace(/[/?#\s]/g, "-"))}
-                      placeholder="your-chosen-name"
-                      className="min-w-0 flex-1 bg-transparent px-1 py-2 text-xs text-slate-200 outline-none font-mono"
+                      type="checkbox"
+                      checked={noHfAccount}
+                      onChange={e => setNoHfAccount(e.target.checked)}
+                      className="accent-emerald-500"
                     />
-                  </div>
-                  <p className="mt-1 text-[11px] text-slate-400">Your public output model will be named RoseG/{hfRepoName.trim() || "your-chosen-name"}.</p>
+                    I don’t have a Hugging Face account
+                  </label>
+                  {!noHfAccount && (
+                    <div className="mt-2">
+                      <label htmlFor="output-model-name" className="block text-xs font-bold text-slate-300 mb-1">Hugging Face repository</label>
+                      <input
+                        id="output-model-name"
+                        type="text"
+                        required
+                        value={hfRepoName}
+                        onChange={e => setHfRepoName(e.target.value.replace(/[?#\s]/g, "-"))}
+                        placeholder="username/repository-name"
+                        className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-200 outline-none font-mono focus:border-emerald-500/50"
+                      />
+                      <p className="mt-1 text-[11px] text-slate-400">Enter the full owner/repository name for your Hugging Face account.</p>
+                    </div>
+                  )}
+                  {noHfAccount && <p className="mt-2 text-[11px] text-slate-400">Training will finish without a Hugging Face export. You can retrieve the model weights here.</p>}
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Model Name Suffix</label>
@@ -579,7 +599,7 @@ export function RunTrainingModal({
                 <button
                   type="button"
                   onClick={runPreflight}
-                  disabled={busy || paidModel !== trainingModel || !trainingValid || !validationValid || !hfRepoName.trim()}
+                  disabled={busy || paidModel !== trainingModel || !trainingValid || !validationValid || (!noHfAccount && !hasValidHfRepo)}
                   className="w-full py-2.5 px-4 rounded-xl kk-primary text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                 >
                   {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
@@ -598,7 +618,7 @@ export function RunTrainingModal({
                   <span>Preflight passed: server credentials are configured.</span>
                 </div>
                 <div className="p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-400 space-y-1.5">
-                  <div className="flex justify-between"><span>Destination HF repo</span><span className="text-slate-200">RoseG/{hfRepoName || "(required)"}</span></div>
+                  <div className="flex justify-between"><span>Destination HF repo</span><span className="text-slate-200">{noHfAccount ? "Not requested" : hfRepoName || "(required)"}</span></div>
                   <div className="flex justify-between"><span>Suffix</span><span className="text-slate-200">{suffix}</span></div>
                   <div className="flex justify-between"><span>Training upload</span><span className="text-green-400">{splits.training.length} examples (JSONL)</span></div>
                   <div className="flex justify-between"><span>Validator upload</span><span className="text-yellow-400">{splits.validation.length} examples (JSONL)</span></div>
@@ -606,7 +626,7 @@ export function RunTrainingModal({
                 <button
                   type="button"
                   onClick={uploadDatasets}
-                  disabled={busy || !hfRepoName.trim()}
+                  disabled={busy}
                   className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500/20 to-green-600/20 hover:from-emerald-500/30 hover:to-green-600/30 border border-emerald-500/40 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                 >
                   {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 text-emerald-400" />}
@@ -629,7 +649,7 @@ export function RunTrainingModal({
                   <div className="flex justify-between"><span>Validation examples</span><span className="text-yellow-400 font-bold">{files?.validationCount}</span></div>
                   <div className="flex justify-between"><span>Model</span><span className="text-slate-200">{MODEL_DISPLAY}</span></div>
                   <div className="flex justify-between"><span>From HF base</span><span className="text-slate-200">{BASE_DISPLAY}</span></div>
-                  <div className="flex justify-between"><span>Output repo</span><span className="text-slate-200">RoseG/{hfRepoName}</span></div>
+                  <div className="flex justify-between"><span>Output repo</span><span className="text-slate-200">{noHfAccount ? "Not requested" : hfRepoName}</span></div>
                 </div>
                 <button
                   type="button"

@@ -95,6 +95,7 @@ const TERMINAL_JOB_STATUSES = new Set(["completed", "error", "user_error", "fail
 interface OwnerSession {
   preflightAt?: string;
   preflightModel?: string;
+  preflightExportToHuggingFace?: boolean;
   upload?: {
     trainingFileId: string;
     validationFileId: string;
@@ -297,26 +298,39 @@ router.post("/finetune/preflight", async (req: AuthRequest, res) => {
   if (!uid) return;
   const config = getTrainingConfig(req.body?.trainingModel);
   if (!config) return res.status(400).json({ success: false, error: "Unsupported training model." });
+  const exportToHuggingFace = req.body?.exportToHuggingFace !== false;
+  const hfRepoName = typeof req.body?.hfRepoName === "string" ? req.body.hfRepoName.trim() : "";
+  const validHfRepoName = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\/[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$/.test(hfRepoName);
+  if (exportToHuggingFace && !validHfRepoName) {
+    return res.status(400).json({ success: false, error: "Provide a valid Hugging Face repository in owner/repository format." });
+  }
   const togetherConfigured = Boolean(process.env.TOGETHER_API_KEY);
   const huggingFaceConfigured = Boolean(process.env.HF_TOKEN);
-  if (!togetherConfigured || !huggingFaceConfigured) {
+  const credentials = {
+    together: togetherConfigured,
+    ...(exportToHuggingFace ? { huggingFace: huggingFaceConfigured } : {}),
+  };
+  if (!togetherConfigured || (exportToHuggingFace && !huggingFaceConfigured)) {
     return res.json({
       success: true,
-      credentials: { together: togetherConfigured, huggingFace: huggingFaceConfigured },
+      credentials,
       model: config.model,
       fromHfModel: config.from_hf_model,
-      defaultHfRepoName: (process.env.HF_OUTPUT_REPO_NAME || "").replace(/^RoseG\//i, ""),
       error: "Server API credentials are not fully configured yet.",
     });
   }
-  store.sessions[uid] = { ...store.sessions[uid], preflightAt: new Date().toISOString(), preflightModel: config.model };
+  store.sessions[uid] = {
+    ...store.sessions[uid],
+    preflightAt: new Date().toISOString(),
+    preflightModel: config.model,
+    preflightExportToHuggingFace: exportToHuggingFace,
+  };
   await saveStore(store);
   return res.json({
     success: true,
-    credentials: { together: true, huggingFace: true },
+    credentials,
     model: config.model,
     fromHfModel: config.from_hf_model,
-    defaultHfRepoName: (process.env.HF_OUTPUT_REPO_NAME || "").replace(/^RoseG\//i, ""),
     settings: { trainingType: "Full (LoRA disabled)", epochs: N_EPOCHS, evaluations: config.n_evals },
   });
 });
@@ -432,6 +446,7 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
   const config = getTrainingConfig(req.body?.trainingModel);
   if (!config) return res.status(400).json({ success: false, error: "Unsupported training model." });
   const { trainingFileId, validationFileId, suffix, hfRepoName, confirmSubmit } = req.body || {};
+  const exportToHuggingFace = req.body?.exportToHuggingFace !== false;
   const fromCheckpoint = typeof req.body?.fromCheckpoint === "string" ? req.body.fromCheckpoint.trim() : "";
   const checkpointChoice = fromCheckpoint ? await findUserModelChoice(uid, fromCheckpoint).catch(() => null) : null;
   if (fromCheckpoint && (!checkpointChoice || checkpointChoice.baseTrainingModel !== req.body?.trainingModel)) {
@@ -439,6 +454,9 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
   }
   if (confirmSubmit !== true) {
     return res.status(400).json({ success: false, error: "Job submission requires explicit approval." });
+  }
+  if ((store.sessions[uid]?.preflightExportToHuggingFace ?? true) !== exportToHuggingFace) {
+    return res.status(409).json({ success: false, error: "The Hugging Face export choice changed after preflight. Run preflight again." });
   }
   const session = store.sessions[uid];
   if (!session?.upload || session.upload.trainingFileId !== trainingFileId || session.upload.validationFileId !== validationFileId) {
@@ -449,15 +467,15 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
     || (session.estimate.fromCheckpoint || "") !== fromCheckpoint) {
     return res.status(409).json({ success: false, error: "Review a cost estimate for these datasets before submitting the job." });
   }
-  const hfToken = process.env.HF_TOKEN;
-  if (!hfToken) {
+  const hfToken = exportToHuggingFace ? process.env.HF_TOKEN : undefined;
+  if (exportToHuggingFace && !hfToken) {
     return res.status(503).json({ success: false, error: "Hugging Face export is not configured on the server." });
   }
-  const repoSlug = typeof hfRepoName === "string" ? hfRepoName.trim().replace(/^RoseG\//i, "") : "";
-  if (!repoSlug || /[/?#\s]/.test(repoSlug)) {
-    return res.status(400).json({ success: false, error: "A Hugging Face output repository name is required." });
+  const repoName = typeof hfRepoName === "string" ? hfRepoName.trim() : "";
+  if (exportToHuggingFace
+    && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\/[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$/.test(repoName)) {
+    return res.status(400).json({ success: false, error: "Provide a valid Hugging Face repository in owner/repository format." });
   }
-  const repoName = `RoseG/${repoSlug}`;
   // Spending control: one active (non-terminal) job per account at a time.
   const ownedActive = Object.entries(store.jobOwners).filter(([, owner]) => owner === uid).map(([id]) => id);
   for (const jobId of ownedActive) {
@@ -493,14 +511,16 @@ router.post("/finetune/jobs", async (req: AuthRequest, res) => {
         n_evals: config.n_evals,
         ...(fromCheckpoint ? { from_checkpoint: fromCheckpoint } : {}),
         ...(typeof suffix === "string" && suffix.trim() ? { suffix: suffix.trim().slice(0, 64) } : {}),
-        hf_api_token: hfToken,
-        hf_output_repo_name: repoName,
+        ...(exportToHuggingFace ? { hf_api_token: hfToken, hf_output_repo_name: repoName } : {}),
       }),
     });
     if (!job?.id) throw new Error("Together AI did not return a job ID.");
     submitted = true;
     await createRecord("job", job.id, {
-      ownerId: uid, trainingModel: trainingSelection, hfRepoName: repoName,
+      ownerId: uid,
+      trainingModel: trainingSelection,
+      hfRepoName: exportToHuggingFace ? repoName : null,
+      exportToHuggingFace,
     });
     await rememberJobStatus(uid, job.id, job);
     return res.json({
@@ -644,12 +664,17 @@ router.get("/finetune/jobs/:id", async (req: AuthRequest, res) => {
   try {
     const job = await togetherRequest(`/fine-tunes/${encodeURIComponent(jobId)}`, { signal: AbortSignal.timeout(15000) });
     await rememberJobStatus(uid, jobId, job);
+    const savedJob = await getRecord("job", jobId);
     let modelReady = false;
     if (String(job?.status || "").trim().toLowerCase() === "completed") {
-      try {
-        modelReady = await rememberCompletedModel(uid, job, jobId);
-      } catch (error) {
-        logger.warn({ error: String(error), jobId }, "Completed model could not be saved to account");
+      if (savedJob?.exportToHuggingFace === false) {
+        modelReady = true;
+      } else {
+        try {
+          modelReady = await rememberCompletedModel(uid, job, jobId);
+        } catch (error) {
+          logger.warn({ error: String(error), jobId }, "Completed model could not be saved to account");
+        }
       }
     }
     let events: string[] = [];
@@ -666,7 +691,8 @@ router.get("/finetune/jobs/:id", async (req: AuthRequest, res) => {
         id: job.id,
         status: job.status,
         modelReady,
-        hfRepoName: job.hf_output_repo_name || (await getRecord("job", jobId))?.hfRepoName || null,
+        hfRepoName: job.hf_output_repo_name || savedJob?.hfRepoName || null,
+        exportToHuggingFace: savedJob?.exportToHuggingFace !== false,
         model: job.model,
         outputName: job.model_output_name || job.output_name || null,
         modelOutputPath: job.model_output_path || null,
