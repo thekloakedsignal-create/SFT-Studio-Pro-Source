@@ -1042,14 +1042,14 @@ async function callDigitalOceanAI(initialClientOrParams: any, maybeParams?: any)
 
 const DEFAULT_GENERATION_MODEL_GROUPS = [
   [
-    "deepseek-v4-pro",
+    "nemotron-3.5-super-vl",
     "nemotron-3-nano-omni",
-    "gemma-4-31B-it",
+    "minimax-m2.5",
     "deepseek-3.2",
     "minimax-m2.5",
   ],
   [
-    "llama-4-maverick",
+    "minimax-m3.1-flash",
     "qwen3.8-max",
     "glm-5.2",
     "mistral-3-14B",
@@ -1439,10 +1439,10 @@ ${JSON.stringify({ examples: [{ messages: [
       ? DEFAULT_GENERATION_MODEL_GROUPS.flat().map(model => model)
       : turnMode === "Single Turn"
         ? getGenerationModels().map(model =>
-            model.startsWith("qwen") ? "gemma-4-31B-it" : model)
+            model.startsWith("qwen") ? "minimax-m2.5" : model)
         : getGenerationModels().map(model =>
           turnMode === "Multi Turn" && model.startsWith("qwen")
-            ? "gemma-4-31B-it" : model);
+            ? "minimax-m2.5" : model);
     const modelAbortControllers = new Map(
       generationModels.map(model => [model, new AbortController()])
     );
@@ -1456,7 +1456,7 @@ ${JSON.stringify({ examples: [{ messages: [
       generationStacks,
       String(batchDescription || ""),
       async (prompt, attempt) => extractResponseText(await callDigitalOceanChatCompletions({
-        model: attempt === 0 ? "gemma-4-31B-it" : "qwen3.8-max",
+        model: attempt === 0 ? "minimax-m2.5" : "qwen3.8-max",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -3192,7 +3192,7 @@ app.post("/api/analyze-document", async (req, res) => {
     });
   }
 
-  const analysisModel = "gemma-4-31B-it";
+  const analysisModel = "minimax-m2.5";
   try {
   const analysisChunkSize = 40_000;
   const analysisChunks = Array.from(
@@ -3351,11 +3351,11 @@ Return only a valid JSON object:
 const DOCUMENT_CONVERTER_REQUEST_TIMEOUT_MS = 180_000;
 const LITERATURE_CONVERTER_BATCH_TIMEOUT_MS = 10 * 60 * 1000;
 const LITERATURE_CONVERTER_BACKUP_MODELS = [
-  "gemma-4-31B-it",
+  "minimax-m2.5",
   "qwen3.8-max",
   "mistral-3-14B",
   "deepseek-4-flash",
-  "llama-4-maverick",
+  "minimax-m3.1-flash",
 ];
 const documentConversionJobs = new Map<string, {
   owner: string; status: "running" | "complete" | "error";
@@ -4266,7 +4266,7 @@ app.post("/api/analyze-quality", async (req, res) => {
       }
 
       // Primary audit model plus backups, tried in order when one fails
-      const QA_AUDIT_MODELS = ["qwen3.8-max", "deepseek-3.2", "llama-4-maverick", "mistral-3-14B"];
+      const QA_AUDIT_MODELS = ["qwen3.8-max", "deepseek-3.2", "minimax-m3.1-flash", "mistral-3-14B"];
       const modelStartIndex = (chunkIndex: number) =>
         Math.floor(chunkIndex / CHUNK_SIZE) % QA_AUDIT_MODELS.length;
 
@@ -5138,7 +5138,7 @@ GUIDELINES:
       response = await callDigitalOceanAI(client, requestParams);
     } catch (error) {
       if (appContext?.mode !== "project-onboarding") throw error;
-      const fallbackModels = ["qwen3.8-max", "deepseek-3.2", "llama-4-maverick", "mistral-3-14B"];
+      const fallbackModels = ["qwen3.8-max", "deepseek-3.2", "minimax-m3.1-flash", "mistral-3-14B"];
       let lastError: any = error;
       for (const fallbackModel of fallbackModels) {
         if (requestParams.model.toLowerCase() === fallbackModel.toLowerCase()) continue;
@@ -5470,7 +5470,7 @@ async function runAutomationPipeline(job: any) {
         instructTemplate: config.isInstruction ? (config.instructTemplate || "ChatML") : undefined,
         isInstruction: Boolean(config.isInstruction),
         ...(Number.isFinite(estimatedCount) ? { count: estimatedCount } : {}),
-        extractionModel: "gemma-4-31B-it",
+        extractionModel: "minimax-m2.5",
         projectName: config.projectName,
         systemPrompt: config.systemPrompt,
         targetTask: config.targetTask,
