@@ -3979,10 +3979,6 @@ export default function App() {
               Full HTML Manual
             </a>
             <span className="text-slate-700">•</span>
-            <a href="https://sft-studio-pro-2.whop.site/" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 transition">
-              Visit the shop
-            </a>
-            <span className="text-slate-700">•</span>
             <button onClick={() => setShowCustomPackageModal(true)} className="hover:text-emerald-400 transition cursor-pointer flex items-center gap-1">
               <HelpCircle className="h-3 w-3 text-emerald-400" />
               Support

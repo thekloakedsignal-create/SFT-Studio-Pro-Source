@@ -14,6 +14,7 @@ const clerkPubKey = publishableKeyFromHost(
 );
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+const appPath = `${basePath}/app`;
 const queryClient = new QueryClient();
 
 function stripBase(path: string): string {
@@ -129,7 +130,7 @@ function AccountBridge({ children }: { children: ReactNode }) {
 function SignInPage() {
   return <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 px-4">
     <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}
-      forceRedirectUrl={basePath || "/"} />
+      forceRedirectUrl={appPath} />
     <a href={`${basePath}/manual.html`} className="text-sm text-emerald-400 underline underline-offset-4">
       Read the SFT Studio Pro manual
     </a>
@@ -138,7 +139,7 @@ function SignInPage() {
 function SignUpPage() {
   return <div className="flex min-h-[100dvh] items-center justify-center px-4">
     <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`}
-      forceRedirectUrl={basePath || "/"} />
+      forceRedirectUrl={appPath} />
   </div>;
 }
 function ClerkProviderWithRoutes() {
