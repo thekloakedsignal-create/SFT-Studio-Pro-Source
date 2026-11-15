@@ -381,7 +381,7 @@ app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest,
       return res.json({ success: true, batchId: batch.id, storage: "local" });
     }
     const saved = await db.transaction(async (tx: any) => {
-      let [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("update");
+      let [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("key share");
       if (!project) {
         // An explicit save transfers an existing file-backed project into SQL.
         // Keep the project and its batch write in the same database transaction.
@@ -395,7 +395,7 @@ app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest,
           batches: legacyProject.batches || [],
           updatedAt: new Date()
         }).onConflictDoNothing({ target: projects.id });
-        [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("update");
+        [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("key share");
       }
       if (!projectBelongsTo(project, ownerId)) return null;
       const [existingBatch] = await tx.select().from(batches).where(eq(batches.id, batch.id));
@@ -416,18 +416,9 @@ app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest,
           templateType: record.templateType, data: savedBatch, updatedAt: record.updatedAt
         }
       });
-      const updatedProject = {
-        ...project,
-        batches: mergeBatchRecords(project.batches, [savedBatch]),
-        updatedAt: record.updatedAt
-      };
-      await tx.update(projects).set({
-        updatedAt: updatedProject.updatedAt
-      }).where(eq(projects.id, projectId));
-      return updatedProject;
+      return true;
     });
     if (!saved) return res.status(404).json({ success: false, error: "Project not found." });
-    cacheSQLProject(saved);
     return res.json({ success: true, batchId: batch.id, storage: "sql" });
   } catch (error: any) {
     logger.error({ error: error?.message }, "Batch save failed");

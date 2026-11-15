@@ -1423,15 +1423,19 @@ export default function App() {
     // 1. Fetch fresh copy from Postgres SQL endpoint
     try {
       const sqlRes = await projectApiFetch(`/api/sql/projects/${encodeURIComponent(selectedId)}`);
-      if (sqlRes.ok) {
-        const sqlData = await sqlRes.json();
-        if (sqlData.success && sqlData.project) {
-          sqlLoadedProject = sqlData.project;
-          selected = { ...(selected || {}), ...sqlLoadedProject };
-        }
+      const sqlData = await sqlRes.json();
+      if (!sqlRes.ok || !sqlData.success || !sqlData.project) {
+        throw new Error(sqlData.error || `Project could not be loaded (${sqlRes.status}).`);
       }
+      sqlLoadedProject = sqlData.project;
+      selected = { ...(selected || {}), ...sqlLoadedProject };
     } catch (sqlErr) {
       console.warn("Postgres project fetch notice:", sqlErr);
+      setNotification({
+        text: sqlErr instanceof Error ? sqlErr.message : "Project could not be loaded. Please try again.",
+        type: "error"
+      });
+      return;
     }
     if (loadVersion !== projectLoadVersion.current) return;
 
