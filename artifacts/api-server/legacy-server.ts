@@ -416,14 +416,13 @@ app.post("/api/sql/projects/:id/batches", optionalAuth, async (req: AuthRequest,
           templateType: record.templateType, data: savedBatch, updatedAt: record.updatedAt
         }
       });
-      const batchRows = await tx.select().from(batches).where(eq(batches.projectId, projectId));
       const updatedProject = {
         ...project,
-        batches: mergeBatchRecords(project.batches, sqlBatchData(batchRows, projectId)),
+        batches: mergeBatchRecords(project.batches, [savedBatch]),
         updatedAt: record.updatedAt
       };
       await tx.update(projects).set({
-        batches: updatedProject.batches, updatedAt: updatedProject.updatedAt
+        updatedAt: updatedProject.updatedAt
       }).where(eq(projects.id, projectId));
       return updatedProject;
     });
@@ -482,8 +481,10 @@ app.get("/api/sql/projects/:id", optionalAuth, async (req: AuthRequest, res) => 
   if (!ownerId) return res.status(401).json({ success: false, error: "Project access requires a signed-in account or guest device identity." });
   const foundLocal = getLocalProjects().find(p => p.id === projId && projectBelongsTo(p, ownerId));
   try {
-    const projRows = await db.select().from(projects).where(eq(projects.id, projId));
-    const batchRows = await db.select().from(batches).where(eq(batches.projectId, projId));
+    const [projRows, batchRows] = await Promise.all([
+      db.select().from(projects).where(eq(projects.id, projId)),
+      db.select().from(batches).where(eq(batches.projectId, projId))
+    ]);
     const sqlProj = projRows[0];
     if (sqlProj && !projectBelongsTo(sqlProj, ownerId)) {
       return res.status(404).json({ success: false, error: "Project not found." });
