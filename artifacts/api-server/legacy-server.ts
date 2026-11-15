@@ -4483,10 +4483,7 @@ app.get("/api/regenerate-flagged/jobs/:jobId", optionalAuth, (req: AuthRequest, 
   if (!job || job.owner !== projectOwnerId(req)) {
     return res.status(404).json({ success: false, error: "QA repair job not found or expired." });
   }
-  return res.json({
-    success: true, status: job.status, completed: job.completed, failed: job.failed || 0,
-    total: job.total, result: job.result
-  });
+  return res.json({ success: true, status: job.status, completed: job.completed, total: job.total, result: job.result });
 });
 
 app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) => {
@@ -4524,7 +4521,7 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
       if (old.status !== "running" && Date.now() - old.updatedAt > 3600000) qaRepairJobs.delete(id);
     }
     const jobId = randomUUID();
-    job = { owner, status: "running", completed: 0, failed: 0, total: flaggedItems.length, updatedAt: Date.now() };
+    job = { owner, status: "running", completed: 0, total: flaggedItems.length, updatedAt: Date.now() };
     qaRepairJobs.set(jobId, job);
     res.status(202).json({ success: true, jobId });
   }
@@ -4632,12 +4629,10 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
       throw new Error("Repaired example still has template/format defects.");
     }
     regeneratedExamples.push({ exampleIndex: item.exampleIndex, messages });
-    if (job) job.completed++;
         } catch (error: any) {
           failures.push({ exampleIndex: item.exampleIndex, error: formatAIErrorMessage(error) });
-          if (job) job.failed++;
         } finally {
-          if (job) job.updatedAt = Date.now();
+          if (job) { job.completed++; job.updatedAt = Date.now(); }
         }
       }
     }));

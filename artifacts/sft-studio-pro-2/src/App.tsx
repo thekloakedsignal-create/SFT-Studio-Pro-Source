@@ -710,7 +710,7 @@ export default function App() {
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
   const [isAssessing, setIsAssessing] = useState(false);
   const [isRegeneratingFlagged, setIsRegeneratingFlagged] = useState(false);
-  const [qaRepairProgress, setQaRepairProgress] = useState<{ completed: number; failed: number; total: number; saving: boolean } | null>(null);
+  const [qaRepairProgress, setQaRepairProgress] = useState<{ completed: number; total: number; saving: boolean } | null>(null);
   const [reports, setReports] = useState<Record<string, QualityReport>>({});
   const [inspectorFilter, setInspectorFilter] = useState<"flagged" | "all">("flagged");
   const [inspectorPage, setInspectorPage] = useState<number>(1);
@@ -2867,7 +2867,7 @@ export default function App() {
     }));
 
     setIsRegeneratingFlagged(true);
-    setQaRepairProgress({ completed: 0, failed: 0, total: flaggedItems.length, saving: false });
+    setQaRepairProgress({ completed: 0, total: flaggedItems.length, saving: false });
     setNotification({
       text: `Regenerating ${flaggedItems.length} flagged example(s) with AI using QA feedback...`,
       type: "info"
@@ -2908,24 +2908,13 @@ export default function App() {
           const statusRes = await projectApiFetch(`/api/regenerate-flagged/jobs/${encodeURIComponent(jobId)}`);
           const status = await statusRes.json();
           if (!statusRes.ok) throw new Error(status.error || "Unable to retrieve QA repairs.");
-          setQaRepairProgress({
-            completed: status.completed || 0,
-            failed: status.failed || 0,
-            total: status.total,
-            saving: false
-          });
+          setQaRepairProgress({ completed: status.completed, total: status.total, saving: false });
           if (status.status === "running") {
-            setNotification({
-              text: `Repaired ${status.completed || 0}/${status.total} flagged examples; ${status.failed || 0} failed.`,
-              type: "info"
-            });
+            setNotification({ text: `Repairing flagged responses: ${status.completed}/${status.total} processed...`, type: "info" });
             continue;
           }
           data = status.result;
-          if (!data?.success) {
-            const firstFailure = data?.failures?.[0]?.error;
-            throw new Error(firstFailure || data?.error || "QA repair failed.");
-          }
+          if (!data?.success) throw new Error(data?.error || "QA repair failed.");
           break;
         }
       }
@@ -2940,15 +2929,7 @@ export default function App() {
       }
 
       // Map new examples into the batch
-      const failedCount = Array.isArray(data.failures) ? data.failures.length : flaggedItems.length - regeneratedList.length;
-      const firstFailure = data.failures?.find((failure: any) => typeof failure.error === "string")?.error;
-      const failureDetail = firstFailure ? ` First failure: ${firstFailure.slice(0, 180)}` : "";
-      setQaRepairProgress({
-        completed: regeneratedList.length,
-        failed: failedCount,
-        total: flaggedItems.length,
-        saving: true
-      });
+      setQaRepairProgress({ completed: flaggedItems.length, total: flaggedItems.length, saving: true });
       const newExamples = [...targetBatch.examples];
       regeneratedList.forEach(item => {
         if (item.exampleIndex >= 0 && item.exampleIndex < newExamples.length) {
@@ -2999,7 +2980,7 @@ export default function App() {
         setBatches(prev => prev.map(b => (b.id === batchId ? updatedBatch : b)));
         setReports(prev => ({ ...prev, [batchId]: updatedReport }));
         setNotification({
-          text: `Updated ${regeneratedList.length} regenerated examples. ${failedCount} failed to regenerate; ${updatedReport.stats.flaggedCount} remain flagged. Quality score: ${updatedReport.overallScore}/100.${failureDetail}`,
+          text: `Updated ${regeneratedList.length} regenerated examples. ${updatedReport.stats.flaggedCount} remain flagged. Quality score: ${updatedReport.overallScore}/100.`,
           type: updatedReport.stats.flaggedCount ? "info" : "success",
         });
       }
@@ -6954,8 +6935,7 @@ export default function App() {
                             <div className="flex items-center justify-between gap-2 text-[11px] text-slate-300">
                               <span>{qaRepairProgress.saving ? "Saving repaired examples..." : "Processing flagged examples..."}</span>
                               <span className="font-mono text-green-300">
-                                {qaRepairProgress.completed} repaired / {qaRepairProgress.total}
-                                {qaRepairProgress.failed > 0 && ` · ${qaRepairProgress.failed} failed`}
+                                {qaRepairProgress.completed} / {qaRepairProgress.total}
                               </span>
                             </div>
                             <div
