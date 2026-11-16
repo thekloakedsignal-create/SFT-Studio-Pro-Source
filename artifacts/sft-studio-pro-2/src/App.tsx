@@ -3800,7 +3800,15 @@ export default function App() {
 
   // Handle active batch selection & memoized inspector pagination
   const currentBatch = batches.find(b => b.id === selectedBatchId) || batches[0];
-  const activeReport = currentBatch ? reports[currentBatch.id] || currentBatch.qualityReport : null;
+  const currentBatchExamples = Array.isArray(currentBatch?.examples) ? currentBatch.examples : [];
+  const reportCandidate = currentBatch ? reports[currentBatch.id] || currentBatch.qualityReport : null;
+  const activeReport = reportCandidate
+    && typeof reportCandidate.overallScore === "number"
+    && reportCandidate.stats
+    && reportCandidate.duplicateCheck
+    && Array.isArray(reportCandidate.issues)
+    ? reportCandidate
+    : null;
 
   const displayedInspectorItems = useMemo<{
     example: SFTExample;
@@ -3808,8 +3816,8 @@ export default function App() {
     issues: QualityIssue[];
     isFlagged: boolean;
   }[]>(() => {
-    if (!currentBatch || !currentBatch.examples) return [];
-    const all = currentBatch.examples.map((ex, originalIndex) => {
+    if (!currentBatch) return [];
+    const all = currentBatchExamples.map((ex, originalIndex) => {
       const issues = activeReport
         ? (activeReport.issues || []).filter(iss => iss.exampleIndex === originalIndex)
         : [];
@@ -3825,21 +3833,21 @@ export default function App() {
       return all.filter(item => item.isFlagged);
     }
     return all;
-  }, [currentBatch, activeReport, inspectorFilter]);
+  }, [currentBatch, currentBatchExamples, activeReport, inspectorFilter]);
 
   const totalInspectorPages = useMemo(() => {
-    if (!currentBatch || !currentBatch.examples) return 1;
-    return Math.max(1, Math.ceil(currentBatch.examples.length / inspectorPageSize));
-  }, [currentBatch, inspectorPageSize]);
+    if (!currentBatch) return 1;
+    return Math.max(1, Math.ceil(currentBatchExamples.length / inspectorPageSize));
+  }, [currentBatch, currentBatchExamples, inspectorPageSize]);
 
   const paginatedInspectorExamples = useMemo(() => {
-    if (!currentBatch || !currentBatch.examples) return [];
+    if (!currentBatch) return [];
     const startIndex = (inspectorPage - 1) * inspectorPageSize;
-    return currentBatch.examples.slice(startIndex, startIndex + inspectorPageSize).map((ex, relativeIdx) => ({
+    return currentBatchExamples.slice(startIndex, startIndex + inspectorPageSize).map((ex, relativeIdx) => ({
       ex,
       exIdx: startIndex + relativeIdx
     }));
-  }, [currentBatch, inspectorPage, inspectorPageSize]);
+  }, [currentBatch, currentBatchExamples, inspectorPage, inspectorPageSize]);
 
   const totalGeneratorPages = useMemo(() => {
     if (!latestGeneratorBatch || !latestGeneratorBatch.examples) return 1;
@@ -7001,7 +7009,7 @@ export default function App() {
                     <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-2xl mb-6">
                        <h2 className="text-lg font-bold text-white mb-2">Batch Assessment Summary</h2>
                        <p className="text-sm text-slate-400">
-                         Assessed <span className="text-white font-semibold">{currentBatch.examples.length}</span> examples. 
+                         Assessed <span className="text-white font-semibold">{currentBatchExamples.length}</span> examples.
                          Found <span className="text-amber-400 font-semibold">{activeReport.issues.length}</span> issues requiring review.
                        </p>
                     </div>
@@ -7049,7 +7057,7 @@ export default function App() {
                           SFT Dataset Inspect & Inline Editor
                         </h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          Viewing {displayedInspectorItems.length} of {currentBatch.examples.length} total items
+                          Viewing {displayedInspectorItems.length} of {currentBatchExamples.length} total items
                         </p>
                       </div>
 
@@ -7074,7 +7082,7 @@ export default function App() {
                               : "text-slate-400 hover:text-slate-200"
                           }`}
                         >
-                          <span>All Examples ({currentBatch.examples.length})</span>
+                          <span>All Examples ({currentBatchExamples.length})</span>
                         </button>
                       </div>
                     </div>
@@ -7094,7 +7102,7 @@ export default function App() {
                                 : "Click 'Run AI Quality Audit' above to evaluate this batch, or switch to 'All Examples' to inspect items.")
                             : "Generate or import examples into this batch to inspect them."}
                         </p>
-                        {currentBatch.examples.length > 0 && (
+                        {currentBatchExamples.length > 0 && (
                           <div className="flex items-center justify-center gap-2 mt-3">
                             {!activeReport && (
                               <button
@@ -7110,7 +7118,7 @@ export default function App() {
                                 onClick={() => setInspectorFilter("all")}
                                 className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition cursor-pointer"
                               >
-                                View All {currentBatch.examples.length} Examples
+                                View All {currentBatchExamples.length} Examples
                               </button>
                             )}
                           </div>
