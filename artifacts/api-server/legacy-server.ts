@@ -3476,7 +3476,9 @@ app.post("/api/convert-document", optionalAuth, async (req: AuthRequest, res) =>
     ? Date.now() + LITERATURE_CONVERTER_BATCH_TIMEOUT_MS
     : null;
   // Same model lineup as regular batch generation.
-  const documentGenerationModels = getGenerationModels();
+  const documentGenerationModels = getGenerationModels().map(model =>
+    model === "deepseek-4-flash" ? "nemotron-3.5-super-vl" : model
+  );
   const conversionStartedAt = Date.now();
   logger.info({
     docType: actualDocType,

@@ -679,7 +679,7 @@ export default function App() {
   const [docTemplate, setDocTemplate] = useState<TemplateType>(TemplateType.SINGLE_TURN);
   const [docCount, setDocCount] = useState<number>(8); // AI estimated example count
   const [literatureTheme, setLiteratureTheme] = useState<string>("");
-  const [extractionModel, setExtractionModel] = useState("gemma-4-31B-it");
+  const [extractionModel, setExtractionModel] = useState("minimax-m2.5");
   const [isConverting, setIsConverting] = useState(false);
   const [docConversionProgress, setDocConversionProgress] = useState<{ completed: number; total: number } | null>(null);
   const [isAnalyzingDoc, setIsAnalyzingDoc] = useState(false);
