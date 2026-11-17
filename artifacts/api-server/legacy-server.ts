@@ -4624,9 +4624,21 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
         || typeof message.content !== "string" || !message.content.trim())) {
       throw new Error("Repair returned an incomplete example or changed its index/roles.");
     }
-    const messages = candidate.messages.map((message: any, index: number) =>
+    let messages = candidate.messages.map((message: any, index: number) =>
       message.role === "assistant" ? sanitizeMessage(message, itemTemplate)
         : allowFormatRepair ? { role: message.role, content: message.content } : original[index]);
+    if (itemTemplate !== "Reasoning") {
+      const projectSystemPrompt = typeof systemPrompt === "string" && systemPrompt.trim()
+        ? systemPrompt
+        : original.find((message: any) => message?.role === "system")?.content;
+      if (typeof projectSystemPrompt !== "string" || !projectSystemPrompt.trim()) {
+        throw new Error("The locked project system prompt is unavailable; this repair was not applied.");
+      }
+      messages = [
+        { role: "system", content: projectSystemPrompt },
+        ...messages.filter((message: any) => message.role !== "system")
+      ];
+    }
     if (auditTemplateFormat([{ messages }], { templateType: itemTemplate, instructTemplate: req.body.instructTemplate }).length) {
       throw new Error("Repaired example still has template/format defects.");
     }
