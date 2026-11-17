@@ -5391,8 +5391,9 @@ async function runPipelineQaChain(job: any, batchId: string) {
 
 async function runAutomationPipeline(job: any) {
   const { userId, config } = job;
-  const noReasoningModel = ["Llama 3.1 70B", "Qwen/Qwen2.5-72B"].includes(config.onboardingModel);
-  const roundRobin = noReasoningModel ? ["Single Turn", "Multi Turn"] : ["Single Turn", "Multi Turn", "Reasoning"];
+  const roundRobin = config.onboardingModel === "Llama 3.1 70B"
+    ? ["Single Turn", "Mixed"]
+    : ["Single Turn", "Multi Turn", "Reasoning"];
   job.producedBatches ??= [];
 
   if (config.autoGenerate) {
@@ -5438,7 +5439,7 @@ async function runAutomationPipeline(job: any) {
         }, {
           name: rec.topic,
           description: rec.topic,
-          templateType: roundRobin.length > 1 ? "Mixed" : roundRobin[0],
+          templateType: roundRobin.includes("Reasoning") ? "Reasoning" : "Mixed",
           count: total,
           specialInstructions: rec.specialInstructions,
           temporaryConstraints: rec.temporaryConstraints
