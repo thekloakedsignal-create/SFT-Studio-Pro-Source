@@ -4643,10 +4643,11 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
       throw new Error("Repaired example still has template/format defects.");
     }
     regeneratedExamples.push({ exampleIndex: item.exampleIndex, messages });
+    if (job) job.completed++;
         } catch (error: any) {
           failures.push({ exampleIndex: item.exampleIndex, error: formatAIErrorMessage(error) });
         } finally {
-          if (job) { job.completed++; job.updatedAt = Date.now(); }
+          if (job) job.updatedAt = Date.now();
         }
       }
     }));
