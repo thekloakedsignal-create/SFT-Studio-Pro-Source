@@ -6,6 +6,10 @@ import { createServer as createViteServer } from "vite";
 const app = express();
 const port = Number(process.env.PORT || 3000);
 
+app.get("/", (_req, res) => {
+  res.redirect(302, "/app");
+});
+
 async function startServer() {
   if (process.env.NODE_ENV === "production") {
     const distPathCandidates = [
