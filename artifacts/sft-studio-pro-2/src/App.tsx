@@ -2910,7 +2910,7 @@ export default function App() {
           if (!statusRes.ok) throw new Error(status.error || "Unable to retrieve QA repairs.");
           setQaRepairProgress({ completed: status.completed, total: status.total, saving: false });
           if (status.status === "running") {
-            setNotification({ text: `Repairing flagged responses: ${status.completed}/${status.total} repaired...`, type: "info" });
+            setNotification({ text: `Repairing flagged responses: ${status.completed}/${status.total} processed...`, type: "info" });
             continue;
           }
           data = status.result;

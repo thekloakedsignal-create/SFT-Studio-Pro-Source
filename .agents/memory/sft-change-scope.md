@@ -9,6 +9,12 @@ For this app, follow the user's instructions directly and literally. Ask before 
 
 **How to apply:** If the requested page, exclusion, or behavior is unclear, ask before changing code.
 
+Obtain the user's approval for every code change before editing any code.
+
+**Why:** The user explicitly required approval before every code change.
+
+**How to apply:** Ask and wait for approval before each code edit, including edits made while diagnosing or fixing a previously discussed issue.
+
 Keep work in Project Onboarding. The only permitted main-app changes are its existing project-definition/recommendation handoff and save paths. The actual batch generator, its UI, backend, APIs, and Model Trainer are strictly off-limits. Do not change lock behavior.
 
 **Why:** The user clarified that the requested work is the batch recommender, not the actual batch generator, and that project model persistence should use the existing definition and save procedures.
