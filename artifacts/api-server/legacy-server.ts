@@ -4511,7 +4511,7 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
   let job: (typeof qaRepairJobs extends Map<string, infer T> ? T : never) | undefined;
   const finish = (code: number, result: any) => {
     if (job) {
-      job.status = result.success ? (result.partial ? "partial" : "complete") : "error";
+      job.status = result.success ? "complete" : "error";
       job.updatedAt = Date.now();
       job.result = result;
     } else res.status(code).json(result);
