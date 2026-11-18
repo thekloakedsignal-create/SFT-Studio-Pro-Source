@@ -4542,13 +4542,19 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
         const itemIndex = nextItem++;
         const { model } = repairTasks[itemIndex];
         const item = flaggedItems[itemIndex];
-        const originalTemplate = item.example.templateType || templateType;
+        const originalTemplate = templateType;
         const itemTemplate = /mixed/i.test(originalTemplate || "")
           ? (item.example.messages.filter((message: any) => message?.role === "user").length > 1 ? "Multi Turn" : "Single Turn")
           : originalTemplate;
         try {
     const allowFormatRepair = item.example.messages.length === 0
       || auditTemplateFormat([item.example], { templateType: itemTemplate, instructTemplate: req.body.instructTemplate }).length > 0;
+    const reasoningFormatRule = itemTemplate === "Reasoning"
+      ? ' For Reasoning, each assistant message must include a non-empty "reasoning" string and a separate non-empty "content" final answer.'
+      : "";
+    const outputSchemaExample = itemTemplate === "Reasoning"
+      ? `{"regeneratedExamples":[{"exampleIndex":${item.exampleIndex},"messages":[{"role":"user","content":"user prompt"},{"role":"assistant","content":"final answer","reasoning":"complete reasoning"}]}]}`
+      : `{"regeneratedExamples":[{"exampleIndex":${item.exampleIndex},"messages":[{"role":"user","content":"user prompt"},{"role":"assistant","content":"corrected response"}]}]}`;
     const fullPrompt = `
       You are an expert Supervised Fine-Tuning (SFT) Dataset Engineer and Quality Improvement Specialist.
       Your task is to regenerate exactly one original flagged SFT training example, correcting only the QA reasons and recommended fixes supplied for that example.
@@ -4589,12 +4595,12 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
         ? "Repair the invalid message structure and formatting to match the dataset template. You may add missing turns, merge duplicate consecutive assistant responses, remove redundant turns, and correct roles or ordering as needed. For a missing user prompt, reconstruct an appropriate prompt from the original response and supplied task; do not invent an unrelated topic."
         : "Retain the exact message structure and roles already set in the example."}
       3. Regenerate the content to fix the specific flagged audit issues without altering the established template or conversation format.
-      4. Ensure the regenerated response completely resolves all formatting anomalies (properly close all markdown code fences and reasoning tags like <think>, finish any truncated thoughts, remove unpopulated placeholder tokens, and ensure coherent turn ordering) and satisfies all system prompt guidelines and negative constraints.
+      4. Ensure the regenerated response completely resolves all formatting anomalies (properly close all markdown code fences and reasoning tags like <think>, finish any truncated thoughts, remove unpopulated placeholder tokens, and ensure coherent turn ordering).${reasoningFormatRule} Satisfy all system prompt guidelines and negative constraints.
       5. Return ONLY valid JSON matching the requested schema.
       6. ${allowFormatRepair
         ? "Preserve the intent and all unaffected content of existing user/system messages. Correct their formatting or placement only as needed. Single Turn requires one user/assistant pair; Multi Turn requires at least two alternating pairs. Reasoning requires one user/assistant pair without a system message. End with an assistant response; never leave consecutive assistant turns or a missing user prompt."
         : "Preserve user, system, and other non-assistant messages exactly. Change only assistant responses."}
-      7. Return exactly {"regeneratedExamples":[{"exampleIndex":${item.exampleIndex},"messages":[{"role":"user","content":"user prompt"},{"role":"assistant","content":"corrected response"}]}]} with the complete corrected conversation. The illustrated two-message array is only an example, not a turn-count limit.
+      7. Return exactly ${outputSchemaExample} with the complete corrected conversation. The illustrated two-message array is only an example, not a turn-count limit.
       8. Resolve the specific issue messages and recommended fixes above. Keep the full JSON response within 4096 output tokens.
     `;
 

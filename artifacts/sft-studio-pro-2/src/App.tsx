@@ -2886,7 +2886,7 @@ export default function App() {
           systemPrompt: originalSettings.systemPrompt,
           targetTask: originalSettings.targetTask,
           constraints: originalSettings.constraints,
-          templateType: targetBatch.templateType,
+          templateType: project.templateType,
           batchDescription: targetBatch.description,
           specialInstructions: targetBatch.specialInstructions,
           temporaryConstraints: targetBatch.temporaryConstraints,
@@ -2946,7 +2946,7 @@ export default function App() {
       // templates are re-flagged, and the passed numbers update immediately.
       const structuralIssues: QualityIssue[] = [];
       repairedIndices.forEach((originalIndex, localIndex) => {
-        findStructuralRepairIssues(newExamples[originalIndex], targetBatch.templateType).forEach(problem => {
+        findStructuralRepairIssues(newExamples[originalIndex], project.templateType).forEach(problem => {
           structuralIssues.push({ exampleIndex: localIndex, severity: "High", type: problem.type, message: problem.message });
         });
       });
