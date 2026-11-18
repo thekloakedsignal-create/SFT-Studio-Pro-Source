@@ -4511,7 +4511,7 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
   let job: (typeof qaRepairJobs extends Map<string, infer T> ? T : never) | undefined;
   const finish = (code: number, result: any) => {
     if (job) {
-      job.status = result.success ? "complete" : "error";
+      job.status = result.success ? (result.partial ? "partial" : "complete") : "error";
       job.updatedAt = Date.now();
       job.result = result;
     } else res.status(code).json(result);
@@ -4643,10 +4643,10 @@ app.post("/api/regenerate-flagged", optionalAuth, async (req: AuthRequest, res) 
       throw new Error("Repaired example still has template/format defects.");
     }
     regeneratedExamples.push({ exampleIndex: item.exampleIndex, messages });
+    if (job) { job.completed++; job.updatedAt = Date.now(); }
         } catch (error: any) {
           failures.push({ exampleIndex: item.exampleIndex, error: formatAIErrorMessage(error) });
-        } finally {
-          if (job) { job.completed++; job.updatedAt = Date.now(); }
+          if (job) job.updatedAt = Date.now();
         }
       }
     }));
